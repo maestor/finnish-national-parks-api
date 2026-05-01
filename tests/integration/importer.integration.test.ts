@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { createVisit, getParkBySlug, getPersonalParkBySlug, listParks, putParkNote } from '../../src/db/repositories.js';
 import { importParks } from '../../src/importer/import-parks.js';
-import { createLipasPark } from '../fixtures/lipas.js';
+import { createLipasPark, parkTypeFixtures } from '../fixtures/lipas.js';
 import { createTestDatabase } from '../helpers/test-db.js';
 
 describe('importParks', () => {
@@ -78,7 +78,12 @@ describe('importParks', () => {
     expect(park).toMatchObject({
       name: 'Äkäsmännyn kansallispuisto uudistettu',
       areaKm2: 13.75,
-      catalogStatus: 'active'
+      catalogStatus: 'active',
+      type: {
+        code: parkTypeFixtures.nationalPark.typeCode,
+        name: parkTypeFixtures.nationalPark.name,
+        slug: parkTypeFixtures.nationalPark.slug
+      }
     });
     expect(personalPark).toMatchObject({
       note: {
@@ -130,6 +135,68 @@ describe('importParks', () => {
     const originalPark = await getParkBySlug(testDatabase.database, 'akasmannyn-kansallispuisto');
     expect(originalPark?.catalogStatus).toBe('inactive');
     await expect(listParks(testDatabase.database)).resolves.toEqual([]);
+  });
+
+  it('imports supported protected-area types and persists normalized type metadata', async () => {
+    await importParks({
+      database: testDatabase.database,
+      expectedActiveCount: 3,
+      now: () => '2026-05-01T08:00:00.000Z',
+      sourceUrl: 'https://example.test/lipas',
+      fetchSource: async () => ({
+        items: [
+          createLipasPark(),
+          createLipasPark({
+            'lipas-id': 21001,
+            name: 'Evon retkeilyalue',
+            type: {
+              'type-code': parkTypeFixtures.stateHikingArea.typeCode
+            },
+            www: 'https://www.luontoon.fi/evo'
+          }),
+          createLipasPark({
+            'lipas-id': 21002,
+            name: 'Koljatti',
+            type: {
+              'type-code': parkTypeFixtures.otherNatureReserve.typeCode
+            },
+            www: 'https://www.luontoon.fi/koljatti'
+          })
+        ]
+      })
+    });
+
+    const parks = await listParks(testDatabase.database);
+
+    expect(parks).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        name: 'Äkäsmännyn kansallispuisto',
+        type: {
+          code: parkTypeFixtures.nationalPark.typeCode,
+          id: parkTypeFixtures.nationalPark.typeCode,
+          name: parkTypeFixtures.nationalPark.name,
+          slug: parkTypeFixtures.nationalPark.slug
+        }
+      }),
+      expect.objectContaining({
+        name: 'Evon retkeilyalue',
+        type: {
+          code: parkTypeFixtures.stateHikingArea.typeCode,
+          id: parkTypeFixtures.stateHikingArea.typeCode,
+          name: parkTypeFixtures.stateHikingArea.name,
+          slug: parkTypeFixtures.stateHikingArea.slug
+        }
+      }),
+      expect.objectContaining({
+        name: 'Koljatti',
+        type: {
+          code: parkTypeFixtures.otherNatureReserve.typeCode,
+          id: parkTypeFixtures.otherNatureReserve.typeCode,
+          name: parkTypeFixtures.otherNatureReserve.name,
+          slug: parkTypeFixtures.otherNatureReserve.slug
+        }
+      })
+    ]));
   });
 
   it('uses the default fetcher and surfaces upstream failures', async () => {

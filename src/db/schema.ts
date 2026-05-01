@@ -8,11 +8,28 @@ export const importRuns = sqliteTable('import_runs', {
   responseShapeVersion: text('response_shape_version').notNull()
 });
 
+export const parkTypes = sqliteTable(
+  'park_types',
+  {
+    id: integer('id').primaryKey(),
+    code: integer('code').notNull(),
+    name: text('name').notNull(),
+    slug: text('slug').notNull()
+  },
+  (table) => ({
+    codeIndex: uniqueIndex('park_types_code_idx').on(table.code),
+    slugIndex: uniqueIndex('park_types_slug_idx').on(table.slug)
+  })
+);
+
 export const parks = sqliteTable(
   'parks',
   {
     id: integer('id').primaryKey({ autoIncrement: true }),
     lipasId: integer('lipas_id').notNull(),
+    typeId: integer('type_id')
+      .notNull()
+      .references(() => parkTypes.id),
     slug: text('slug').notNull(),
     name: text('name').notNull(),
     areaKm2: real('area_km2'),
@@ -39,6 +56,7 @@ export const parks = sqliteTable(
   (table) => ({
     lipasIdIndex: uniqueIndex('parks_lipas_id_idx').on(table.lipasId),
     slugIndex: uniqueIndex('parks_slug_idx').on(table.slug),
+    typeIndex: index('parks_type_id_idx').on(table.typeId),
     statusIndex: index('parks_catalog_status_idx').on(table.catalogStatus)
   })
 );

@@ -5,6 +5,7 @@ import {
   createImportRun,
   listExistingParksByLipasIds,
   markMissingParksInactive,
+  syncParkTypes,
   upsertImportedPark
 } from '../db/repositories.js';
 import { mapLipasPark } from './map-lipas-park.js';
@@ -21,7 +22,7 @@ type ImportParksOptions = {
   sourceUrl: string;
 };
 
-const RESPONSE_SHAPE_VERSION = 'catalog-v1';
+const RESPONSE_SHAPE_VERSION = 'catalog-v2';
 
 async function defaultFetchSource(sourceUrl: string) {
   const response = await fetch(sourceUrl);
@@ -46,7 +47,7 @@ function ensureUniqueSlug(baseSlug: string, lipasId: number, takenSlugs: Set<str
 
 export async function importParks({
   database,
-  expectedActiveCount = 41,
+  expectedActiveCount = 137,
   fetchSource = defaultFetchSource,
   now = () => new Date().toISOString(),
   sourceUrl
@@ -66,6 +67,9 @@ export async function importParks({
   const existingSlugByLipasId = new Map(existingParks.map((park) => [park.lipasId, park.slug]));
   const takenSlugs = new Set(existingParks.map((park) => park.slug));
   const importedAt = now();
+
+  await syncParkTypes(database);
+
   const importRunId = await createImportRun(database, {
     activeCount: activeItems.length,
     importedAt,
@@ -99,6 +103,7 @@ export async function importParks({
       postalOffice: mapped.postalOffice,
       slug,
       sourceEventDate: mapped.sourceEventDate,
+      typeId: mapped.type.id,
       updatedAt: importedAt
     });
   }

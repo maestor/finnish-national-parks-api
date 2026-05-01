@@ -35,6 +35,29 @@ export type LipasSourceItem = {
   owner: string;
 };
 
+export const parkTypeFixtures = {
+  nationalPark: {
+    name: 'Kansallispuisto',
+    slug: 'national-park',
+    typeCode: 111
+  },
+  otherNatureReserve: {
+    name: 'Muu luonnonsuojelualue',
+    slug: 'other-nature-reserve',
+    typeCode: 112
+  },
+  stateHikingArea: {
+    name: 'Valtion retkeilyalue',
+    slug: 'state-hiking-area',
+    typeCode: 109
+  },
+  wildernessArea: {
+    name: 'Erämaa-alue',
+    slug: 'wilderness-area',
+    typeCode: 110
+  }
+} as const;
+
 export function createLipasPark(
   overrides: Omit<Partial<LipasSourceItem>, 'location'> & {
     location?: Partial<LipasSourceItem['location']>;
@@ -99,7 +122,7 @@ export function createLipasPark(
     name: 'Äkäsmännyn kansallispuisto',
     'construction-year': 1982,
     type: {
-      'type-code': 111
+      'type-code': parkTypeFixtures.nationalPark.typeCode
     },
     'lipas-id': 12345,
     status: 'active',

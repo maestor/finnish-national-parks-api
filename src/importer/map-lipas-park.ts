@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { getSupportedParkTypeByCode } from '../parks/park-types.js';
+
 const geometryPolygonSchema = z.object({
   coordinates: z.array(z.array(z.tuple([z.number(), z.number()]))),
   type: z.literal('Polygon')
@@ -76,6 +78,12 @@ export type MappedPark = {
   postalOffice: string | null;
   slug: string;
   sourceEventDate: string | null;
+  type: {
+    code: number;
+    id: number;
+    name: string;
+    slug: string;
+  };
 };
 
 function normalizeLuontoonUrl(value?: string) {
@@ -150,6 +158,7 @@ function combineBoundingBoxes(boxes: Array<ReturnType<typeof deriveBoundingBox>>
 
 export function mapLipasPark(source: unknown, existingSlug?: string): MappedPark {
   const park = lipasParkSchema.parse(source);
+  const parkType = getSupportedParkTypeByCode(park.type['type-code']);
   const boxes = park.location.geometries.features.map((feature) =>
     deriveBoundingBox(feature.geometry.coordinates)
   );
@@ -171,6 +180,7 @@ export function mapLipasPark(source: unknown, existingSlug?: string): MappedPark
     name: park.name,
     postalOffice: park.location['postal-office'] ?? null,
     slug: existingSlug ?? createSlug(park.name),
-    sourceEventDate: park['event-date'] ?? null
+    sourceEventDate: park['event-date'] ?? null,
+    type: parkType
   };
 }

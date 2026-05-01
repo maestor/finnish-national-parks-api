@@ -11,7 +11,7 @@ await migrateDatabase(client);
 
 const result = await importParks({
   database: createDatabase(client),
-  sourceUrl: env.LIPAS_NATIONAL_PARKS_URL
+  sourceUrl: env.LIPAS_PROTECTED_AREAS_URL
 });
 
 await client.close();

@@ -1,7 +1,9 @@
 import { and, desc, eq, inArray, notInArray, sql } from 'drizzle-orm';
 
+import type { SupportedParkTypeSlug } from '../parks/park-types.js';
+import { supportedParkTypes } from '../parks/park-types.js';
 import type { Database } from './database.js';
-import { importRuns, parkNotes, parks, parkVisits } from './schema.js';
+import { importRuns, parkNotes, parks, parkTypes, parkVisits } from './schema.js';
 
 type PutVisitInput = {
   note?: string | null | undefined;
@@ -25,6 +27,11 @@ type MarkerPoint = {
   lon: number;
 };
 
+type TypedParkRow = {
+  park: typeof parks.$inferSelect;
+  parkType: typeof parkTypes.$inferSelect;
+};
+
 function toBoundingBox(row: typeof parks.$inferSelect): BoundingBox {
   return {
     maxLat: row.bboxMaxLat,
@@ -41,23 +48,33 @@ function toMarkerPoint(row: typeof parks.$inferSelect): MarkerPoint {
   };
 }
 
-function toPark(row: typeof parks.$inferSelect) {
+function toParkType(row: typeof parkTypes.$inferSelect) {
   return {
-    areaKm2: row.areaKm2,
-    boundingBox: toBoundingBox(row),
-    boundaryGeoJson: JSON.parse(row.boundaryGeojson) as Record<string, unknown>,
-    catalogStatus: row.catalogStatus as 'active' | 'inactive',
-    establishmentYear: row.establishmentYear,
-    lipasId: row.lipasId,
-    locationLabel: row.locationLabel,
-    luontoonUrl: row.luontoonUrl,
-    markerPoint: toMarkerPoint(row),
-    municipalityCode: row.municipalityCode,
+    code: row.code,
+    id: row.id,
     name: row.name,
-    postalOffice: row.postalOffice,
-    slug: row.slug,
-    sourceEventDate: row.sourceEventDate,
-    updatedAt: row.updatedAt
+    slug: row.slug as SupportedParkTypeSlug
+  };
+}
+
+function toPark(row: TypedParkRow) {
+  return {
+    areaKm2: row.park.areaKm2,
+    boundingBox: toBoundingBox(row.park),
+    boundaryGeoJson: JSON.parse(row.park.boundaryGeojson) as Record<string, unknown>,
+    catalogStatus: row.park.catalogStatus as 'active' | 'inactive',
+    establishmentYear: row.park.establishmentYear,
+    lipasId: row.park.lipasId,
+    locationLabel: row.park.locationLabel,
+    luontoonUrl: row.park.luontoonUrl,
+    markerPoint: toMarkerPoint(row.park),
+    municipalityCode: row.park.municipalityCode,
+    name: row.park.name,
+    postalOffice: row.park.postalOffice,
+    slug: row.park.slug,
+    sourceEventDate: row.park.sourceEventDate,
+    type: toParkType(row.parkType),
+    updatedAt: row.park.updatedAt
   };
 }
 
@@ -75,6 +92,33 @@ async function getParkRecordBySlug(database: Database, slug: string) {
   return database.query.parks.findFirst({
     where: eq(parks.slug, slug)
   });
+}
+
+async function getTypedParkBySlug(database: Database, slug: string) {
+  return (await database
+    .select({
+      park: parks,
+      parkType: parkTypes
+    })
+    .from(parks)
+    .innerJoin(parkTypes, eq(parks.typeId, parkTypes.id))
+    .where(eq(parks.slug, slug)))[0] ?? null;
+}
+
+async function listTypedParks(database: Database, options: { typeSlug?: SupportedParkTypeSlug } = {}) {
+  const whereClause = options.typeSlug
+    ? and(eq(parks.catalogStatus, 'active'), eq(parkTypes.slug, options.typeSlug))
+    : eq(parks.catalogStatus, 'active');
+
+  return database
+    .select({
+      park: parks,
+      parkType: parkTypes
+    })
+    .from(parks)
+    .innerJoin(parkTypes, eq(parks.typeId, parkTypes.id))
+    .where(whereClause)
+    .orderBy(parks.name);
 }
 
 async function getVisitsForPark(database: Database, parkId: number) {
@@ -101,10 +145,10 @@ async function getNoteForPark(database: Database, parkId: number) {
   };
 }
 
-async function buildPersonalPark(database: Database, row: typeof parks.$inferSelect) {
+async function buildPersonalPark(database: Database, row: TypedParkRow) {
   const [note, visits] = await Promise.all([
-    getNoteForPark(database, row.id),
-    getVisitsForPark(database, row.id)
+    getNoteForPark(database, row.park.id),
+    getVisitsForPark(database, row.park.id)
   ]);
 
   return {
@@ -117,6 +161,20 @@ async function buildPersonalPark(database: Database, row: typeof parks.$inferSel
     },
     visits
   };
+}
+
+export async function syncParkTypes(database: Database) {
+  await database
+    .insert(parkTypes)
+    .values([...supportedParkTypes])
+    .onConflictDoUpdate({
+      set: {
+        code: sql`excluded.code`,
+        name: sql`excluded.name`,
+        slug: sql`excluded.slug`
+      },
+      target: parkTypes.id
+    });
 }
 
 export async function createImportRun(
@@ -140,32 +198,25 @@ export async function listExistingParksByLipasIds(database: Database, lipasIds: 
   });
 }
 
-export async function listParks(database: Database) {
-  const rows = await database.query.parks.findMany({
-    orderBy: [parks.name],
-    where: eq(parks.catalogStatus, 'active')
-  });
-
-  return rows.map(toPark);
+export async function listParks(
+  database: Database,
+  options: { typeSlug?: SupportedParkTypeSlug } = {}
+) {
+  return (await listTypedParks(database, options)).map(toPark);
 }
 
 export async function getParkBySlug(database: Database, slug: string) {
-  const row = await getParkRecordBySlug(database, slug);
+  const row = await getTypedParkBySlug(database, slug);
   return row ? toPark(row) : null;
 }
 
 export async function getPersonalParkBySlug(database: Database, slug: string) {
-  const row = await getParkRecordBySlug(database, slug);
+  const row = await getTypedParkBySlug(database, slug);
   return row ? buildPersonalPark(database, row) : null;
 }
 
 export async function listPersonalParks(database: Database) {
-  const rows = await database.query.parks.findMany({
-    orderBy: [parks.name],
-    where: eq(parks.catalogStatus, 'active')
-  });
-
-  return Promise.all(rows.map((row) => buildPersonalPark(database, row)));
+  return Promise.all((await listTypedParks(database)).map((row) => buildPersonalPark(database, row)));
 }
 
 export async function putParkNote(database: Database, slug: string, note: string) {
@@ -285,6 +336,7 @@ export async function upsertImportedPark(
         postalOffice: values.postalOffice,
         slug: values.slug,
         sourceEventDate: values.sourceEventDate,
+        typeId: values.typeId,
         updatedAt: values.updatedAt
       },
       target: parks.lipasId
@@ -323,7 +375,13 @@ export async function markMissingParksInactive(
     );
 }
 
-export async function getCatalogListEtagSeed(database: Database) {
+export async function getCatalogListEtagSeed(
+  database: Database,
+  options: { typeSlug?: SupportedParkTypeSlug } = {}
+) {
+  const whereClause = options.typeSlug
+    ? and(eq(parks.catalogStatus, 'active'), eq(parkTypes.slug, options.typeSlug))
+    : eq(parks.catalogStatus, 'active');
   const summary = (await database
     .select({
       activeCount: sql<number>`COUNT(*)`,
@@ -331,11 +389,13 @@ export async function getCatalogListEtagSeed(database: Database) {
       latestUpdatedAt: sql<string | null>`MAX(${parks.updatedAt})`
     })
     .from(parks)
-    .where(eq(parks.catalogStatus, 'active')))[0]!;
+    .innerJoin(parkTypes, eq(parks.typeId, parkTypes.id))
+    .where(whereClause))[0]!;
 
   return {
     activeCount: summary.activeCount,
     latestImportRunId: summary.latestImportRunId,
-    latestUpdatedAt: summary.latestUpdatedAt
+    latestUpdatedAt: summary.latestUpdatedAt,
+    typeSlug: options.typeSlug ?? null
   };
 }

@@ -103,7 +103,8 @@ describe('repositories', () => {
     await expect(getCatalogListEtagSeed(testDatabase.database)).resolves.toEqual({
       activeCount: 0,
       latestImportRunId: null,
-      latestUpdatedAt: null
+      latestUpdatedAt: null,
+      typeSlug: null
     });
   });
 });

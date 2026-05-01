@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { mapLipasPark } from '../../src/importer/map-lipas-park.js';
-import { createLipasPark } from '../fixtures/lipas.js';
+import { createLipasPark, parkTypeFixtures } from '../fixtures/lipas.js';
 
 describe('mapLipasPark', () => {
   it('maps the supported catalog fields and excludes upstream contact fields', () => {
@@ -27,6 +27,12 @@ describe('mapLipasPark', () => {
       markerPoint: {
         lon: 27.5,
         lat: 62.5
+      },
+      type: {
+        code: parkTypeFixtures.nationalPark.typeCode,
+        id: parkTypeFixtures.nationalPark.typeCode,
+        name: parkTypeFixtures.nationalPark.name,
+        slug: parkTypeFixtures.nationalPark.slug
       }
     });
     expect(mapped).not.toHaveProperty('email');
