@@ -6,7 +6,7 @@ import { createApp } from './app.js';
 import { getEnv } from './env.js';
 
 const env = getEnv();
-const port = Number.parseInt(env.PORT ?? '3000', 10);
+const port = Number.parseInt(env.PORT ?? '3004', 10);
 const client = createDatabaseClient();
 
 serve({
