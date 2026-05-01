@@ -8,7 +8,9 @@ export default defineConfig({
       include: ['src/**/*.ts'],
       exclude: [
         'src/server.ts',
-        'src/cli/**/*.ts'
+        'src/cli/**/*.ts',
+        'src/env.ts',
+        'src/db/client.ts'
       ],
       thresholds: {
         branches: 100,

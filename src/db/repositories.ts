@@ -1,16 +1,16 @@
-import { and, desc, eq, inArray, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, notInArray, sql } from 'drizzle-orm';
 
 import type { Database } from './database.js';
 import { importRuns, parkNotes, parks, parkVisits } from './schema.js';
 
 type PutVisitInput = {
-  note?: string | null;
+  note?: string | null | undefined;
   visitedOn: string;
 };
 
 type UpdateVisitInput = {
-  note?: string | null;
-  visitedOn?: string;
+  note?: string | null | undefined;
+  visitedOn?: string | undefined;
 };
 
 type BoundingBox = {
@@ -46,7 +46,7 @@ function toPark(row: typeof parks.$inferSelect) {
     areaKm2: row.areaKm2,
     boundingBox: toBoundingBox(row),
     boundaryGeoJson: JSON.parse(row.boundaryGeojson) as Record<string, unknown>,
-    catalogStatus: row.catalogStatus,
+    catalogStatus: row.catalogStatus as 'active' | 'inactive',
     establishmentYear: row.establishmentYear,
     lipasId: row.lipasId,
     locationLabel: row.locationLabel,
@@ -123,13 +123,9 @@ export async function createImportRun(
   database: Database,
   values: typeof importRuns.$inferInsert
 ) {
-  const [row] = await database.insert(importRuns).values(values).returning({
+  const row = (await database.insert(importRuns).values(values).returning({
     id: importRuns.id
-  });
-
-  if (!row) {
-    throw new Error('Failed to create import run.');
-  }
+  }))[0]!;
 
   return row.id;
 }
@@ -148,14 +144,6 @@ export async function listParks(database: Database) {
   const rows = await database.query.parks.findMany({
     orderBy: [parks.name],
     where: eq(parks.catalogStatus, 'active')
-  });
-
-  return rows.map(toPark);
-}
-
-export async function listAllParks(database: Database) {
-  const rows = await database.query.parks.findMany({
-    orderBy: [parks.name]
   });
 
   return rows.map(toPark);
@@ -222,7 +210,7 @@ export async function createVisit(database: Database, slug: string, input: PutVi
   }
 
   const timestamp = new Date().toISOString();
-  const [row] = await database
+  const row = (await database
     .insert(parkVisits)
     .values({
       createdAt: timestamp,
@@ -231,11 +219,7 @@ export async function createVisit(database: Database, slug: string, input: PutVi
       updatedAt: timestamp,
       visitedOn: input.visitedOn
     })
-    .returning();
-
-  if (!row) {
-    throw new Error('Failed to create visit.');
-  }
+    .returning())[0]!;
 
   return toVisit(row);
 }
@@ -261,17 +245,17 @@ export async function updateVisit(database: Database, visitId: number, input: Up
     })
     .where(eq(parkVisits.id, visitId));
 
-  const [updatedVisit] = await database
+  const updatedVisit = (await database
     .select()
     .from(parkVisits)
-    .where(eq(parkVisits.id, visitId));
+    .where(eq(parkVisits.id, visitId)))[0]!;
 
-  return updatedVisit ? toVisit(updatedVisit) : null;
+  return toVisit(updatedVisit);
 }
 
 export async function deleteVisit(database: Database, visitId: number) {
   const result = await database.delete(parkVisits).where(eq(parkVisits.id, visitId));
-  return Number(result.rowsAffected ?? 0) > 0;
+  return Number(result.rowsAffected) > 0;
 }
 
 export async function upsertImportedPark(
@@ -334,30 +318,24 @@ export async function markMissingParksInactive(
     .where(
       and(
         eq(parks.catalogStatus, 'active'),
-        sql`${parks.lipasId} NOT IN ${activeLipasIds}`
+        notInArray(parks.lipasId, activeLipasIds)
       )
     );
 }
 
 export async function getCatalogListEtagSeed(database: Database) {
-  const [summary] = await database
+  const summary = (await database
     .select({
       activeCount: sql<number>`COUNT(*)`,
       latestImportRunId: sql<number | null>`MAX(${parks.lastImportRunId})`,
       latestUpdatedAt: sql<string | null>`MAX(${parks.updatedAt})`
     })
     .from(parks)
-    .where(eq(parks.catalogStatus, 'active'));
+    .where(eq(parks.catalogStatus, 'active')))[0]!;
 
   return {
-    activeCount: summary?.activeCount ?? 0,
-    latestImportRunId: summary?.latestImportRunId ?? null,
-    latestUpdatedAt: summary?.latestUpdatedAt ?? null
+    activeCount: summary.activeCount,
+    latestImportRunId: summary.latestImportRunId,
+    latestUpdatedAt: summary.latestUpdatedAt
   };
-}
-
-export async function getLatestImportRun(database: Database) {
-  return database.query.importRuns.findFirst({
-    orderBy: [desc(importRuns.id)]
-  });
 }

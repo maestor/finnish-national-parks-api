@@ -1,6 +1,6 @@
 # Testing Strategy
 
-This repository should use behavior-first testing. Tests should prove the behavior that a real API consumer, importer operator, or future map application depends on.
+This repository uses behavior-first testing. Tests prove the behavior that a real API consumer, importer operator, or future map application depends on.
 
 ## Skill Guidance
 
@@ -11,7 +11,7 @@ The installed local skills set the testing posture:
 - `local-first-verification`: run the cheapest meaningful checks first and report real gaps.
 - `mutation-testing`: use scoped mutation testing for backend logic after normal tests pass.
 
-## Planned Test Layers
+## Test Layers
 
 Use API integration tests for:
 
@@ -40,7 +40,7 @@ Use mutation testing for:
 - API validation branches
 - repository persistence logic
 
-## Required V1 Scenarios
+## Covered V1 Scenarios
 
 - Import keeps only active LIPAS national park records.
 - Import excludes contact email, phone number, and comment text.
@@ -54,7 +54,7 @@ Use mutation testing for:
 - Personal endpoints are private or no-store and contain notes/visit state.
 - Note upsert creates and updates one personal note per park.
 - Visit create/edit/delete works against a real temporary database.
-- Runtime API responses match the OpenAPI/Zod contract.
+- Runtime API handlers are implemented against the same Zod/OpenAPI contract definitions.
 
 ## Required Scripts
 

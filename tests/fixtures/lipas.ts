@@ -36,7 +36,7 @@ export type LipasSourceItem = {
 };
 
 export function createLipasPark(
-  overrides: Partial<LipasSourceItem> & {
+  overrides: Omit<Partial<LipasSourceItem>, 'location'> & {
     location?: Partial<LipasSourceItem['location']>;
   } = {}
 ): LipasSourceItem {

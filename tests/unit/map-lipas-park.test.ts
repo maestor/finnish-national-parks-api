@@ -33,4 +33,43 @@ describe('mapLipasPark', () => {
     expect(mapped).not.toHaveProperty('phoneNumber');
     expect(mapped).not.toHaveProperty('comment');
   });
+
+  it('falls back cleanly when url, address, and slug inputs are sparse', () => {
+    const source = createLipasPark({
+      name: '!!!'
+    });
+    delete source.www;
+    delete source.location.address;
+    delete source.location['postal-office'];
+    const mapped = mapLipasPark(source);
+
+    expect(mapped.slug).toBe('park');
+    expect(mapped.luontoonUrl).toBeNull();
+    expect(mapped.locationLabel).toBe('!!!');
+  });
+
+  it('normalizes root-relative luontoon urls to absolute urls', () => {
+    const mapped = mapLipasPark(
+      createLipasPark({
+        www: '/saaristo'
+      })
+    );
+
+    expect(mapped.luontoonUrl).toBe('https://www.luontoon.fi/saaristo');
+  });
+
+  it('falls back to null for missing optional numeric and date fields', () => {
+    const source = createLipasPark();
+    delete source['construction-year'];
+    delete source['event-date'];
+    source.properties = {};
+    source.location.city = {};
+
+    const mapped = mapLipasPark(source);
+
+    expect(mapped.areaKm2).toBeNull();
+    expect(mapped.establishmentYear).toBeNull();
+    expect(mapped.municipalityCode).toBeNull();
+    expect(mapped.sourceEventDate).toBeNull();
+  });
 });

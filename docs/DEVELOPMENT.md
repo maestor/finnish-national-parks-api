@@ -1,10 +1,8 @@
 # Development Notes
 
-This document captures the intended local development workflow before implementation starts. It should be updated as soon as the real scripts, dependencies, and database commands exist.
+## Local Workflow
 
-## Planned Local Workflow
-
-The first implementation should support this shape:
+Current local workflow:
 
 ```sh
 npm install
@@ -14,17 +12,9 @@ npm run verify
 npm run dev
 ```
 
-The exact package manager and script names can change during implementation, but the workflow should remain:
-
-1. Install dependencies.
-2. Prepare the local database.
-3. Import park catalog data from LIPAS.
-4. Run verification before handoff.
-5. Start the API locally.
-
 ## Environment
 
-Planned environment variables:
+Environment variables:
 
 ```sh
 DATABASE_URL=file:./data/local.db
@@ -55,42 +45,36 @@ The importer should:
 - Exclude contact email, phone number, and comment text.
 - Update import metadata so catalog ETags change when imported catalog data changes.
 
-If the active count changes, the importer should finish loudly enough for a human to notice. The exact behavior can be a warning or a failing command, but it must not silently drift.
+The current implementation fails the import if the active count does not match `41`, so upstream drift is visible immediately.
 
-## Database Direction
+## Database
 
-Use Drizzle ORM with libSQL-compatible SQLite. Keep schema ownership in the repository so the API does not depend on live upstream availability for normal use.
+The repository owns the database schema through:
 
-Expected table groups:
+- [src/db/schema.ts](../src/db/schema.ts)
+- [src/db/migrations/0000_init.sql](../src/db/migrations/0000_init.sql)
 
-- Park catalog data imported from LIPAS.
-- Personal park notes.
-- Personal visit records.
-- Optional import run metadata.
+Current table groups:
+
+- imported park catalog rows
+- personal park notes
+- personal visit records
+- import run metadata
 
 Personal data must not be removed by catalog synchronization.
 
 Local development should use a file database. Production should target Turso with the same Drizzle schema and libSQL client path.
 
-## API Development Direction
+## API Contract
 
-Use contract-first route development:
+The API uses Zod schemas as the contract source of truth with OpenAPI exposed at `GET /openapi.json`.
 
-- Define Zod schemas first.
-- Generate or expose OpenAPI from those schemas.
-- Implement route handlers against the schemas.
-- Verify runtime responses match the contract.
+Key route behavior:
 
-The list endpoint should be optimized for map/list views. Full boundary geometry belongs on the detail endpoint or behind an explicit include flag.
-
-Catalog endpoints should be cache-friendly:
-
-- read only from the local/Turso database
-- emit deterministic ETags
-- return `304 Not Modified` for matching `If-None-Match`
-- avoid mixing personal note or visit state into public catalog responses
-
-Personal endpoints should use private or no-store cache policy.
+- `GET /api/parks` is optimized for map/list views and omits boundary geometry.
+- `GET /api/parks/:slug?includeBoundary=true` returns the stored boundary GeoJSON.
+- catalog routes emit deterministic `ETag` headers and support `304 Not Modified`
+- personal routes use `private, no-store`
 
 ## Deployment Direction
 

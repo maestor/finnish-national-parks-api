@@ -2,9 +2,7 @@
 
 A local-first TypeScript API for Finnish national park catalog data and personal visit tracking.
 
-The planned API imports national park data from the open LIPAS API into an owned SQLite/libSQL database, then serves it for a future personal map application where parks can have notes and visit history.
-
-This repository is currently in the documentation and planning phase. The implementation plan is in [docs/plans/2026-05-01-finnish-national-parks-api-v1.md](docs/plans/2026-05-01-finnish-national-parks-api-v1.md).
+The API imports national park data from the open LIPAS API into an owned SQLite/libSQL database, then serves it for a future personal map application where parks can have notes and visit history.
 
 ## Goals
 
@@ -25,9 +23,28 @@ This repository is currently in the documentation and planning phase. The implem
 - Production database target: Turso.
 - Deployment target: Vercel Functions.
 
-## Planned API Shape
+## Setup
+
+```sh
+npm install
+npm run db:migrate
+npm run import:parks
+npm run verify
+npm run dev
+```
+
+Default environment:
+
+```sh
+DATABASE_URL=file:./data/local.db
+DATABASE_AUTH_TOKEN=
+LIPAS_NATIONAL_PARKS_URL=https://api.lipas.fi/v2/sports-sites?type-codes=111&page-size=100&page=1
+```
+
+## API Shape
 
 - `GET /health`
+- `GET /openapi.json`
 - `GET /api/parks`
 - `GET /api/parks/:slug`
 - `GET /api/me/parks`
@@ -37,7 +54,12 @@ This repository is currently in the documentation and planning phase. The implem
 - `PATCH /api/me/visits/:id`
 - `DELETE /api/me/visits/:id`
 
-Catalog endpoints should stay lightweight and cache-friendly for map/list views. Full boundary geometry belongs on detail responses or an explicit include mode. Personal notes and visits should be served from separate private endpoints.
+Catalog endpoints stay cache-friendly and database-backed:
+
+- `GET /api/parks` returns lightweight list data without boundary GeoJSON.
+- `GET /api/parks/:slug?includeBoundary=true` includes stored boundary geometry.
+- Catalog `GET` endpoints emit deterministic `ETag` headers and support `304 Not Modified`.
+- Personal endpoints use `Cache-Control: private, no-store`.
 
 ## Data Source
 
@@ -54,18 +76,21 @@ Importer expectations:
 - Store catalog fields needed for a map app.
 - Exclude LIPAS contact email, phone number, and comment text.
 - Preserve personal notes and visit history across imports.
+- Read from the local/libSQL database during normal API requests instead of calling LIPAS live.
 
-## Planned Verification
+## Verification
 
-The implementation should provide `npm run verify` as the main local quality gate. It must run at least typecheck and test coverage, with high coverage thresholds for first-party application code.
+The main quality gate is:
+
+```sh
+npm run verify
+```
+
+It runs typecheck plus coverage tests with 100 percent thresholds for first-party application code.
 
 ## Documentation
 
 - [AGENTS.md](AGENTS.md): codebase rules for future agents and implementation sessions.
-- [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md): planned local development and database workflow.
-- [docs/TESTING.md](docs/TESTING.md): planned testing strategy and verification expectations.
+- [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md): local development, database, importer, and deployment notes.
+- [docs/TESTING.md](docs/TESTING.md): testing strategy and verification expectations.
 - [docs/plans/2026-05-01-finnish-national-parks-api-v1.md](docs/plans/2026-05-01-finnish-national-parks-api-v1.md): current V1 implementation plan.
-
-## Current Status
-
-No application code has been implemented yet. The next implementation session should start from the plan and documentation rather than re-deciding the architecture.

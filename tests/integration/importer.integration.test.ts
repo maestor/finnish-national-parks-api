@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { createVisit, getParkBySlug, getPersonalParkBySlug, listParks, putParkNote } from '../../src/db/repositories.js';
 import { importParks } from '../../src/importer/import-parks.js';
@@ -92,5 +92,83 @@ describe('importParks', () => {
     });
     expect(personalPark?.visits).toHaveLength(1);
     expect(parks).toHaveLength(1);
+  });
+
+  it('reuses existing slugs, deduplicates new slugs, and can mark all parks inactive', async () => {
+    await importParks({
+      database: testDatabase.database,
+      expectedActiveCount: 2,
+      now: () => '2026-05-01T08:00:00.000Z',
+      sourceUrl: 'https://example.test/lipas',
+      fetchSource: async () => ({
+        items: [
+          createLipasPark(),
+          createLipasPark({
+            'lipas-id': 12346
+          })
+        ]
+      })
+    });
+
+    const duplicateSlugPark = await getParkBySlug(testDatabase.database, 'akasmannyn-kansallispuisto-12346');
+    expect(duplicateSlugPark?.lipasId).toBe(12346);
+
+    await importParks({
+      database: testDatabase.database,
+      expectedActiveCount: 0,
+      now: () => '2026-05-02T08:00:00.000Z',
+      sourceUrl: 'https://example.test/lipas',
+      fetchSource: async () => ({
+        items: [
+          createLipasPark({
+            status: 'incorrect-data'
+          })
+        ]
+      })
+    });
+
+    const originalPark = await getParkBySlug(testDatabase.database, 'akasmannyn-kansallispuisto');
+    expect(originalPark?.catalogStatus).toBe('inactive');
+    await expect(listParks(testDatabase.database)).resolves.toEqual([]);
+  });
+
+  it('uses the default fetcher and surfaces upstream failures', async () => {
+    const originalFetch = globalThis.fetch;
+
+    globalThis.fetch = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            items: [createLipasPark()]
+          }),
+          {
+            status: 200
+          }
+        )
+      )
+      .mockResolvedValueOnce(
+        new Response('nope', {
+          status: 503
+        })
+      ) as typeof fetch;
+
+    try {
+      await importParks({
+        database: testDatabase.database,
+        expectedActiveCount: 1,
+        sourceUrl: 'https://example.test/lipas'
+      });
+
+      await expect(
+        importParks({
+          database: testDatabase.database,
+          expectedActiveCount: 1,
+          sourceUrl: 'https://example.test/lipas'
+        })
+      ).rejects.toThrow('LIPAS import failed with status 503.');
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
   });
 });
