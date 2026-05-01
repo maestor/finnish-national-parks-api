@@ -1,13 +1,13 @@
 # Finnish National Parks API
 
-A local-first TypeScript API for Finnish national park catalog data and personal visit tracking.
+A local-first TypeScript API for Finnish protected-area catalog data and personal visit tracking.
 
-The API imports national park data from the open LIPAS API into an owned SQLite/libSQL database, then serves it for a future personal map application where parks can have notes and visit history.
+The API imports selected protected-area data from the open LIPAS API into an owned SQLite/libSQL database, then serves it for a future personal map application where places can have notes and visit history.
 
 ## Goals
 
-- Keep a small, reliable national parks catalog in an owned database.
-- Use LIPAS as the machine-readable source for park names, locations, boundaries, area, establishment year, and Luontoon links.
+- Keep a small, reliable protected-areas catalog in an owned database.
+- Use LIPAS as the machine-readable source for place names, locations, boundaries, area, establishment year, and Luontoon links.
 - Use Luontoon only as an official external reference link.
 - Store personal notes and visit history separately from imported catalog data.
 - Start locally with SQLite/libSQL and target Turso on Vercel for deployment.
@@ -38,7 +38,7 @@ Default environment:
 ```sh
 DATABASE_URL=file:./data/local.db
 DATABASE_AUTH_TOKEN=
-LIPAS_NATIONAL_PARKS_URL=https://api.lipas.fi/v2/sports-sites?type-codes=111&page-size=100&page=1
+LIPAS_PROTECTED_AREAS_URL=https://api.lipas.fi/v2/sports-sites?type-codes=109,110,111,112&page-size=200&page=1
 ```
 
 ## API Shape
@@ -57,6 +57,7 @@ LIPAS_NATIONAL_PARKS_URL=https://api.lipas.fi/v2/sports-sites?type-codes=111&pag
 Catalog endpoints stay cache-friendly and database-backed:
 
 - `GET /api/parks` returns lightweight list data without boundary GeoJSON.
+- `GET /api/parks?type=state-hiking-area` filters by normalized type slug.
 - `GET /api/parks/:slug?includeBoundary=true` includes stored boundary geometry.
 - Catalog `GET` endpoints emit deterministic `ETag` headers and support `304 Not Modified`.
 - Personal endpoints use `Cache-Control: private, no-store`.
@@ -66,13 +67,19 @@ Catalog endpoints stay cache-friendly and database-backed:
 The catalog importer should use:
 
 ```text
-https://api.lipas.fi/v2/sports-sites?type-codes=111&page-size=100&page=1
+https://api.lipas.fi/v2/sports-sites?type-codes=109,110,111,112&page-size=200&page=1
 ```
 
 Importer expectations:
 
 - Keep only `status === "active"` records.
-- Expect 41 active national parks in the current dataset.
+- Expect 137 active protected areas in the current dataset.
+- Import these supported LIPAS protected-area types:
+  - `109` Valtion retkeilyalue
+  - `110` Erämaa-alue
+  - `111` Kansallispuisto
+  - `112` Muu luonnonsuojelualue
+- Store normalized type metadata in a dedicated type table and reference it from catalog rows.
 - Store catalog fields needed for a map app.
 - Exclude LIPAS contact email, phone number, and comment text.
 - Preserve personal notes and visit history across imports.

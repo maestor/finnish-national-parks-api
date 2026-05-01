@@ -58,7 +58,10 @@ export function createApp({ database }: AppDependencies = {}) {
 
   if (database) {
     app.openapi(listParksRoute, async (context) => {
-      const etag = createCatalogListEtag(await getCatalogListEtagSeed(database));
+      const query = context.req.valid('query');
+      const typeSlug = query.type;
+      const filter = typeSlug ? { typeSlug } : {};
+      const etag = createCatalogListEtag(await getCatalogListEtagSeed(database, filter));
       context.header('Cache-Control', CATALOG_CACHE_CONTROL);
       context.header('ETag', etag);
 
@@ -69,7 +72,7 @@ export function createApp({ database }: AppDependencies = {}) {
         });
       }
 
-      const parks = await listParks(database);
+      const parks = await listParks(database, filter);
 
       return context.json({
         parks: parks.map(({ boundaryGeoJson: _boundaryGeoJson, catalogStatus: _catalogStatus, lipasId: _lipasId, municipalityCode: _municipalityCode, postalOffice: _postalOffice, sourceEventDate: _sourceEventDate, updatedAt: _updatedAt, ...park }) => park)

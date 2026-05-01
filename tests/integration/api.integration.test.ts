@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { createApp } from '../../src/app.js';
 import { importParks } from '../../src/importer/import-parks.js';
-import { createLipasPark } from '../fixtures/lipas.js';
+import { createLipasPark, parkTypeFixtures } from '../fixtures/lipas.js';
 import { createTestDatabase } from '../helpers/test-db.js';
 
 describe('API routes', () => {
@@ -13,7 +13,7 @@ describe('API routes', () => {
 
     await importParks({
       database: testDatabase.database,
-      expectedActiveCount: 2,
+      expectedActiveCount: 3,
       now: () => '2026-05-01T09:00:00.000Z',
       sourceUrl: 'https://example.test/lipas',
       fetchSource: async () => ({
@@ -30,6 +30,21 @@ describe('API routes', () => {
               'area-km2': 45.2
             },
             www: 'https://www.luontoon.fi/seitseminen'
+          }),
+          createLipasPark({
+            'lipas-id': 67891,
+            name: 'Evon retkeilyalue',
+            type: {
+              'type-code': parkTypeFixtures.stateHikingArea.typeCode
+            },
+            location: {
+              address: 'Evontie 1',
+              'postal-office': 'Evo'
+            },
+            properties: {
+              'area-km2': 47.0
+            },
+            www: 'https://www.luontoon.fi/evo'
           })
         ]
       })
@@ -50,8 +65,9 @@ describe('API routes', () => {
     expect(response.status).toBe(200);
     expect(response.headers.get('cache-control')).toContain('public');
     expect(response.headers.get('etag')).toBeTruthy();
-    expect(body.parks).toHaveLength(2);
+    expect(body.parks).toHaveLength(3);
     expect(body.parks[0]).not.toHaveProperty('boundaryGeoJson');
+    expect(body.parks[0]).toHaveProperty('type');
   });
 
   it('returns 304 when the public list ETag matches', async () => {
@@ -77,7 +93,7 @@ describe('API routes', () => {
 
     await importParks({
       database: testDatabase.database,
-      expectedActiveCount: 2,
+      expectedActiveCount: 3,
       now: () => '2026-05-02T09:00:00.000Z',
       sourceUrl: 'https://example.test/lipas',
       fetchSource: async () => ({
@@ -98,6 +114,21 @@ describe('API routes', () => {
               'area-km2': 45.2
             },
             www: 'https://www.luontoon.fi/seitseminen'
+          }),
+          createLipasPark({
+            'lipas-id': 67891,
+            name: 'Evon retkeilyalue',
+            type: {
+              'type-code': parkTypeFixtures.stateHikingArea.typeCode
+            },
+            location: {
+              address: 'Evontie 1',
+              'postal-office': 'Evo'
+            },
+            properties: {
+              'area-km2': 47.0
+            },
+            www: 'https://www.luontoon.fi/evo'
           })
         ]
       })
@@ -129,7 +160,38 @@ describe('API routes', () => {
     expect(body).toHaveProperty('boundaryGeoJson');
     expect(body).not.toHaveProperty('note');
     expect(body).not.toHaveProperty('visits');
+    expect(body).toMatchObject({
+      type: {
+        code: parkTypeFixtures.nationalPark.typeCode,
+        slug: parkTypeFixtures.nationalPark.slug
+      }
+    });
     expect(cachedResponse.status).toBe(304);
+  });
+
+  it('filters the public park list by type slug', async () => {
+    const app = createApp({ database: testDatabase.database });
+    const response = await app.request('/api/parks?type=state-hiking-area');
+    const body = (await response.json()) as {
+      parks: Array<{
+        name: string;
+        type: {
+          slug: string;
+        };
+      }>;
+    };
+
+    expect(response.status).toBe(200);
+    expect(body.parks).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        name: 'Evon retkeilyalue',
+        type: expect.objectContaining({
+          slug: parkTypeFixtures.stateHikingArea.slug
+        })
+      })
+    ]));
+    expect(body.parks).toHaveLength(1);
+    expect(response.headers.get('etag')).toContain(parkTypeFixtures.stateHikingArea.slug);
   });
 
   it('supports personal note and visit workflows with private cache policy', async () => {
@@ -242,7 +304,7 @@ describe('API routes', () => {
 
     expect(listResponse.status).toBe(200);
     expect(listResponse.headers.get('cache-control')).toBe('private, no-store');
-    expect(listBody.parks).toHaveLength(2);
+    expect(listBody.parks).toHaveLength(3);
     expect(listBody.parks[0]?.note).toBeNull();
     expect(listBody.parks[0]?.visits).toEqual([]);
 

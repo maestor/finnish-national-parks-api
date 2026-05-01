@@ -15,7 +15,8 @@ describe('contracts and cache helpers', () => {
     const emptyListEtag = createCatalogListEtag({
       activeCount: 0,
       latestImportRunId: null,
-      latestUpdatedAt: null
+      latestUpdatedAt: null,
+      typeSlug: null
     });
     const detailEtag = createCatalogDetailEtag({
       includeBoundary: false,
@@ -24,6 +25,7 @@ describe('contracts and cache helpers', () => {
     });
 
     expect(emptyListEtag).toContain('none');
+    expect(emptyListEtag).toContain('all');
     expect(detailEtag).toContain('summary');
     expect(hasMatchingEtag(undefined, emptyListEtag)).toBe(false);
     expect(hasMatchingEtag(`W/ignored, ${detailEtag}`, detailEtag)).toBe(true);

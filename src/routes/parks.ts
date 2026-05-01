@@ -12,11 +12,17 @@ import {
   updateVisitRequestSchema,
   visitSchema
 } from '../contracts/parks.js';
+import { supportedParkTypeSlugs } from '../parks/park-types.js';
 
 export const listParksRoute = createRoute({
   method: 'get',
   path: '/api/parks',
   tags: ['Catalog'],
+  request: {
+    query: z.object({
+      type: z.enum(supportedParkTypeSlugs).optional()
+    })
+  },
   responses: {
     200: {
       description: 'Catalog park list',

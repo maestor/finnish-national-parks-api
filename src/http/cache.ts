@@ -7,8 +7,9 @@ export function createCatalogListEtag(seed: {
   activeCount: number;
   latestImportRunId: number | null;
   latestUpdatedAt: string | null;
+  typeSlug?: string | null;
 }) {
-  return `"parks-list:${CATALOG_RESPONSE_VERSION}:${seed.latestImportRunId ?? 'none'}:${seed.latestUpdatedAt ?? 'none'}:${seed.activeCount}"`;
+  return `"parks-list:${CATALOG_RESPONSE_VERSION}:${seed.typeSlug ?? 'all'}:${seed.latestImportRunId ?? 'none'}:${seed.latestUpdatedAt ?? 'none'}:${seed.activeCount}"`;
 }
 
 export function createCatalogDetailEtag(input: {

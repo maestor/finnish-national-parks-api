@@ -1,5 +1,14 @@
 import { z } from '@hono/zod-openapi';
 
+import { supportedParkTypeSlugs } from '../parks/park-types.js';
+
+export const parkTypeSchema = z.object({
+  code: z.number().int(),
+  id: z.number().int(),
+  name: z.string(),
+  slug: z.enum(supportedParkTypeSlugs)
+});
+
 export const pointSchema = z.object({
   lat: z.number(),
   lon: z.number()
@@ -35,7 +44,8 @@ export const parkListItemSchema = z.object({
   luontoonUrl: z.string().nullable(),
   markerPoint: pointSchema,
   name: z.string(),
-  slug: z.string()
+  slug: z.string(),
+  type: parkTypeSchema
 });
 
 export const parkDetailSchema = parkListItemSchema.extend({

@@ -42,12 +42,14 @@ Use mutation testing for:
 
 ## Covered V1 Scenarios
 
-- Import keeps only active LIPAS national park records.
+- Import keeps only active LIPAS protected-area records.
+- Import persists normalized protected-area type metadata and park-to-type references.
 - Import excludes contact email, phone number, and comment text.
 - Import stores the expected catalog fields.
 - Import derives stable slugs, marker points, and bounding boxes.
 - Re-import updates catalog fields without deleting notes or visits.
 - `GET /api/parks` returns lightweight list/map data without full boundary geometry.
+- `GET /api/parks?type=...` filters the public catalog list by normalized type slug.
 - `GET /api/parks/:slug` returns catalog detail without personal state.
 - Catalog `GET` endpoints emit ETags and return `304 Not Modified` for matching `If-None-Match`.
 - Catalog `GET` endpoints are safe for public caching.
