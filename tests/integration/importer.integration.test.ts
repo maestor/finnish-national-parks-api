@@ -238,4 +238,155 @@ describe('importParks', () => {
       globalThis.fetch = originalFetch;
     }
   });
+
+  it('collects all pages from the default fetcher when the source spans multiple pages', async () => {
+    const originalFetch = globalThis.fetch;
+
+    globalThis.fetch = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            items: [
+              createLipasPark({
+                'lipas-id': 30001
+              })
+            ],
+            pagination: {
+              'current-page': 1,
+              'page-size': 100,
+              'total-items': 2,
+              'total-pages': 2
+            }
+          }),
+          {
+            status: 200
+          }
+        )
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            items: [
+              createLipasPark({
+                'lipas-id': 30002,
+                name: 'Toinen sivu'
+              })
+            ],
+            pagination: {
+              'current-page': 2,
+              'page-size': 100,
+              'total-items': 2,
+              'total-pages': 2
+            }
+          }),
+          {
+            status: 200
+          }
+        )
+      ) as typeof fetch;
+
+    try {
+      await importParks({
+        database: testDatabase.database,
+        expectedActiveCount: 2,
+        sourceUrl: 'https://example.test/lipas?page=1&page-size=100'
+      });
+
+      await expect(listParks(testDatabase.database)).resolves.toHaveLength(2);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  it('surfaces later-page fetch failures from the default fetcher', async () => {
+    const originalFetch = globalThis.fetch;
+
+    globalThis.fetch = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            items: [createLipasPark()],
+            pagination: {
+              'current-page': 1,
+              'page-size': 100,
+              'total-items': 2,
+              'total-pages': 2
+            }
+          }),
+          {
+            status: 200
+          }
+        )
+      )
+      .mockResolvedValueOnce(
+        new Response('broken second page', {
+          status: 502
+        })
+      ) as typeof fetch;
+
+    try {
+      await expect(
+        importParks({
+          database: testDatabase.database,
+          expectedActiveCount: 2,
+          sourceUrl: 'https://example.test/lipas?page=1&page-size=100'
+        })
+      ).rejects.toThrow('LIPAS import failed with status 502 on page 2.');
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  it('falls back to combined item counts when pagination metadata is missing on later pages', async () => {
+    const originalFetch = globalThis.fetch;
+
+    globalThis.fetch = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            items: [createLipasPark()],
+            pagination: {
+              'current-page': 1,
+              'page-size': 100,
+              'total-items': 2,
+              'total-pages': 2
+            }
+          }),
+          {
+            status: 200
+          }
+        )
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            items: [
+              createLipasPark({
+                'lipas-id': 30003,
+                name: 'Kolmas sivu'
+              })
+            ]
+          }),
+          {
+            status: 200
+          }
+        )
+      ) as typeof fetch;
+
+    try {
+      const result = await importParks({
+        database: testDatabase.database,
+        expectedActiveCount: 2,
+        sourceUrl: 'https://example.test/lipas?page=1&page-size=100'
+      });
+
+      expect(result.activeCount).toBe(2);
+      await expect(listParks(testDatabase.database)).resolves.toHaveLength(2);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
 });

@@ -16,6 +16,6 @@ export function getEnv() {
     LIPAS_PROTECTED_AREAS_URL:
       env.LIPAS_PROTECTED_AREAS_URL ??
       env.LIPAS_NATIONAL_PARKS_URL ??
-      'https://api.lipas.fi/v2/sports-sites?type-codes=109,110,111,112&page-size=200&page=1'
+      'https://api.lipas.fi/v2/sports-sites?type-codes=109,110,111,112&page-size=100&page=1'
   };
 }

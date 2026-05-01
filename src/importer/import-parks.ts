@@ -11,7 +11,13 @@ import {
 import { mapLipasPark } from './map-lipas-park.js';
 
 const lipasResponseSchema = z.object({
-  items: z.array(z.unknown())
+  items: z.array(z.unknown()),
+  pagination: z.object({
+    'current-page': z.number().int(),
+    'page-size': z.number().int(),
+    'total-items': z.number().int(),
+    'total-pages': z.number().int()
+  }).optional()
 });
 
 type ImportParksOptions = {
@@ -25,13 +31,45 @@ type ImportParksOptions = {
 const RESPONSE_SHAPE_VERSION = 'catalog-v2';
 
 async function defaultFetchSource(sourceUrl: string) {
-  const response = await fetch(sourceUrl);
+  const firstResponse = await fetch(sourceUrl);
 
-  if (!response.ok) {
-    throw new Error(`LIPAS import failed with status ${response.status}.`);
+  if (!firstResponse.ok) {
+    throw new Error(`LIPAS import failed with status ${firstResponse.status}.`);
   }
 
-  return response.json();
+  const firstPayload = lipasResponseSchema.parse(await firstResponse.json());
+  const totalPages = firstPayload.pagination?.['total-pages'] ?? 1;
+
+  if (totalPages === 1) {
+    return firstPayload;
+  }
+
+  const firstPagination = firstPayload.pagination!;
+  const combinedItems = [...firstPayload.items];
+
+  for (let page = 2; page <= totalPages; page += 1) {
+    const pageUrl = new URL(sourceUrl);
+    pageUrl.searchParams.set('page', String(page));
+
+    const response = await fetch(pageUrl);
+
+    if (!response.ok) {
+      throw new Error(`LIPAS import failed with status ${response.status} on page ${page}.`);
+    }
+
+    const payload = lipasResponseSchema.parse(await response.json());
+    combinedItems.push(...payload.items);
+  }
+
+  return {
+    items: combinedItems,
+    pagination: {
+      'current-page': 1,
+      'page-size': firstPagination['page-size'],
+      'total-items': firstPagination['total-items'],
+      'total-pages': totalPages
+    }
+  };
 }
 
 function ensureUniqueSlug(baseSlug: string, lipasId: number, takenSlugs: Set<string>) {

@@ -38,7 +38,7 @@ Default environment:
 ```sh
 DATABASE_URL=file:./data/local.db
 DATABASE_AUTH_TOKEN=
-LIPAS_PROTECTED_AREAS_URL=https://api.lipas.fi/v2/sports-sites?type-codes=109,110,111,112&page-size=200&page=1
+LIPAS_PROTECTED_AREAS_URL=https://api.lipas.fi/v2/sports-sites?type-codes=109,110,111,112&page-size=100&page=1
 ```
 
 ## API Shape
@@ -67,7 +67,7 @@ Catalog endpoints stay cache-friendly and database-backed:
 The catalog importer should use:
 
 ```text
-https://api.lipas.fi/v2/sports-sites?type-codes=109,110,111,112&page-size=200&page=1
+https://api.lipas.fi/v2/sports-sites?type-codes=109,110,111,112&page-size=100&page=1
 ```
 
 Importer expectations:
