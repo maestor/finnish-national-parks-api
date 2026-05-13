@@ -2,7 +2,7 @@ import { and, desc, eq, inArray, notInArray, sql } from 'drizzle-orm';
 
 import type { SupportedParkTypeSlug } from '../parks/park-types.js';
 import { supportedParkTypes } from '../parks/park-types.js';
-import type { Database } from './database.js';
+import type { Database, DbClient } from './database.js';
 import { importRuns, parkNotes, parks, parkTypes, parkVisits } from './schema.js';
 
 type PutVisitInput = {
@@ -191,7 +191,7 @@ const buildPersonalPark = async (database: Database, row: TypedParkRow) => {
   };
 };
 
-export const syncParkTypes = async (database: Database) => {
+export const syncParkTypes = async (database: DbClient) => {
   await database
     .insert(parkTypes)
     .values([...supportedParkTypes])
@@ -206,7 +206,7 @@ export const syncParkTypes = async (database: Database) => {
 };
 
 export const createImportRun = async (
-  database: Database,
+  database: DbClient,
   values: typeof importRuns.$inferInsert
 ) => {
   const row = (
@@ -374,7 +374,7 @@ export const deleteVisit = async (database: Database, visitId: number) => {
 };
 
 export const upsertImportedPark = async (
-  database: Database,
+  database: DbClient,
   values: Omit<typeof parks.$inferInsert, 'id'>
 ) => {
   await database
@@ -408,7 +408,7 @@ export const upsertImportedPark = async (
 };
 
 export const markMissingParksInactive = async (
-  database: Database,
+  database: DbClient,
   activeLipasIds: number[],
   lastImportRunId: number,
   updatedAt: string

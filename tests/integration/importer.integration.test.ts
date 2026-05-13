@@ -1,5 +1,4 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-
 import {
   createVisit,
   getParkBySlug,
@@ -7,6 +6,7 @@ import {
   listParks,
   putParkNote
 } from '../../src/db/repositories.js';
+import { importRuns } from '../../src/db/schema.js';
 import { importParks } from '../../src/importer/import-parks.js';
 import { createLipasPark, parkTypeFixtures } from '../fixtures/lipas.js';
 import { createTestDatabase } from '../helpers/test-db.js';
@@ -402,5 +402,57 @@ describe('importParks', () => {
     } finally {
       globalThis.fetch = originalFetch;
     }
+  });
+
+  it('rolls back all catalog changes on mid-import failure', async () => {
+    await importParks({
+      database: testDatabase.database,
+      expectedActiveCount: 2,
+      now: () => '2026-05-01T08:00:00.000Z',
+      sourceUrl: 'https://example.test/lipas',
+      fetchSource: async () => ({
+        items: [
+          createLipasPark(),
+          createLipasPark({
+            'lipas-id': 99998,
+            name: 'Toinen puisto'
+          })
+        ]
+      })
+    });
+
+    const parksBefore = await listParks(testDatabase.database);
+    const runsBefore = await testDatabase.database.select().from(importRuns);
+
+    await expect(
+      importParks({
+        database: testDatabase.database,
+        expectedActiveCount: 2,
+        now: () => '2026-05-02T08:00:00.000Z',
+        sourceUrl: 'https://example.test/lipas',
+        fetchSource: async () => ({
+          items: [
+            createLipasPark({
+              name: 'Päivitetty nimi'
+            }),
+            createLipasPark({
+              'lipas-id': 99998,
+              name: 'Päivitetty toinen'
+            })
+          ]
+        }),
+        beforeEachUpsert: (index) => {
+          if (index === 1) {
+            throw new Error('Simulated mid-import failure.');
+          }
+        }
+      })
+    ).rejects.toThrow('Simulated mid-import failure.');
+
+    const parksAfter = await listParks(testDatabase.database);
+    const runsAfter = await testDatabase.database.select().from(importRuns);
+
+    expect(parksAfter).toEqual(parksBefore);
+    expect(runsAfter).toEqual(runsBefore);
   });
 });

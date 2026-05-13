@@ -25,6 +25,7 @@ const lipasResponseSchema = z.object({
 type ImportParksOptions = {
   database: Database;
   expectedActiveCount?: number;
+  beforeEachUpsert?: (index: number, lipasId: number) => void | Promise<void>;
   fetchSource?: (sourceUrl: string) => Promise<unknown>;
   now?: () => string;
   sourceUrl: string;
@@ -88,6 +89,7 @@ const ensureUniqueSlug = (baseSlug: string, lipasId: number, takenSlugs: Set<str
 export const importParks = async ({
   database,
   expectedActiveCount = 137,
+  beforeEachUpsert,
   fetchSource = defaultFetchSource,
   now = () => new Date().toISOString(),
   sourceUrl
@@ -112,50 +114,60 @@ export const importParks = async ({
 
   await syncParkTypes(database);
 
-  const importRunId = await createImportRun(database, {
-    activeCount: activeItems.length,
-    importedAt,
-    responseShapeVersion: RESPONSE_SHAPE_VERSION,
-    sourceUrl
-  });
+  let importRunId: number;
 
-  for (const item of activeItems) {
-    const lipasId = (item as { 'lipas-id': number })['lipas-id'];
-    const mapped = mapLipasPark(item, existingSlugByLipasId.get(lipasId));
-    const slug =
-      existingSlugByLipasId.get(lipasId) ?? ensureUniqueSlug(mapped.slug, lipasId, takenSlugs);
-
-    await upsertImportedPark(database, {
-      areaKm2: mapped.areaKm2,
-      bboxMaxLat: mapped.boundingBox.maxLat,
-      bboxMaxLon: mapped.boundingBox.maxLon,
-      bboxMinLat: mapped.boundingBox.minLat,
-      bboxMinLon: mapped.boundingBox.minLon,
-      boundaryGeojson: JSON.stringify(mapped.boundaryGeoJson),
-      catalogStatus: 'active',
-      createdAt: importedAt,
-      establishmentYear: mapped.establishmentYear,
-      lastImportRunId: importRunId,
-      lipasId: mapped.lipasId,
-      locationLabel: mapped.locationLabel,
-      luontoonUrl: mapped.luontoonUrl,
-      markerLat: mapped.markerPoint.lat,
-      markerLon: mapped.markerPoint.lon,
-      municipalityCode: mapped.municipalityCode,
-      name: mapped.name,
-      postalOffice: mapped.postalOffice,
-      slug,
-      sourceEventDate: mapped.sourceEventDate,
-      typeId: mapped.type.id,
-      updatedAt: importedAt
+  await database.transaction(async (tx) => {
+    importRunId = await createImportRun(tx, {
+      activeCount: activeItems.length,
+      importedAt,
+      responseShapeVersion: RESPONSE_SHAPE_VERSION,
+      sourceUrl
     });
-  }
 
-  await markMissingParksInactive(database, lipasIds, importRunId, importedAt);
+    for (let index = 0; index < activeItems.length; index += 1) {
+      const item = activeItems[index];
+      const lipasId = (item as { 'lipas-id': number })['lipas-id'];
+
+      if (beforeEachUpsert) {
+        await beforeEachUpsert(index, lipasId);
+      }
+
+      const mapped = mapLipasPark(item, existingSlugByLipasId.get(lipasId));
+      const slug =
+        existingSlugByLipasId.get(lipasId) ?? ensureUniqueSlug(mapped.slug, lipasId, takenSlugs);
+
+      await upsertImportedPark(tx, {
+        areaKm2: mapped.areaKm2,
+        bboxMaxLat: mapped.boundingBox.maxLat,
+        bboxMaxLon: mapped.boundingBox.maxLon,
+        bboxMinLat: mapped.boundingBox.minLat,
+        bboxMinLon: mapped.boundingBox.minLon,
+        boundaryGeojson: JSON.stringify(mapped.boundaryGeoJson),
+        catalogStatus: 'active',
+        createdAt: importedAt,
+        establishmentYear: mapped.establishmentYear,
+        lastImportRunId: importRunId,
+        lipasId: mapped.lipasId,
+        locationLabel: mapped.locationLabel,
+        luontoonUrl: mapped.luontoonUrl,
+        markerLat: mapped.markerPoint.lat,
+        markerLon: mapped.markerPoint.lon,
+        municipalityCode: mapped.municipalityCode,
+        name: mapped.name,
+        postalOffice: mapped.postalOffice,
+        slug,
+        sourceEventDate: mapped.sourceEventDate,
+        typeId: mapped.type.id,
+        updatedAt: importedAt
+      });
+    }
+
+    await markMissingParksInactive(tx, lipasIds, importRunId, importedAt);
+  });
 
   return {
     activeCount: activeItems.length,
-    importRunId,
+    importRunId: importRunId!,
     importedAt
   };
 };
