@@ -20,4 +20,17 @@ describe('health endpoint', () => {
     expect(response.status).toBe(200);
     expect(document.paths['/health']).toBeDefined();
   });
+
+  it('returns safe 500 for unhandled errors without leaking stack traces', async () => {
+    const app = createApp();
+    app.get('/test-error', () => {
+      throw new Error('Unexpected failure');
+    });
+
+    const response = await app.request('/test-error');
+    const body = (await response.json()) as { error: string };
+
+    expect(response.status).toBe(500);
+    expect(body.error).toBe('Internal server error.');
+  });
 });

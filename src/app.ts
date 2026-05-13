@@ -20,6 +20,7 @@ import {
   hasMatchingEtag,
   PRIVATE_CACHE_CONTROL
 } from './http/cache.js';
+import { logger } from './http/logger.js';
 import { healthRoute } from './routes/health.js';
 import {
   createVisitRoute,
@@ -45,6 +46,25 @@ const jsonNotFound = (error: string) => {
 
 export const createApp = ({ apiKey, database }: AppDependencies = {}) => {
   const app = new OpenAPIHono();
+
+  app.use(async (c, next) => {
+    const start = Date.now();
+    await next();
+    logger.info(
+      {
+        duration: Date.now() - start,
+        method: c.req.method,
+        path: c.req.path,
+        status: c.res.status
+      },
+      'request'
+    );
+  });
+
+  app.onError((err, c) => {
+    logger.error({ err: err.message, path: c.req.path }, 'Unhandled error');
+    return c.json({ error: 'Internal server error.' }, 500);
+  });
 
   app.use(createAuthMiddleware(apiKey));
 
@@ -101,6 +121,7 @@ export const createApp = ({ apiKey, database }: AppDependencies = {}) => {
       const { slug } = context.req.valid('param');
       const query = context.req.valid('query');
       const includeBoundary = query.includeBoundary === 'true';
+      const omitBoundary = query.includeBoundary === 'false' || !query.includeBoundary;
       const park = await getParkBySlug(database, slug);
 
       if (!park) {
@@ -125,7 +146,7 @@ export const createApp = ({ apiKey, database }: AppDependencies = {}) => {
       return context.json(
         {
           ...park,
-          ...(includeBoundary ? {} : { boundaryGeoJson: undefined })
+          ...(omitBoundary ? { boundaryGeoJson: undefined } : {})
         },
         200
       );

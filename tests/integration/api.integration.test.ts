@@ -171,6 +171,17 @@ describe('API routes', () => {
     expect(cachedResponse.status).toBe(304);
   });
 
+  it('explicitly omits boundary geometry when includeBoundary=false', async () => {
+    const app = createApp({ database: testDatabase.database });
+    const response = await app.request(
+      '/api/parks/akasmannyn-kansallispuisto?includeBoundary=false'
+    );
+    const body = (await response.json()) as Record<string, unknown>;
+
+    expect(response.status).toBe(200);
+    expect(body).not.toHaveProperty('boundaryGeoJson');
+  });
+
   it('filters the public park list by type slug', async () => {
     const app = createApp({ database: testDatabase.database });
     const response = await app.request('/api/parks?type=state-hiking-area');
