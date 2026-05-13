@@ -40,9 +40,18 @@ DATABASE_URL=file:./data/local.db
 DATABASE_AUTH_TOKEN=
 LIPAS_PROTECTED_AREAS_URL=https://api.lipas.fi/v2/sports-sites?type-codes=109,110,111,112&page-size=100&page=1
 PORT=3004
+
+# Google OAuth (optional — only needed for control-panel login)
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+AUTH_JWT_SECRET=change-me-to-a-long-random-string
+AUTH_COOKIE_NAME=__session
+FRONTEND_URL=http://localhost:4300
 ```
 
 All variables are optional for local development — sensible defaults are built in. `API_KEY` is only required if you want to test authenticated access locally; localhost requests bypass auth even when it is set.
+
+OAuth routes (`/auth/*`) are only registered when `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, and `AUTH_JWT_SECRET` are all provided.
 
 Turso/Vercel deployment variables should use the same names where possible:
 
@@ -84,8 +93,19 @@ Current table groups:
 - personal park notes
 - personal visit records
 - import run metadata
+- admin allowlist (`admins`)
 
 Personal data must not be removed by catalog synchronization.
+
+### Admin Allowlist
+
+The `admins` table stores allowed Google email addresses for control-panel access. It contains only `email`, `created_at`, and `updated_at` — no Google IDs, names, or pictures are persisted.
+
+Add an admin manually:
+
+```sh
+sqlite3 data/local.db "INSERT INTO admins (email, created_at, updated_at) VALUES ('admin@example.com', datetime('now'), datetime('now'));"
+```
 
 Local development should use a file database. Production should target Turso with the same Drizzle schema and libSQL client path.
 
@@ -100,7 +120,8 @@ Key route behavior:
 - `GET /api/parks/:slug?includeBoundary=true` returns the stored boundary GeoJSON.
 - Catalog routes emit deterministic `ETag` headers and support `304 Not Modified`.
 - Personal routes use `private, no-store`.
-- All non-public endpoints (everything except `/health` and `/openapi.json`) require API key authentication; localhost requests are exempt.
+- Auth routes (`/auth/*`) bypass API key authentication so the OAuth flow can complete without a bearer token.
+- All other non-public endpoints require API key authentication; localhost requests are exempt.
 
 ## Deployment Direction
 

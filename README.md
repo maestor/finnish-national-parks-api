@@ -47,6 +47,12 @@ DATABASE_URL=file:./data/local.db
 DATABASE_AUTH_TOKEN=
 API_KEY=your-local-dev-key
 LIPAS_PROTECTED_AREAS_URL=https://api.lipas.fi/v2/sports-sites?type-codes=109,110,111,112&page-size=100&page=1
+
+# Optional: enable Google OAuth login for the control panel
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+AUTH_JWT_SECRET=change-me-to-a-long-random-string
+FRONTEND_URL=http://localhost:4300
 ```
 
 ## API Shape
@@ -61,6 +67,13 @@ LIPAS_PROTECTED_AREAS_URL=https://api.lipas.fi/v2/sports-sites?type-codes=109,11
 - `POST /api/me/parks/:slug/visits`
 - `PATCH /api/me/visits/:id`
 - `DELETE /api/me/visits/:id`
+
+Auth endpoints for control-panel login:
+
+- `GET /auth/google`
+- `GET /auth/google/callback`
+- `GET /auth/me`
+- `POST /auth/logout`
 
 Catalog endpoints stay cache-friendly and database-backed:
 

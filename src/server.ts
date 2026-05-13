@@ -12,6 +12,16 @@ const client = createDatabaseClient();
 
 const app = createApp({
   apiKey: env.API_KEY,
+  auth:
+    env.AUTH_JWT_SECRET && env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET
+      ? {
+          cookieName: env.AUTH_COOKIE_NAME,
+          frontendUrl: env.FRONTEND_URL,
+          googleClientId: env.GOOGLE_CLIENT_ID,
+          googleClientSecret: env.GOOGLE_CLIENT_SECRET,
+          jwtSecret: env.AUTH_JWT_SECRET
+        }
+      : undefined,
   database: createDatabase(client)
 });
 

@@ -56,6 +56,10 @@ Use mutation testing for:
 - Personal endpoints are private or no-store and contain notes/visit state.
 - Note upsert creates and updates one personal note per park.
 - Visit create/edit/delete works against a real temporary database.
+- Auth routes bypass bearer-token middleware.
+- Google OAuth callback validates state/PKCE, verifies the ID token, checks the admin allowlist, and sets a session cookie.
+- `GET /auth/me` returns the current user from a valid session or `401` otherwise.
+- `POST /auth/logout` clears the session cookie.
 - Runtime API handlers are implemented against the same Zod/OpenAPI contract definitions.
 
 ## Required Scripts
