@@ -12,6 +12,7 @@ import {
   putParkNote,
   updateVisit
 } from './db/repositories.js';
+import { createAuthMiddleware } from './http/auth.js';
 import {
   CATALOG_CACHE_CONTROL,
   createCatalogDetailEtag,
@@ -32,6 +33,7 @@ import {
 } from './routes/parks.js';
 
 type AppDependencies = {
+  apiKey?: string | undefined;
   database?: Database;
 };
 
@@ -41,10 +43,12 @@ const jsonNotFound = (error: string) => {
   };
 };
 
-export const createApp = ({ database }: AppDependencies = {}) => {
+export const createApp = ({ apiKey, database }: AppDependencies = {}) => {
   const app = new OpenAPIHono();
 
-  app.openAPIRegistry.registerComponent('securitySchemes', 'none', {
+  app.use(createAuthMiddleware(apiKey));
+
+  app.openAPIRegistry.registerComponent('securitySchemes', 'bearerAuth', {
     type: 'http',
     scheme: 'bearer'
   });

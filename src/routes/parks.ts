@@ -18,6 +18,7 @@ export const listParksRoute = createRoute({
   method: 'get',
   path: '/api/parks',
   tags: ['Catalog'],
+  security: [{ bearerAuth: [] }],
   request: {
     query: z.object({
       type: z.enum(supportedParkTypeSlugs).optional()
@@ -42,6 +43,7 @@ export const getParkRoute = createRoute({
   method: 'get',
   path: '/api/parks/{slug}',
   tags: ['Catalog'],
+  security: [{ bearerAuth: [] }],
   request: {
     params: z.object({
       slug: z.string()
@@ -77,6 +79,7 @@ export const listPersonalParksRoute = createRoute({
   method: 'get',
   path: '/api/me/parks',
   tags: ['Personal'],
+  security: [{ bearerAuth: [] }],
   responses: {
     200: {
       description: 'Personal park list',
@@ -93,6 +96,7 @@ export const getPersonalParkRoute = createRoute({
   method: 'get',
   path: '/api/me/parks/{slug}',
   tags: ['Personal'],
+  security: [{ bearerAuth: [] }],
   request: {
     params: z.object({
       slug: z.string()
@@ -122,6 +126,7 @@ export const putParkNoteRoute = createRoute({
   method: 'put',
   path: '/api/me/parks/{slug}/note',
   tags: ['Personal'],
+  security: [{ bearerAuth: [] }],
   request: {
     params: z.object({
       slug: z.string()
@@ -158,6 +163,7 @@ export const createVisitRoute = createRoute({
   method: 'post',
   path: '/api/me/parks/{slug}/visits',
   tags: ['Personal'],
+  security: [{ bearerAuth: [] }],
   request: {
     params: z.object({
       slug: z.string()
@@ -194,6 +200,7 @@ export const updateVisitRoute = createRoute({
   method: 'patch',
   path: '/api/me/visits/{id}',
   tags: ['Personal'],
+  security: [{ bearerAuth: [] }],
   request: {
     params: z.object({
       id: z.coerce.number().int()
@@ -230,6 +237,7 @@ export const deleteVisitRoute = createRoute({
   method: 'delete',
   path: '/api/me/visits/{id}',
   tags: ['Personal'],
+  security: [{ bearerAuth: [] }],
   request: {
     params: z.object({
       id: z.coerce.number().int()

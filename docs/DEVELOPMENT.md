@@ -22,13 +22,23 @@ npm run dev
 
 ## Environment
 
-Environment variables:
+Copy `.env.example` to `.env` and adjust as needed:
 
 ```sh
+cp .env.example .env
+```
+
+Available variables:
+
+```sh
+API_KEY=your-local-dev-key
 DATABASE_URL=file:./data/local.db
 DATABASE_AUTH_TOKEN=
 LIPAS_PROTECTED_AREAS_URL=https://api.lipas.fi/v2/sports-sites?type-codes=109,110,111,112&page-size=100&page=1
+PORT=3004
 ```
+
+All variables are optional for local development — sensible defaults are built in. `API_KEY` is only required if you want to test authenticated access locally; localhost requests bypass auth even when it is set.
 
 Turso/Vercel deployment variables should use the same names where possible:
 
@@ -37,7 +47,7 @@ DATABASE_URL=libsql://...
 DATABASE_AUTH_TOKEN=...
 ```
 
-The local SQLite/libSQL file should not be committed.
+The local SQLite/libSQL file and `.env` itself should not be committed.
 
 ## Importer Workflow
 
