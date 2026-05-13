@@ -105,13 +105,13 @@ export const createApp = ({ apiKey, auth, database }: AppDependencies = {}) => {
   });
 
   if (auth) {
-    app.use(
-      '/auth/*',
-      cors({
-        credentials: true,
-        origin: auth.frontendUrl
-      })
-    );
+    const authCors = cors({
+      credentials: true,
+      origin: auth.frontendUrl
+    });
+
+    app.use('/auth/*', authCors);
+    app.use('/api/*', authCors);
   }
 
   app.use(createAuthMiddleware(apiKey));

@@ -1,5 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
+const authConfig = {
+  cookieName: '__session',
+  frontendUrl: 'http://localhost:4300',
+  googleClientId: 'test-google-client-id',
+  googleClientSecret: 'test-google-client-secret',
+  jwtSecret: 'test-jwt-secret-at-least-32-characters-long'
+};
+
 import { createApp } from '../../src/app.js';
 import { importParks } from '../../src/importer/import-parks.js';
 import { createLipasPark, parkTypeFixtures } from '../fixtures/lipas.js';
@@ -365,5 +373,51 @@ describe('API routes', () => {
     expect(missingVisit.status).toBe(404);
     expect(missingVisitPatch.status).toBe(404);
     expect(missingVisitDelete.status).toBe(404);
+  });
+
+  it('returns CORS headers for preflight requests on API routes', async () => {
+    const app = createApp({ auth: authConfig, database: testDatabase.database });
+    const response = await app.request('/api/me/parks/akasmannyn-kansallispuisto/visits', {
+      headers: {
+        'access-control-request-headers': 'content-type',
+        'access-control-request-method': 'POST',
+        origin: authConfig.frontendUrl
+      },
+      method: 'OPTIONS'
+    });
+
+    expect(response.status).toBe(204);
+    expect(response.headers.get('access-control-allow-origin')).toBe(authConfig.frontendUrl);
+    expect(response.headers.get('access-control-allow-credentials')).toBe('true');
+    expect(response.headers.get('access-control-allow-methods')).toContain('POST');
+  });
+
+  it('returns CORS headers for actual cross-origin API requests', async () => {
+    const app = createApp({ auth: authConfig, database: testDatabase.database });
+    const response = await app.request('/api/me/parks/akasmannyn-kansallispuisto/visits', {
+      body: JSON.stringify({ visitedOn: '2026-04-20' }),
+      headers: {
+        'content-type': 'application/json',
+        origin: authConfig.frontendUrl
+      },
+      method: 'POST'
+    });
+
+    expect(response.status).toBe(201);
+    expect(response.headers.get('access-control-allow-origin')).toBe(authConfig.frontendUrl);
+    expect(response.headers.get('access-control-allow-credentials')).toBe('true');
+  });
+
+  it('returns CORS headers for catalog API routes', async () => {
+    const app = createApp({ auth: authConfig, database: testDatabase.database });
+    const response = await app.request('/api/parks', {
+      headers: {
+        origin: authConfig.frontendUrl
+      }
+    });
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('access-control-allow-origin')).toBe(authConfig.frontendUrl);
+    expect(response.headers.get('access-control-allow-credentials')).toBe('true');
   });
 });
