@@ -6,6 +6,7 @@ import {
   getCatalogListEtagSeed,
   getParkBySlug,
   getPersonalParkBySlug,
+  listPersonalParks,
   putParkNote,
   updateVisit
 } from '../../src/db/repositories.js';
@@ -37,6 +38,12 @@ describe('repositories', () => {
   it('returns null for missing parks and can clear notes explicitly', async () => {
     await expect(getParkBySlug(testDatabase.database, 'missing-park')).resolves.toBeNull();
     await expect(getPersonalParkBySlug(testDatabase.database, 'missing-park')).resolves.toBeNull();
+
+    const personalParkBeforeNote = await getPersonalParkBySlug(
+      testDatabase.database,
+      'akasmannyn-kansallispuisto'
+    );
+    expect(personalParkBeforeNote?.note).toBeNull();
 
     await putParkNote(testDatabase.database, 'akasmannyn-kansallispuisto', 'Keep this note');
     await expect(
@@ -108,5 +115,84 @@ describe('repositories', () => {
       latestUpdatedAt: null,
       typeSlug: null
     });
+  });
+
+  it('returns empty personal parks list when no active parks remain', async () => {
+    await importParks({
+      database: testDatabase.database,
+      expectedActiveCount: 0,
+      now: () => '2026-05-02T10:00:00.000Z',
+      sourceUrl: 'https://example.test/lipas',
+      fetchSource: async () => ({
+        items: [
+          createLipasPark({
+            status: 'incorrect-data'
+          })
+        ]
+      })
+    });
+
+    await expect(listPersonalParks(testDatabase.database)).resolves.toEqual([]);
+  });
+
+  it('batch-aggregates notes and visits across multiple parks', async () => {
+    await importParks({
+      database: testDatabase.database,
+      expectedActiveCount: 2,
+      now: () => '2026-05-01T10:00:00.000Z',
+      sourceUrl: 'https://example.test/lipas',
+      fetchSource: async () => ({
+        items: [
+          createLipasPark(),
+          createLipasPark({
+            'lipas-id': 99999,
+            name: 'Toinen puisto'
+          })
+        ]
+      })
+    });
+
+    await putParkNote(testDatabase.database, 'akasmannyn-kansallispuisto', 'Note A');
+    await createVisit(testDatabase.database, 'akasmannyn-kansallispuisto', {
+      note: 'Visit A1',
+      visitedOn: '2026-04-10'
+    });
+    await createVisit(testDatabase.database, 'akasmannyn-kansallispuisto', {
+      note: 'Visit A2',
+      visitedOn: '2026-04-11'
+    });
+    await putParkNote(testDatabase.database, 'toinen-puisto', 'Note B');
+    await createVisit(testDatabase.database, 'toinen-puisto', {
+      visitedOn: '2026-03-20'
+    });
+
+    const result = await listPersonalParks(testDatabase.database);
+
+    expect(result).toHaveLength(2);
+
+    const first = result.find((p) => p.slug === 'akasmannyn-kansallispuisto');
+    const second = result.find((p) => p.slug === 'toinen-puisto');
+
+    expect(first).toMatchObject({
+      note: { note: 'Note A' },
+      visitedSummary: {
+        visited: true,
+        visitCount: 2,
+        lastVisitedOn: '2026-04-11'
+      }
+    });
+    expect(first?.visits).toHaveLength(2);
+    expect(first?.visits[0]).toMatchObject({ note: 'Visit A2', visitedOn: '2026-04-11' });
+
+    expect(second).toMatchObject({
+      note: { note: 'Note B' },
+      visitedSummary: {
+        visited: true,
+        visitCount: 1,
+        lastVisitedOn: '2026-03-20'
+      }
+    });
+    expect(second?.visits).toHaveLength(1);
+    expect(second?.visits[0]).toMatchObject({ note: null, visitedOn: '2026-03-20' });
   });
 });
