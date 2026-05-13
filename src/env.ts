@@ -8,7 +8,7 @@ const envSchema = z.object({
   PORT: z.string().optional()
 });
 
-export function getEnv() {
+export const getEnv = () => {
   const env = envSchema.parse(process.env);
 
   return {
@@ -18,4 +18,4 @@ export function getEnv() {
       env.LIPAS_NATIONAL_PARKS_URL ??
       'https://api.lipas.fi/v2/sports-sites?type-codes=109,110,111,112&page-size=100&page=1'
   };
-}
+};

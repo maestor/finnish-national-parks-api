@@ -2,7 +2,7 @@ import { createClient } from '@libsql/client';
 
 import { getEnv } from '../env.js';
 
-export function createDatabaseClient() {
+export const createDatabaseClient = () => {
   const env = getEnv();
 
   return createClient(
@@ -15,4 +15,4 @@ export function createDatabaseClient() {
           url: env.DATABASE_URL
         }
   );
-}
+};

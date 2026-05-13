@@ -39,7 +39,9 @@ describe('repositories', () => {
     await expect(getPersonalParkBySlug(testDatabase.database, 'missing-park')).resolves.toBeNull();
 
     await putParkNote(testDatabase.database, 'akasmannyn-kansallispuisto', 'Keep this note');
-    await expect(putParkNote(testDatabase.database, 'akasmannyn-kansallispuisto', '   ')).resolves.toBeNull();
+    await expect(
+      putParkNote(testDatabase.database, 'akasmannyn-kansallispuisto', '   ')
+    ).resolves.toBeNull();
   });
 
   it('preserves an existing visit note when only the date changes and reports missing deletes', async () => {

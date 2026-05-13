@@ -11,7 +11,9 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
-    "verify": "npm run typecheck && npm run test:coverage"
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
+    "verify": "npm run typecheck && npm run lint && npm run test:coverage"
   },
   "dependencies": {
     "@hono/node-server": "^1.19.6",
@@ -22,6 +24,7 @@
     "zod": "^4.1.5"
   },
   "devDependencies": {
+    "@biomejs/biome": "^2.4.15",
     "@types/node": "^24.6.0",
     "@vitest/coverage-v8": "^3.2.4",
     "tsx": "^4.20.5",

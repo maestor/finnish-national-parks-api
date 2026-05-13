@@ -146,7 +146,9 @@ describe('API routes', () => {
     const summaryResponse = await app.request('/api/parks/akasmannyn-kansallispuisto');
     const summaryBody = (await summaryResponse.json()) as Record<string, unknown>;
     const etag = summaryResponse.headers.get('etag');
-    const response = await app.request('/api/parks/akasmannyn-kansallispuisto?includeBoundary=true');
+    const response = await app.request(
+      '/api/parks/akasmannyn-kansallispuisto?includeBoundary=true'
+    );
     const body = (await response.json()) as Record<string, unknown>;
     const cachedResponse = await app.request('/api/parks/akasmannyn-kansallispuisto', {
       headers: {
@@ -182,14 +184,16 @@ describe('API routes', () => {
     };
 
     expect(response.status).toBe(200);
-    expect(body.parks).toEqual(expect.arrayContaining([
-      expect.objectContaining({
-        name: 'Evon retkeilyalue',
-        type: expect.objectContaining({
-          slug: parkTypeFixtures.stateHikingArea.slug
+    expect(body.parks).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          name: 'Evon retkeilyalue',
+          type: expect.objectContaining({
+            slug: parkTypeFixtures.stateHikingArea.slug
+          })
         })
-      })
-    ]));
+      ])
+    );
     expect(body.parks).toHaveLength(1);
     expect(response.headers.get('etag')).toContain(parkTypeFixtures.stateHikingArea.slug);
   });
@@ -210,16 +214,19 @@ describe('API routes', () => {
     expect(noteResponse.status).toBe(200);
     expect(noteResponse.headers.get('cache-control')).toBe('private, no-store');
 
-    const createVisitResponse = await app.request('/api/me/parks/akasmannyn-kansallispuisto/visits', {
-      method: 'POST',
-      body: JSON.stringify({
-        note: 'Windy but sunny.',
-        visitedOn: '2026-04-20'
-      }),
-      headers: {
-        'content-type': 'application/json'
+    const createVisitResponse = await app.request(
+      '/api/me/parks/akasmannyn-kansallispuisto/visits',
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          note: 'Windy but sunny.',
+          visitedOn: '2026-04-20'
+        }),
+        headers: {
+          'content-type': 'application/json'
+        }
       }
-    });
+    );
     const createdVisit = (await createVisitResponse.json()) as { id: number };
 
     expect(createVisitResponse.status).toBe(201);

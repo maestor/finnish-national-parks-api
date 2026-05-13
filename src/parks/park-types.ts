@@ -40,7 +40,7 @@ const parkTypeBySlug = new Map<string, SupportedParkType>(
   supportedParkTypes.map((parkType) => [parkType.slug, parkType])
 );
 
-export function getSupportedParkTypeByCode(code: number) {
+export const getSupportedParkTypeByCode = (code: number) => {
   const parkType = parkTypeByCode.get(code);
 
   if (!parkType) {
@@ -48,9 +48,9 @@ export function getSupportedParkTypeByCode(code: number) {
   }
 
   return parkType;
-}
+};
 
-export function getSupportedParkTypeBySlug(slug: string) {
+export const getSupportedParkTypeBySlug = (slug: string) => {
   const parkType = parkTypeBySlug.get(slug);
 
   if (!parkType) {
@@ -58,4 +58,4 @@ export function getSupportedParkTypeBySlug(slug: string) {
   }
 
   return parkType;
-}
+};
