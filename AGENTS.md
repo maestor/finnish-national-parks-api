@@ -2,12 +2,6 @@
 
 This repository is for a local-first TypeScript API that imports Finnish national park catalog data, stores it in an owned database, and exposes it for a future personal map application.
 
-## Current Phase
-
-- The repository is in planning and documentation setup.
-- Do not scaffold the application, install dependencies, create migrations, or implement API routes unless the user explicitly asks for implementation.
-- Treat [docs/plans/2026-05-01-finnish-national-parks-api-v1.md](docs/plans/2026-05-01-finnish-national-parks-api-v1.md) as the current source of truth for the first implementation pass.
-
 ## Intended Stack
 
 - TypeScript on Node.js.
@@ -57,6 +51,17 @@ This repository is for a local-first TypeScript API that imports Finnish nationa
 
 ## Git And Change Hygiene
 
+- **PR-based workflow:** All changes must be developed on a dedicated branch (`feature/<name>`, `bugfix/<name>`, `chore/<name>`, `docs/<name>`, etc.) and submitted as a pull request against `main`. Do not push directly to `main`.
+- **Commit conventions:** Use meaningful, independent commits with descriptive prefixes:
+  - `Feature:` — new behavior or endpoints
+  - `Fix:` — bug fixes
+  - `Chore:` — tooling, dependencies, config
+  - `Docs:` — documentation updates
+  - `Refactor:` — code restructuring without behavior change
+  - `Test:` — test-only changes
+- A single PR may contain multiple commits.
+- **Quality gate:** `npm run verify` must pass before any task or PR is considered ready. The only exception is changes that are entirely outside what `verify` validates — for example, pure documentation updates (README, DEVELOPMENT, TESTING, AGENTS, plans) or repository configuration that does not affect code, tests, or types. In those cases, skip `verify` and note the exception in the PR description.
+- **Review requirement:** User review and explicit acceptance are required before merging.
 - Keep documentation-only changes separate from implementation changes when practical.
 - Do not revert user changes.
 - Do not hand-edit generated files once generation exists.

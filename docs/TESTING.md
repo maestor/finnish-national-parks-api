@@ -65,11 +65,16 @@ The implementation should provide these scripts:
 - `npm run typecheck`
 - `npm run test`
 - `npm run test:coverage`
+- `npm run lint`
 - `npm run verify`
 
-`npm run verify` is the main local quality gate. It must run at least typecheck and coverage tests, and should add lint/contract checks when those exist.
+`npm run verify` is the main local quality gate. It must run at least typecheck, lint, and coverage tests.
 
 Coverage thresholds should start high from the beginning. Aim for 100 percent on first-party application code, excluding generated artifacts, migrations, config, and unavoidable runtime glue explicitly rather than letting them lower the target silently.
+
+## Quality Gate
+
+`npm run verify` must pass before any task or pull request is considered ready. The only exception is changes that are entirely outside what `verify` validates — for example, pure documentation updates or repository configuration that does not affect code, tests, or types. In those cases, skip `verify` and note the exception in the PR description. User review and explicit acceptance are required before merging.
 
 ## Verification Order
 
@@ -78,7 +83,11 @@ For implementation tasks, start with the cheapest check that can fail for the ri
 1. Focused test for the changed behavior.
 2. Typecheck or lint when configured.
 3. API integration tests for touched routes/importer behavior.
-4. Full verification command when configured.
+4. Full verification command (`npm run verify`).
 5. Scoped mutation run for meaningful backend logic.
 
 Do not claim behavior is verified unless the check actually exercised it.
+
+## CI
+
+Pull requests against `main` trigger a GitHub Actions workflow that runs `npm run verify`. The build must pass before review and merge.

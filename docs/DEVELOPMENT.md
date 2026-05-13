@@ -12,6 +12,14 @@ npm run verify
 npm run dev
 ```
 
+## Branch And PR Workflow
+
+- Create a dedicated branch for every change: `feature/<name>`, `bugfix/<name>`, `chore/<name>`, `docs/<name>`, etc.
+- Push the branch and open a pull request against `main`.
+- Ensure `npm run verify` passes locally before requesting review.
+- User review and explicit acceptance are required before merging.
+- Do not push directly to `main`.
+
 ## Environment
 
 Environment variables:
@@ -76,8 +84,9 @@ Key route behavior:
 - `GET /api/parks` is optimized for map/list views and omits boundary geometry.
 - `GET /api/parks?type=state-hiking-area` filters by normalized protected-area type slug.
 - `GET /api/parks/:slug?includeBoundary=true` returns the stored boundary GeoJSON.
-- catalog routes emit deterministic `ETag` headers and support `304 Not Modified`
-- personal routes use `private, no-store`
+- Catalog routes emit deterministic `ETag` headers and support `304 Not Modified`.
+- Personal routes use `private, no-store`.
+- All non-public endpoints (everything except `/health` and `/openapi.json`) require API key authentication; localhost requests are exempt.
 
 ## Deployment Direction
 

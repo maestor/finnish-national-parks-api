@@ -38,6 +38,7 @@ Default environment:
 ```sh
 DATABASE_URL=file:./data/local.db
 DATABASE_AUTH_TOKEN=
+API_KEY=your-local-dev-key
 LIPAS_PROTECTED_AREAS_URL=https://api.lipas.fi/v2/sports-sites?type-codes=109,110,111,112&page-size=100&page=1
 ```
 
@@ -93,11 +94,11 @@ The main quality gate is:
 npm run verify
 ```
 
-It runs typecheck plus coverage tests with 100 percent thresholds for first-party application code.
+It runs typecheck, lint, and coverage tests with 100 percent thresholds for first-party application code. This must pass before any change is considered ready, unless the change is entirely outside what `verify` validates — for example, pure documentation updates.
 
 ## Documentation
 
 - [AGENTS.md](AGENTS.md): codebase rules for future agents and implementation sessions.
 - [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md): local development, database, importer, and deployment notes.
 - [docs/TESTING.md](docs/TESTING.md): testing strategy and verification expectations.
-- [docs/plans/2026-05-01-finnish-national-parks-api-v1.md](docs/plans/2026-05-01-finnish-national-parks-api-v1.md): current V1 implementation plan.
+- [docs/plans/2026-05-13-post-v1-improvements.md](docs/plans/2026-05-13-post-v1-improvements.md): current improvement plan.
