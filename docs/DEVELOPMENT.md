@@ -32,6 +32,8 @@ Copy `.env.example` to `.env` and adjust as needed:
 cp .env.example .env
 ```
 
+The `.env` file is loaded automatically on startup — no manual `export` needed.
+
 Available variables:
 
 ```sh
