@@ -3,7 +3,7 @@ import { and, desc, eq, inArray, notInArray, sql } from 'drizzle-orm';
 import type { SupportedParkTypeSlug } from '../parks/park-types.js';
 import { supportedParkTypes } from '../parks/park-types.js';
 import type { Database, DbClient } from './database.js';
-import { importRuns, parkNotes, parks, parkTypes, parkVisits } from './schema.js';
+import { admins, importRuns, parkNotes, parks, parkTypes, parkVisits } from './schema.js';
 
 type PutVisitInput = {
   note?: string | null | undefined;
@@ -457,4 +457,9 @@ export const getCatalogListEtagSeed = async (
     latestUpdatedAt: summary.latestUpdatedAt,
     typeSlug: options.typeSlug ?? null
   };
+};
+
+export const findAdminByEmail = async (db: DbClient, email: string) => {
+  const rows = await db.select().from(admins).where(eq(admins.email, email)).limit(1);
+  return rows[0] ?? null;
 };

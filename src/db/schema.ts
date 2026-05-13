@@ -87,3 +87,16 @@ export const parkVisits = sqliteTable(
     visitedOnIndex: index('park_visits_visited_on_idx').on(table.visitedOn)
   })
 );
+
+export const admins = sqliteTable(
+  'admins',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    email: text('email').notNull().unique(),
+    createdAt: text('created_at').notNull(),
+    updatedAt: text('updated_at').notNull()
+  },
+  (table) => ({
+    emailIndex: uniqueIndex('admins_email_idx').on(table.email)
+  })
+);

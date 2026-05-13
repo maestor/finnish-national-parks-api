@@ -1,9 +1,11 @@
 import { OpenAPIHono } from '@hono/zod-openapi';
+import { cors } from 'hono/cors';
 
 import type { Database } from './db/database.js';
 import {
   createVisit,
   deleteVisit,
+  findAdminByEmail,
   getCatalogListEtagSeed,
   getParkBySlug,
   getPersonalParkBySlug,
@@ -20,7 +22,34 @@ import {
   hasMatchingEtag,
   PRIVATE_CACHE_CONTROL
 } from './http/cache.js';
+import {
+  buildGoogleAuthUrl,
+  clearOAuthStateCookie,
+  clearPkceCookie,
+  exchangeCodeForTokens,
+  generateCodeChallenge,
+  generateCodeVerifier,
+  generateState,
+  getOAuthStateCookie,
+  getPkceCookie,
+  setOAuthStateCookie,
+  setPkceCookie,
+  verifyGoogleIdToken
+} from './http/google-oauth.js';
 import { logger } from './http/logger.js';
+import {
+  clearSessionCookie,
+  createSessionToken,
+  getSessionCookie,
+  setSessionCookie,
+  verifySessionToken
+} from './http/session.js';
+import {
+  getAuthMeRoute,
+  googleAuthCallbackRoute,
+  googleAuthRoute,
+  postAuthLogoutRoute
+} from './routes/auth.js';
 import { healthRoute } from './routes/health.js';
 import {
   createVisitRoute,
@@ -33,9 +62,18 @@ import {
   updateVisitRoute
 } from './routes/parks.js';
 
+type AuthConfig = {
+  cookieName: string;
+  frontendUrl: string;
+  googleClientId: string;
+  googleClientSecret: string;
+  jwtSecret: string;
+};
+
 type AppDependencies = {
   apiKey?: string | undefined;
-  database?: Database;
+  auth?: AuthConfig | undefined;
+  database?: Database | undefined;
 };
 
 const jsonNotFound = (error: string) => {
@@ -44,7 +82,7 @@ const jsonNotFound = (error: string) => {
   };
 };
 
-export const createApp = ({ apiKey, database }: AppDependencies = {}) => {
+export const createApp = ({ apiKey, auth, database }: AppDependencies = {}) => {
   const app = new OpenAPIHono();
 
   app.use(async (c, next) => {
@@ -66,6 +104,16 @@ export const createApp = ({ apiKey, database }: AppDependencies = {}) => {
     return c.json({ error: 'Internal server error.' }, 500);
   });
 
+  if (auth) {
+    app.use(
+      '/auth/*',
+      cors({
+        credentials: true,
+        origin: auth.frontendUrl
+      })
+    );
+  }
+
   app.use(createAuthMiddleware(apiKey));
 
   app.openAPIRegistry.registerComponent('securitySchemes', 'bearerAuth', {
@@ -81,6 +129,120 @@ export const createApp = ({ apiKey, database }: AppDependencies = {}) => {
   );
 
   if (database) {
+    if (auth) {
+      app.openapi(googleAuthRoute, (c) => {
+        const state = generateState();
+        const codeVerifier = generateCodeVerifier();
+        const codeChallenge = generateCodeChallenge(codeVerifier);
+
+        setOAuthStateCookie(c, state);
+        setPkceCookie(c, codeVerifier);
+
+        const redirectUri = new URL('/auth/google/callback', c.req.url).toString();
+        const url = buildGoogleAuthUrl({
+          clientId: auth.googleClientId,
+          codeChallenge,
+          redirectUri,
+          state
+        });
+
+        return c.redirect(url, 302);
+      });
+
+      app.openapi(googleAuthCallbackRoute, async (c) => {
+        const query = c.req.valid('query');
+        const frontendUrl = auth.frontendUrl;
+
+        try {
+          if (query.error) {
+            throw new Error('OAuth error');
+          }
+
+          const code = query.code;
+          const state = query.state;
+
+          if (!code || !state) {
+            throw new Error('Missing code or state');
+          }
+
+          const storedState = getOAuthStateCookie(c);
+          const codeVerifier = getPkceCookie(c);
+
+          if (!storedState || !codeVerifier || storedState !== state) {
+            throw new Error('Invalid state');
+          }
+
+          clearOAuthStateCookie(c);
+          clearPkceCookie(c);
+
+          const redirectUri = new URL('/auth/google/callback', c.req.url).toString();
+          const tokens = await exchangeCodeForTokens({
+            clientId: auth.googleClientId,
+            clientSecret: auth.googleClientSecret,
+            code,
+            codeVerifier,
+            redirectUri
+          });
+
+          const googleUser = await verifyGoogleIdToken(tokens.id_token, auth.googleClientId);
+          const admin = await findAdminByEmail(database, googleUser.email);
+
+          if (!admin) {
+            return c.redirect(`${frontendUrl}/login?error=access_denied`, 302);
+          }
+
+          const sessionToken = await createSessionToken(
+            {
+              email: googleUser.email,
+              name: googleUser.name ?? '',
+              picture: googleUser.picture ?? '',
+              sub: googleUser.sub
+            },
+            new TextEncoder().encode(auth.jwtSecret)
+          );
+
+          setSessionCookie(c, sessionToken, auth.cookieName);
+
+          return c.redirect(`${frontendUrl}/control-panel`, 302);
+        } catch {
+          return c.redirect(`${frontendUrl}/login?error=auth_failed`, 302);
+        }
+      });
+
+      app.openapi(getAuthMeRoute, async (c) => {
+        const token = getSessionCookie(c, auth.cookieName);
+
+        if (!token) {
+          return c.json({ error: 'Unauthorized' }, 401);
+        }
+
+        try {
+          const payload = await verifySessionToken(token, new TextEncoder().encode(auth.jwtSecret));
+
+          return c.json(
+            {
+              email: payload.email,
+              id: payload.sub,
+              name: payload.name,
+              picture: payload.picture
+            },
+            200
+          );
+        } catch {
+          return c.json({ error: 'Unauthorized' }, 401);
+        }
+      });
+
+      app.openapi(postAuthLogoutRoute, (c) => {
+        clearSessionCookie(c, auth.cookieName);
+
+        return new Response(null, {
+          headers: c.res.headers,
+          status: 204
+        });
+      });
+    }
+
     app.openapi(listParksRoute, async (context) => {
       const query = context.req.valid('query');
       const typeSlug = query.type;
