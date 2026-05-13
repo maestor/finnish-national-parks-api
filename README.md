@@ -27,13 +27,20 @@ The API imports selected protected-area data from the open LIPAS API into an own
 
 ```sh
 npm install
+cp .env.example .env
 npm run db:migrate
 npm run import:parks
 npm run verify
 npm run dev
 ```
 
-Default environment:
+Environment variables are optional for local development — sensible defaults are built in. Copy `.env.example` to `.env` if you want to customize anything:
+
+```sh
+cp .env.example .env
+```
+
+Key variables:
 
 ```sh
 DATABASE_URL=file:./data/local.db
