@@ -15,7 +15,7 @@ The API imports selected protected-area data from the open LIPAS API into an own
 
 ## Planned Stack
 
-- Node.js and TypeScript.
+- Node.js 24 and TypeScript.
 - Hono for HTTP routing.
 - Zod and OpenAPI for API contracts.
 - Drizzle ORM with `@libsql/client`.
