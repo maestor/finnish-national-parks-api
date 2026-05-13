@@ -13,7 +13,7 @@ The API imports selected protected-area data from the open LIPAS API into an own
 - Start locally with SQLite/libSQL and target Turso on Vercel for deployment.
 - Keep imported catalog data heavily cached and never fetch LIPAS during normal API reads.
 
-## Planned Stack
+## Stack
 
 - Node.js 24 and TypeScript.
 - Hono for HTTP routing.
@@ -108,4 +108,4 @@ It runs typecheck, lint, and coverage tests with 100 percent thresholds for firs
 - [AGENTS.md](AGENTS.md): codebase rules for future agents and implementation sessions.
 - [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md): local development, database, importer, and deployment notes.
 - [docs/TESTING.md](docs/TESTING.md): testing strategy and verification expectations.
-- [docs/plans/2026-05-13-post-v1-improvements.md](docs/plans/2026-05-13-post-v1-improvements.md): current improvement plan.
+
