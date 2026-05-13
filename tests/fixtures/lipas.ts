@@ -58,15 +58,12 @@ export const parkTypeFixtures = {
   }
 } as const;
 
-export function createLipasPark(
+export const createLipasPark = (
   overrides: Omit<Partial<LipasSourceItem>, 'location'> & {
     location?: Partial<LipasSourceItem['location']>;
   } = {}
-): LipasSourceItem {
-  const {
-    location: locationOverrides,
-    ...rootOverrides
-  } = overrides;
+): LipasSourceItem => {
+  const { location: locationOverrides, ...rootOverrides } = overrides;
 
   const baseLocation: LipasSourceItem['location'] = {
     city: {
@@ -139,4 +136,4 @@ export function createLipasPark(
       'postal-office': locationOverrides?.['postal-office'] ?? 'Testikylä'
     }
   };
-}
+};

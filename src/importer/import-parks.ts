@@ -12,12 +12,14 @@ import { mapLipasPark } from './map-lipas-park.js';
 
 const lipasResponseSchema = z.object({
   items: z.array(z.unknown()),
-  pagination: z.object({
-    'current-page': z.number().int(),
-    'page-size': z.number().int(),
-    'total-items': z.number().int(),
-    'total-pages': z.number().int()
-  }).optional()
+  pagination: z
+    .object({
+      'current-page': z.number().int(),
+      'page-size': z.number().int(),
+      'total-items': z.number().int(),
+      'total-pages': z.number().int()
+    })
+    .optional()
 });
 
 type ImportParksOptions = {
@@ -30,7 +32,7 @@ type ImportParksOptions = {
 
 const RESPONSE_SHAPE_VERSION = 'catalog-v2';
 
-async function defaultFetchSource(sourceUrl: string) {
+const defaultFetchSource = async (sourceUrl: string) => {
   const firstResponse = await fetch(sourceUrl);
 
   if (!firstResponse.ok) {
@@ -70,9 +72,9 @@ async function defaultFetchSource(sourceUrl: string) {
       'total-pages': totalPages
     }
   };
-}
+};
 
-function ensureUniqueSlug(baseSlug: string, lipasId: number, takenSlugs: Set<string>) {
+const ensureUniqueSlug = (baseSlug: string, lipasId: number, takenSlugs: Set<string>) => {
   if (!takenSlugs.has(baseSlug)) {
     takenSlugs.add(baseSlug);
     return baseSlug;
@@ -81,15 +83,15 @@ function ensureUniqueSlug(baseSlug: string, lipasId: number, takenSlugs: Set<str
   const candidate = `${baseSlug}-${lipasId}`;
   takenSlugs.add(candidate);
   return candidate;
-}
+};
 
-export async function importParks({
+export const importParks = async ({
   database,
   expectedActiveCount = 137,
   fetchSource = defaultFetchSource,
   now = () => new Date().toISOString(),
   sourceUrl
-}: ImportParksOptions) {
+}: ImportParksOptions) => {
   const payload = lipasResponseSchema.parse(await fetchSource(sourceUrl));
   const activeItems = payload.items.filter((item) => {
     const candidate = item as { status?: string };
@@ -97,7 +99,9 @@ export async function importParks({
   });
 
   if (activeItems.length !== expectedActiveCount) {
-    throw new Error(`Expected ${expectedActiveCount} active parks but received ${activeItems.length}.`);
+    throw new Error(
+      `Expected ${expectedActiveCount} active parks but received ${activeItems.length}.`
+    );
   }
 
   const lipasIds = activeItems.map((item) => (item as { 'lipas-id': number })['lipas-id']);
@@ -118,7 +122,8 @@ export async function importParks({
   for (const item of activeItems) {
     const lipasId = (item as { 'lipas-id': number })['lipas-id'];
     const mapped = mapLipasPark(item, existingSlugByLipasId.get(lipasId));
-    const slug = existingSlugByLipasId.get(lipasId) ?? ensureUniqueSlug(mapped.slug, lipasId, takenSlugs);
+    const slug =
+      existingSlugByLipasId.get(lipasId) ?? ensureUniqueSlug(mapped.slug, lipasId, takenSlugs);
 
     await upsertImportedPark(database, {
       areaKm2: mapped.areaKm2,
@@ -153,4 +158,4 @@ export async function importParks({
     importRunId,
     importedAt
   };
-}
+};

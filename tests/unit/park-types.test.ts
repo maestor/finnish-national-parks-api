@@ -25,7 +25,11 @@ describe('park type helpers', () => {
   });
 
   it('fails loudly for unsupported park type identifiers', () => {
-    expect(() => getSupportedParkTypeByCode(999)).toThrow('Unsupported LIPAS protected-area type code "999".');
-    expect(() => getSupportedParkTypeBySlug('unknown-type')).toThrow('Unsupported protected-area type slug "unknown-type".');
+    expect(() => getSupportedParkTypeByCode(999)).toThrow(
+      'Unsupported LIPAS protected-area type code "999".'
+    );
+    expect(() => getSupportedParkTypeBySlug('unknown-type')).toThrow(
+      'Unsupported protected-area type slug "unknown-type".'
+    );
   });
 });

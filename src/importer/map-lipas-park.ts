@@ -86,23 +86,24 @@ export type MappedPark = {
   };
 };
 
-function normalizeLuontoonUrl(value?: string) {
+const normalizeLuontoonUrl = (value?: string) => {
   if (!value) {
     return null;
   }
 
-  const normalizedInput = value.startsWith('http://') || value.startsWith('https://')
-    ? value
-    : value.startsWith('/')
-      ? `https://www.luontoon.fi${value}`
-      : `https://${value}`;
+  const normalizedInput =
+    value.startsWith('http://') || value.startsWith('https://')
+      ? value
+      : value.startsWith('/')
+        ? `https://www.luontoon.fi${value}`
+        : `https://${value}`;
   const url = new URL(normalizedInput);
   const pathname = url.pathname.replace(/\/+$/, '');
 
   return `https://www.luontoon.fi${pathname}`;
-}
+};
 
-function createSlug(name: string) {
+const createSlug = (name: string) => {
   const slug = name
     .normalize('NFKD')
     .replace(/[\u0300-\u036f]/g, '')
@@ -111,9 +112,9 @@ function createSlug(name: string) {
     .replace(/^-+|-+$/g, '');
 
   return slug || 'park';
-}
+};
 
-function deriveBoundingBox(coordinates: number[][][]) {
+const deriveBoundingBox = (coordinates: number[][][]) => {
   let minLon = Number.POSITIVE_INFINITY;
   let minLat = Number.POSITIVE_INFINITY;
   let maxLon = Number.NEGATIVE_INFINITY;
@@ -137,9 +138,9 @@ function deriveBoundingBox(coordinates: number[][][]) {
     minLat,
     minLon
   };
-}
+};
 
-function combineBoundingBoxes(boxes: Array<ReturnType<typeof deriveBoundingBox>>) {
+const combineBoundingBoxes = (boxes: Array<ReturnType<typeof deriveBoundingBox>>) => {
   return boxes.reduce(
     (combined, box) => ({
       maxLat: Math.max(combined.maxLat, box.maxLat),
@@ -154,9 +155,9 @@ function combineBoundingBoxes(boxes: Array<ReturnType<typeof deriveBoundingBox>>
       minLon: Number.POSITIVE_INFINITY
     }
   );
-}
+};
 
-export function mapLipasPark(source: unknown, existingSlug?: string): MappedPark {
+export const mapLipasPark = (source: unknown, existingSlug?: string): MappedPark => {
   const park = lipasParkSchema.parse(source);
   const parkType = getSupportedParkTypeByCode(park.type['type-code']);
   const boxes = park.location.geometries.features.map((feature) =>
@@ -183,4 +184,4 @@ export function mapLipasPark(source: unknown, existingSlug?: string): MappedPark
     sourceEventDate: park['event-date'] ?? null,
     type: parkType
   };
-}
+};

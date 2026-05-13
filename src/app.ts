@@ -14,10 +14,10 @@ import {
 } from './db/repositories.js';
 import {
   CATALOG_CACHE_CONTROL,
-  PRIVATE_CACHE_CONTROL,
   createCatalogDetailEtag,
   createCatalogListEtag,
-  hasMatchingEtag
+  hasMatchingEtag,
+  PRIVATE_CACHE_CONTROL
 } from './http/cache.js';
 import { healthRoute } from './routes/health.js';
 import {
@@ -35,13 +35,13 @@ type AppDependencies = {
   database?: Database;
 };
 
-function jsonNotFound(error: string) {
+const jsonNotFound = (error: string) => {
   return {
     error
   };
-}
+};
 
-export function createApp({ database }: AppDependencies = {}) {
+export const createApp = ({ database }: AppDependencies = {}) => {
   const app = new OpenAPIHono();
 
   app.openAPIRegistry.registerComponent('securitySchemes', 'none', {
@@ -74,9 +74,23 @@ export function createApp({ database }: AppDependencies = {}) {
 
       const parks = await listParks(database, filter);
 
-      return context.json({
-        parks: parks.map(({ boundaryGeoJson: _boundaryGeoJson, catalogStatus: _catalogStatus, lipasId: _lipasId, municipalityCode: _municipalityCode, postalOffice: _postalOffice, sourceEventDate: _sourceEventDate, updatedAt: _updatedAt, ...park }) => park)
-      }, 200);
+      return context.json(
+        {
+          parks: parks.map(
+            ({
+              boundaryGeoJson: _boundaryGeoJson,
+              catalogStatus: _catalogStatus,
+              lipasId: _lipasId,
+              municipalityCode: _municipalityCode,
+              postalOffice: _postalOffice,
+              sourceEventDate: _sourceEventDate,
+              updatedAt: _updatedAt,
+              ...park
+            }) => park
+          )
+        },
+        200
+      );
     });
 
     app.openapi(getParkRoute, async (context) => {
@@ -104,10 +118,13 @@ export function createApp({ database }: AppDependencies = {}) {
         });
       }
 
-      return context.json({
-        ...park,
-        ...(includeBoundary ? {} : { boundaryGeoJson: undefined })
-      }, 200);
+      return context.json(
+        {
+          ...park,
+          ...(includeBoundary ? {} : { boundaryGeoJson: undefined })
+        },
+        200
+      );
     });
 
     app.openapi(listPersonalParksRoute, async (context) => {
@@ -115,9 +132,12 @@ export function createApp({ database }: AppDependencies = {}) {
 
       const parks = await listPersonalParks(database);
 
-      return context.json({
-        parks
-      }, 200);
+      return context.json(
+        {
+          parks
+        },
+        200
+      );
     });
 
     app.openapi(getPersonalParkRoute, async (context) => {
@@ -201,4 +221,4 @@ export function createApp({ database }: AppDependencies = {}) {
   });
 
   return app;
-}
+};

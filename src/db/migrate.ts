@@ -1,10 +1,10 @@
-import { readFile, readdir } from 'node:fs/promises';
+import { readdir, readFile } from 'node:fs/promises';
 
 import type { Client } from '@libsql/client';
 
 const migrationDirectoryUrl = new URL('./migrations/', import.meta.url);
 
-export async function migrateDatabase(client: Client) {
+export const migrateDatabase = async (client: Client) => {
   await client.execute(`
     CREATE TABLE IF NOT EXISTS schema_migrations (
       name TEXT PRIMARY KEY,
@@ -32,4 +32,4 @@ export async function migrateDatabase(client: Client) {
       sql: 'INSERT INTO schema_migrations (name, applied_at) VALUES (?, ?)'
     });
   }
-}
+};

@@ -72,18 +72,23 @@ export const visitSchema = z.object({
 });
 
 export const visitedSummarySchema = z.object({
-  lastVisitedOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable(),
+  lastVisitedOn: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .nullable(),
   visitCount: z.number().int(),
   visited: z.boolean()
 });
 
-export const personalParkSchema = parkDetailSchema.omit({
-  boundaryGeoJson: true
-}).extend({
-  note: noteSchema.nullable(),
-  visitedSummary: visitedSummarySchema,
-  visits: z.array(visitSchema)
-});
+export const personalParkSchema = parkDetailSchema
+  .omit({
+    boundaryGeoJson: true
+  })
+  .extend({
+    note: noteSchema.nullable(),
+    visitedSummary: visitedSummarySchema,
+    visits: z.array(visitSchema)
+  });
 
 export const parkListResponseSchema = z.object({
   parks: z.array(parkListItemSchema)
@@ -106,9 +111,8 @@ export const createVisitRequestSchema = z.object({
   visitedOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/)
 });
 
-export const updateVisitRequestSchema = createVisitRequestSchema.partial().refine(
-  (input) => input.note !== undefined || input.visitedOn !== undefined,
-  {
+export const updateVisitRequestSchema = createVisitRequestSchema
+  .partial()
+  .refine((input) => input.note !== undefined || input.visitedOn !== undefined, {
     message: 'Provide at least one field to update.'
-  }
-);
+  });

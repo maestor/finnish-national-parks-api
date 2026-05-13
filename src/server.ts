@@ -1,8 +1,7 @@
 import { serve } from '@hono/node-server';
-
+import { createApp } from './app.js';
 import { createDatabaseClient } from './db/client.js';
 import { createDatabase } from './db/database.js';
-import { createApp } from './app.js';
 import { getEnv } from './env.js';
 
 const env = getEnv();

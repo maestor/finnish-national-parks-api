@@ -2,6 +2,12 @@
 
 This repository is for a local-first TypeScript API that imports Finnish national park catalog data, stores it in an owned database, and exposes it for a future personal map application.
 
+## Code Style
+
+- Prefer `const fn = () => {}` arrow functions over `function fn() {}` declarations for all top-level module functions.
+- `function` declarations are only acceptable when hoisting is genuinely required.
+- Biome handles formatting and linting; `npm run lint:fix` applies fixes automatically.
+
 ## Intended Stack
 
 - TypeScript on Node.js.

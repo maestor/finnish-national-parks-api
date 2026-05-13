@@ -1,6 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { createVisit, getParkBySlug, getPersonalParkBySlug, listParks, putParkNote } from '../../src/db/repositories.js';
+import {
+  createVisit,
+  getParkBySlug,
+  getPersonalParkBySlug,
+  listParks,
+  putParkNote
+} from '../../src/db/repositories.js';
 import { importParks } from '../../src/importer/import-parks.js';
 import { createLipasPark, parkTypeFixtures } from '../fixtures/lipas.js';
 import { createTestDatabase } from '../helpers/test-db.js';
@@ -72,7 +78,10 @@ describe('importParks', () => {
     });
 
     const park = await getParkBySlug(testDatabase.database, 'akasmannyn-kansallispuisto');
-    const personalPark = await getPersonalParkBySlug(testDatabase.database, 'akasmannyn-kansallispuisto');
+    const personalPark = await getPersonalParkBySlug(
+      testDatabase.database,
+      'akasmannyn-kansallispuisto'
+    );
     const parks = await listParks(testDatabase.database);
 
     expect(park).toMatchObject({
@@ -115,7 +124,10 @@ describe('importParks', () => {
       })
     });
 
-    const duplicateSlugPark = await getParkBySlug(testDatabase.database, 'akasmannyn-kansallispuisto-12346');
+    const duplicateSlugPark = await getParkBySlug(
+      testDatabase.database,
+      'akasmannyn-kansallispuisto-12346'
+    );
     expect(duplicateSlugPark?.lipasId).toBe(12346);
 
     await importParks({
@@ -168,35 +180,37 @@ describe('importParks', () => {
 
     const parks = await listParks(testDatabase.database);
 
-    expect(parks).toEqual(expect.arrayContaining([
-      expect.objectContaining({
-        name: 'Äkäsmännyn kansallispuisto',
-        type: {
-          code: parkTypeFixtures.nationalPark.typeCode,
-          id: parkTypeFixtures.nationalPark.typeCode,
-          name: parkTypeFixtures.nationalPark.name,
-          slug: parkTypeFixtures.nationalPark.slug
-        }
-      }),
-      expect.objectContaining({
-        name: 'Evon retkeilyalue',
-        type: {
-          code: parkTypeFixtures.stateHikingArea.typeCode,
-          id: parkTypeFixtures.stateHikingArea.typeCode,
-          name: parkTypeFixtures.stateHikingArea.name,
-          slug: parkTypeFixtures.stateHikingArea.slug
-        }
-      }),
-      expect.objectContaining({
-        name: 'Koljatti',
-        type: {
-          code: parkTypeFixtures.otherNatureReserve.typeCode,
-          id: parkTypeFixtures.otherNatureReserve.typeCode,
-          name: parkTypeFixtures.otherNatureReserve.name,
-          slug: parkTypeFixtures.otherNatureReserve.slug
-        }
-      })
-    ]));
+    expect(parks).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          name: 'Äkäsmännyn kansallispuisto',
+          type: {
+            code: parkTypeFixtures.nationalPark.typeCode,
+            id: parkTypeFixtures.nationalPark.typeCode,
+            name: parkTypeFixtures.nationalPark.name,
+            slug: parkTypeFixtures.nationalPark.slug
+          }
+        }),
+        expect.objectContaining({
+          name: 'Evon retkeilyalue',
+          type: {
+            code: parkTypeFixtures.stateHikingArea.typeCode,
+            id: parkTypeFixtures.stateHikingArea.typeCode,
+            name: parkTypeFixtures.stateHikingArea.name,
+            slug: parkTypeFixtures.stateHikingArea.slug
+          }
+        }),
+        expect.objectContaining({
+          name: 'Koljatti',
+          type: {
+            code: parkTypeFixtures.otherNatureReserve.typeCode,
+            id: parkTypeFixtures.otherNatureReserve.typeCode,
+            name: parkTypeFixtures.otherNatureReserve.name,
+            slug: parkTypeFixtures.otherNatureReserve.slug
+          }
+        })
+      ])
+    );
   });
 
   it('uses the default fetcher and surfaces upstream failures', async () => {
