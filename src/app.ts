@@ -129,119 +129,133 @@ export const createApp = ({ apiKey, auth, database }: AppDependencies = {}) => {
   );
 
   if (database) {
-    if (auth) {
-      app.openapi(googleAuthRoute, (c) => {
-        const state = generateState();
-        const codeVerifier = generateCodeVerifier();
-        const codeChallenge = generateCodeChallenge(codeVerifier);
+    app.openapi(googleAuthRoute, (c) => {
+      if (!auth) {
+        return c.json({ error: 'OAuth not configured.' }, 503);
+      }
 
-        setOAuthStateCookie(c, state);
-        setPkceCookie(c, codeVerifier);
+      const state = generateState();
+      const codeVerifier = generateCodeVerifier();
+      const codeChallenge = generateCodeChallenge(codeVerifier);
+
+      setOAuthStateCookie(c, state);
+      setPkceCookie(c, codeVerifier);
+
+      const redirectUri = new URL('/auth/google/callback', c.req.url).toString();
+      const url = buildGoogleAuthUrl({
+        clientId: auth.googleClientId,
+        codeChallenge,
+        redirectUri,
+        state
+      });
+
+      return c.redirect(url, 302);
+    });
+
+    app.openapi(googleAuthCallbackRoute, async (c) => {
+      if (!auth) {
+        return c.json({ error: 'OAuth not configured.' }, 503);
+      }
+
+      const query = c.req.valid('query');
+      const frontendUrl = auth.frontendUrl;
+
+      try {
+        if (query.error) {
+          throw new Error('OAuth error');
+        }
+
+        const code = query.code;
+        const state = query.state;
+
+        if (!code || !state) {
+          throw new Error('Missing code or state');
+        }
+
+        const storedState = getOAuthStateCookie(c);
+        const codeVerifier = getPkceCookie(c);
+
+        if (!storedState || !codeVerifier || storedState !== state) {
+          throw new Error('Invalid state');
+        }
+
+        clearOAuthStateCookie(c);
+        clearPkceCookie(c);
 
         const redirectUri = new URL('/auth/google/callback', c.req.url).toString();
-        const url = buildGoogleAuthUrl({
+        const tokens = await exchangeCodeForTokens({
           clientId: auth.googleClientId,
-          codeChallenge,
-          redirectUri,
-          state
+          clientSecret: auth.googleClientSecret,
+          code,
+          codeVerifier,
+          redirectUri
         });
 
-        return c.redirect(url, 302);
-      });
+        const googleUser = await verifyGoogleIdToken(tokens.id_token, auth.googleClientId);
+        const admin = await findAdminByEmail(database, googleUser.email);
 
-      app.openapi(googleAuthCallbackRoute, async (c) => {
-        const query = c.req.valid('query');
-        const frontendUrl = auth.frontendUrl;
-
-        try {
-          if (query.error) {
-            throw new Error('OAuth error');
-          }
-
-          const code = query.code;
-          const state = query.state;
-
-          if (!code || !state) {
-            throw new Error('Missing code or state');
-          }
-
-          const storedState = getOAuthStateCookie(c);
-          const codeVerifier = getPkceCookie(c);
-
-          if (!storedState || !codeVerifier || storedState !== state) {
-            throw new Error('Invalid state');
-          }
-
-          clearOAuthStateCookie(c);
-          clearPkceCookie(c);
-
-          const redirectUri = new URL('/auth/google/callback', c.req.url).toString();
-          const tokens = await exchangeCodeForTokens({
-            clientId: auth.googleClientId,
-            clientSecret: auth.googleClientSecret,
-            code,
-            codeVerifier,
-            redirectUri
-          });
-
-          const googleUser = await verifyGoogleIdToken(tokens.id_token, auth.googleClientId);
-          const admin = await findAdminByEmail(database, googleUser.email);
-
-          if (!admin) {
-            return c.redirect(`${frontendUrl}/login?error=access_denied`, 302);
-          }
-
-          const sessionToken = await createSessionToken(
-            {
-              email: googleUser.email,
-              name: googleUser.name ?? '',
-              picture: googleUser.picture ?? '',
-              sub: googleUser.sub
-            },
-            new TextEncoder().encode(auth.jwtSecret)
-          );
-
-          setSessionCookie(c, sessionToken, auth.cookieName);
-
-          return c.redirect(`${frontendUrl}/control-panel`, 302);
-        } catch {
-          return c.redirect(`${frontendUrl}/login?error=auth_failed`, 302);
-        }
-      });
-
-      app.openapi(getAuthMeRoute, async (c) => {
-        const token = getSessionCookie(c, auth.cookieName);
-
-        if (!token) {
-          return c.json({ error: 'Unauthorized' }, 401);
+        if (!admin) {
+          return c.redirect(`${frontendUrl}/login?error=access_denied`, 302);
         }
 
-        try {
-          const payload = await verifySessionToken(token, new TextEncoder().encode(auth.jwtSecret));
+        const sessionToken = await createSessionToken(
+          {
+            email: googleUser.email,
+            name: googleUser.name ?? '',
+            picture: googleUser.picture ?? '',
+            sub: googleUser.sub
+          },
+          new TextEncoder().encode(auth.jwtSecret)
+        );
 
-          return c.json(
-            {
-              email: payload.email,
-              id: payload.sub,
-              name: payload.name,
-              picture: payload.picture
-            },
-            200
-          );
-        } catch {
-          return c.json({ error: 'Unauthorized' }, 401);
-        }
+        setSessionCookie(c, sessionToken, auth.cookieName);
+
+        return c.redirect(`${frontendUrl}/control-panel`, 302);
+      } catch {
+        return c.redirect(`${frontendUrl}/login?error=auth_failed`, 302);
+      }
+    });
+
+    app.openapi(getAuthMeRoute, async (c) => {
+      if (!auth) {
+        return c.json({ error: 'OAuth not configured.' }, 503);
+      }
+
+      const token = getSessionCookie(c, auth.cookieName);
+
+      if (!token) {
+        return c.json({ error: 'Unauthorized' }, 401);
+      }
+
+      try {
+        const payload = await verifySessionToken(token, new TextEncoder().encode(auth.jwtSecret));
+
+        return c.json(
+          {
+            email: payload.email,
+            id: payload.sub,
+            name: payload.name,
+            picture: payload.picture
+          },
+          200
+        );
+      } catch {
+        return c.json({ error: 'Unauthorized' }, 401);
+      }
+    });
+
+    app.openapi(postAuthLogoutRoute, (c) => {
+      if (!auth) {
+        return c.json({ error: 'OAuth not configured.' }, 503);
+      }
+
+      clearSessionCookie(c, auth.cookieName);
+
+      return new Response(null, {
+        headers: c.res.headers,
+        status: 204
       });
-
-      app.openapi(postAuthLogoutRoute, (c) => {
-        clearSessionCookie(c, auth.cookieName);
-
-        return new Response(null, {
-          headers: c.res.headers,
-          status: 204
-        });
-      });
-    }
+    });
 
     app.openapi(listParksRoute, async (context) => {
       const query = context.req.valid('query');

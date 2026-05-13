@@ -573,4 +573,28 @@ describe('google oauth', () => {
 
     expect(response.status).toBe(302);
   });
+
+  it('returns 503 when OAuth is not configured', async () => {
+    const app = createApp({ database: testDatabase.database });
+
+    const googleResponse = await app.request('/auth/google');
+    expect(googleResponse.status).toBe(503);
+    const googleBody = (await googleResponse.json()) as { error: string };
+    expect(googleBody.error).toBe('OAuth not configured.');
+
+    const callbackResponse = await app.request('/auth/google/callback');
+    expect(callbackResponse.status).toBe(503);
+    const callbackBody = (await callbackResponse.json()) as { error: string };
+    expect(callbackBody.error).toBe('OAuth not configured.');
+
+    const meResponse = await app.request('/auth/me');
+    expect(meResponse.status).toBe(503);
+    const meBody = (await meResponse.json()) as { error: string };
+    expect(meBody.error).toBe('OAuth not configured.');
+
+    const logoutResponse = await app.request('/auth/logout', { method: 'POST' });
+    expect(logoutResponse.status).toBe(503);
+    const logoutBody = (await logoutResponse.json()) as { error: string };
+    expect(logoutBody.error).toBe('OAuth not configured.');
+  });
 });
