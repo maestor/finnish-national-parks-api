@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 const envSchema = z.object({
+  API_KEY: z.string().optional(),
   DATABASE_AUTH_TOKEN: z.string().optional(),
   DATABASE_URL: z.string().default('file:./data/local.db'),
   LIPAS_NATIONAL_PARKS_URL: z.string().url().optional(),

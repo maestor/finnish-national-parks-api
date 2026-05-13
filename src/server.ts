@@ -10,6 +10,7 @@ const client = createDatabaseClient();
 
 serve({
   fetch: createApp({
+    apiKey: env.API_KEY,
     database: createDatabase(client)
   }).fetch,
   port
