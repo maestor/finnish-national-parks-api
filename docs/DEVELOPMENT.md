@@ -12,6 +12,10 @@ npm run verify
 npm run dev
 ```
 
+## Runtime Requirements
+
+- Node.js 24 or newer.
+
 ## Branch And PR Workflow
 
 - Create a dedicated branch for every change: `feature/<name>`, `bugfix/<name>`, `chore/<name>`, `docs/<name>`, etc.
