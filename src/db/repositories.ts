@@ -152,6 +152,27 @@ const getNoteForPark = async (database: Database, parkId: number) => {
   };
 };
 
+const getNotesForParkIds = async (database: Database, parkIds: number[]) => {
+  if (parkIds.length === 0) {
+    return [];
+  }
+
+  return database.query.parkNotes.findMany({
+    where: inArray(parkNotes.parkId, parkIds)
+  });
+};
+
+const getVisitsForParkIds = async (database: Database, parkIds: number[]) => {
+  if (parkIds.length === 0) {
+    return [];
+  }
+
+  return database.query.parkVisits.findMany({
+    orderBy: [desc(parkVisits.visitedOn), desc(parkVisits.id)],
+    where: inArray(parkVisits.parkId, parkIds)
+  });
+};
+
 const buildPersonalPark = async (database: Database, row: TypedParkRow) => {
   const [note, visits] = await Promise.all([
     getNoteForPark(database, row.park.id),
@@ -225,9 +246,40 @@ export const getPersonalParkBySlug = async (database: Database, slug: string) =>
 };
 
 export const listPersonalParks = async (database: Database) => {
-  return Promise.all(
-    (await listTypedParks(database)).map((row) => buildPersonalPark(database, row))
+  const rows = await listTypedParks(database);
+  const parkIds = rows.map((row) => row.park.id);
+
+  const [allNotes, allVisits] = await Promise.all([
+    getNotesForParkIds(database, parkIds),
+    getVisitsForParkIds(database, parkIds)
+  ]);
+
+  const notesByParkId = new Map(
+    allNotes.map((row) => [row.parkId, { note: row.note, updatedAt: row.updatedAt }])
   );
+
+  const visitsByParkId = new Map<number, (typeof parkVisits.$inferSelect)[]>();
+  for (const visit of allVisits) {
+    const list = visitsByParkId.get(visit.parkId) ?? [];
+    list.push(visit);
+    visitsByParkId.set(visit.parkId, list);
+  }
+
+  return rows.map((row) => {
+    const note = notesByParkId.get(row.park.id) ?? null;
+    const visits = (visitsByParkId.get(row.park.id) ?? []).map(toVisit);
+
+    return {
+      ...toPark(row),
+      note,
+      visitedSummary: {
+        lastVisitedOn: visits[0]?.visitedOn ?? null,
+        visitCount: visits.length,
+        visited: visits.length > 0
+      },
+      visits
+    };
+  });
 };
 
 export const putParkNote = async (database: Database, slug: string, note: string) => {
