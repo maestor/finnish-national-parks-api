@@ -73,7 +73,7 @@ The importer should:
 - Expect 137 active records for the current dataset.
 - Upsert catalog rows by `lipasId`.
 - Upsert normalized protected-area types in a dedicated `park_types` table.
-- Preserve personal notes and visit history during catalog re-imports.
+- Preserve personal visit history during catalog re-imports.
 - Derive slug, marker point, and bounding box from imported data.
 - Store boundary GeoJSON for detail/map-boundary usage.
 - Exclude contact email, phone number, and comment text.
@@ -92,7 +92,6 @@ Current table groups:
 
 - protected-area types
 - imported park catalog rows
-- personal park notes
 - personal visit records
 - import run metadata
 - admin allowlist (`admins`)

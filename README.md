@@ -63,7 +63,6 @@ FRONTEND_URL=http://localhost:4300
 - `GET /api/parks/:slug`
 - `GET /api/me/parks`
 - `GET /api/me/parks/:slug`
-- `PUT /api/me/parks/:slug/note`
 - `POST /api/me/parks/:slug/visits`
 - `PATCH /api/me/visits/:id`
 - `DELETE /api/me/visits/:id`

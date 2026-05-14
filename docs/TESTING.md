@@ -20,7 +20,7 @@ Use API integration tests for:
 - response contracts
 - ETag and cache-control behavior
 - persistence behavior
-- note and visit workflows
+- visit workflows
 - importer plus database behavior when realistic enough
 
 Use focused unit tests for:
@@ -47,14 +47,14 @@ Use mutation testing for:
 - Import excludes contact email, phone number, and comment text.
 - Import stores the expected catalog fields.
 - Import derives stable slugs, marker points, and bounding boxes.
-- Re-import updates catalog fields without deleting notes or visits.
+- Re-import updates catalog fields without deleting visits.
 - `GET /api/parks` returns lightweight list/map data without full boundary geometry.
 - `GET /api/parks?type=...` filters the public catalog list by normalized type slug.
 - `GET /api/parks/:slug` returns catalog detail without personal state.
 - Catalog `GET` endpoints emit ETags and return `304 Not Modified` for matching `If-None-Match`.
 - Catalog `GET` endpoints are safe for public caching.
-- Personal endpoints are private or no-store and contain notes/visit state.
-- Note upsert creates and updates one personal note per park.
+- Personal endpoints are private or no-store and contain visit state.
+- Visit create/edit/delete supports optional route and author fields.
 - Visit create/edit/delete works against a real temporary database.
 - Auth routes bypass bearer-token middleware.
 - Google OAuth callback validates state/PKCE, verifies the ID token, checks the admin allowlist, and sets a session cookie.
