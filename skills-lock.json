@@ -7,6 +7,12 @@
       "skillPath": "skills/api-contract-sync/SKILL.md",
       "computedHash": "5a84737d3a58e6f43228303570f7997ee1a644e75f4aaf592d0bf33a70d220ca"
     },
+    "git-pr-workflow": {
+      "source": "maestor/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/git-pr-workflow/SKILL.md",
+      "computedHash": "40e64ee3cd04130db176d353aae532da37da659b33736ccd2a7a1b9aec235ca4"
+    },
     "intelligence-testing": {
       "source": "maestor/agent-skills",
       "sourceType": "github",
@@ -24,6 +30,12 @@
       "sourceType": "github",
       "skillPath": "skills/mutation-testing/SKILL.md",
       "computedHash": "73d761e9ad67367073d9dbc54966f8ae27fcbc5f9e26633b6a89977a8eabacfb"
+    },
+    "project-documentation": {
+      "source": "maestor/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/project-documentation/SKILL.md",
+      "computedHash": "6045f59b9b299ff3e7223f5dea726d78817e9937573a48324fd0d50ab86b6d03"
     }
   }
 }
