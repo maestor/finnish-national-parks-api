@@ -95,13 +95,13 @@ export type VisitImage = {
   createdAt: string;
 };
 
-const toVisitImage = (
+const toVisitImage = async (
   row: typeof visitImages.$inferSelect,
-  getPublicUrl: (key: string) => string
-): VisitImage => ({
+  getPublicUrl: (key: string) => Promise<string>
+): Promise<VisitImage> => ({
   id: row.id,
-  fullUrl: getPublicUrl(row.fullKey),
-  thumbUrl: getPublicUrl(row.thumbKey),
+  fullUrl: await getPublicUrl(row.fullKey),
+  thumbUrl: await getPublicUrl(row.thumbKey),
   fullWidth: row.fullWidth,
   fullHeight: row.fullHeight,
   thumbWidth: row.thumbWidth,
@@ -196,7 +196,7 @@ const getImagesForVisitIds = async (database: Database, visitIds: number[]) => {
 const buildPersonalPark = async (
   database: Database,
   row: TypedParkRow,
-  getImagePublicUrl: (key: string) => string
+  getImagePublicUrl: (key: string) => Promise<string>
 ) => {
   const visitRows = await getVisitsForPark(database, row.park.id);
   const visitIds = visitRows.map((v) => v.id);
@@ -209,12 +209,14 @@ const buildPersonalPark = async (
     imagesByVisitId.set(img.visitId, list);
   }
 
-  const visits = visitRows.map((v) => {
-    const imgs = (imagesByVisitId.get(v.id) ?? []).map((img) =>
-      toVisitImage(img, getImagePublicUrl)
-    );
-    return toVisit(v, imgs);
-  });
+  const visits = await Promise.all(
+    visitRows.map(async (v) => {
+      const imgs = await Promise.all(
+        (imagesByVisitId.get(v.id) ?? []).map((img) => toVisitImage(img, getImagePublicUrl))
+      );
+      return toVisit(v, imgs);
+    })
+  );
 
   return {
     ...toPark(row),
@@ -279,7 +281,7 @@ export const getParkBySlug = async (database: Database, slug: string) => {
 export const getPersonalParkBySlug = async (
   database: Database,
   slug: string,
-  getImagePublicUrl: (key: string) => string
+  getImagePublicUrl: (key: string) => Promise<string>
 ) => {
   const row = await getTypedParkBySlug(database, slug);
   return row ? buildPersonalPark(database, row, getImagePublicUrl) : null;
@@ -287,7 +289,7 @@ export const getPersonalParkBySlug = async (
 
 export const listPersonalParks = async (
   database: Database,
-  getImagePublicUrl: (key: string) => string
+  getImagePublicUrl: (key: string) => Promise<string>
 ) => {
   const rows = await listTypedParks(database);
   const parkIds = rows.map((row) => row.park.id);
@@ -310,24 +312,28 @@ export const listPersonalParks = async (
     imagesByVisitId.set(img.visitId, list);
   }
 
-  return rows.map((row) => {
-    const visits = (visitsByParkId.get(row.park.id) ?? []).map((v) => {
-      const imgs = (imagesByVisitId.get(v.id) ?? []).map((img) =>
-        toVisitImage(img, getImagePublicUrl)
+  return Promise.all(
+    rows.map(async (row) => {
+      const visits = await Promise.all(
+        (visitsByParkId.get(row.park.id) ?? []).map(async (v) => {
+          const imgs = await Promise.all(
+            (imagesByVisitId.get(v.id) ?? []).map((img) => toVisitImage(img, getImagePublicUrl))
+          );
+          return toVisit(v, imgs);
+        })
       );
-      return toVisit(v, imgs);
-    });
 
-    return {
-      ...toPark(row),
-      visitedSummary: {
-        lastVisitedOn: visits[0]?.visitedOn ?? null,
-        visitCount: visits.length,
-        visited: visits.length > 0
-      },
-      visits
-    };
-  });
+      return {
+        ...toPark(row),
+        visitedSummary: {
+          lastVisitedOn: visits[0]?.visitedOn ?? null,
+          visitCount: visits.length,
+          visited: visits.length > 0
+        },
+        visits
+      };
+    })
+  );
 };
 
 export const createVisit = async (database: Database, slug: string, input: PutVisitInput) => {

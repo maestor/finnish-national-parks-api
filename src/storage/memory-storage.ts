@@ -7,7 +7,7 @@ export const createMemoryStorage = (): StorageClient & { getStore(): Map<string,
     delete: async (key: string) => {
       store.delete(key);
     },
-    getPublicUrl: (key: string) => {
+    getPresignedUrl: async (key: string) => {
       return `https://memory-storage.test/${key}`;
     },
     getStore: () => store,

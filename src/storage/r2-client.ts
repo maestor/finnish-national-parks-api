@@ -1,4 +1,10 @@
-import { DeleteObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import {
+  DeleteObjectCommand,
+  GetObjectCommand,
+  PutObjectCommand,
+  S3Client
+} from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
 import type { StorageClient } from './types.js';
 
@@ -6,7 +12,6 @@ export type R2Config = {
   accessKeyId: string;
   bucketName: string;
   endpoint: string;
-  publicUrl: string;
   secretAccessKey: string;
 };
 
@@ -30,8 +35,10 @@ export const createR2Client = (config: R2Config): StorageClient => {
         })
       );
     },
-    getPublicUrl: (key: string) => {
-      return `${config.publicUrl}/${key}`;
+    getPresignedUrl: async (key: string, expiresInSeconds: number) => {
+      return getSignedUrl(s3, new GetObjectCommand({ Bucket: config.bucketName, Key: key }), {
+        expiresIn: expiresInSeconds
+      });
     },
     upload: async (key: string, buffer: Buffer, contentType: string) => {
       await s3.send(

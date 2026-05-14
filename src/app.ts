@@ -93,9 +93,9 @@ const jsonNotFound = (error: string) => {
 };
 
 export const createApp = ({ apiKey, auth, database, storage }: AppDependencies = {}) => {
-  const getImagePublicUrl = (key: string) => {
+  const getImagePublicUrl = async (key: string) => {
     if (storage) {
-      return storage.getPublicUrl(key);
+      return storage.getPresignedUrl(key, 3600);
     }
     return '';
   };
@@ -509,12 +509,12 @@ export const createApp = ({ apiKey, auth, database, storage }: AppDependencies =
               createdAt: row.createdAt,
               displayOrder: row.displayOrder,
               fullHeight: row.fullHeight,
-              fullUrl: storage.getPublicUrl(row.fullKey),
+              fullUrl: await storage.getPresignedUrl(row.fullKey, 3600),
               fullWidth: row.fullWidth,
               id: row.id,
               originalName: row.originalName,
               thumbHeight: row.thumbHeight,
-              thumbUrl: storage.getPublicUrl(row.thumbKey),
+              thumbUrl: await storage.getPresignedUrl(row.thumbKey, 3600),
               thumbWidth: row.thumbWidth
             });
           } catch (err) {

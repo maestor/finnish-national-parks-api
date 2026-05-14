@@ -12,10 +12,12 @@ describe('createMemoryStorage', () => {
     expect(storage.getStore().get('test/key.txt')).toEqual(buffer);
   });
 
-  it('generates predictable test URLs', () => {
+  it('generates predictable test URLs', async () => {
     const storage = createMemoryStorage();
 
-    expect(storage.getPublicUrl('foo.jpg')).toBe('https://memory-storage.test/foo.jpg');
+    expect(await storage.getPresignedUrl('foo.jpg', 3600)).toBe(
+      'https://memory-storage.test/foo.jpg'
+    );
   });
 
   it('removes stored buffers on delete', async () => {

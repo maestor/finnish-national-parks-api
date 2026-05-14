@@ -81,7 +81,7 @@ describe('importParks', () => {
     const personalPark = await getPersonalParkBySlug(
       testDatabase.database,
       'akasmannyn-kansallispuisto',
-      () => ''
+      async () => ''
     );
     const parks = await listParks(testDatabase.database);
 

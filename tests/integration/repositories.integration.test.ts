@@ -39,13 +39,13 @@ describe('repositories', () => {
   it('returns null for missing parks', async () => {
     await expect(getParkBySlug(testDatabase.database, 'missing-park')).resolves.toBeNull();
     await expect(
-      getPersonalParkBySlug(testDatabase.database, 'missing-park', () => '')
+      getPersonalParkBySlug(testDatabase.database, 'missing-park', async () => '')
     ).resolves.toBeNull();
 
     const personalPark = await getPersonalParkBySlug(
       testDatabase.database,
       'akasmannyn-kansallispuisto',
-      () => ''
+      async () => ''
     );
     expect(personalPark?.visits).toEqual([]);
   });
@@ -145,7 +145,7 @@ describe('repositories', () => {
       })
     });
 
-    await expect(listPersonalParks(testDatabase.database, () => '')).resolves.toEqual([]);
+    await expect(listPersonalParks(testDatabase.database, async () => '')).resolves.toEqual([]);
   });
 
   it('batch-aggregates visits across multiple parks', async () => {
@@ -179,7 +179,7 @@ describe('repositories', () => {
       visitedOn: '2026-03-20'
     });
 
-    const result = await listPersonalParks(testDatabase.database, () => '');
+    const result = await listPersonalParks(testDatabase.database, async () => '');
 
     expect(result).toHaveLength(2);
 
@@ -243,7 +243,7 @@ describe('repositories', () => {
       visitId: visitWithImage.id
     });
 
-    const result = await listPersonalParks(testDatabase.database, () => '');
+    const result = await listPersonalParks(testDatabase.database, async () => '');
     const park = result.find((p) => p.slug === 'akasmannyn-kansallispuisto');
 
     expect(park?.visits).toHaveLength(2);
@@ -291,7 +291,7 @@ describe('repositories', () => {
     const personal = await getPersonalParkBySlug(
       testDatabase.database,
       'akasmannyn-kansallispuisto',
-      () => ''
+      async () => ''
     );
 
     expect(personal?.visits[0]?.images[0]?.id).toBe(img2.id);

@@ -20,7 +20,6 @@ const storage =
           accessKeyId: env.R2_ACCESS_KEY_ID,
           bucketName: env.R2_BUCKET_NAME,
           endpoint: env.R2_ENDPOINT,
-          publicUrl: env.R2_PUBLIC_URL ?? env.R2_ENDPOINT,
           secretAccessKey: env.R2_SECRET_ACCESS_KEY
         })
       : undefined;
