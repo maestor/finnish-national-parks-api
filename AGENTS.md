@@ -23,6 +23,7 @@ This repository is for a local-first TypeScript API that imports Finnish nationa
 - Update `README.md` when project purpose, setup, or common commands change.
 - Update `docs/DEVELOPMENT.md` when local development, importer, database, or deployment workflow changes.
 - Update `docs/TESTING.md` when the test strategy, commands, or quality gates change.
+- **When adding, removing, or changing API endpoints, request/response fields, or database schema, update `README.md` endpoint lists and `docs/DEVELOPMENT.md` / `docs/TESTING.md` references in the same session.** Do not wait for a separate request to sync documentation.
 - Prefer linking to source documents instead of duplicating long explanations.
 
 ## Data Rules
