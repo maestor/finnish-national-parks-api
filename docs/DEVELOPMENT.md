@@ -49,6 +49,14 @@ GOOGLE_CLIENT_SECRET=
 AUTH_JWT_SECRET=change-me-to-a-long-random-string
 AUTH_COOKIE_NAME=__session
 FRONTEND_URL=http://localhost:4300
+
+# Cloudflare R2 (optional — only needed for visit image uploads)
+R2_BUCKET_NAME=
+R2_ENDPOINT=
+R2_ACCESS_KEY_ID=
+R2_SECRET_ACCESS_KEY=
+R2_PUBLIC_URL=
+MEMORY_STORAGE=false
 ```
 
 All variables are optional for local development — sensible defaults are built in. `API_KEY` is only required if you want to test authenticated access locally; localhost requests bypass auth even when it is set.
@@ -93,6 +101,7 @@ Current table groups:
 - protected-area types
 - imported park catalog rows
 - personal visit records
+- visit images
 - import run metadata
 - admin allowlist (`admins`)
 
@@ -123,6 +132,7 @@ Key route behavior:
 - Personal routes use `private, no-store`.
 - Auth routes (`/auth/*`) bypass API key authentication so the OAuth flow can complete without a bearer token.
 - All other non-public endpoints require API key authentication; localhost requests are exempt.
+- Image upload routes (`POST /api/me/visits/:id/images`) accept multipart/form-data, resize images with Sharp, and store them in R2. They are only registered when R2 credentials (or `MEMORY_STORAGE=true`) are configured.
 
 ## Deployment Direction
 

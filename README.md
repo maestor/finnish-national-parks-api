@@ -53,6 +53,13 @@ GOOGLE_CLIENT_ID=
 GOOGLE_CLIENT_SECRET=
 AUTH_JWT_SECRET=change-me-to-a-long-random-string
 FRONTEND_URL=http://localhost:4300
+
+# Optional: Cloudflare R2 storage for visit images
+R2_BUCKET_NAME=
+R2_ENDPOINT=
+R2_ACCESS_KEY_ID=
+R2_SECRET_ACCESS_KEY=
+R2_PUBLIC_URL=
 ```
 
 ## API Shape
@@ -66,6 +73,9 @@ FRONTEND_URL=http://localhost:4300
 - `POST /api/me/parks/:slug/visits`
 - `PATCH /api/me/visits/:id`
 - `DELETE /api/me/visits/:id`
+- `POST /api/me/visits/:id/images`
+- `DELETE /api/me/visits/:visitId/images/:imageId`
+- `PATCH /api/me/visits/:id/images/reorder`
 
 Auth endpoints for control-panel login:
 
