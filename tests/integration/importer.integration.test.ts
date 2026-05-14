@@ -3,8 +3,7 @@ import {
   createVisit,
   getParkBySlug,
   getPersonalParkBySlug,
-  listParks,
-  putParkNote
+  listParks
 } from '../../src/db/repositories.js';
 import { importRuns } from '../../src/db/schema.js';
 import { importParks } from '../../src/importer/import-parks.js';
@@ -43,7 +42,7 @@ describe('importParks', () => {
     ).rejects.toThrow('Expected 41 active parks but received 1.');
   });
 
-  it('updates catalog rows without deleting personal note or visit data', async () => {
+  it('updates catalog rows without deleting personal visit data', async () => {
     await importParks({
       database: testDatabase.database,
       expectedActiveCount: 1,
@@ -54,9 +53,10 @@ describe('importParks', () => {
       })
     });
 
-    await putParkNote(testDatabase.database, 'akasmannyn-kansallispuisto', 'Bring coffee.');
     await createVisit(testDatabase.database, 'akasmannyn-kansallispuisto', {
+      author: 'Alice',
       note: 'Snowy trail.',
+      route: 'North loop',
       visitedOn: '2026-04-10'
     });
 
@@ -95,9 +95,6 @@ describe('importParks', () => {
       }
     });
     expect(personalPark).toMatchObject({
-      note: {
-        note: 'Bring coffee.'
-      },
       visitedSummary: {
         visitCount: 1,
         visited: true,
@@ -105,6 +102,12 @@ describe('importParks', () => {
       }
     });
     expect(personalPark?.visits).toHaveLength(1);
+    expect(personalPark?.visits[0]).toMatchObject({
+      author: 'Alice',
+      note: 'Snowy trail.',
+      route: 'North loop',
+      visitedOn: '2026-04-10'
+    });
     expect(parks).toHaveLength(1);
   });
 

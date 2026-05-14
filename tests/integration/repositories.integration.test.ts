@@ -7,7 +7,6 @@ import {
   getParkBySlug,
   getPersonalParkBySlug,
   listPersonalParks,
-  putParkNote,
   updateVisit
 } from '../../src/db/repositories.js';
 import { importParks } from '../../src/importer/import-parks.js';
@@ -35,25 +34,22 @@ describe('repositories', () => {
     await testDatabase.dispose();
   });
 
-  it('returns null for missing parks and can clear notes explicitly', async () => {
+  it('returns null for missing parks', async () => {
     await expect(getParkBySlug(testDatabase.database, 'missing-park')).resolves.toBeNull();
     await expect(getPersonalParkBySlug(testDatabase.database, 'missing-park')).resolves.toBeNull();
 
-    const personalParkBeforeNote = await getPersonalParkBySlug(
+    const personalPark = await getPersonalParkBySlug(
       testDatabase.database,
       'akasmannyn-kansallispuisto'
     );
-    expect(personalParkBeforeNote?.note).toBeNull();
-
-    await putParkNote(testDatabase.database, 'akasmannyn-kansallispuisto', 'Keep this note');
-    await expect(
-      putParkNote(testDatabase.database, 'akasmannyn-kansallispuisto', '   ')
-    ).resolves.toBeNull();
+    expect(personalPark?.visits).toEqual([]);
   });
 
-  it('preserves an existing visit note when only the date changes and reports missing deletes', async () => {
+  it('preserves existing visit fields when only the date changes and reports missing deletes', async () => {
     const visit = await createVisit(testDatabase.database, 'akasmannyn-kansallispuisto', {
+      author: 'Alice',
       note: 'First draft',
+      route: 'Loop A',
       visitedOn: '2026-04-11'
     });
 
@@ -62,34 +58,46 @@ describe('repositories', () => {
     });
 
     expect(updatedVisit).toMatchObject({
+      author: 'Alice',
       note: 'First draft',
+      route: 'Loop A',
       visitedOn: '2026-04-12'
     });
     await expect(deleteVisit(testDatabase.database, 99999)).resolves.toBe(false);
   });
 
-  it('supports creating visits without notes and patching only the note field', async () => {
+  it('supports creating visits without optional fields and patching individual fields', async () => {
     const visit = await createVisit(testDatabase.database, 'akasmannyn-kansallispuisto', {
       visitedOn: '2026-04-13'
     });
 
+    expect(visit.author).toBeNull();
     expect(visit.note).toBeNull();
+    expect(visit.route).toBeNull();
 
     const updatedVisit = await updateVisit(testDatabase.database, visit.id, {
-      note: 'Added later'
+      author: 'Bob',
+      note: 'Added later',
+      route: 'Loop B'
     });
 
     expect(updatedVisit).toMatchObject({
+      author: 'Bob',
       note: 'Added later',
+      route: 'Loop B',
       visitedOn: '2026-04-13'
     });
 
     const clearedVisit = await updateVisit(testDatabase.database, visit.id, {
-      note: '   '
+      author: '   ',
+      note: '   ',
+      route: '   '
     });
 
     expect(clearedVisit).toMatchObject({
+      author: null,
       note: null,
+      route: null,
       visitedOn: '2026-04-13'
     });
   });
@@ -135,7 +143,7 @@ describe('repositories', () => {
     await expect(listPersonalParks(testDatabase.database)).resolves.toEqual([]);
   });
 
-  it('batch-aggregates notes and visits across multiple parks', async () => {
+  it('batch-aggregates visits across multiple parks', async () => {
     await importParks({
       database: testDatabase.database,
       expectedActiveCount: 2,
@@ -152,16 +160,16 @@ describe('repositories', () => {
       })
     });
 
-    await putParkNote(testDatabase.database, 'akasmannyn-kansallispuisto', 'Note A');
     await createVisit(testDatabase.database, 'akasmannyn-kansallispuisto', {
+      author: 'Alice',
       note: 'Visit A1',
+      route: 'North',
       visitedOn: '2026-04-10'
     });
     await createVisit(testDatabase.database, 'akasmannyn-kansallispuisto', {
       note: 'Visit A2',
       visitedOn: '2026-04-11'
     });
-    await putParkNote(testDatabase.database, 'toinen-puisto', 'Note B');
     await createVisit(testDatabase.database, 'toinen-puisto', {
       visitedOn: '2026-03-20'
     });
@@ -174,7 +182,6 @@ describe('repositories', () => {
     const second = result.find((p) => p.slug === 'toinen-puisto');
 
     expect(first).toMatchObject({
-      note: { note: 'Note A' },
       visitedSummary: {
         visited: true,
         visitCount: 2,
@@ -182,10 +189,14 @@ describe('repositories', () => {
       }
     });
     expect(first?.visits).toHaveLength(2);
-    expect(first?.visits[0]).toMatchObject({ note: 'Visit A2', visitedOn: '2026-04-11' });
+    expect(first?.visits[0]).toMatchObject({
+      author: null,
+      note: 'Visit A2',
+      route: null,
+      visitedOn: '2026-04-11'
+    });
 
     expect(second).toMatchObject({
-      note: { note: 'Note B' },
       visitedSummary: {
         visited: true,
         visitCount: 1,
@@ -193,6 +204,11 @@ describe('repositories', () => {
       }
     });
     expect(second?.visits).toHaveLength(1);
-    expect(second?.visits[0]).toMatchObject({ note: null, visitedOn: '2026-03-20' });
+    expect(second?.visits[0]).toMatchObject({
+      author: null,
+      note: null,
+      route: null,
+      visitedOn: '2026-03-20'
+    });
   });
 });

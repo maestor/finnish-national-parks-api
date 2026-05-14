@@ -3,15 +3,19 @@ import { and, desc, eq, inArray, notInArray, sql } from 'drizzle-orm';
 import type { SupportedParkTypeSlug } from '../parks/park-types.js';
 import { supportedParkTypes } from '../parks/park-types.js';
 import type { Database, DbClient } from './database.js';
-import { admins, importRuns, parkNotes, parks, parkTypes, parkVisits } from './schema.js';
+import { admins, importRuns, parks, parkTypes, parkVisits } from './schema.js';
 
 type PutVisitInput = {
+  author?: string | null | undefined;
   note?: string | null | undefined;
+  route?: string | null | undefined;
   visitedOn: string;
 };
 
 type UpdateVisitInput = {
+  author?: string | null | undefined;
   note?: string | null | undefined;
+  route?: string | null | undefined;
   visitedOn?: string | undefined;
 };
 
@@ -80,9 +84,11 @@ const toPark = (row: TypedParkRow) => {
 
 const toVisit = (row: typeof parkVisits.$inferSelect) => {
   return {
+    author: row.author,
     createdAt: row.createdAt,
     id: row.id,
     note: row.note,
+    route: row.route,
     updatedAt: row.updatedAt,
     visitedOn: row.visitedOn
   };
@@ -137,31 +143,6 @@ const getVisitsForPark = async (database: Database, parkId: number) => {
   return rows.map(toVisit);
 };
 
-const getNoteForPark = async (database: Database, parkId: number) => {
-  const row = await database.query.parkNotes.findFirst({
-    where: eq(parkNotes.parkId, parkId)
-  });
-
-  if (!row) {
-    return null;
-  }
-
-  return {
-    note: row.note,
-    updatedAt: row.updatedAt
-  };
-};
-
-const getNotesForParkIds = async (database: Database, parkIds: number[]) => {
-  if (parkIds.length === 0) {
-    return [];
-  }
-
-  return database.query.parkNotes.findMany({
-    where: inArray(parkNotes.parkId, parkIds)
-  });
-};
-
 const getVisitsForParkIds = async (database: Database, parkIds: number[]) => {
   if (parkIds.length === 0) {
     return [];
@@ -174,14 +155,10 @@ const getVisitsForParkIds = async (database: Database, parkIds: number[]) => {
 };
 
 const buildPersonalPark = async (database: Database, row: TypedParkRow) => {
-  const [note, visits] = await Promise.all([
-    getNoteForPark(database, row.park.id),
-    getVisitsForPark(database, row.park.id)
-  ]);
+  const visits = await getVisitsForPark(database, row.park.id);
 
   return {
     ...toPark(row),
-    note,
     visitedSummary: {
       lastVisitedOn: visits[0]?.visitedOn ?? null,
       visitCount: visits.length,
@@ -249,14 +226,7 @@ export const listPersonalParks = async (database: Database) => {
   const rows = await listTypedParks(database);
   const parkIds = rows.map((row) => row.park.id);
 
-  const [allNotes, allVisits] = await Promise.all([
-    getNotesForParkIds(database, parkIds),
-    getVisitsForParkIds(database, parkIds)
-  ]);
-
-  const notesByParkId = new Map(
-    allNotes.map((row) => [row.parkId, { note: row.note, updatedAt: row.updatedAt }])
-  );
+  const allVisits = await getVisitsForParkIds(database, parkIds);
 
   const visitsByParkId = new Map<number, (typeof parkVisits.$inferSelect)[]>();
   for (const visit of allVisits) {
@@ -266,12 +236,10 @@ export const listPersonalParks = async (database: Database) => {
   }
 
   return rows.map((row) => {
-    const note = notesByParkId.get(row.park.id) ?? null;
     const visits = (visitsByParkId.get(row.park.id) ?? []).map(toVisit);
 
     return {
       ...toPark(row),
-      note,
       visitedSummary: {
         lastVisitedOn: visits[0]?.visitedOn ?? null,
         visitCount: visits.length,
@@ -280,40 +248,6 @@ export const listPersonalParks = async (database: Database) => {
       visits
     };
   });
-};
-
-export const putParkNote = async (database: Database, slug: string, note: string) => {
-  const park = await getParkRecordBySlug(database, slug);
-
-  if (!park) {
-    throw new Error(`Park not found for slug "${slug}".`);
-  }
-
-  const normalizedNote = note.trim();
-  const timestamp = new Date().toISOString();
-
-  if (normalizedNote.length === 0) {
-    await database.delete(parkNotes).where(eq(parkNotes.parkId, park.id));
-    return null;
-  }
-
-  await database
-    .insert(parkNotes)
-    .values({
-      createdAt: timestamp,
-      note: normalizedNote,
-      parkId: park.id,
-      updatedAt: timestamp
-    })
-    .onConflictDoUpdate({
-      set: {
-        note: normalizedNote,
-        updatedAt: timestamp
-      },
-      target: parkNotes.parkId
-    });
-
-  return getNoteForPark(database, park.id);
 };
 
 export const createVisit = async (database: Database, slug: string, input: PutVisitInput) => {
@@ -328,9 +262,11 @@ export const createVisit = async (database: Database, slug: string, input: PutVi
     await database
       .insert(parkVisits)
       .values({
+        author: input.author?.trim() || null,
         createdAt: timestamp,
         note: input.note?.trim() || null,
         parkId: park.id,
+        route: input.route?.trim() || null,
         updatedAt: timestamp,
         visitedOn: input.visitedOn
       })
@@ -355,7 +291,9 @@ export const updateVisit = async (database: Database, visitId: number, input: Up
   await database
     .update(parkVisits)
     .set({
+      author: input.author === undefined ? existingVisit.author : input.author?.trim() || null,
       note: input.note === undefined ? existingVisit.note : input.note?.trim() || null,
+      route: input.route === undefined ? existingVisit.route : input.route?.trim() || null,
       updatedAt: timestamp,
       visitedOn: input.visitedOn ?? existingVisit.visitedOn
     })
