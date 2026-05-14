@@ -54,12 +54,11 @@ GOOGLE_CLIENT_SECRET=
 AUTH_JWT_SECRET=change-me-to-a-long-random-string
 FRONTEND_URL=http://localhost:4300
 
-# Optional: Cloudflare R2 storage for visit images
+# Optional: Cloudflare R2 storage for visit images (bucket can be private)
 R2_BUCKET_NAME=
 R2_ENDPOINT=
 R2_ACCESS_KEY_ID=
 R2_SECRET_ACCESS_KEY=
-R2_PUBLIC_URL=
 ```
 
 ## API Shape

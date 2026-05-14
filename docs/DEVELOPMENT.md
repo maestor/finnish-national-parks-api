@@ -51,11 +51,11 @@ AUTH_COOKIE_NAME=__session
 FRONTEND_URL=http://localhost:4300
 
 # Cloudflare R2 (optional — only needed for visit image uploads)
+# The bucket can be private; the API generates presigned URLs for frontend access.
 R2_BUCKET_NAME=
 R2_ENDPOINT=
 R2_ACCESS_KEY_ID=
 R2_SECRET_ACCESS_KEY=
-R2_PUBLIC_URL=
 MEMORY_STORAGE=false
 ```
 
@@ -133,6 +133,7 @@ Key route behavior:
 - Auth routes (`/auth/*`) bypass API key authentication so the OAuth flow can complete without a bearer token.
 - All other non-public endpoints require API key authentication; localhost requests are exempt.
 - Image upload routes (`POST /api/me/visits/:id/images`) accept multipart/form-data, resize images with Sharp, and store them in R2. They are only registered when R2 credentials (or `MEMORY_STORAGE=true`) are configured.
+- Image responses include time-limited presigned URLs so the R2 bucket can remain private.
 
 ## Deployment Direction
 
