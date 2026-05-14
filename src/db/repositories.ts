@@ -1,9 +1,9 @@
-import { and, desc, eq, inArray, notInArray, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, notInArray, sql } from 'drizzle-orm';
 
 import type { SupportedParkTypeSlug } from '../parks/park-types.js';
 import { supportedParkTypes } from '../parks/park-types.js';
 import type { Database, DbClient } from './database.js';
-import { admins, importRuns, parks, parkTypes, parkVisits } from './schema.js';
+import { admins, importRuns, parks, parkTypes, parkVisits, visitImages } from './schema.js';
 
 type PutVisitInput = {
   author?: string | null | undefined;
@@ -82,11 +82,41 @@ const toPark = (row: TypedParkRow) => {
   };
 };
 
-const toVisit = (row: typeof parkVisits.$inferSelect) => {
+export type VisitImage = {
+  id: number;
+  fullUrl: string;
+  thumbUrl: string;
+  fullWidth: number | null;
+  fullHeight: number | null;
+  thumbWidth: number | null;
+  thumbHeight: number | null;
+  originalName: string | null;
+  displayOrder: number;
+  createdAt: string;
+};
+
+const toVisitImage = (
+  row: typeof visitImages.$inferSelect,
+  getPublicUrl: (key: string) => string
+): VisitImage => ({
+  id: row.id,
+  fullUrl: getPublicUrl(row.fullKey),
+  thumbUrl: getPublicUrl(row.thumbKey),
+  fullWidth: row.fullWidth,
+  fullHeight: row.fullHeight,
+  thumbWidth: row.thumbWidth,
+  thumbHeight: row.thumbHeight,
+  originalName: row.originalName,
+  displayOrder: row.displayOrder,
+  createdAt: row.createdAt
+});
+
+const toVisit = (row: typeof parkVisits.$inferSelect, images: VisitImage[] = []) => {
   return {
     author: row.author,
     createdAt: row.createdAt,
     id: row.id,
+    images,
     note: row.note,
     route: row.route,
     updatedAt: row.updatedAt,
@@ -135,12 +165,10 @@ const listTypedParks = async (
 };
 
 const getVisitsForPark = async (database: Database, parkId: number) => {
-  const rows = await database.query.parkVisits.findMany({
+  return database.query.parkVisits.findMany({
     orderBy: [desc(parkVisits.visitedOn), desc(parkVisits.id)],
     where: eq(parkVisits.parkId, parkId)
   });
-
-  return rows.map(toVisit);
 };
 
 const getVisitsForParkIds = async (database: Database, parkIds: number[]) => {
@@ -154,8 +182,39 @@ const getVisitsForParkIds = async (database: Database, parkIds: number[]) => {
   });
 };
 
-const buildPersonalPark = async (database: Database, row: TypedParkRow) => {
-  const visits = await getVisitsForPark(database, row.park.id);
+const getImagesForVisitIds = async (database: Database, visitIds: number[]) => {
+  if (visitIds.length === 0) {
+    return [];
+  }
+
+  return database.query.visitImages.findMany({
+    orderBy: [asc(visitImages.displayOrder), asc(visitImages.createdAt)],
+    where: inArray(visitImages.visitId, visitIds)
+  });
+};
+
+const buildPersonalPark = async (
+  database: Database,
+  row: TypedParkRow,
+  getImagePublicUrl: (key: string) => string
+) => {
+  const visitRows = await getVisitsForPark(database, row.park.id);
+  const visitIds = visitRows.map((v) => v.id);
+  const imageRows = await getImagesForVisitIds(database, visitIds);
+
+  const imagesByVisitId = new Map<number, (typeof visitImages.$inferSelect)[]>();
+  for (const img of imageRows) {
+    const list = imagesByVisitId.get(img.visitId) ?? [];
+    list.push(img);
+    imagesByVisitId.set(img.visitId, list);
+  }
+
+  const visits = visitRows.map((v) => {
+    const imgs = (imagesByVisitId.get(v.id) ?? []).map((img) =>
+      toVisitImage(img, getImagePublicUrl)
+    );
+    return toVisit(v, imgs);
+  });
 
   return {
     ...toPark(row),
@@ -217,16 +276,25 @@ export const getParkBySlug = async (database: Database, slug: string) => {
   return row ? toPark(row) : null;
 };
 
-export const getPersonalParkBySlug = async (database: Database, slug: string) => {
+export const getPersonalParkBySlug = async (
+  database: Database,
+  slug: string,
+  getImagePublicUrl: (key: string) => string
+) => {
   const row = await getTypedParkBySlug(database, slug);
-  return row ? buildPersonalPark(database, row) : null;
+  return row ? buildPersonalPark(database, row, getImagePublicUrl) : null;
 };
 
-export const listPersonalParks = async (database: Database) => {
+export const listPersonalParks = async (
+  database: Database,
+  getImagePublicUrl: (key: string) => string
+) => {
   const rows = await listTypedParks(database);
   const parkIds = rows.map((row) => row.park.id);
 
   const allVisits = await getVisitsForParkIds(database, parkIds);
+  const visitIds = allVisits.map((v) => v.id);
+  const allImages = await getImagesForVisitIds(database, visitIds);
 
   const visitsByParkId = new Map<number, (typeof parkVisits.$inferSelect)[]>();
   for (const visit of allVisits) {
@@ -235,8 +303,20 @@ export const listPersonalParks = async (database: Database) => {
     visitsByParkId.set(visit.parkId, list);
   }
 
+  const imagesByVisitId = new Map<number, (typeof visitImages.$inferSelect)[]>();
+  for (const img of allImages) {
+    const list = imagesByVisitId.get(img.visitId) ?? [];
+    list.push(img);
+    imagesByVisitId.set(img.visitId, list);
+  }
+
   return rows.map((row) => {
-    const visits = (visitsByParkId.get(row.park.id) ?? []).map(toVisit);
+    const visits = (visitsByParkId.get(row.park.id) ?? []).map((v) => {
+      const imgs = (imagesByVisitId.get(v.id) ?? []).map((img) =>
+        toVisitImage(img, getImagePublicUrl)
+      );
+      return toVisit(v, imgs);
+    });
 
     return {
       ...toPark(row),
@@ -309,6 +389,57 @@ export const updateVisit = async (database: Database, visitId: number, input: Up
 export const deleteVisit = async (database: Database, visitId: number) => {
   const result = await database.delete(parkVisits).where(eq(parkVisits.id, visitId));
   return Number(result.rowsAffected) > 0;
+};
+
+export const createVisitImage = async (
+  database: Database,
+  values: typeof visitImages.$inferInsert
+) => {
+  const row = (await database.insert(visitImages).values(values).returning())[0]!;
+  return row;
+};
+
+export const findVisitImageById = async (database: Database, imageId: number) => {
+  const rows = await database
+    .select()
+    .from(visitImages)
+    .where(eq(visitImages.id, imageId))
+    .limit(1);
+  return rows[0] ?? null;
+};
+
+export const deleteVisitImage = async (database: Database, imageId: number) => {
+  const result = await database.delete(visitImages).where(eq(visitImages.id, imageId));
+  return Number(result.rowsAffected) > 0;
+};
+
+export const reorderVisitImages = async (
+  database: Database,
+  visitId: number,
+  orderedImageIds: number[]
+) => {
+  const existing = await database
+    .select({ id: visitImages.id })
+    .from(visitImages)
+    .where(eq(visitImages.visitId, visitId));
+
+  const existingIds = new Set(existing.map((r) => r.id));
+  if (
+    orderedImageIds.length !== existingIds.size ||
+    !orderedImageIds.every((id) => existingIds.has(id))
+  ) {
+    throw new Error('Invalid image order: IDs do not match visit images.');
+  }
+
+  const timestamp = new Date().toISOString();
+
+  for (let index = 0; index < orderedImageIds.length; index++) {
+    const imageId = orderedImageIds[index]!;
+    await database
+      .update(visitImages)
+      .set({ displayOrder: index, updatedAt: timestamp })
+      .where(eq(visitImages.id, imageId));
+  }
 };
 
 export const upsertImportedPark = async (

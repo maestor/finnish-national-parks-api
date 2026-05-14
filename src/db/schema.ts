@@ -81,6 +81,32 @@ export const parkVisits = sqliteTable(
   })
 );
 
+export const visitImages = sqliteTable(
+  'visit_images',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    visitId: integer('visit_id')
+      .notNull()
+      .references(() => parkVisits.id, { onDelete: 'cascade' }),
+    fullKey: text('full_key').notNull(),
+    thumbKey: text('thumb_key').notNull(),
+    originalName: text('original_name'),
+    mimeType: text('mime_type').notNull(),
+    fullWidth: integer('full_width'),
+    fullHeight: integer('full_height'),
+    thumbWidth: integer('thumb_width'),
+    thumbHeight: integer('thumb_height'),
+    fileSizeBytes: integer('file_size_bytes'),
+    displayOrder: integer('display_order').notNull().default(0),
+    createdAt: text('created_at').notNull(),
+    updatedAt: text('updated_at').notNull()
+  },
+  (table) => ({
+    visitIdIndex: index('visit_images_visit_id_idx').on(table.visitId),
+    orderIndex: index('visit_images_order_idx').on(table.visitId, table.displayOrder)
+  })
+);
+
 export const admins = sqliteTable(
   'admins',
   {

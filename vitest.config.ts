@@ -11,7 +11,10 @@ export default defineConfig({
         'src/cli/**/*.ts',
         'src/env.ts',
         'src/db/client.ts',
-        'src/http/logger.ts'
+        'src/db/schema.ts',
+        'src/http/logger.ts',
+        'src/storage/r2-client.ts',
+        'src/storage/types.ts'
       ],
       thresholds: {
         branches: 100,
