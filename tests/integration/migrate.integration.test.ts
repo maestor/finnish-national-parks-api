@@ -34,7 +34,8 @@ describe('migrateDatabase', () => {
       '0000_init.sql',
       '0001_park_types.sql',
       '0002_admins.sql',
-      '0003_visit_details.sql'
+      '0003_visit_details.sql',
+      '0004_visit_images.sql'
     ]);
     expect(parkTypes.rows.map((row) => String(row.slug))).toEqual([
       'state-hiking-area',
