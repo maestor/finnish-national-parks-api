@@ -33,7 +33,8 @@ describe('migrateDatabase', () => {
     expect(migrations.rows.map((row) => String(row.name))).toEqual([
       '0000_init.sql',
       '0001_park_types.sql',
-      '0002_admins.sql'
+      '0002_admins.sql',
+      '0003_visit_details.sql'
     ]);
     expect(parkTypes.rows.map((row) => String(row.slug))).toEqual([
       'state-hiking-area',

@@ -58,15 +58,12 @@ export const parkDetailSchema = parkListItemSchema.extend({
   updatedAt: z.string()
 });
 
-export const noteSchema = z.object({
-  note: z.string(),
-  updatedAt: z.string()
-});
-
 export const visitSchema = z.object({
+  author: z.string().nullable(),
   createdAt: z.string(),
   id: z.number().int(),
   note: z.string().nullable(),
+  route: z.string().nullable(),
   updatedAt: z.string(),
   visitedOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/)
 });
@@ -85,7 +82,6 @@ export const personalParkSchema = parkDetailSchema
     boundaryGeoJson: true
   })
   .extend({
-    note: noteSchema.nullable(),
     visitedSummary: visitedSummarySchema,
     visits: z.array(visitSchema)
   });
@@ -98,21 +94,22 @@ export const personalParkListResponseSchema = z.object({
   parks: z.array(personalParkSchema)
 });
 
-export const putNoteRequestSchema = z.object({
-  note: z.string().max(10000)
-});
-
-export const putNoteResponseSchema = z.object({
-  note: noteSchema.nullable()
-});
-
 export const createVisitRequestSchema = z.object({
+  author: z.string().max(50).nullable().optional(),
   note: z.string().max(5000).nullable().optional(),
+  route: z.string().max(80).nullable().optional(),
   visitedOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/)
 });
 
 export const updateVisitRequestSchema = createVisitRequestSchema
   .partial()
-  .refine((input) => input.note !== undefined || input.visitedOn !== undefined, {
-    message: 'Provide at least one field to update.'
-  });
+  .refine(
+    (input) =>
+      input.author !== undefined ||
+      input.note !== undefined ||
+      input.route !== undefined ||
+      input.visitedOn !== undefined,
+    {
+      message: 'Provide at least one field to update.'
+    }
+  );

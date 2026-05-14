@@ -61,15 +61,6 @@ export const parks = sqliteTable(
   })
 );
 
-export const parkNotes = sqliteTable('park_notes', {
-  parkId: integer('park_id')
-    .primaryKey()
-    .references(() => parks.id),
-  note: text('note').notNull(),
-  createdAt: text('created_at').notNull(),
-  updatedAt: text('updated_at').notNull()
-});
-
 export const parkVisits = sqliteTable(
   'park_visits',
   {
@@ -79,6 +70,8 @@ export const parkVisits = sqliteTable(
       .references(() => parks.id),
     visitedOn: text('visited_on').notNull(),
     note: text('note'),
+    route: text('route'),
+    author: text('author'),
     createdAt: text('created_at').notNull(),
     updatedAt: text('updated_at').notNull()
   },

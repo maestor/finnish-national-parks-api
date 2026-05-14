@@ -11,7 +11,6 @@ import {
   getPersonalParkBySlug,
   listParks,
   listPersonalParks,
-  putParkNote,
   updateVisit
 } from './db/repositories.js';
 import { createAuthMiddleware } from './http/auth.js';
@@ -58,7 +57,6 @@ import {
   getPersonalParkRoute,
   listParksRoute,
   listPersonalParksRoute,
-  putParkNoteRoute,
   updateVisitRoute
 } from './routes/parks.js';
 
@@ -352,20 +350,6 @@ export const createApp = ({ apiKey, auth, database }: AppDependencies = {}) => {
       }
 
       return context.json(park, 200);
-    });
-
-    app.openapi(putParkNoteRoute, async (context) => {
-      context.header('Cache-Control', PRIVATE_CACHE_CONTROL);
-
-      const { slug } = context.req.valid('param');
-      const body = context.req.valid('json');
-
-      try {
-        const note = await putParkNote(database, slug, body.note);
-        return context.json({ note }, 200);
-      } catch (error) {
-        return context.json(jsonNotFound((error as Error).message), 404);
-      }
     });
 
     app.openapi(createVisitRoute, async (context) => {

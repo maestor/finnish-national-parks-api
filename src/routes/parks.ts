@@ -7,8 +7,6 @@ import {
   parkListResponseSchema,
   personalParkListResponseSchema,
   personalParkSchema,
-  putNoteRequestSchema,
-  putNoteResponseSchema,
   updateVisitRequestSchema,
   visitSchema
 } from '../contracts/parks.js';
@@ -108,43 +106,6 @@ export const getPersonalParkRoute = createRoute({
       content: {
         'application/json': {
           schema: personalParkSchema
-        }
-      }
-    },
-    404: {
-      description: 'Park was not found',
-      content: {
-        'application/json': {
-          schema: errorSchema
-        }
-      }
-    }
-  }
-});
-
-export const putParkNoteRoute = createRoute({
-  method: 'put',
-  path: '/api/me/parks/{slug}/note',
-  tags: ['Personal'],
-  security: [{ bearerAuth: [] }],
-  request: {
-    params: z.object({
-      slug: z.string()
-    }),
-    body: {
-      content: {
-        'application/json': {
-          schema: putNoteRequestSchema
-        }
-      }
-    }
-  },
-  responses: {
-    200: {
-      description: 'Updated personal note',
-      content: {
-        'application/json': {
-          schema: putNoteResponseSchema
         }
       }
     },

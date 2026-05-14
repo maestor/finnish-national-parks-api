@@ -217,28 +217,17 @@ describe('API routes', () => {
     expect(response.headers.get('etag')).toContain(parkTypeFixtures.stateHikingArea.slug);
   });
 
-  it('supports personal note and visit workflows with private cache policy', async () => {
+  it('supports personal visit workflows with private cache policy', async () => {
     const app = createApp({ database: testDatabase.database });
-
-    const noteResponse = await app.request('/api/me/parks/akasmannyn-kansallispuisto/note', {
-      method: 'PUT',
-      body: JSON.stringify({
-        note: 'Pack lunch.'
-      }),
-      headers: {
-        'content-type': 'application/json'
-      }
-    });
-
-    expect(noteResponse.status).toBe(200);
-    expect(noteResponse.headers.get('cache-control')).toBe('private, no-store');
 
     const createVisitResponse = await app.request(
       '/api/me/parks/akasmannyn-kansallispuisto/visits',
       {
         method: 'POST',
         body: JSON.stringify({
+          author: 'Hiker One',
           note: 'Windy but sunny.',
+          route: 'North trail',
           visitedOn: '2026-04-20'
         }),
         headers: {
@@ -253,7 +242,9 @@ describe('API routes', () => {
     const patchVisitResponse = await app.request(`/api/me/visits/${createdVisit.id}`, {
       method: 'PATCH',
       body: JSON.stringify({
+        author: 'Hiker Two',
         note: 'Windy and bright.',
+        route: 'South trail',
         visitedOn: '2026-04-21'
       }),
       headers: {
@@ -265,31 +256,30 @@ describe('API routes', () => {
 
     const personalResponse = await app.request('/api/me/parks/akasmannyn-kansallispuisto');
     const personalBody = (await personalResponse.json()) as {
-      note: { note: string } | null;
       visitedSummary: {
         lastVisitedOn: string | null;
         visitCount: number;
         visited: boolean;
       };
       visits: Array<{
+        author: string | null;
         note: string | null;
+        route: string | null;
         visitedOn: string;
       }>;
     };
 
     expect(personalResponse.status).toBe(200);
     expect(personalResponse.headers.get('cache-control')).toBe('private, no-store');
-    expect(personalBody.note).toEqual({
-      note: 'Pack lunch.',
-      updatedAt: expect.any(String)
-    });
     expect(personalBody.visitedSummary).toEqual({
       lastVisitedOn: '2026-04-21',
       visitCount: 1,
       visited: true
     });
     expect(personalBody.visits[0]).toMatchObject({
+      author: 'Hiker Two',
       note: 'Windy and bright.',
+      route: 'South trail',
       visitedOn: '2026-04-21'
     });
 
@@ -299,22 +289,6 @@ describe('API routes', () => {
 
     expect(deleteResponse.status).toBe(204);
     expect(deleteResponse.headers.get('cache-control')).toBe('private, no-store');
-
-    const clearNoteResponse = await app.request('/api/me/parks/akasmannyn-kansallispuisto/note', {
-      method: 'PUT',
-      body: JSON.stringify({
-        note: '   '
-      }),
-      headers: {
-        'content-type': 'application/json'
-      }
-    });
-    const clearedNoteBody = (await clearNoteResponse.json()) as {
-      note: null;
-    };
-
-    expect(clearNoteResponse.status).toBe(200);
-    expect(clearedNoteBody.note).toBeNull();
   });
 
   it('serves personal park lists and returns 404s for missing resources', async () => {
@@ -323,7 +297,6 @@ describe('API routes', () => {
     const listResponse = await app.request('/api/me/parks');
     const listBody = (await listResponse.json()) as {
       parks: Array<{
-        note: null;
         visits: unknown[];
       }>;
     };
@@ -331,20 +304,10 @@ describe('API routes', () => {
     expect(listResponse.status).toBe(200);
     expect(listResponse.headers.get('cache-control')).toBe('private, no-store');
     expect(listBody.parks).toHaveLength(3);
-    expect(listBody.parks[0]?.note).toBeNull();
     expect(listBody.parks[0]?.visits).toEqual([]);
 
     const missingCatalog = await app.request('/api/parks/missing-park');
     const missingPersonal = await app.request('/api/me/parks/missing-park');
-    const missingNote = await app.request('/api/me/parks/missing-park/note', {
-      method: 'PUT',
-      body: JSON.stringify({
-        note: 'Missing'
-      }),
-      headers: {
-        'content-type': 'application/json'
-      }
-    });
     const missingVisit = await app.request('/api/me/parks/missing-park/visits', {
       method: 'POST',
       body: JSON.stringify({
@@ -369,7 +332,6 @@ describe('API routes', () => {
 
     expect(missingCatalog.status).toBe(404);
     expect(missingPersonal.status).toBe(404);
-    expect(missingNote.status).toBe(404);
     expect(missingVisit.status).toBe(404);
     expect(missingVisitPatch.status).toBe(404);
     expect(missingVisitDelete.status).toBe(404);
