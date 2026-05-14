@@ -58,10 +58,24 @@ export const parkDetailSchema = parkListItemSchema.extend({
   updatedAt: z.string()
 });
 
+export const visitImageSchema = z.object({
+  id: z.number().int(),
+  fullUrl: z.string().url(),
+  thumbUrl: z.string().url(),
+  fullWidth: z.number().int().nullable(),
+  fullHeight: z.number().int().nullable(),
+  thumbWidth: z.number().int().nullable(),
+  thumbHeight: z.number().int().nullable(),
+  originalName: z.string().nullable(),
+  displayOrder: z.number().int(),
+  createdAt: z.string()
+});
+
 export const visitSchema = z.object({
   author: z.string().nullable(),
   createdAt: z.string(),
   id: z.number().int(),
+  images: z.array(visitImageSchema),
   note: z.string().nullable(),
   route: z.string().nullable(),
   updatedAt: z.string(),
@@ -113,3 +127,7 @@ export const updateVisitRequestSchema = createVisitRequestSchema
       message: 'Provide at least one field to update.'
     }
   );
+
+export const reorderVisitImagesRequestSchema = z.object({
+  imageIds: z.array(z.number().int()).min(1)
+});

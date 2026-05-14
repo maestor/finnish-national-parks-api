@@ -14,7 +14,13 @@ const envSchema = z.object({
   GOOGLE_CLIENT_SECRET: z.string().optional(),
   LIPAS_NATIONAL_PARKS_URL: z.string().url().optional(),
   LIPAS_PROTECTED_AREAS_URL: z.string().url().optional(),
-  PORT: z.string().optional()
+  MEMORY_STORAGE: z.string().optional().default('false'),
+  PORT: z.string().optional(),
+  R2_ACCESS_KEY_ID: z.string().optional(),
+  R2_BUCKET_NAME: z.string().optional(),
+  R2_ENDPOINT: z.string().optional(),
+  R2_PUBLIC_URL: z.string().optional(),
+  R2_SECRET_ACCESS_KEY: z.string().optional()
 });
 
 export const getEnv = () => {

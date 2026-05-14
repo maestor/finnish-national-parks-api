@@ -1,16 +1,22 @@
+import { randomUUID } from 'node:crypto';
+
 import { OpenAPIHono } from '@hono/zod-openapi';
 import { cors } from 'hono/cors';
 
 import type { Database } from './db/database.js';
 import {
   createVisit,
+  createVisitImage,
   deleteVisit,
+  deleteVisitImage,
   findAdminByEmail,
+  findVisitImageById,
   getCatalogListEtagSeed,
   getParkBySlug,
   getPersonalParkBySlug,
   listParks,
   listPersonalParks,
+  reorderVisitImages,
   updateVisit
 } from './db/repositories.js';
 import { createAuthMiddleware } from './http/auth.js';
@@ -52,12 +58,15 @@ import {
 import { healthRoute } from './routes/health.js';
 import {
   createVisitRoute,
+  deleteVisitImageRoute,
   deleteVisitRoute,
   getParkRoute,
   getPersonalParkRoute,
   listParksRoute,
   listPersonalParksRoute,
-  updateVisitRoute
+  reorderVisitImagesRoute,
+  updateVisitRoute,
+  uploadVisitImagesRoute
 } from './routes/parks.js';
 
 type AuthConfig = {
@@ -68,10 +77,13 @@ type AuthConfig = {
   jwtSecret: string;
 };
 
+import type { StorageClient } from './storage/types.js';
+
 type AppDependencies = {
   apiKey?: string | undefined;
   auth?: AuthConfig | undefined;
   database?: Database | undefined;
+  storage?: StorageClient | undefined;
 };
 
 const jsonNotFound = (error: string) => {
@@ -80,7 +92,13 @@ const jsonNotFound = (error: string) => {
   };
 };
 
-export const createApp = ({ apiKey, auth, database }: AppDependencies = {}) => {
+export const createApp = ({ apiKey, auth, database, storage }: AppDependencies = {}) => {
+  const getImagePublicUrl = async (key: string) => {
+    if (storage) {
+      return storage.getPresignedUrl(key, 3600);
+    }
+    return '';
+  };
   const app = new OpenAPIHono();
 
   app.use(async (c, next) => {
@@ -329,7 +347,7 @@ export const createApp = ({ apiKey, auth, database }: AppDependencies = {}) => {
     app.openapi(listPersonalParksRoute, async (context) => {
       context.header('Cache-Control', PRIVATE_CACHE_CONTROL);
 
-      const parks = await listPersonalParks(database);
+      const parks = await listPersonalParks(database, getImagePublicUrl);
 
       return context.json(
         {
@@ -343,7 +361,7 @@ export const createApp = ({ apiKey, auth, database }: AppDependencies = {}) => {
       context.header('Cache-Control', PRIVATE_CACHE_CONTROL);
 
       const { slug } = context.req.valid('param');
-      const park = await getPersonalParkBySlug(database, slug);
+      const park = await getPersonalParkBySlug(database, slug, getImagePublicUrl);
 
       if (!park) {
         return context.json(jsonNotFound('Park not found.'), 404);
@@ -395,6 +413,172 @@ export const createApp = ({ apiKey, auth, database }: AppDependencies = {}) => {
         status: 204
       });
     });
+
+    if (storage) {
+      const MAX_FILE_SIZE = 15 * 1024 * 1024; // 15 MB
+      const ACCEPTED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+
+      app.openapi(uploadVisitImagesRoute, async (context) => {
+        context.header('Cache-Control', PRIVATE_CACHE_CONTROL);
+
+        const { id } = context.req.valid('param');
+        const body = await context.req.parseBody({ all: true });
+        const rawImages = body.images;
+        const files: File[] = [];
+
+        if (Array.isArray(rawImages)) {
+          for (const item of rawImages) {
+            if (item instanceof File) {
+              files.push(item);
+            }
+          }
+        } else if (rawImages instanceof File) {
+          files.push(rawImages);
+        }
+
+        if (files.length === 0) {
+          return context.json({ error: 'No images provided.' }, 400);
+        }
+
+        // Verify visit exists
+        const existingVisit = await database.query.parkVisits.findFirst({
+          where: (visits, { eq }) => eq(visits.id, id)
+        });
+
+        if (!existingVisit) {
+          return context.json(jsonNotFound('Visit not found.'), 404);
+        }
+
+        type UploadResult = {
+          createdAt: string;
+          displayOrder: number;
+          fullHeight: number | null;
+          fullUrl: string;
+          fullWidth: number | null;
+          id: number;
+          originalName: string | null;
+          thumbHeight: number | null;
+          thumbUrl: string;
+          thumbWidth: number | null;
+        };
+
+        const results: UploadResult[] = [];
+        const errors: { originalName: string; reason: string }[] = [];
+
+        for (const file of files) {
+          if (!ACCEPTED_MIME_TYPES.includes(file.type)) {
+            errors.push({ originalName: file.name, reason: 'Unsupported file type.' });
+            continue;
+          }
+
+          if (file.size > MAX_FILE_SIZE) {
+            errors.push({ originalName: file.name, reason: 'File too large.' });
+            continue;
+          }
+
+          try {
+            const buffer = Buffer.from(await file.arrayBuffer());
+            const { processImage } = await import('./images/process-image.js');
+            const processed = await processImage(buffer);
+
+            const baseKey = `visits/${id}/${randomUUID()}`;
+            const fullKey = `${baseKey}-full.jpg`;
+            const thumbKey = `${baseKey}-thumb.jpg`;
+
+            await storage.upload(fullKey, processed.fullBuffer, 'image/jpeg');
+            await storage.upload(thumbKey, processed.thumbBuffer, 'image/jpeg');
+
+            const timestamp = new Date().toISOString();
+            const row = await createVisitImage(database, {
+              createdAt: timestamp,
+              displayOrder: 0,
+              fileSizeBytes: processed.fullBuffer.length,
+              fullHeight: processed.fullHeight,
+              fullKey,
+              fullWidth: processed.fullWidth,
+              mimeType: 'image/jpeg',
+              originalName: file.name,
+              thumbHeight: processed.thumbHeight,
+              thumbKey,
+              thumbWidth: processed.thumbWidth,
+              updatedAt: timestamp,
+              visitId: id
+            });
+
+            results.push({
+              createdAt: row.createdAt,
+              displayOrder: row.displayOrder,
+              fullHeight: row.fullHeight,
+              fullUrl: await storage.getPresignedUrl(row.fullKey, 3600),
+              fullWidth: row.fullWidth,
+              id: row.id,
+              originalName: row.originalName,
+              thumbHeight: row.thumbHeight,
+              thumbUrl: await storage.getPresignedUrl(row.thumbKey, 3600),
+              thumbWidth: row.thumbWidth
+            });
+          } catch (err) {
+            logger.error(
+              { err: (err as Error).message, fileName: file.name },
+              'Image upload failed'
+            );
+            errors.push({ originalName: file.name, reason: 'Processing failed.' });
+          }
+        }
+
+        if (results.length === 0) {
+          return context.json({ error: 'All uploads failed.', errors }, 422);
+        }
+
+        return context.json({ images: results, errors }, 201);
+      });
+
+      app.openapi(deleteVisitImageRoute, async (context) => {
+        context.header('Cache-Control', PRIVATE_CACHE_CONTROL);
+
+        const { imageId, visitId } = context.req.valid('param');
+        const image = await findVisitImageById(database, imageId);
+
+        if (!image || image.visitId !== visitId) {
+          return context.json(jsonNotFound('Image not found.'), 404);
+        }
+
+        await storage.delete(image.fullKey);
+        await storage.delete(image.thumbKey);
+        await deleteVisitImage(database, imageId);
+
+        return new Response(null, {
+          headers: context.res.headers,
+          status: 204
+        });
+      });
+
+      app.openapi(reorderVisitImagesRoute, async (context) => {
+        context.header('Cache-Control', PRIVATE_CACHE_CONTROL);
+
+        const { id } = context.req.valid('param');
+        const { imageIds } = context.req.valid('json');
+
+        const existingVisit = await database.query.parkVisits.findFirst({
+          where: (visits, { eq }) => eq(visits.id, id)
+        });
+
+        if (!existingVisit) {
+          return context.json(jsonNotFound('Visit not found.'), 404);
+        }
+
+        try {
+          await reorderVisitImages(database, id, imageIds);
+        } catch {
+          return context.json({ error: 'Invalid image order.' }, 422);
+        }
+
+        return new Response(null, {
+          headers: context.res.headers,
+          status: 204
+        });
+      });
+    }
   }
 
   app.doc('/openapi.json', {

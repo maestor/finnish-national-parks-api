@@ -2,11 +2,13 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import {
   createVisit,
+  createVisitImage,
   deleteVisit,
   getCatalogListEtagSeed,
   getParkBySlug,
   getPersonalParkBySlug,
   listPersonalParks,
+  reorderVisitImages,
   updateVisit
 } from '../../src/db/repositories.js';
 import { importParks } from '../../src/importer/import-parks.js';
@@ -36,11 +38,14 @@ describe('repositories', () => {
 
   it('returns null for missing parks', async () => {
     await expect(getParkBySlug(testDatabase.database, 'missing-park')).resolves.toBeNull();
-    await expect(getPersonalParkBySlug(testDatabase.database, 'missing-park')).resolves.toBeNull();
+    await expect(
+      getPersonalParkBySlug(testDatabase.database, 'missing-park', async () => '')
+    ).resolves.toBeNull();
 
     const personalPark = await getPersonalParkBySlug(
       testDatabase.database,
-      'akasmannyn-kansallispuisto'
+      'akasmannyn-kansallispuisto',
+      async () => ''
     );
     expect(personalPark?.visits).toEqual([]);
   });
@@ -140,7 +145,7 @@ describe('repositories', () => {
       })
     });
 
-    await expect(listPersonalParks(testDatabase.database)).resolves.toEqual([]);
+    await expect(listPersonalParks(testDatabase.database, async () => '')).resolves.toEqual([]);
   });
 
   it('batch-aggregates visits across multiple parks', async () => {
@@ -174,7 +179,7 @@ describe('repositories', () => {
       visitedOn: '2026-03-20'
     });
 
-    const result = await listPersonalParks(testDatabase.database);
+    const result = await listPersonalParks(testDatabase.database, async () => '');
 
     expect(result).toHaveLength(2);
 
@@ -210,5 +215,94 @@ describe('repositories', () => {
       route: null,
       visitedOn: '2026-03-20'
     });
+  });
+
+  it('includes empty images array for visits without images', async () => {
+    const visitWithImage = await createVisit(testDatabase.database, 'akasmannyn-kansallispuisto', {
+      visitedOn: '2026-04-10'
+    });
+    const visitWithoutImage = await createVisit(
+      testDatabase.database,
+      'akasmannyn-kansallispuisto',
+      {
+        visitedOn: '2026-04-11'
+      }
+    );
+
+    await createVisitImage(testDatabase.database, {
+      createdAt: new Date().toISOString(),
+      displayOrder: 0,
+      fullHeight: 100,
+      fullKey: 'k1',
+      fullWidth: 100,
+      mimeType: 'image/jpeg',
+      thumbHeight: 50,
+      thumbKey: 't1',
+      thumbWidth: 50,
+      updatedAt: new Date().toISOString(),
+      visitId: visitWithImage.id
+    });
+
+    const result = await listPersonalParks(testDatabase.database, async () => '');
+    const park = result.find((p) => p.slug === 'akasmannyn-kansallispuisto');
+
+    expect(park?.visits).toHaveLength(2);
+    const withImage = park?.visits.find((v) => v.id === visitWithImage.id);
+    const withoutImage = park?.visits.find((v) => v.id === visitWithoutImage.id);
+    expect(withImage?.images).toHaveLength(1);
+    expect(withoutImage?.images).toEqual([]);
+  });
+
+  it('reorders visit images and rejects invalid order', async () => {
+    const visit = await createVisit(testDatabase.database, 'akasmannyn-kansallispuisto', {
+      visitedOn: '2026-04-10'
+    });
+
+    const timestamp = new Date().toISOString();
+    const img1 = await createVisitImage(testDatabase.database, {
+      createdAt: timestamp,
+      displayOrder: 0,
+      fullHeight: 100,
+      fullKey: 'k1',
+      fullWidth: 100,
+      mimeType: 'image/jpeg',
+      thumbHeight: 50,
+      thumbKey: 't1',
+      thumbWidth: 50,
+      updatedAt: timestamp,
+      visitId: visit.id
+    });
+    const img2 = await createVisitImage(testDatabase.database, {
+      createdAt: timestamp,
+      displayOrder: 0,
+      fullHeight: 100,
+      fullKey: 'k2',
+      fullWidth: 100,
+      mimeType: 'image/jpeg',
+      thumbHeight: 50,
+      thumbKey: 't2',
+      thumbWidth: 50,
+      updatedAt: timestamp,
+      visitId: visit.id
+    });
+
+    await reorderVisitImages(testDatabase.database, visit.id, [img2.id, img1.id]);
+
+    const personal = await getPersonalParkBySlug(
+      testDatabase.database,
+      'akasmannyn-kansallispuisto',
+      async () => ''
+    );
+
+    expect(personal?.visits[0]?.images[0]?.id).toBe(img2.id);
+    expect(personal?.visits[0]?.images[1]?.id).toBe(img1.id);
+
+    await expect(reorderVisitImages(testDatabase.database, visit.id, [img1.id])).rejects.toThrow(
+      'Invalid image order'
+    );
+
+    await expect(
+      reorderVisitImages(testDatabase.database, visit.id, [99999, img1.id])
+    ).rejects.toThrow('Invalid image order');
   });
 });

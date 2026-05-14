@@ -7,7 +7,9 @@ import {
   parkListResponseSchema,
   personalParkListResponseSchema,
   personalParkSchema,
+  reorderVisitImagesRequestSchema,
   updateVisitRequestSchema,
+  visitImageSchema,
   visitSchema
 } from '../contracts/parks.js';
 import { supportedParkTypeSlugs } from '../parks/park-types.js';
@@ -210,6 +212,143 @@ export const deleteVisitRoute = createRoute({
     },
     404: {
       description: 'Visit was not found',
+      content: {
+        'application/json': {
+          schema: errorSchema
+        }
+      }
+    }
+  }
+});
+
+export const uploadVisitImagesRoute = createRoute({
+  method: 'post',
+  path: '/api/me/visits/{id}/images',
+  tags: ['Personal'],
+  security: [{ bearerAuth: [] }],
+  request: {
+    params: z.object({
+      id: z.coerce.number().int()
+    }),
+    body: {
+      content: {
+        'multipart/form-data': {
+          schema: z.object({
+            images: z.any().openapi({ type: 'string', format: 'binary' })
+          })
+        }
+      }
+    }
+  },
+  responses: {
+    201: {
+      description: 'Uploaded visit images',
+      content: {
+        'application/json': {
+          schema: z.object({
+            errors: z.array(
+              z.object({
+                originalName: z.string(),
+                reason: z.string()
+              })
+            ),
+            images: z.array(visitImageSchema)
+          })
+        }
+      }
+    },
+    400: {
+      description: 'No images provided',
+      content: {
+        'application/json': {
+          schema: errorSchema
+        }
+      }
+    },
+    404: {
+      description: 'Visit was not found',
+      content: {
+        'application/json': {
+          schema: errorSchema
+        }
+      }
+    },
+    413: {
+      description: 'File too large',
+      content: {
+        'application/json': {
+          schema: errorSchema
+        }
+      }
+    },
+    422: {
+      description: 'Invalid file type or all uploads failed',
+      content: {
+        'application/json': {
+          schema: errorSchema
+        }
+      }
+    }
+  }
+});
+
+export const deleteVisitImageRoute = createRoute({
+  method: 'delete',
+  path: '/api/me/visits/{visitId}/images/{imageId}',
+  tags: ['Personal'],
+  security: [{ bearerAuth: [] }],
+  request: {
+    params: z.object({
+      imageId: z.coerce.number().int(),
+      visitId: z.coerce.number().int()
+    })
+  },
+  responses: {
+    204: {
+      description: 'Deleted visit image'
+    },
+    404: {
+      description: 'Image or visit was not found',
+      content: {
+        'application/json': {
+          schema: errorSchema
+        }
+      }
+    }
+  }
+});
+
+export const reorderVisitImagesRoute = createRoute({
+  method: 'patch',
+  path: '/api/me/visits/{id}/images/reorder',
+  tags: ['Personal'],
+  security: [{ bearerAuth: [] }],
+  request: {
+    params: z.object({
+      id: z.coerce.number().int()
+    }),
+    body: {
+      content: {
+        'application/json': {
+          schema: reorderVisitImagesRequestSchema
+        }
+      }
+    }
+  },
+  responses: {
+    204: {
+      description: 'Reordered visit images'
+    },
+    404: {
+      description: 'Visit was not found',
+      content: {
+        'application/json': {
+          schema: errorSchema
+        }
+      }
+    },
+    422: {
+      description: 'Invalid image order',
       content: {
         'application/json': {
           schema: errorSchema
