@@ -156,12 +156,20 @@ describe('importParks', () => {
   it('imports supported protected-area types and persists normalized type metadata', async () => {
     await importParks({
       database: testDatabase.database,
-      expectedActiveCount: 3,
+      expectedActiveCount: 4,
       now: () => '2026-05-01T08:00:00.000Z',
       sourceUrl: 'https://example.test/lipas',
       fetchSource: async () => ({
         items: [
           createLipasPark(),
+          createLipasPark({
+            'lipas-id': 21000,
+            name: 'Kaupunkilaakson ulkoilualue',
+            type: {
+              'type-code': parkTypeFixtures.outdoorRecreationArea.typeCode
+            },
+            www: 'https://www.luontoon.fi/kaupunkilaakso'
+          }),
           createLipasPark({
             'lipas-id': 21001,
             name: 'Evon retkeilyalue',
@@ -186,6 +194,15 @@ describe('importParks', () => {
 
     expect(parks).toEqual(
       expect.arrayContaining([
+        expect.objectContaining({
+          name: 'Kaupunkilaakson ulkoilualue',
+          type: {
+            code: parkTypeFixtures.outdoorRecreationArea.typeCode,
+            id: parkTypeFixtures.outdoorRecreationArea.typeCode,
+            name: parkTypeFixtures.outdoorRecreationArea.name,
+            slug: parkTypeFixtures.outdoorRecreationArea.slug
+          }
+        }),
         expect.objectContaining({
           name: 'Äkäsmännyn kansallispuisto',
           type: {

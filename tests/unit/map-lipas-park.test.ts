@@ -78,4 +78,27 @@ describe('mapLipasPark', () => {
     expect(mapped.municipalityCode).toBeNull();
     expect(mapped.sourceEventDate).toBeNull();
   });
+
+  it('accepts live LIPAS records that omit the properties object', () => {
+    const source = createLipasPark({
+      'lipas-id': 72648,
+      name: 'Aittovuoren ulkoilualue',
+      type: {
+        'type-code': parkTypeFixtures.outdoorRecreationArea.typeCode
+      }
+    });
+    const { properties: _properties, ...sourceWithoutProperties } = source;
+
+    const mapped = mapLipasPark(sourceWithoutProperties);
+
+    expect(mapped).toMatchObject({
+      areaKm2: null,
+      lipasId: 72648,
+      name: 'Aittovuoren ulkoilualue',
+      type: {
+        code: parkTypeFixtures.outdoorRecreationArea.typeCode,
+        slug: parkTypeFixtures.outdoorRecreationArea.slug
+      }
+    });
+  });
 });

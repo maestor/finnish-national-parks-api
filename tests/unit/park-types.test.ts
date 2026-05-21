@@ -8,6 +8,10 @@ import {
 
 describe('park type helpers', () => {
   it('returns supported park types by code and slug', () => {
+    expect(getSupportedParkTypeByCode(103)).toMatchObject({
+      code: 103,
+      slug: 'outdoor-recreation-area'
+    });
     expect(getSupportedParkTypeByCode(111)).toMatchObject({
       code: 111,
       slug: 'national-park'
@@ -17,6 +21,7 @@ describe('park type helpers', () => {
       name: 'Valtion retkeilyalue'
     });
     expect(supportedParkTypeSlugs).toEqual([
+      'outdoor-recreation-area',
       'state-hiking-area',
       'wilderness-area',
       'national-park',

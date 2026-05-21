@@ -88,7 +88,7 @@ const ensureUniqueSlug = (baseSlug: string, lipasId: number, takenSlugs: Set<str
 
 export const importParks = async ({
   database,
-  expectedActiveCount = 137,
+  expectedActiveCount = 373,
   beforeEachUpsert,
   fetchSource = defaultFetchSource,
   now = () => new Date().toISOString(),

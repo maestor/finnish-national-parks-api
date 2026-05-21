@@ -40,7 +40,7 @@ Available variables:
 API_KEY=your-local-dev-key
 DATABASE_URL=file:./data/local.db
 DATABASE_AUTH_TOKEN=
-LIPAS_PROTECTED_AREAS_URL=https://api.lipas.fi/v2/sports-sites?type-codes=109,110,111,112&page-size=100&page=1
+LIPAS_PROTECTED_AREAS_URL=https://api.lipas.fi/v2/sports-sites?type-codes=103,109,110,111,112&page-size=100&page=1
 PORT=3004
 
 # Google OAuth (optional — only needed for control-panel login)
@@ -76,9 +76,9 @@ The local SQLite/libSQL file and `.env` itself should not be committed.
 
 The importer should:
 
-- Fetch LIPAS sports sites with type codes `109,110,111,112`.
+- Fetch LIPAS sports sites with type codes `103,109,110,111,112`.
 - Keep only records where `status` is `active`.
-- Expect 137 active records for the current dataset.
+- Expect 373 active records for the current dataset as of 2026-05-21.
 - Upsert catalog rows by `lipasId`.
 - Upsert normalized protected-area types in a dedicated `park_types` table.
 - Preserve personal visit history during catalog re-imports.
@@ -87,7 +87,7 @@ The importer should:
 - Exclude contact email, phone number, and comment text.
 - Update import metadata so catalog ETags change when imported catalog data changes.
 
-The current implementation fails the import if the active count does not match `137`, so upstream drift is visible immediately.
+The current implementation fails the import if the active count does not match `373`, so upstream drift is visible immediately.
 
 ## Database
 
