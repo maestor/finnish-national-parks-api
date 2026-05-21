@@ -1,12 +1,12 @@
 # Finnish National Parks API
 
-A local-first TypeScript API for Finnish protected-area catalog data and personal visit tracking.
+A local-first TypeScript API for Finnish park and outdoor-area catalog data and personal visit tracking.
 
-The API imports selected protected-area data from the open LIPAS API into an owned SQLite/libSQL database, then serves it for a future personal map application where places can have notes and visit history.
+The API imports selected park and outdoor-area data from the open LIPAS API into an owned SQLite/libSQL database, then serves it for a future personal map application where places can have notes and visit history.
 
 ## Goals
 
-- Keep a small, reliable protected-areas catalog in an owned database.
+- Keep a small, reliable park catalog in an owned database.
 - Use LIPAS as the machine-readable source for place names, locations, boundaries, area, establishment year, and Luontoon links.
 - Use Luontoon only as an official external reference link.
 - Store personal notes and visit history separately from imported catalog data.
@@ -46,7 +46,7 @@ Key variables:
 DATABASE_URL=file:./data/local.db
 DATABASE_AUTH_TOKEN=
 API_KEY=your-local-dev-key
-LIPAS_PROTECTED_AREAS_URL=https://api.lipas.fi/v2/sports-sites?type-codes=109,110,111,112&page-size=100&page=1
+LIPAS_PROTECTED_AREAS_URL=https://api.lipas.fi/v2/sports-sites?type-codes=103,109,110,111,112&page-size=100&page=1
 
 # Optional: enable Google OAuth login for the control panel
 GOOGLE_CLIENT_ID=
@@ -96,14 +96,15 @@ Catalog endpoints stay cache-friendly and database-backed:
 The catalog importer should use:
 
 ```text
-https://api.lipas.fi/v2/sports-sites?type-codes=109,110,111,112&page-size=100&page=1
+https://api.lipas.fi/v2/sports-sites?type-codes=103,109,110,111,112&page-size=100&page=1
 ```
 
 Importer expectations:
 
 - Keep only `status === "active"` records.
-- Expect 137 active protected areas in the current dataset.
+- Expect 373 active records in the current dataset as of 2026-05-21.
 - Import these supported LIPAS protected-area types:
+  - `103` Ulkoilu-/virkistysalue
   - `109` Valtion retkeilyalue
   - `110` Erämaa-alue
   - `111` Kansallispuisto
@@ -129,4 +130,3 @@ It runs typecheck, lint, and coverage tests with 100 percent thresholds for firs
 - [AGENTS.md](AGENTS.md): codebase rules for future agents and implementation sessions.
 - [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md): local development, database, importer, and deployment notes.
 - [docs/TESTING.md](docs/TESTING.md): testing strategy and verification expectations.
-

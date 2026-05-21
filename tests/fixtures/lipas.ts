@@ -41,6 +41,11 @@ export const parkTypeFixtures = {
     slug: 'national-park',
     typeCode: 111
   },
+  outdoorRecreationArea: {
+    name: 'Ulkoilu-/virkistysalue',
+    slug: 'outdoor-recreation-area',
+    typeCode: 103
+  },
   otherNatureReserve: {
     name: 'Muu luonnonsuojelualue',
     slug: 'other-nature-reserve',

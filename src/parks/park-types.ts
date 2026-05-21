@@ -1,5 +1,11 @@
 export const supportedParkTypes = [
   {
+    code: 103,
+    id: 103,
+    name: 'Ulkoilu-/virkistysalue',
+    slug: 'outdoor-recreation-area'
+  },
+  {
     code: 109,
     id: 109,
     name: 'Valtion retkeilyalue',

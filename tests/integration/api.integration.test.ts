@@ -21,12 +21,27 @@ describe('API routes', () => {
 
     await importParks({
       database: testDatabase.database,
-      expectedActiveCount: 3,
+      expectedActiveCount: 4,
       now: () => '2026-05-01T09:00:00.000Z',
       sourceUrl: 'https://example.test/lipas',
       fetchSource: async () => ({
         items: [
           createLipasPark(),
+          createLipasPark({
+            'lipas-id': 67889,
+            name: 'Kaupunkilaakson ulkoilualue',
+            type: {
+              'type-code': parkTypeFixtures.outdoorRecreationArea.typeCode
+            },
+            location: {
+              address: 'Laaksopolku 1',
+              'postal-office': 'Espoo'
+            },
+            properties: {
+              'area-km2': 22.4
+            },
+            www: 'https://www.luontoon.fi/kaupunkilaakso'
+          }),
           createLipasPark({
             'lipas-id': 67890,
             name: 'Seitsemisen kansallispuisto',
@@ -73,7 +88,7 @@ describe('API routes', () => {
     expect(response.status).toBe(200);
     expect(response.headers.get('cache-control')).toContain('public');
     expect(response.headers.get('etag')).toBeTruthy();
-    expect(body.parks).toHaveLength(3);
+    expect(body.parks).toHaveLength(4);
     expect(body.parks[0]).not.toHaveProperty('boundaryGeoJson');
     expect(body.parks[0]).toHaveProperty('type');
   });
@@ -101,7 +116,7 @@ describe('API routes', () => {
 
     await importParks({
       database: testDatabase.database,
-      expectedActiveCount: 3,
+      expectedActiveCount: 4,
       now: () => '2026-05-02T09:00:00.000Z',
       sourceUrl: 'https://example.test/lipas',
       fetchSource: async () => ({
@@ -110,6 +125,21 @@ describe('API routes', () => {
             properties: {
               'area-km2': 14.25
             }
+          }),
+          createLipasPark({
+            'lipas-id': 67889,
+            name: 'Kaupunkilaakson ulkoilualue',
+            type: {
+              'type-code': parkTypeFixtures.outdoorRecreationArea.typeCode
+            },
+            location: {
+              address: 'Laaksopolku 1',
+              'postal-office': 'Espoo'
+            },
+            properties: {
+              'area-km2': 22.4
+            },
+            www: 'https://www.luontoon.fi/kaupunkilaakso'
           }),
           createLipasPark({
             'lipas-id': 67890,
@@ -192,7 +222,7 @@ describe('API routes', () => {
 
   it('filters the public park list by type slug', async () => {
     const app = createApp({ database: testDatabase.database });
-    const response = await app.request('/api/parks?type=state-hiking-area');
+    const response = await app.request('/api/parks?type=outdoor-recreation-area');
     const body = (await response.json()) as {
       parks: Array<{
         name: string;
@@ -206,15 +236,15 @@ describe('API routes', () => {
     expect(body.parks).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          name: 'Evon retkeilyalue',
+          name: 'Kaupunkilaakson ulkoilualue',
           type: expect.objectContaining({
-            slug: parkTypeFixtures.stateHikingArea.slug
+            slug: parkTypeFixtures.outdoorRecreationArea.slug
           })
         })
       ])
     );
     expect(body.parks).toHaveLength(1);
-    expect(response.headers.get('etag')).toContain(parkTypeFixtures.stateHikingArea.slug);
+    expect(response.headers.get('etag')).toContain(parkTypeFixtures.outdoorRecreationArea.slug);
   });
 
   it('supports personal visit workflows with private cache policy', async () => {
@@ -303,7 +333,7 @@ describe('API routes', () => {
 
     expect(listResponse.status).toBe(200);
     expect(listResponse.headers.get('cache-control')).toBe('private, no-store');
-    expect(listBody.parks).toHaveLength(3);
+    expect(listBody.parks).toHaveLength(4);
     expect(listBody.parks[0]?.visits).toEqual([]);
 
     const missingCatalog = await app.request('/api/parks/missing-park');
