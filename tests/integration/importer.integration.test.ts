@@ -1,3 +1,4 @@
+import { eq } from 'drizzle-orm';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   createVisit,
@@ -5,7 +6,7 @@ import {
   getPersonalParkBySlug,
   listParks
 } from '../../src/db/repositories.js';
-import { importRuns } from '../../src/db/schema.js';
+import { importRuns, parks } from '../../src/db/schema.js';
 import { importParks } from '../../src/importer/import-parks.js';
 import { createLipasPark, parkTypeFixtures } from '../fixtures/lipas.js';
 import { createTestDatabase } from '../helpers/test-db.js';
@@ -110,6 +111,53 @@ describe('importParks', () => {
       visitedOn: '2026-04-10'
     });
     expect(parks).toHaveLength(1);
+  });
+
+  it('preserves manually removed parks across imports', async () => {
+    await importParks({
+      database: testDatabase.database,
+      expectedActiveCount: 1,
+      now: () => '2026-05-01T08:00:00.000Z',
+      sourceUrl: 'https://example.test/lipas',
+      fetchSource: async () => ({
+        items: [createLipasPark()]
+      })
+    });
+
+    await testDatabase.database
+      .update(parks)
+      .set({ removed: true })
+      .where(eq(parks.slug, 'akasmannyn-kansallispuisto'));
+
+    await importParks({
+      database: testDatabase.database,
+      expectedActiveCount: 1,
+      now: () => '2026-05-02T08:00:00.000Z',
+      sourceUrl: 'https://example.test/lipas',
+      fetchSource: async () => ({
+        items: [
+          createLipasPark({
+            name: 'Äkäsmännyn kansallispuisto uudistettu'
+          })
+        ]
+      })
+    });
+
+    const rawPark = await testDatabase.database.query.parks.findFirst({
+      where: eq(parks.slug, 'akasmannyn-kansallispuisto')
+    });
+
+    expect(rawPark).toMatchObject({
+      name: 'Äkäsmännyn kansallispuisto uudistettu',
+      removed: true
+    });
+    await expect(
+      getParkBySlug(testDatabase.database, 'akasmannyn-kansallispuisto')
+    ).resolves.toBeNull();
+    await expect(
+      getPersonalParkBySlug(testDatabase.database, 'akasmannyn-kansallispuisto', async () => '')
+    ).resolves.toBeNull();
+    await expect(listParks(testDatabase.database)).resolves.toEqual([]);
   });
 
   it('reuses existing slugs, deduplicates new slugs, and can mark all parks inactive', async () => {

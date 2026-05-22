@@ -8,6 +8,7 @@ import {
   personalParkListResponseSchema,
   personalParkSchema,
   reorderVisitImagesRequestSchema,
+  updateParkRemovedRequestSchema,
   updateVisitRequestSchema,
   visitImageSchema,
   visitSchema
@@ -147,6 +148,38 @@ export const createVisitRoute = createRoute({
           schema: visitSchema
         }
       }
+    },
+    404: {
+      description: 'Park was not found',
+      content: {
+        'application/json': {
+          schema: errorSchema
+        }
+      }
+    }
+  }
+});
+
+export const updateParkRemovedRoute = createRoute({
+  method: 'patch',
+  path: '/api/me/parks/{slug}/removed',
+  tags: ['Personal'],
+  security: [{ bearerAuth: [] }],
+  request: {
+    params: z.object({
+      slug: z.string()
+    }),
+    body: {
+      content: {
+        'application/json': {
+          schema: updateParkRemovedRequestSchema
+        }
+      }
+    }
+  },
+  responses: {
+    204: {
+      description: 'Updated park removed state'
     },
     404: {
       description: 'Park was not found',

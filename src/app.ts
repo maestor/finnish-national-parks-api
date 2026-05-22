@@ -17,6 +17,7 @@ import {
   listParks,
   listPersonalParks,
   reorderVisitImages,
+  updateParkRemoved,
   updateVisit
 } from './db/repositories.js';
 import { createAuthMiddleware } from './http/auth.js';
@@ -65,6 +66,7 @@ import {
   listParksRoute,
   listPersonalParksRoute,
   reorderVisitImagesRoute,
+  updateParkRemovedRoute,
   updateVisitRoute,
   uploadVisitImagesRoute
 } from './routes/parks.js';
@@ -382,6 +384,23 @@ export const createApp = ({ apiKey, auth, database, storage }: AppDependencies =
       } catch (error) {
         return context.json(jsonNotFound((error as Error).message), 404);
       }
+    });
+
+    app.openapi(updateParkRemovedRoute, async (context) => {
+      context.header('Cache-Control', PRIVATE_CACHE_CONTROL);
+
+      const { slug } = context.req.valid('param');
+      const { removed } = context.req.valid('json');
+      const updated = await updateParkRemoved(database, slug, removed);
+
+      if (!updated) {
+        return context.json(jsonNotFound('Park not found.'), 404);
+      }
+
+      return new Response(null, {
+        headers: context.res.headers,
+        status: 204
+      });
     });
 
     app.openapi(updateVisitRoute, async (context) => {

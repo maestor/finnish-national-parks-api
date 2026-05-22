@@ -69,6 +69,7 @@ R2_SECRET_ACCESS_KEY=
 - `GET /api/parks/:slug`
 - `GET /api/me/parks`
 - `GET /api/me/parks/:slug`
+- `PATCH /api/me/parks/:slug/removed`
 - `POST /api/me/parks/:slug/visits`
 - `PATCH /api/me/visits/:id`
 - `DELETE /api/me/visits/:id`
@@ -90,6 +91,7 @@ Catalog endpoints stay cache-friendly and database-backed:
 - `GET /api/parks/:slug?includeBoundary=true` includes stored boundary geometry.
 - Catalog `GET` endpoints emit deterministic `ETag` headers and support `304 Not Modified`.
 - Personal endpoints use `Cache-Control: private, no-store`.
+- `PATCH /api/me/parks/:slug/removed` lets the UI hide or restore a park by toggling its persisted `removed` flag.
 
 ## Data Source
 
@@ -113,6 +115,7 @@ Importer expectations:
 - Store catalog fields needed for a map app.
 - Exclude LIPAS contact email, phone number, and comment text.
 - Preserve personal notes and visit history across imports.
+- Preserve manual park removals across imports and exclude removed rows from API responses.
 - Read from the local/libSQL database during normal API requests instead of calling LIPAS live.
 
 ## Verification

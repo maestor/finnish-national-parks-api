@@ -82,6 +82,7 @@ The importer should:
 - Upsert catalog rows by `lipasId`.
 - Upsert normalized protected-area types in a dedicated `park_types` table.
 - Preserve personal visit history during catalog re-imports.
+- Preserve any manually set `parks.removed` flags during catalog re-imports.
 - Derive slug, marker point, and bounding box from imported data.
 - Store boundary GeoJSON for detail/map-boundary usage.
 - Exclude contact email, phone number, and comment text.
@@ -106,6 +107,7 @@ Current table groups:
 - admin allowlist (`admins`)
 
 Personal data must not be removed by catalog synchronization.
+Catalog rows marked with `parks.removed = 1` are intentionally hidden from park APIs and should stay removed across future imports.
 
 ### Admin Allowlist
 
@@ -130,6 +132,7 @@ Key route behavior:
 - `GET /api/parks/:slug?includeBoundary=true` returns the stored boundary GeoJSON.
 - Catalog routes emit deterministic `ETag` headers and support `304 Not Modified`.
 - Personal routes use `private, no-store`.
+- `PATCH /api/me/parks/:slug/removed` toggles whether a park is hidden from catalog and personal park responses.
 - Auth routes (`/auth/*`) bypass API key authentication so the OAuth flow can complete without a bearer token.
 - All other non-public endpoints require API key authentication; localhost requests are exempt.
 - Image upload routes (`POST /api/me/visits/:id/images`) accept multipart/form-data, resize images with Sharp, and store them in R2. They are only registered when R2 credentials (or `MEMORY_STORAGE=true`) are configured.

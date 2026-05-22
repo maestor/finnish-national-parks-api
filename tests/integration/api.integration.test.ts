@@ -1,3 +1,4 @@
+import { eq } from 'drizzle-orm';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 const authConfig = {
@@ -9,6 +10,8 @@ const authConfig = {
 };
 
 import { createApp } from '../../src/app.js';
+import { getParkBySlug } from '../../src/db/repositories.js';
+import { parks } from '../../src/db/schema.js';
 import { importParks } from '../../src/importer/import-parks.js';
 import { createLipasPark, parkTypeFixtures } from '../fixtures/lipas.js';
 import { createTestDatabase } from '../helpers/test-db.js';
@@ -365,6 +368,99 @@ describe('API routes', () => {
     expect(missingVisit.status).toBe(404);
     expect(missingVisitPatch.status).toBe(404);
     expect(missingVisitDelete.status).toBe(404);
+  });
+
+  it('hides removed parks from catalog and personal park endpoints', async () => {
+    await testDatabase.database
+      .update(parks)
+      .set({ removed: true })
+      .where(eq(parks.slug, 'akasmannyn-kansallispuisto'));
+
+    const app = createApp({ database: testDatabase.database });
+    const publicListResponse = await app.request('/api/parks');
+    const publicListBody = (await publicListResponse.json()) as {
+      parks: Array<{ slug: string }>;
+    };
+    const publicDetailResponse = await app.request('/api/parks/akasmannyn-kansallispuisto');
+    const personalListResponse = await app.request('/api/me/parks');
+    const personalListBody = (await personalListResponse.json()) as {
+      parks: Array<{ slug: string }>;
+    };
+    const personalDetailResponse = await app.request('/api/me/parks/akasmannyn-kansallispuisto');
+    const createVisitResponse = await app.request(
+      '/api/me/parks/akasmannyn-kansallispuisto/visits',
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          visitedOn: '2026-04-20'
+        }),
+        headers: {
+          'content-type': 'application/json'
+        }
+      }
+    );
+
+    expect(publicListResponse.status).toBe(200);
+    expect(publicListBody.parks).toHaveLength(3);
+    expect(publicListBody.parks.map((park) => park.slug)).not.toContain(
+      'akasmannyn-kansallispuisto'
+    );
+    expect(publicDetailResponse.status).toBe(404);
+    expect(personalListResponse.status).toBe(200);
+    expect(personalListBody.parks).toHaveLength(3);
+    expect(personalListBody.parks.map((park) => park.slug)).not.toContain(
+      'akasmannyn-kansallispuisto'
+    );
+    expect(personalDetailResponse.status).toBe(404);
+    expect(createVisitResponse.status).toBe(404);
+  });
+
+  it('allows authenticated UI to disable and restore a park by slug', async () => {
+    const app = createApp({ database: testDatabase.database });
+
+    const disableResponse = await app.request('/api/me/parks/akasmannyn-kansallispuisto/removed', {
+      method: 'PATCH',
+      body: JSON.stringify({
+        removed: true
+      }),
+      headers: {
+        'content-type': 'application/json'
+      }
+    });
+
+    expect(disableResponse.status).toBe(204);
+    await expect(
+      getParkBySlug(testDatabase.database, 'akasmannyn-kansallispuisto')
+    ).resolves.toBeNull();
+
+    const restoreResponse = await app.request('/api/me/parks/akasmannyn-kansallispuisto/removed', {
+      method: 'PATCH',
+      body: JSON.stringify({
+        removed: false
+      }),
+      headers: {
+        'content-type': 'application/json'
+      }
+    });
+
+    expect(restoreResponse.status).toBe(204);
+    await expect(
+      getParkBySlug(testDatabase.database, 'akasmannyn-kansallispuisto')
+    ).resolves.toMatchObject({
+      slug: 'akasmannyn-kansallispuisto'
+    });
+
+    const missingResponse = await app.request('/api/me/parks/missing-park/removed', {
+      method: 'PATCH',
+      body: JSON.stringify({
+        removed: true
+      }),
+      headers: {
+        'content-type': 'application/json'
+      }
+    });
+
+    expect(missingResponse.status).toBe(404);
   });
 
   it('returns CORS headers for preflight requests on API routes', async () => {

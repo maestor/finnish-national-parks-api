@@ -61,6 +61,15 @@ const toParkType = (row: typeof parkTypes.$inferSelect) => {
   };
 };
 
+const visibleParkBySlugWhere = (slug: string) =>
+  and(eq(parks.slug, slug), eq(parks.removed, false));
+
+const visibleCatalogWhere = (typeSlug?: SupportedParkTypeSlug) => {
+  return typeSlug
+    ? and(eq(parks.catalogStatus, 'active'), eq(parks.removed, false), eq(parkTypes.slug, typeSlug))
+    : and(eq(parks.catalogStatus, 'active'), eq(parks.removed, false));
+};
+
 const toPark = (row: TypedParkRow) => {
   return {
     areaKm2: row.park.areaKm2,
@@ -126,6 +135,12 @@ const toVisit = (row: typeof parkVisits.$inferSelect, images: VisitImage[] = [])
 
 const getParkRecordBySlug = async (database: Database, slug: string) => {
   return database.query.parks.findFirst({
+    where: visibleParkBySlugWhere(slug)
+  });
+};
+
+const getParkRecordBySlugIncludingRemoved = async (database: Database, slug: string) => {
+  return database.query.parks.findFirst({
     where: eq(parks.slug, slug)
   });
 };
@@ -140,7 +155,7 @@ const getTypedParkBySlug = async (database: Database, slug: string) => {
         })
         .from(parks)
         .innerJoin(parkTypes, eq(parks.typeId, parkTypes.id))
-        .where(eq(parks.slug, slug))
+        .where(visibleParkBySlugWhere(slug))
     )[0] ?? null
   );
 };
@@ -149,10 +164,6 @@ const listTypedParks = async (
   database: Database,
   options: { typeSlug?: SupportedParkTypeSlug } = {}
 ) => {
-  const whereClause = options.typeSlug
-    ? and(eq(parks.catalogStatus, 'active'), eq(parkTypes.slug, options.typeSlug))
-    : eq(parks.catalogStatus, 'active');
-
   return database
     .select({
       park: parks,
@@ -160,7 +171,7 @@ const listTypedParks = async (
     })
     .from(parks)
     .innerJoin(parkTypes, eq(parks.typeId, parkTypes.id))
-    .where(whereClause)
+    .where(visibleCatalogWhere(options.typeSlug))
     .orderBy(parks.name);
 };
 
@@ -362,6 +373,24 @@ export const createVisit = async (database: Database, slug: string, input: PutVi
   return toVisit(row);
 };
 
+export const updateParkRemoved = async (database: Database, slug: string, removed: boolean) => {
+  const park = await getParkRecordBySlugIncludingRemoved(database, slug);
+
+  if (!park) {
+    return false;
+  }
+
+  await database
+    .update(parks)
+    .set({
+      removed,
+      updatedAt: new Date().toISOString()
+    })
+    .where(eq(parks.id, park.id));
+
+  return true;
+};
+
 export const updateVisit = async (database: Database, visitId: number, input: UpdateVisitInput) => {
   const [existingVisit] = await database
     .select()
@@ -511,9 +540,6 @@ export const getCatalogListEtagSeed = async (
   database: Database,
   options: { typeSlug?: SupportedParkTypeSlug } = {}
 ) => {
-  const whereClause = options.typeSlug
-    ? and(eq(parks.catalogStatus, 'active'), eq(parkTypes.slug, options.typeSlug))
-    : eq(parks.catalogStatus, 'active');
   const summary = (
     await database
       .select({
@@ -523,7 +549,7 @@ export const getCatalogListEtagSeed = async (
       })
       .from(parks)
       .innerJoin(parkTypes, eq(parks.typeId, parkTypes.id))
-      .where(whereClause)
+      .where(visibleCatalogWhere(options.typeSlug))
   )[0]!;
 
   return {

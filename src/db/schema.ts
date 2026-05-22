@@ -47,6 +47,7 @@ export const parks = sqliteTable(
     markerLon: real('marker_lon').notNull(),
     markerLat: real('marker_lat').notNull(),
     catalogStatus: text('catalog_status').notNull(),
+    removed: integer('removed', { mode: 'boolean' }).notNull().default(false),
     lastImportRunId: integer('last_import_run_id')
       .notNull()
       .references(() => importRuns.id),
@@ -57,7 +58,8 @@ export const parks = sqliteTable(
     lipasIdIndex: uniqueIndex('parks_lipas_id_idx').on(table.lipasId),
     slugIndex: uniqueIndex('parks_slug_idx').on(table.slug),
     typeIndex: index('parks_type_id_idx').on(table.typeId),
-    statusIndex: index('parks_catalog_status_idx').on(table.catalogStatus)
+    statusIndex: index('parks_catalog_status_idx').on(table.catalogStatus),
+    removedIndex: index('parks_removed_idx').on(table.removed)
   })
 );
 
