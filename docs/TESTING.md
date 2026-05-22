@@ -48,6 +48,7 @@ Use mutation testing for:
 - Import stores the expected catalog fields.
 - Import derives stable slugs, marker points, and bounding boxes.
 - Re-import updates catalog fields without deleting visits.
+- Import prefers official Luontoon sitemap destination URLs over stale LIPAS `www` links and falls back when no sitemap match exists.
 - `GET /api/parks` returns lightweight list/map data without full boundary geometry.
 - `GET /api/parks?type=...` filters the public catalog list by normalized type slug.
 - `GET /api/parks/:slug` returns catalog detail without personal state.

@@ -83,12 +83,14 @@ The importer should:
 - Upsert normalized protected-area types in a dedicated `park_types` table.
 - Preserve personal visit history during catalog re-imports.
 - Preserve any manually set `parks.removed` flags during catalog re-imports.
+- Refresh destination `luontoonUrl` values from `https://www.luontoon.fi/resources/sitemap/fi.xml` when the official sitemap contains a matching base destination URL.
 - Derive slug, marker point, and bounding box from imported data.
 - Store boundary GeoJSON for detail/map-boundary usage.
 - Exclude contact email, phone number, and comment text.
 - Update import metadata so catalog ETags change when imported catalog data changes.
 
 The current implementation fails the import if the active count does not match `373`, so upstream drift is visible immediately.
+If a destination cannot be matched from the official Luontoon sitemap, the importer falls back to the normalized LIPAS `www` value for that row.
 
 ## Database
 

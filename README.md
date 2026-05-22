@@ -114,6 +114,7 @@ Importer expectations:
 - Store normalized type metadata in a dedicated type table and reference it from catalog rows.
 - Store catalog fields needed for a map app.
 - Exclude LIPAS contact email, phone number, and comment text.
+- Refresh `luontoonUrl` from Luontoon's official Finnish sitemap when a matching destination exists, instead of trusting LIPAS `www` blindly.
 - Preserve personal notes and visit history across imports.
 - Preserve manual park removals across imports and exclude removed rows from API responses.
 - Read from the local/libSQL database during normal API requests instead of calling LIPAS live.

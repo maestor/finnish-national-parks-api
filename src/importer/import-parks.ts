@@ -8,6 +8,7 @@ import {
   syncParkTypes,
   upsertImportedPark
 } from '../db/repositories.js';
+import { createLuontoonUrlResolver } from './luontoon-sitemap.js';
 import { mapLipasPark } from './map-lipas-park.js';
 
 const lipasResponseSchema = z.object({
@@ -27,11 +28,13 @@ type ImportParksOptions = {
   expectedActiveCount?: number;
   beforeEachUpsert?: (index: number, lipasId: number) => void | Promise<void>;
   fetchSource?: (sourceUrl: string) => Promise<unknown>;
+  fetchLuontoonSitemap?: ((sourceUrl: string) => Promise<string>) | undefined;
   now?: () => string;
   sourceUrl: string;
 };
 
 const RESPONSE_SHAPE_VERSION = 'catalog-v2';
+const LUONTOON_SITEMAP_URL = 'https://www.luontoon.fi/resources/sitemap/fi.xml';
 
 const defaultFetchSource = async (sourceUrl: string) => {
   const firstResponse = await fetch(sourceUrl);
@@ -75,6 +78,20 @@ const defaultFetchSource = async (sourceUrl: string) => {
   };
 };
 
+const defaultFetchLuontoonSitemap = async (sourceUrl: string) => {
+  const response = await fetch(sourceUrl);
+
+  if (!response.ok) {
+    throw new Error(`Luontoon sitemap fetch failed with status ${response.status}.`);
+  }
+
+  return response.text();
+};
+
+const emptyLuontoonSitemap = async () => {
+  return '<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"></urlset>';
+};
+
 const ensureUniqueSlug = (baseSlug: string, lipasId: number, takenSlugs: Set<string>) => {
   if (!takenSlugs.has(baseSlug)) {
     takenSlugs.add(baseSlug);
@@ -91,10 +108,17 @@ export const importParks = async ({
   expectedActiveCount = 373,
   beforeEachUpsert,
   fetchSource = defaultFetchSource,
+  fetchLuontoonSitemap,
   now = () => new Date().toISOString(),
   sourceUrl
 }: ImportParksOptions) => {
   const payload = lipasResponseSchema.parse(await fetchSource(sourceUrl));
+  const effectiveFetchLuontoonSitemap =
+    fetchLuontoonSitemap ??
+    (fetchSource === defaultFetchSource ? defaultFetchLuontoonSitemap : emptyLuontoonSitemap);
+  const resolveLuontoonUrl = createLuontoonUrlResolver(
+    await effectiveFetchLuontoonSitemap(LUONTOON_SITEMAP_URL)
+  );
   const activeItems = payload.items.filter((item) => {
     const candidate = item as { status?: string };
     return candidate.status === 'active';
@@ -133,6 +157,7 @@ export const importParks = async ({
       }
 
       const mapped = mapLipasPark(item, existingSlugByLipasId.get(lipasId));
+      const resolvedLuontoonUrl = resolveLuontoonUrl(mapped) ?? mapped.luontoonUrl;
       const slug =
         existingSlugByLipasId.get(lipasId) ?? ensureUniqueSlug(mapped.slug, lipasId, takenSlugs);
 
@@ -149,7 +174,7 @@ export const importParks = async ({
         lastImportRunId: importRunId,
         lipasId: mapped.lipasId,
         locationLabel: mapped.locationLabel,
-        luontoonUrl: mapped.luontoonUrl,
+        luontoonUrl: resolvedLuontoonUrl,
         markerLat: mapped.markerPoint.lat,
         markerLon: mapped.markerPoint.lon,
         municipalityCode: mapped.municipalityCode,
