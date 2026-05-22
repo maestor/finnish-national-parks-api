@@ -54,6 +54,7 @@ Use mutation testing for:
 - Catalog `GET` endpoints emit ETags and return `304 Not Modified` for matching `If-None-Match`.
 - Catalog `GET` endpoints are safe for public caching.
 - Personal endpoints are private or no-store and contain visit state.
+- Park removal toggle can hide and restore a park through the authenticated personal API.
 - Visit create/edit/delete supports optional route and author fields.
 - Visit create/edit/delete works against a real temporary database.
 - Auth routes bypass bearer-token middleware.

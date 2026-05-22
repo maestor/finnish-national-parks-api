@@ -115,6 +115,10 @@ export const createVisitRequestSchema = z.object({
   visitedOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/)
 });
 
+export const updateParkRemovedRequestSchema = z.object({
+  removed: z.boolean()
+});
+
 export const updateVisitRequestSchema = createVisitRequestSchema
   .partial()
   .refine(
