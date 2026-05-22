@@ -250,29 +250,26 @@ describe('API routes', () => {
     expect(response.headers.get('etag')).toContain(parkTypeFixtures.outdoorRecreationArea.slug);
   });
 
-  it('supports personal visit workflows with private cache policy', async () => {
+  it('supports visit workflows with private cache policy', async () => {
     const app = createApp({ database: testDatabase.database });
 
-    const createVisitResponse = await app.request(
-      '/api/me/parks/akasmannyn-kansallispuisto/visits',
-      {
-        method: 'POST',
-        body: JSON.stringify({
-          author: 'Hiker One',
-          note: 'Windy but sunny.',
-          route: 'North trail',
-          visitedOn: '2026-04-20'
-        }),
-        headers: {
-          'content-type': 'application/json'
-        }
+    const createVisitResponse = await app.request('/api/parks/akasmannyn-kansallispuisto/visits', {
+      method: 'POST',
+      body: JSON.stringify({
+        author: 'Hiker One',
+        note: 'Windy but sunny.',
+        route: 'North trail',
+        visitedOn: '2026-04-20'
+      }),
+      headers: {
+        'content-type': 'application/json'
       }
-    );
+    });
     const createdVisit = (await createVisitResponse.json()) as { id: number };
 
     expect(createVisitResponse.status).toBe(201);
 
-    const patchVisitResponse = await app.request(`/api/me/visits/${createdVisit.id}`, {
+    const patchVisitResponse = await app.request(`/api/visits/${createdVisit.id}`, {
       method: 'PATCH',
       body: JSON.stringify({
         author: 'Hiker Two',
@@ -287,8 +284,8 @@ describe('API routes', () => {
 
     expect(patchVisitResponse.status).toBe(200);
 
-    const personalResponse = await app.request('/api/me/parks/akasmannyn-kansallispuisto');
-    const personalBody = (await personalResponse.json()) as {
+    const parkVisitsResponse = await app.request('/api/parks/akasmannyn-kansallispuisto/visits');
+    const parkVisitsBody = (await parkVisitsResponse.json()) as {
       visitedSummary: {
         lastVisitedOn: string | null;
         visitCount: number;
@@ -301,22 +298,52 @@ describe('API routes', () => {
         visitedOn: string;
       }>;
     };
+    const visitsResponse = await app.request('/api/visits');
+    const visitsBody = (await visitsResponse.json()) as {
+      visits: Array<{
+        park: {
+          name: string;
+          slug: string;
+        };
+      }>;
+    };
+    const visitResponse = await app.request(`/api/visits/${createdVisit.id}`);
+    const visitBody = (await visitResponse.json()) as {
+      park: {
+        name: string;
+        slug: string;
+      };
+    };
 
-    expect(personalResponse.status).toBe(200);
-    expect(personalResponse.headers.get('cache-control')).toBe('private, no-store');
-    expect(personalBody.visitedSummary).toEqual({
+    expect(parkVisitsResponse.status).toBe(200);
+    expect(parkVisitsResponse.headers.get('cache-control')).toBe('private, no-store');
+    expect(parkVisitsBody.visitedSummary).toEqual({
       lastVisitedOn: '2026-04-21',
       visitCount: 1,
       visited: true
     });
-    expect(personalBody.visits[0]).toMatchObject({
+    expect(parkVisitsBody.visits[0]).toMatchObject({
       author: 'Hiker Two',
       note: 'Windy and bright.',
       route: 'South trail',
       visitedOn: '2026-04-21'
     });
+    expect(visitsResponse.status).toBe(200);
+    expect(visitsResponse.headers.get('cache-control')).toBe('private, no-store');
+    expect(visitsBody.visits[0]).toMatchObject({
+      park: {
+        name: 'Äkäsmännyn kansallispuisto',
+        slug: 'akasmannyn-kansallispuisto'
+      }
+    });
+    expect(visitResponse.status).toBe(200);
+    expect(visitResponse.headers.get('cache-control')).toBe('private, no-store');
+    expect(visitBody.park).toEqual({
+      name: 'Äkäsmännyn kansallispuisto',
+      slug: 'akasmannyn-kansallispuisto'
+    });
 
-    const deleteResponse = await app.request(`/api/me/visits/${createdVisit.id}`, {
+    const deleteResponse = await app.request(`/api/visits/${createdVisit.id}`, {
       method: 'DELETE'
     });
 
@@ -324,24 +351,36 @@ describe('API routes', () => {
     expect(deleteResponse.headers.get('cache-control')).toBe('private, no-store');
   });
 
-  it('serves personal park lists and returns 404s for missing resources', async () => {
+  it('serves visit resources and returns 404s for missing resources', async () => {
     const app = createApp({ database: testDatabase.database });
 
-    const listResponse = await app.request('/api/me/parks');
-    const listBody = (await listResponse.json()) as {
-      parks: Array<{
-        visits: unknown[];
-      }>;
+    const parkVisitsResponse = await app.request('/api/parks/akasmannyn-kansallispuisto/visits');
+    const parkVisitsBody = (await parkVisitsResponse.json()) as {
+      visits: unknown[];
+      visitedSummary: {
+        visited: boolean;
+      };
+    };
+    const visitsResponse = await app.request('/api/visits');
+    const visitsBody = (await visitsResponse.json()) as {
+      visits: unknown[];
     };
 
-    expect(listResponse.status).toBe(200);
-    expect(listResponse.headers.get('cache-control')).toBe('private, no-store');
-    expect(listBody.parks).toHaveLength(4);
-    expect(listBody.parks[0]?.visits).toEqual([]);
+    expect(parkVisitsResponse.status).toBe(200);
+    expect(parkVisitsResponse.headers.get('cache-control')).toBe('private, no-store');
+    expect(parkVisitsBody.visitedSummary).toEqual({
+      visited: false,
+      visitCount: 0,
+      lastVisitedOn: null
+    });
+    expect(parkVisitsBody.visits).toEqual([]);
+    expect(visitsResponse.status).toBe(200);
+    expect(visitsResponse.headers.get('cache-control')).toBe('private, no-store');
+    expect(visitsBody.visits).toEqual([]);
 
     const missingCatalog = await app.request('/api/parks/missing-park');
-    const missingPersonal = await app.request('/api/me/parks/missing-park');
-    const missingVisit = await app.request('/api/me/parks/missing-park/visits', {
+    const missingParkVisits = await app.request('/api/parks/missing-park/visits');
+    const missingVisitCreate = await app.request('/api/parks/missing-park/visits', {
       method: 'POST',
       body: JSON.stringify({
         visitedOn: '2026-04-20'
@@ -350,7 +389,8 @@ describe('API routes', () => {
         'content-type': 'application/json'
       }
     });
-    const missingVisitPatch = await app.request('/api/me/visits/99999', {
+    const missingVisitGet = await app.request('/api/visits/99999');
+    const missingVisitPatch = await app.request('/api/visits/99999', {
       method: 'PATCH',
       body: JSON.stringify({
         note: 'No visit'
@@ -359,40 +399,53 @@ describe('API routes', () => {
         'content-type': 'application/json'
       }
     });
-    const missingVisitDelete = await app.request('/api/me/visits/99999', {
+    const missingVisitDelete = await app.request('/api/visits/99999', {
       method: 'DELETE'
     });
 
     expect(missingCatalog.status).toBe(404);
-    expect(missingPersonal.status).toBe(404);
-    expect(missingVisit.status).toBe(404);
+    expect(missingParkVisits.status).toBe(404);
+    expect(missingVisitCreate.status).toBe(404);
+    expect(missingVisitGet.status).toBe(404);
     expect(missingVisitPatch.status).toBe(404);
     expect(missingVisitDelete.status).toBe(404);
   });
 
-  it('hides removed parks from catalog and personal park endpoints', async () => {
+  it('hides removed parks from catalog and visit responses', async () => {
+    const app = createApp({ database: testDatabase.database });
+    const createVisitResponse = await app.request('/api/parks/akasmannyn-kansallispuisto/visits', {
+      method: 'POST',
+      body: JSON.stringify({
+        visitedOn: '2026-04-20'
+      }),
+      headers: {
+        'content-type': 'application/json'
+      }
+    });
+    const createdVisit = (await createVisitResponse.json()) as { id: number };
+
     await testDatabase.database
       .update(parks)
       .set({ removed: true })
       .where(eq(parks.slug, 'akasmannyn-kansallispuisto'));
 
-    const app = createApp({ database: testDatabase.database });
     const publicListResponse = await app.request('/api/parks');
     const publicListBody = (await publicListResponse.json()) as {
       parks: Array<{ slug: string }>;
     };
     const publicDetailResponse = await app.request('/api/parks/akasmannyn-kansallispuisto');
-    const personalListResponse = await app.request('/api/me/parks');
-    const personalListBody = (await personalListResponse.json()) as {
-      parks: Array<{ slug: string }>;
+    const parkVisitsResponse = await app.request('/api/parks/akasmannyn-kansallispuisto/visits');
+    const visitsResponse = await app.request('/api/visits');
+    const visitsBody = (await visitsResponse.json()) as {
+      visits: Array<{ id: number }>;
     };
-    const personalDetailResponse = await app.request('/api/me/parks/akasmannyn-kansallispuisto');
-    const createVisitResponse = await app.request(
-      '/api/me/parks/akasmannyn-kansallispuisto/visits',
+    const visitDetailResponse = await app.request(`/api/visits/${createdVisit.id}`);
+    const createRemovedVisitResponse = await app.request(
+      '/api/parks/akasmannyn-kansallispuisto/visits',
       {
         method: 'POST',
         body: JSON.stringify({
-          visitedOn: '2026-04-20'
+          visitedOn: '2026-04-21'
         }),
         headers: {
           'content-type': 'application/json'
@@ -406,19 +459,17 @@ describe('API routes', () => {
       'akasmannyn-kansallispuisto'
     );
     expect(publicDetailResponse.status).toBe(404);
-    expect(personalListResponse.status).toBe(200);
-    expect(personalListBody.parks).toHaveLength(3);
-    expect(personalListBody.parks.map((park) => park.slug)).not.toContain(
-      'akasmannyn-kansallispuisto'
-    );
-    expect(personalDetailResponse.status).toBe(404);
-    expect(createVisitResponse.status).toBe(404);
+    expect(parkVisitsResponse.status).toBe(404);
+    expect(visitsResponse.status).toBe(200);
+    expect(visitsBody.visits).toEqual([]);
+    expect(visitDetailResponse.status).toBe(404);
+    expect(createRemovedVisitResponse.status).toBe(404);
   });
 
   it('allows authenticated UI to disable and restore a park by slug', async () => {
     const app = createApp({ database: testDatabase.database });
 
-    const disableResponse = await app.request('/api/me/parks/akasmannyn-kansallispuisto/removed', {
+    const disableResponse = await app.request('/api/parks/akasmannyn-kansallispuisto/removed', {
       method: 'PATCH',
       body: JSON.stringify({
         removed: true
@@ -433,7 +484,7 @@ describe('API routes', () => {
       getParkBySlug(testDatabase.database, 'akasmannyn-kansallispuisto')
     ).resolves.toBeNull();
 
-    const restoreResponse = await app.request('/api/me/parks/akasmannyn-kansallispuisto/removed', {
+    const restoreResponse = await app.request('/api/parks/akasmannyn-kansallispuisto/removed', {
       method: 'PATCH',
       body: JSON.stringify({
         removed: false
@@ -450,7 +501,7 @@ describe('API routes', () => {
       slug: 'akasmannyn-kansallispuisto'
     });
 
-    const missingResponse = await app.request('/api/me/parks/missing-park/removed', {
+    const missingResponse = await app.request('/api/parks/missing-park/removed', {
       method: 'PATCH',
       body: JSON.stringify({
         removed: true
@@ -465,7 +516,7 @@ describe('API routes', () => {
 
   it('returns CORS headers for preflight requests on API routes', async () => {
     const app = createApp({ auth: authConfig, database: testDatabase.database });
-    const response = await app.request('/api/me/parks/akasmannyn-kansallispuisto/visits', {
+    const response = await app.request('/api/parks/akasmannyn-kansallispuisto/visits', {
       headers: {
         'access-control-request-headers': 'content-type',
         'access-control-request-method': 'POST',
@@ -482,7 +533,7 @@ describe('API routes', () => {
 
   it('returns CORS headers for actual cross-origin API requests', async () => {
     const app = createApp({ auth: authConfig, database: testDatabase.database });
-    const response = await app.request('/api/me/parks/akasmannyn-kansallispuisto/visits', {
+    const response = await app.request('/api/parks/akasmannyn-kansallispuisto/visits', {
       body: JSON.stringify({ visitedOn: '2026-04-20' }),
       headers: {
         'content-type': 'application/json',

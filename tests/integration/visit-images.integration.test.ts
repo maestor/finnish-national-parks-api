@@ -45,7 +45,7 @@ describe('Visit image routes', () => {
 
   const createVisit = async () => {
     const app = createApp({ database: testDatabase.database, storage });
-    const response = await app.request('/api/me/parks/akasmannyn-kansallispuisto/visits', {
+    const response = await app.request('/api/parks/akasmannyn-kansallispuisto/visits', {
       body: JSON.stringify({ visitedOn: '2026-04-20' }),
       headers: { 'content-type': 'application/json' },
       method: 'POST'
@@ -60,7 +60,7 @@ describe('Visit image routes', () => {
     for (const file of files) {
       formData.append('images', file);
     }
-    return app.request(`/api/me/visits/${visitId}/images`, {
+    return app.request(`/api/visits/${visitId}/images`, {
       body: formData,
       method: 'POST'
     });
@@ -99,7 +99,7 @@ describe('Visit image routes', () => {
     expect(storedKeys.some((k) => k.endsWith('-thumb.jpg'))).toBe(true);
   });
 
-  it('includes images in personal park and visit responses', async () => {
+  it('includes images in park visit history responses', async () => {
     const visitId = await createVisit();
     const buffer = await createTestImageBuffer();
     const file = new File([buffer], 'trail.jpg', { type: 'image/jpeg' });
@@ -107,7 +107,7 @@ describe('Visit image routes', () => {
     await uploadImages(visitId, [file]);
 
     const app = createApp({ database: testDatabase.database, storage });
-    const response = await app.request('/api/me/parks/akasmannyn-kansallispuisto');
+    const response = await app.request('/api/parks/akasmannyn-kansallispuisto/visits');
     const body = (await response.json()) as {
       visits: Array<{
         images: Array<{ id: number; fullUrl: string }>;
@@ -131,18 +131,18 @@ describe('Visit image routes', () => {
     const imageId = uploadBody.images[0]!.id;
 
     const app = createApp({ database: testDatabase.database, storage });
-    const deleteResponse = await app.request(`/api/me/visits/${visitId}/images/${imageId}`, {
+    const deleteResponse = await app.request(`/api/visits/${visitId}/images/${imageId}`, {
       method: 'DELETE'
     });
 
     expect(deleteResponse.status).toBe(204);
     expect(storage.getStore().size).toBe(0);
 
-    const personalResponse = await app.request('/api/me/parks/akasmannyn-kansallispuisto');
-    const personalBody = (await personalResponse.json()) as {
+    const parkVisitsResponse = await app.request('/api/parks/akasmannyn-kansallispuisto/visits');
+    const parkVisitsBody = (await parkVisitsResponse.json()) as {
       visits: Array<{ images: unknown[] }>;
     };
-    expect(personalBody.visits[0]!.images).toHaveLength(0);
+    expect(parkVisitsBody.visits[0]!.images).toHaveLength(0);
   });
 
   it('reorders images via PATCH', async () => {
@@ -159,7 +159,7 @@ describe('Visit image routes', () => {
     expect(uploadBody.images[1]!.displayOrder).toBe(0);
 
     const app = createApp({ database: testDatabase.database, storage });
-    const reorderResponse = await app.request(`/api/me/visits/${visitId}/images/reorder`, {
+    const reorderResponse = await app.request(`/api/visits/${visitId}/images/reorder`, {
       body: JSON.stringify({
         imageIds: [uploadBody.images[1]!.id, uploadBody.images[0]!.id]
       }),
@@ -169,15 +169,15 @@ describe('Visit image routes', () => {
 
     expect(reorderResponse.status).toBe(204);
 
-    const personalResponse = await app.request('/api/me/parks/akasmannyn-kansallispuisto');
-    const personalBody = (await personalResponse.json()) as {
+    const parkVisitsResponse = await app.request('/api/parks/akasmannyn-kansallispuisto/visits');
+    const parkVisitsBody = (await parkVisitsResponse.json()) as {
       visits: Array<{
         images: Array<{ id: number; displayOrder: number }>;
       }>;
     };
 
-    expect(personalBody.visits[0]!.images[0]!.id).toBe(uploadBody.images[1]!.id);
-    expect(personalBody.visits[0]!.images[1]!.id).toBe(uploadBody.images[0]!.id);
+    expect(parkVisitsBody.visits[0]!.images[0]!.id).toBe(uploadBody.images[1]!.id);
+    expect(parkVisitsBody.visits[0]!.images[1]!.id).toBe(uploadBody.images[0]!.id);
   });
 
   it('returns 404 when uploading to a missing visit', async () => {
@@ -190,7 +190,7 @@ describe('Visit image routes', () => {
 
   it('returns 404 when reordering a missing visit', async () => {
     const app = createApp({ database: testDatabase.database, storage });
-    const response = await app.request('/api/me/visits/99999/images/reorder', {
+    const response = await app.request('/api/visits/99999/images/reorder', {
       body: JSON.stringify({ imageIds: [1] }),
       headers: { 'content-type': 'application/json' },
       method: 'PATCH'
@@ -202,7 +202,7 @@ describe('Visit image routes', () => {
   it('returns 422 when reordering with invalid image IDs', async () => {
     const visitId = await createVisit();
     const app = createApp({ database: testDatabase.database, storage });
-    const response = await app.request(`/api/me/visits/${visitId}/images/reorder`, {
+    const response = await app.request(`/api/visits/${visitId}/images/reorder`, {
       body: JSON.stringify({ imageIds: [99999] }),
       headers: { 'content-type': 'application/json' },
       method: 'PATCH'
@@ -214,7 +214,7 @@ describe('Visit image routes', () => {
   it('returns 404 when deleting a missing image', async () => {
     const visitId = await createVisit();
     const app = createApp({ database: testDatabase.database, storage });
-    const response = await app.request(`/api/me/visits/${visitId}/images/99999`, {
+    const response = await app.request(`/api/visits/${visitId}/images/99999`, {
       method: 'DELETE'
     });
 
@@ -226,7 +226,7 @@ describe('Visit image routes', () => {
     const app = createApp({ database: testDatabase.database, storage });
     const formData = new FormData();
     formData.append('images', 'not-a-file');
-    const response = await app.request(`/api/me/visits/${visitId}/images`, {
+    const response = await app.request(`/api/visits/${visitId}/images`, {
       body: formData,
       method: 'POST'
     });
@@ -253,7 +253,7 @@ describe('Visit image routes', () => {
     });
 
     const app = createApp({ database: testDatabase.database });
-    const response = await app.request('/api/me/parks/akasmannyn-kansallispuisto');
+    const response = await app.request('/api/parks/akasmannyn-kansallispuisto/visits');
     const body = (await response.json()) as {
       visits: Array<{ images: Array<{ fullUrl: string }> }>;
     };

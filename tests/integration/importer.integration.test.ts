@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   createVisit,
   getParkBySlug,
-  getPersonalParkBySlug,
+  getParkVisitsBySlug,
   listParks
 } from '../../src/db/repositories.js';
 import { importRuns, parks } from '../../src/db/schema.js';
@@ -82,7 +82,7 @@ describe('importParks', () => {
     });
 
     const park = await getParkBySlug(testDatabase.database, 'akasmannyn-kansallispuisto');
-    const personalPark = await getPersonalParkBySlug(
+    const parkVisits = await getParkVisitsBySlug(
       testDatabase.database,
       'akasmannyn-kansallispuisto',
       async () => ''
@@ -99,15 +99,15 @@ describe('importParks', () => {
         slug: parkTypeFixtures.nationalPark.slug
       }
     });
-    expect(personalPark).toMatchObject({
+    expect(parkVisits).toMatchObject({
       visitedSummary: {
         visitCount: 1,
         visited: true,
         lastVisitedOn: '2026-04-10'
       }
     });
-    expect(personalPark?.visits).toHaveLength(1);
-    expect(personalPark?.visits[0]).toMatchObject({
+    expect(parkVisits?.visits).toHaveLength(1);
+    expect(parkVisits?.visits[0]).toMatchObject({
       author: 'Alice',
       note: 'Snowy trail.',
       route: 'North loop',
@@ -158,7 +158,7 @@ describe('importParks', () => {
       getParkBySlug(testDatabase.database, 'akasmannyn-kansallispuisto')
     ).resolves.toBeNull();
     await expect(
-      getPersonalParkBySlug(testDatabase.database, 'akasmannyn-kansallispuisto', async () => '')
+      getParkVisitsBySlug(testDatabase.database, 'akasmannyn-kansallispuisto', async () => '')
     ).resolves.toBeNull();
     await expect(listParks(testDatabase.database)).resolves.toEqual([]);
   });

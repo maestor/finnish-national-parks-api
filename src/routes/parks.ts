@@ -5,13 +5,14 @@ import {
   createVisitRequestSchema,
   parkDetailSchema,
   parkListResponseSchema,
-  personalParkListResponseSchema,
-  personalParkSchema,
+  parkVisitsResponseSchema,
   reorderVisitImagesRequestSchema,
   updateParkRemovedRequestSchema,
   updateVisitRequestSchema,
   visitImageSchema,
-  visitSchema
+  visitListResponseSchema,
+  visitSchema,
+  visitWithParkSchema
 } from '../contracts/parks.js';
 import { supportedParkTypeSlugs } from '../parks/park-types.js';
 
@@ -76,27 +77,10 @@ export const getParkRoute = createRoute({
   }
 });
 
-export const listPersonalParksRoute = createRoute({
+export const getParkVisitsRoute = createRoute({
   method: 'get',
-  path: '/api/me/parks',
-  tags: ['Personal'],
-  security: [{ bearerAuth: [] }],
-  responses: {
-    200: {
-      description: 'Personal park list',
-      content: {
-        'application/json': {
-          schema: personalParkListResponseSchema
-        }
-      }
-    }
-  }
-});
-
-export const getPersonalParkRoute = createRoute({
-  method: 'get',
-  path: '/api/me/parks/{slug}',
-  tags: ['Personal'],
+  path: '/api/parks/{slug}/visits',
+  tags: ['Visits'],
   security: [{ bearerAuth: [] }],
   request: {
     params: z.object({
@@ -105,10 +89,10 @@ export const getPersonalParkRoute = createRoute({
   },
   responses: {
     200: {
-      description: 'Personal park detail',
+      description: 'Park visit history',
       content: {
         'application/json': {
-          schema: personalParkSchema
+          schema: parkVisitsResponseSchema
         }
       }
     },
@@ -123,10 +107,57 @@ export const getPersonalParkRoute = createRoute({
   }
 });
 
+export const listVisitsRoute = createRoute({
+  method: 'get',
+  path: '/api/visits',
+  tags: ['Visits'],
+  security: [{ bearerAuth: [] }],
+  responses: {
+    200: {
+      description: 'Visit list',
+      content: {
+        'application/json': {
+          schema: visitListResponseSchema
+        }
+      }
+    }
+  }
+});
+
+export const getVisitRoute = createRoute({
+  method: 'get',
+  path: '/api/visits/{id}',
+  tags: ['Visits'],
+  security: [{ bearerAuth: [] }],
+  request: {
+    params: z.object({
+      id: z.coerce.number().int()
+    })
+  },
+  responses: {
+    200: {
+      description: 'Visit detail',
+      content: {
+        'application/json': {
+          schema: visitWithParkSchema
+        }
+      }
+    },
+    404: {
+      description: 'Visit was not found',
+      content: {
+        'application/json': {
+          schema: errorSchema
+        }
+      }
+    }
+  }
+});
+
 export const createVisitRoute = createRoute({
   method: 'post',
-  path: '/api/me/parks/{slug}/visits',
-  tags: ['Personal'],
+  path: '/api/parks/{slug}/visits',
+  tags: ['Visits'],
   security: [{ bearerAuth: [] }],
   request: {
     params: z.object({
@@ -162,8 +193,8 @@ export const createVisitRoute = createRoute({
 
 export const updateParkRemovedRoute = createRoute({
   method: 'patch',
-  path: '/api/me/parks/{slug}/removed',
-  tags: ['Personal'],
+  path: '/api/parks/{slug}/removed',
+  tags: ['Parks'],
   security: [{ bearerAuth: [] }],
   request: {
     params: z.object({
@@ -194,8 +225,8 @@ export const updateParkRemovedRoute = createRoute({
 
 export const updateVisitRoute = createRoute({
   method: 'patch',
-  path: '/api/me/visits/{id}',
-  tags: ['Personal'],
+  path: '/api/visits/{id}',
+  tags: ['Visits'],
   security: [{ bearerAuth: [] }],
   request: {
     params: z.object({
@@ -231,8 +262,8 @@ export const updateVisitRoute = createRoute({
 
 export const deleteVisitRoute = createRoute({
   method: 'delete',
-  path: '/api/me/visits/{id}',
-  tags: ['Personal'],
+  path: '/api/visits/{id}',
+  tags: ['Visits'],
   security: [{ bearerAuth: [] }],
   request: {
     params: z.object({
@@ -256,8 +287,8 @@ export const deleteVisitRoute = createRoute({
 
 export const uploadVisitImagesRoute = createRoute({
   method: 'post',
-  path: '/api/me/visits/{id}/images',
-  tags: ['Personal'],
+  path: '/api/visits/{id}/images',
+  tags: ['Visits'],
   security: [{ bearerAuth: [] }],
   request: {
     params: z.object({
@@ -327,8 +358,8 @@ export const uploadVisitImagesRoute = createRoute({
 
 export const deleteVisitImageRoute = createRoute({
   method: 'delete',
-  path: '/api/me/visits/{visitId}/images/{imageId}',
-  tags: ['Personal'],
+  path: '/api/visits/{visitId}/images/{imageId}',
+  tags: ['Visits'],
   security: [{ bearerAuth: [] }],
   request: {
     params: z.object({
@@ -353,8 +384,8 @@ export const deleteVisitImageRoute = createRoute({
 
 export const reorderVisitImagesRoute = createRoute({
   method: 'patch',
-  path: '/api/me/visits/{id}/images/reorder',
-  tags: ['Personal'],
+  path: '/api/visits/{id}/images/reorder',
+  tags: ['Visits'],
   security: [{ bearerAuth: [] }],
   request: {
     params: z.object({

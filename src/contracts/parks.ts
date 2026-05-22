@@ -91,21 +91,26 @@ export const visitedSummarySchema = z.object({
   visited: z.boolean()
 });
 
-export const personalParkSchema = parkDetailSchema
-  .omit({
-    boundaryGeoJson: true
-  })
-  .extend({
-    visitedSummary: visitedSummarySchema,
-    visits: z.array(visitSchema)
-  });
+export const parkVisitsResponseSchema = z.object({
+  visitedSummary: visitedSummarySchema,
+  visits: z.array(visitSchema)
+});
+
+export const visitParkSchema = z.object({
+  name: z.string(),
+  slug: z.string()
+});
+
+export const visitWithParkSchema = visitSchema.extend({
+  park: visitParkSchema
+});
 
 export const parkListResponseSchema = z.object({
   parks: z.array(parkListItemSchema)
 });
 
-export const personalParkListResponseSchema = z.object({
-  parks: z.array(personalParkSchema)
+export const visitListResponseSchema = z.object({
+  visits: z.array(visitWithParkSchema)
 });
 
 export const createVisitRequestSchema = z.object({
