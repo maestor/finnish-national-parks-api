@@ -13,9 +13,10 @@ import {
   findVisitImageById,
   getCatalogListEtagSeed,
   getParkBySlug,
-  getPersonalParkBySlug,
+  getParkVisitsBySlug,
+  getVisitById,
   listParks,
-  listPersonalParks,
+  listVisits,
   reorderVisitImages,
   updateParkRemoved,
   updateVisit
@@ -62,9 +63,10 @@ import {
   deleteVisitImageRoute,
   deleteVisitRoute,
   getParkRoute,
-  getPersonalParkRoute,
+  getParkVisitsRoute,
+  getVisitRoute,
   listParksRoute,
-  listPersonalParksRoute,
+  listVisitsRoute,
   reorderVisitImagesRoute,
   updateParkRemovedRoute,
   updateVisitRoute,
@@ -346,30 +348,48 @@ export const createApp = ({ apiKey, auth, database, storage }: AppDependencies =
       );
     });
 
-    app.openapi(listPersonalParksRoute, async (context) => {
+    app.openapi(getParkVisitsRoute, async (context) => {
       context.header('Cache-Control', PRIVATE_CACHE_CONTROL);
 
-      const parks = await listPersonalParks(database, getImagePublicUrl);
+      const { slug } = context.req.valid('param');
+      const parkVisits = await getParkVisitsBySlug(database, slug, getImagePublicUrl);
+
+      if (!parkVisits) {
+        return context.json(jsonNotFound('Park not found.'), 404);
+      }
 
       return context.json(
         {
-          parks
+          ...parkVisits
         },
         200
       );
     });
 
-    app.openapi(getPersonalParkRoute, async (context) => {
+    app.openapi(listVisitsRoute, async (context) => {
       context.header('Cache-Control', PRIVATE_CACHE_CONTROL);
 
-      const { slug } = context.req.valid('param');
-      const park = await getPersonalParkBySlug(database, slug, getImagePublicUrl);
+      const visits = await listVisits(database, getImagePublicUrl);
 
-      if (!park) {
-        return context.json(jsonNotFound('Park not found.'), 404);
+      return context.json(
+        {
+          visits
+        },
+        200
+      );
+    });
+
+    app.openapi(getVisitRoute, async (context) => {
+      context.header('Cache-Control', PRIVATE_CACHE_CONTROL);
+
+      const { id } = context.req.valid('param');
+      const visit = await getVisitById(database, id, getImagePublicUrl);
+
+      if (!visit) {
+        return context.json(jsonNotFound('Visit not found.'), 404);
       }
 
-      return context.json(park, 200);
+      return context.json(visit, 200);
     });
 
     app.openapi(createVisitRoute, async (context) => {

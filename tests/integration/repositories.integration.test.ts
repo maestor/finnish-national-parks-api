@@ -6,8 +6,9 @@ import {
   deleteVisit,
   getCatalogListEtagSeed,
   getParkBySlug,
-  getPersonalParkBySlug,
-  listPersonalParks,
+  getParkVisitsBySlug,
+  getVisitById,
+  listVisits,
   reorderVisitImages,
   updateVisit
 } from '../../src/db/repositories.js';
@@ -39,15 +40,16 @@ describe('repositories', () => {
   it('returns null for missing parks', async () => {
     await expect(getParkBySlug(testDatabase.database, 'missing-park')).resolves.toBeNull();
     await expect(
-      getPersonalParkBySlug(testDatabase.database, 'missing-park', async () => '')
+      getParkVisitsBySlug(testDatabase.database, 'missing-park', async () => '')
     ).resolves.toBeNull();
+    await expect(getVisitById(testDatabase.database, 99999, async () => '')).resolves.toBeNull();
 
-    const personalPark = await getPersonalParkBySlug(
+    const parkVisits = await getParkVisitsBySlug(
       testDatabase.database,
       'akasmannyn-kansallispuisto',
       async () => ''
     );
-    expect(personalPark?.visits).toEqual([]);
+    expect(parkVisits?.visits).toEqual([]);
   });
 
   it('preserves existing visit fields when only the date changes and reports missing deletes', async () => {
@@ -130,7 +132,7 @@ describe('repositories', () => {
     });
   });
 
-  it('returns empty personal parks list when no active parks remain', async () => {
+  it('returns empty visit list when no active parks remain', async () => {
     await importParks({
       database: testDatabase.database,
       expectedActiveCount: 0,
@@ -145,10 +147,10 @@ describe('repositories', () => {
       })
     });
 
-    await expect(listPersonalParks(testDatabase.database, async () => '')).resolves.toEqual([]);
+    await expect(listVisits(testDatabase.database, async () => '')).resolves.toEqual([]);
   });
 
-  it('batch-aggregates visits across multiple parks', async () => {
+  it('lists flat visits and park-scoped visit history across multiple parks', async () => {
     await importParks({
       database: testDatabase.database,
       expectedActiveCount: 2,
@@ -179,37 +181,59 @@ describe('repositories', () => {
       visitedOn: '2026-03-20'
     });
 
-    const result = await listPersonalParks(testDatabase.database, async () => '');
+    const visits = await listVisits(testDatabase.database, async () => '');
+    const firstParkVisits = await getParkVisitsBySlug(
+      testDatabase.database,
+      'akasmannyn-kansallispuisto',
+      async () => ''
+    );
+    const secondParkVisits = await getParkVisitsBySlug(
+      testDatabase.database,
+      'toinen-puisto',
+      async () => ''
+    );
 
-    expect(result).toHaveLength(2);
+    expect(visits).toHaveLength(3);
+    expect(visits[0]).toMatchObject({
+      note: 'Visit A2',
+      park: {
+        name: 'Äkäsmännyn kansallispuisto',
+        slug: 'akasmannyn-kansallispuisto'
+      },
+      visitedOn: '2026-04-11'
+    });
+    expect(visits[2]).toMatchObject({
+      park: {
+        name: 'Toinen puisto',
+        slug: 'toinen-puisto'
+      },
+      visitedOn: '2026-03-20'
+    });
 
-    const first = result.find((p) => p.slug === 'akasmannyn-kansallispuisto');
-    const second = result.find((p) => p.slug === 'toinen-puisto');
-
-    expect(first).toMatchObject({
+    expect(firstParkVisits).toMatchObject({
       visitedSummary: {
         visited: true,
         visitCount: 2,
         lastVisitedOn: '2026-04-11'
       }
     });
-    expect(first?.visits).toHaveLength(2);
-    expect(first?.visits[0]).toMatchObject({
+    expect(firstParkVisits?.visits).toHaveLength(2);
+    expect(firstParkVisits?.visits[0]).toMatchObject({
       author: null,
       note: 'Visit A2',
       route: null,
       visitedOn: '2026-04-11'
     });
 
-    expect(second).toMatchObject({
+    expect(secondParkVisits).toMatchObject({
       visitedSummary: {
         visited: true,
         visitCount: 1,
         lastVisitedOn: '2026-03-20'
       }
     });
-    expect(second?.visits).toHaveLength(1);
-    expect(second?.visits[0]).toMatchObject({
+    expect(secondParkVisits?.visits).toHaveLength(1);
+    expect(secondParkVisits?.visits[0]).toMatchObject({
       author: null,
       note: null,
       route: null,
@@ -243,12 +267,15 @@ describe('repositories', () => {
       visitId: visitWithImage.id
     });
 
-    const result = await listPersonalParks(testDatabase.database, async () => '');
-    const park = result.find((p) => p.slug === 'akasmannyn-kansallispuisto');
+    const parkVisits = await getParkVisitsBySlug(
+      testDatabase.database,
+      'akasmannyn-kansallispuisto',
+      async () => ''
+    );
 
-    expect(park?.visits).toHaveLength(2);
-    const withImage = park?.visits.find((v) => v.id === visitWithImage.id);
-    const withoutImage = park?.visits.find((v) => v.id === visitWithoutImage.id);
+    expect(parkVisits?.visits).toHaveLength(2);
+    const withImage = parkVisits?.visits.find((visit) => visit.id === visitWithImage.id);
+    const withoutImage = parkVisits?.visits.find((visit) => visit.id === visitWithoutImage.id);
     expect(withImage?.images).toHaveLength(1);
     expect(withoutImage?.images).toEqual([]);
   });
@@ -288,14 +315,14 @@ describe('repositories', () => {
 
     await reorderVisitImages(testDatabase.database, visit.id, [img2.id, img1.id]);
 
-    const personal = await getPersonalParkBySlug(
+    const parkVisits = await getParkVisitsBySlug(
       testDatabase.database,
       'akasmannyn-kansallispuisto',
       async () => ''
     );
 
-    expect(personal?.visits[0]?.images[0]?.id).toBe(img2.id);
-    expect(personal?.visits[0]?.images[1]?.id).toBe(img1.id);
+    expect(parkVisits?.visits[0]?.images[0]?.id).toBe(img2.id);
+    expect(parkVisits?.visits[0]?.images[1]?.id).toBe(img1.id);
 
     await expect(reorderVisitImages(testDatabase.database, visit.id, [img1.id])).rejects.toThrow(
       'Invalid image order'
