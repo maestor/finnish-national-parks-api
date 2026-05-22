@@ -11,6 +11,9 @@ import { importParks } from '../../src/importer/import-parks.js';
 import { createLipasPark, parkTypeFixtures } from '../fixtures/lipas.js';
 import { createTestDatabase } from '../helpers/test-db.js';
 
+const emptyLuontoonSitemap = async () =>
+  '<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"></urlset>';
+
 describe('importParks', () => {
   let testDatabase: Awaited<ReturnType<typeof createTestDatabase>>;
 
@@ -282,6 +285,92 @@ describe('importParks', () => {
     );
   });
 
+  it('prefers official luontoon sitemap urls over stale lipas www values', async () => {
+    await importParks({
+      database: testDatabase.database,
+      expectedActiveCount: 2,
+      now: () => '2026-05-01T08:00:00.000Z',
+      sourceUrl: 'https://example.test/lipas',
+      fetchSource: async () => ({
+        items: [
+          createLipasPark({
+            'lipas-id': 72648,
+            name: 'Aittovuoren ulkoilualue',
+            type: {
+              'type-code': parkTypeFixtures.outdoorRecreationArea.typeCode
+            },
+            www: 'https://www.luontoon.fi/aittovuoren-ulkoilualue'
+          }),
+          createLipasPark({
+            'lipas-id': 61234,
+            name: 'Langinkosken luonnonsuojelualue',
+            type: {
+              'type-code': parkTypeFixtures.otherNatureReserve.typeCode
+            },
+            www: 'https://www.luontoon.fi/langinkoski'
+          })
+        ]
+      }),
+      fetchLuontoonSitemap: async () => `
+        <?xml version="1.0" encoding="UTF-8"?>
+        <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+          <url>
+            <loc>https://www.luontoon.fi/fi/kohteet/aittovuoren-ulkoilualue-jyvaskyla-72648</loc>
+          </url>
+          <url>
+            <loc>https://www.luontoon.fi/fi/kohteet/langinkosken-luonnonsuojelualue</loc>
+          </url>
+        </urlset>
+      `
+    });
+
+    await expect(
+      getParkBySlug(testDatabase.database, 'aittovuoren-ulkoilualue')
+    ).resolves.toMatchObject({
+      luontoonUrl: 'https://www.luontoon.fi/fi/kohteet/aittovuoren-ulkoilualue-jyvaskyla-72648'
+    });
+    await expect(
+      getParkBySlug(testDatabase.database, 'langinkosken-luonnonsuojelualue')
+    ).resolves.toMatchObject({
+      luontoonUrl: 'https://www.luontoon.fi/fi/kohteet/langinkosken-luonnonsuojelualue'
+    });
+  });
+
+  it('falls back to normalized lipas www when the luontoon sitemap has no match', async () => {
+    await importParks({
+      database: testDatabase.database,
+      expectedActiveCount: 1,
+      now: () => '2026-05-01T08:00:00.000Z',
+      sourceUrl: 'https://example.test/lipas',
+      fetchSource: async () => ({
+        items: [
+          createLipasPark({
+            'lipas-id': 71000,
+            name: 'Tuntematon ulkoilualue',
+            type: {
+              'type-code': parkTypeFixtures.outdoorRecreationArea.typeCode
+            },
+            www: 'https://www.luontoon.fi/tuntematon-ulkoilualue'
+          })
+        ]
+      }),
+      fetchLuontoonSitemap: async () => `
+        <?xml version="1.0" encoding="UTF-8"?>
+        <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+          <url>
+            <loc>https://www.luontoon.fi/fi/kohteet/jokin-toinen-kohde-12345</loc>
+          </url>
+        </urlset>
+      `
+    });
+
+    await expect(
+      getParkBySlug(testDatabase.database, 'tuntematon-ulkoilualue')
+    ).resolves.toMatchObject({
+      luontoonUrl: 'https://www.luontoon.fi/tuntematon-ulkoilualue'
+    });
+  });
+
   it('uses the default fetcher and surfaces upstream failures', async () => {
     const originalFetch = globalThis.fetch;
 
@@ -292,6 +381,14 @@ describe('importParks', () => {
           JSON.stringify({
             items: [createLipasPark()]
           }),
+          {
+            status: 200
+          }
+        )
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          '<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"></urlset>',
           {
             status: 200
           }
@@ -317,6 +414,40 @@ describe('importParks', () => {
           sourceUrl: 'https://example.test/lipas'
         })
       ).rejects.toThrow('LIPAS import failed with status 503.');
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  it('fails when the default luontoon sitemap fetch returns a non-ok response', async () => {
+    const originalFetch = globalThis.fetch;
+
+    globalThis.fetch = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            items: [createLipasPark()]
+          }),
+          {
+            status: 200
+          }
+        )
+      )
+      .mockResolvedValueOnce(
+        new Response('broken sitemap', {
+          status: 503
+        })
+      ) as typeof fetch;
+
+    try {
+      await expect(
+        importParks({
+          database: testDatabase.database,
+          expectedActiveCount: 1,
+          sourceUrl: 'https://example.test/lipas'
+        })
+      ).rejects.toThrow('Luontoon sitemap fetch failed with status 503.');
     } finally {
       globalThis.fetch = originalFetch;
     }
@@ -373,6 +504,7 @@ describe('importParks', () => {
       await importParks({
         database: testDatabase.database,
         expectedActiveCount: 2,
+        fetchLuontoonSitemap: emptyLuontoonSitemap,
         sourceUrl: 'https://example.test/lipas?page=1&page-size=100'
       });
 
@@ -414,6 +546,7 @@ describe('importParks', () => {
         importParks({
           database: testDatabase.database,
           expectedActiveCount: 2,
+          fetchLuontoonSitemap: emptyLuontoonSitemap,
           sourceUrl: 'https://example.test/lipas?page=1&page-size=100'
         })
       ).rejects.toThrow('LIPAS import failed with status 502 on page 2.');
@@ -463,6 +596,7 @@ describe('importParks', () => {
       const result = await importParks({
         database: testDatabase.database,
         expectedActiveCount: 2,
+        fetchLuontoonSitemap: emptyLuontoonSitemap,
         sourceUrl: 'https://example.test/lipas?page=1&page-size=100'
       });
 
