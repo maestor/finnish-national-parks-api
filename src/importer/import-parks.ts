@@ -38,6 +38,9 @@ type ImportParksOptions = {
 
 const RESPONSE_SHAPE_VERSION = 'catalog-v2';
 const LUONTOON_SITEMAP_URL = 'https://www.luontoon.fi/resources/sitemap/fi.xml';
+const SUPPORTED_LIPAS_TYPE_CODES = [103, 109, 110, 111, 112, 4404] as const;
+
+export const defaultLipasCatalogSourceUrl = `https://api.lipas.fi/v2/sports-sites?type-codes=${SUPPORTED_LIPAS_TYPE_CODES.join(',')}&page-size=100&page=1`;
 
 const defaultFetchSource = async (sourceUrl: string) => {
   const firstResponse = await fetch(sourceUrl);

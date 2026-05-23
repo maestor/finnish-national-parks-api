@@ -41,7 +41,6 @@ Available variables:
 API_KEY=your-local-dev-key
 DATABASE_URL=file:./data/local.db
 DATABASE_AUTH_TOKEN=
-LIPAS_PROTECTED_AREAS_URL=https://api.lipas.fi/v2/sports-sites?type-codes=103,109,110,111,112,4404&page-size=100&page=1
 PORT=3004
 
 # Google OAuth (optional — only needed for control-panel login)
@@ -61,6 +60,7 @@ MEMORY_STORAGE=false
 ```
 
 All variables are optional for local development — sensible defaults are built in. `API_KEY` is only required if you want to test authenticated access locally; localhost requests bypass auth even when it is set.
+The importer's LIPAS source URL and supported type-code list are internal configuration rather than `.env` settings.
 
 OAuth routes (`/auth/*`) are only registered when `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, and `AUTH_JWT_SECRET` are all provided.
 
