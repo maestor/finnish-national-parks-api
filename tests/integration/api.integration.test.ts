@@ -81,6 +81,30 @@ describe('API routes', () => {
     await testDatabase.dispose();
   });
 
+  const createVisit = async (
+    app: ReturnType<typeof createApp>,
+    slug: string,
+    body: {
+      author?: string;
+      note?: string;
+      route?: string;
+      visitedOn: string;
+    }
+  ) => {
+    const response = await app.request(`/api/parks/${slug}/visits`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+      headers: {
+        'content-type': 'application/json'
+      }
+    });
+
+    return {
+      body: (await response.json()) as { id: number },
+      response
+    };
+  };
+
   it('serves the public park list without boundary geometry and with cache validators', async () => {
     const app = createApp({ database: testDatabase.database });
     const response = await app.request('/api/parks');
@@ -248,6 +272,232 @@ describe('API routes', () => {
     );
     expect(body.parks).toHaveLength(1);
     expect(response.headers.get('etag')).toContain(parkTypeFixtures.outdoorRecreationArea.slug);
+  });
+
+  it('serves lightweight public home summary data with shared-cache validators', async () => {
+    const app = createApp({ database: testDatabase.database });
+
+    await createVisit(app, 'akasmannyn-kansallispuisto', {
+      author: 'Hiker One',
+      note: 'Keep private note out of public summary.',
+      route: 'North trail',
+      visitedOn: '2026-04-20'
+    });
+    await createVisit(app, 'akasmannyn-kansallispuisto', {
+      visitedOn: '2026-04-22'
+    });
+    await createVisit(app, 'seitsemisen-kansallispuisto', {
+      visitedOn: '2026-04-21'
+    });
+
+    const response = await app.request('/api/public/home-summary');
+    const body = (await response.json()) as {
+      latestVisitEntries: Array<{
+        id: number;
+        park: { slug: string };
+        visitedOn: string;
+      }>;
+      mostVisitedParks: Array<{
+        lastVisitedOn: string | null;
+        park: { slug: string };
+        visitCount: number;
+      }>;
+      progressByType: Array<{
+        totalParks: number;
+        totalVisits: number;
+        type: { slug: string };
+        visitedParks: number;
+      }>;
+      recentVisits: Array<{
+        park: { slug: string };
+        visitedSummary: {
+          lastVisitedOn: string | null;
+          visitCount: number;
+          visited: boolean;
+        };
+      }>;
+      totalVisits: number;
+      uniqueVisitedParks: number;
+      updatedAt: string | null;
+      version: number;
+    };
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('cache-control')).toBe(
+      'public, max-age=0, s-maxage=3600, stale-while-revalidate=86400'
+    );
+    expect(response.headers.get('etag')).toBeTruthy();
+    expect(body.totalVisits).toBe(3);
+    expect(body.uniqueVisitedParks).toBe(2);
+    expect(body.version).toBeGreaterThan(0);
+    expect(body.updatedAt).toBeTruthy();
+    expect(body.progressByType).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          totalParks: 2,
+          totalVisits: 3,
+          type: expect.objectContaining({
+            slug: parkTypeFixtures.nationalPark.slug
+          }),
+          visitedParks: 2
+        })
+      ])
+    );
+    expect(body.mostVisitedParks[0]).toEqual(
+      expect.objectContaining({
+        lastVisitedOn: '2026-04-22',
+        park: expect.objectContaining({
+          slug: 'akasmannyn-kansallispuisto'
+        }),
+        visitCount: 2
+      })
+    );
+    expect(body.recentVisits[0]).toEqual(
+      expect.objectContaining({
+        park: expect.objectContaining({
+          slug: 'akasmannyn-kansallispuisto'
+        }),
+        visitedSummary: {
+          lastVisitedOn: '2026-04-22',
+          visitCount: 2,
+          visited: true
+        }
+      })
+    );
+    expect(body.latestVisitEntries.map((entry) => entry.park.slug)).toEqual([
+      'akasmannyn-kansallispuisto',
+      'seitsemisen-kansallispuisto',
+      'akasmannyn-kansallispuisto'
+    ]);
+    expect(body.latestVisitEntries[0]).not.toHaveProperty('note');
+    expect(body.latestVisitEntries[0]).not.toHaveProperty('route');
+    expect(body.latestVisitEntries[0]).not.toHaveProperty('images');
+  });
+
+  it('serves lightweight public map summary data with per-park visited summaries', async () => {
+    const app = createApp({ database: testDatabase.database });
+
+    await createVisit(app, 'akasmannyn-kansallispuisto', {
+      visitedOn: '2026-04-20'
+    });
+
+    const response = await app.request('/api/public/map-summary');
+    const body = (await response.json()) as {
+      parks: Array<{
+        slug: string;
+        visitedSummary: {
+          lastVisitedOn: string | null;
+          visitCount: number;
+          visited: boolean;
+        };
+      }>;
+      updatedAt: string | null;
+      version: number;
+    };
+    const akasmanty = body.parks.find((park) => park.slug === 'akasmannyn-kansallispuisto');
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('cache-control')).toBe(
+      'public, max-age=0, s-maxage=3600, stale-while-revalidate=86400'
+    );
+    expect(response.headers.get('etag')).toBeTruthy();
+    expect(body.parks).toHaveLength(4);
+    expect(body.version).toBeGreaterThan(0);
+    expect(body.updatedAt).toBeTruthy();
+    expect(akasmanty).toBeDefined();
+    expect(akasmanty?.visitedSummary).toEqual({
+      lastVisitedOn: '2026-04-20',
+      visitCount: 1,
+      visited: true
+    });
+    expect(akasmanty).not.toHaveProperty('boundaryGeoJson');
+    expect(akasmanty).not.toHaveProperty('visits');
+    expect(akasmanty).not.toHaveProperty('note');
+  });
+
+  it('returns 304 for matching public map summary ETags', async () => {
+    const app = createApp({ database: testDatabase.database });
+    const firstResponse = await app.request('/api/public/map-summary');
+    const etag = firstResponse.headers.get('etag');
+
+    expect(etag).toBeTruthy();
+
+    const cachedResponse = await app.request('/api/public/map-summary', {
+      headers: {
+        'if-none-match': etag ?? ''
+      }
+    });
+
+    expect(cachedResponse.status).toBe(304);
+  });
+
+  it('returns 304 for matching public summary ETags and changes them when public visit data changes', async () => {
+    const app = createApp({ database: testDatabase.database });
+
+    const firstResponse = await app.request('/api/public/home-summary');
+    const firstEtag = firstResponse.headers.get('etag');
+    const firstBody = (await firstResponse.json()) as {
+      version: number;
+    };
+    const cachedResponse = await app.request('/api/public/home-summary', {
+      headers: {
+        'if-none-match': firstEtag ?? ''
+      }
+    });
+
+    expect(firstEtag).toBeTruthy();
+    expect(firstBody.version).toBe(0);
+    expect(cachedResponse.status).toBe(304);
+
+    const { body: createdVisit } = await createVisit(app, 'akasmannyn-kansallispuisto', {
+      visitedOn: '2026-04-20'
+    });
+
+    const secondResponse = await app.request('/api/public/home-summary');
+    const secondEtag = secondResponse.headers.get('etag');
+    const secondBody = (await secondResponse.json()) as {
+      version: number;
+    };
+
+    expect(secondEtag).toBeTruthy();
+    expect(secondEtag).not.toBe(firstEtag);
+    expect(secondBody.version).toBeGreaterThan(firstBody.version);
+
+    await app.request(`/api/visits/${createdVisit.id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({
+        visitedOn: '2026-04-21'
+      }),
+      headers: {
+        'content-type': 'application/json'
+      }
+    });
+
+    const thirdResponse = await app.request('/api/public/home-summary');
+    const thirdEtag = thirdResponse.headers.get('etag');
+    const thirdBody = (await thirdResponse.json()) as {
+      version: number;
+    };
+
+    expect(thirdEtag).toBeTruthy();
+    expect(thirdEtag).not.toBe(secondEtag);
+    expect(thirdBody.version).toBeGreaterThan(secondBody.version);
+
+    await app.request(`/api/visits/${createdVisit.id}`, {
+      method: 'DELETE'
+    });
+
+    const fourthResponse = await app.request('/api/public/home-summary');
+    const fourthEtag = fourthResponse.headers.get('etag');
+    const fourthBody = (await fourthResponse.json()) as {
+      totalVisits: number;
+      version: number;
+    };
+
+    expect(fourthEtag).toBeTruthy();
+    expect(fourthEtag).not.toBe(thirdEtag);
+    expect(fourthBody.totalVisits).toBe(0);
+    expect(fourthBody.version).toBeGreaterThan(thirdBody.version);
   });
 
   it('supports visit workflows with private cache policy', async () => {

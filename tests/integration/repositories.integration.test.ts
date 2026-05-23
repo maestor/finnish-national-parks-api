@@ -7,6 +7,7 @@ import {
   getCatalogListEtagSeed,
   getParkBySlug,
   getParkVisitsBySlug,
+  getPublicHomeSummary,
   getVisitById,
   listVisits,
   reorderVisitImages,
@@ -331,5 +332,53 @@ describe('repositories', () => {
     await expect(
       reorderVisitImages(testDatabase.database, visit.id, [99999, img1.id])
     ).rejects.toThrow('Invalid image order');
+  });
+
+  it('builds public home summary ordering from lightweight public visit data', async () => {
+    await importParks({
+      database: testDatabase.database,
+      expectedActiveCount: 3,
+      now: () => '2026-05-02T10:00:00.000Z',
+      sourceUrl: 'https://example.test/lipas',
+      fetchSource: async () => ({
+        items: [
+          createLipasPark(),
+          createLipasPark({
+            'lipas-id': 99999,
+            name: 'Toinen puisto'
+          }),
+          createLipasPark({
+            'lipas-id': 99998,
+            name: 'Kolmas puisto'
+          })
+        ]
+      })
+    });
+
+    await createVisit(testDatabase.database, 'akasmannyn-kansallispuisto', {
+      visitedOn: '2026-04-22'
+    });
+    await createVisit(testDatabase.database, 'toinen-puisto', {
+      visitedOn: '2026-04-21'
+    });
+    await createVisit(testDatabase.database, 'kolmas-puisto', {
+      visitedOn: '2026-04-21'
+    });
+
+    const summary = await getPublicHomeSummary(testDatabase.database);
+
+    expect(summary.mostVisitedParks.map((park) => park.park.slug)).toEqual([
+      'akasmannyn-kansallispuisto',
+      'kolmas-puisto',
+      'toinen-puisto'
+    ]);
+    expect(summary.recentVisits.map((park) => park.park.slug)).toEqual([
+      'akasmannyn-kansallispuisto',
+      'kolmas-puisto',
+      'toinen-puisto'
+    ]);
+    expect(summary.latestVisitEntries[0]).not.toHaveProperty('note');
+    expect(summary.latestVisitEntries[0]).not.toHaveProperty('route');
+    expect(summary.version).toBeGreaterThan(0);
   });
 });

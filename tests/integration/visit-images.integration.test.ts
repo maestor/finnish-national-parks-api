@@ -180,6 +180,64 @@ describe('Visit image routes', () => {
     expect(parkVisitsBody.visits[0]!.images[1]!.id).toBe(uploadBody.images[0]!.id);
   });
 
+  it('bumps the public summary version when visit images change', async () => {
+    const visitId = await createVisit();
+    const file = new File([await createTestImageBuffer()], 'first.jpg', { type: 'image/jpeg' });
+    const secondFile = new File([await createTestImageBuffer()], 'second.jpg', {
+      type: 'image/jpeg'
+    });
+    const app = createApp({ database: testDatabase.database, storage });
+
+    const firstSummaryResponse = await app.request('/api/public/home-summary');
+    const firstSummaryBody = (await firstSummaryResponse.json()) as {
+      version: number;
+    };
+
+    const uploadResponse = await uploadImages(visitId, [file, secondFile]);
+    const uploadBody = (await uploadResponse.json()) as {
+      images: Array<{ id: number }>;
+    };
+    const secondSummaryResponse = await app.request('/api/public/home-summary');
+    const secondSummaryBody = (await secondSummaryResponse.json()) as {
+      version: number;
+    };
+
+    expect(secondSummaryBody.version).toBeGreaterThan(firstSummaryBody.version);
+
+    const reorderResponse = await app.request(`/api/visits/${visitId}/images/reorder`, {
+      body: JSON.stringify({
+        imageIds: [uploadBody.images[1]!.id, uploadBody.images[0]!.id]
+      }),
+      headers: { 'content-type': 'application/json' },
+      method: 'PATCH'
+    });
+
+    expect(reorderResponse.status).toBe(204);
+
+    const thirdSummaryResponse = await app.request('/api/public/home-summary');
+    const thirdSummaryBody = (await thirdSummaryResponse.json()) as {
+      version: number;
+    };
+
+    expect(thirdSummaryBody.version).toBeGreaterThan(secondSummaryBody.version);
+
+    const deleteResponse = await app.request(
+      `/api/visits/${visitId}/images/${uploadBody.images[0]!.id}`,
+      {
+        method: 'DELETE'
+      }
+    );
+
+    expect(deleteResponse.status).toBe(204);
+
+    const fourthSummaryResponse = await app.request('/api/public/home-summary');
+    const fourthSummaryBody = (await fourthSummaryResponse.json()) as {
+      version: number;
+    };
+
+    expect(fourthSummaryBody.version).toBeGreaterThan(thirdSummaryBody.version);
+  });
+
   it('returns 404 when uploading to a missing visit', async () => {
     const buffer = await createTestImageBuffer();
     const file = new File([buffer], 'orphan.jpg', { type: 'image/jpeg' });

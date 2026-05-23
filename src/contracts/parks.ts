@@ -105,6 +105,57 @@ export const visitWithParkSchema = visitSchema.extend({
   park: visitParkSchema
 });
 
+export const publicVisitVersionSchema = z.object({
+  updatedAt: z.string().datetime().nullable(),
+  version: z.number().int().nonnegative()
+});
+
+export const publicTypeProgressSchema = z.object({
+  totalParks: z.number().int(),
+  totalVisits: z.number().int(),
+  type: parkTypeSchema,
+  visitedParks: z.number().int()
+});
+
+export const publicMostVisitedParkSchema = z.object({
+  lastVisitedOn: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .nullable(),
+  park: visitParkSchema,
+  visitCount: z.number().int()
+});
+
+export const publicRecentParkVisitSchema = z.object({
+  park: visitParkSchema,
+  visitedSummary: visitedSummarySchema
+});
+
+export const publicVisitEntrySchema = z.object({
+  createdAt: z.string().datetime(),
+  id: z.number().int(),
+  park: visitParkSchema,
+  updatedAt: z.string().datetime(),
+  visitedOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/)
+});
+
+export const publicHomeSummaryResponseSchema = publicVisitVersionSchema.extend({
+  latestVisitEntries: z.array(publicVisitEntrySchema),
+  mostVisitedParks: z.array(publicMostVisitedParkSchema),
+  progressByType: z.array(publicTypeProgressSchema),
+  recentVisits: z.array(publicRecentParkVisitSchema),
+  totalVisits: z.number().int(),
+  uniqueVisitedParks: z.number().int()
+});
+
+export const publicMapParkSchema = parkListItemSchema.extend({
+  visitedSummary: visitedSummarySchema
+});
+
+export const publicMapSummaryResponseSchema = publicVisitVersionSchema.extend({
+  parks: z.array(publicMapParkSchema)
+});
+
 export const parkListResponseSchema = z.object({
   parks: z.array(parkListItemSchema)
 });

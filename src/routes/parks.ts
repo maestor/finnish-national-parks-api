@@ -6,6 +6,8 @@ import {
   parkDetailSchema,
   parkListResponseSchema,
   parkVisitsResponseSchema,
+  publicHomeSummaryResponseSchema,
+  publicMapSummaryResponseSchema,
   reorderVisitImagesRequestSchema,
   updateParkRemovedRequestSchema,
   updateVisitRequestSchema,
@@ -103,6 +105,44 @@ export const getParkVisitsRoute = createRoute({
           schema: errorSchema
         }
       }
+    }
+  }
+});
+
+export const getPublicHomeSummaryRoute = createRoute({
+  method: 'get',
+  path: '/api/public/home-summary',
+  tags: ['Public'],
+  responses: {
+    200: {
+      description: 'Public visit summary for the home page',
+      content: {
+        'application/json': {
+          schema: publicHomeSummaryResponseSchema
+        }
+      }
+    },
+    304: {
+      description: 'Public home summary not modified'
+    }
+  }
+});
+
+export const getPublicMapSummaryRoute = createRoute({
+  method: 'get',
+  path: '/api/public/map-summary',
+  tags: ['Public'],
+  responses: {
+    200: {
+      description: 'Public park and visit summary for the map page',
+      content: {
+        'application/json': {
+          schema: publicMapSummaryResponseSchema
+        }
+      }
+    },
+    304: {
+      description: 'Public map summary not modified'
     }
   }
 });

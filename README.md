@@ -67,6 +67,8 @@ R2_SECRET_ACCESS_KEY=
 - `GET /openapi.json`
 - `GET /api/parks`
 - `GET /api/parks/:slug`
+- `GET /api/public/home-summary`
+- `GET /api/public/map-summary`
 - `GET /api/parks/:slug/visits`
 - `POST /api/parks/:slug/visits`
 - `PATCH /api/parks/:slug/removed`
@@ -90,10 +92,14 @@ Catalog endpoints stay cache-friendly and database-backed:
 - `GET /api/parks` returns lightweight list data without boundary GeoJSON.
 - `GET /api/parks?type=state-hiking-area` filters by normalized type slug.
 - `GET /api/parks/:slug?includeBoundary=true` includes stored boundary geometry.
+- `GET /api/public/home-summary` returns public visit totals, type progress, recent activity, and a public data `version` / `updatedAt` signal without notes, routes, or images.
+- `GET /api/public/map-summary` returns lightweight park map data plus per-park visited summaries and the same public data version signal.
 - `GET /api/parks/:slug/visits` returns visit history plus a visited summary for one park.
 - `GET /api/visits` returns flat visit resources with their parent park reference.
 - `GET /api/visits/:id` returns one visit with its parent park reference.
-- Catalog `GET` endpoints emit deterministic `ETag` headers and support `304 Not Modified`.
+- Catalog and public summary `GET` endpoints emit deterministic `ETag` headers and support `304 Not Modified`.
+- Public summary endpoints use `Cache-Control: public, max-age=0, s-maxage=3600, stale-while-revalidate=86400`.
+- Public summary versions bump when public visit data changes, including visit create/update/delete and visit image upload/delete/reorder.
 - Visit and management endpoints use `Cache-Control: private, no-store`.
 - `PATCH /api/parks/:slug/removed` lets the UI hide or restore a park by toggling its persisted `removed` flag.
 
