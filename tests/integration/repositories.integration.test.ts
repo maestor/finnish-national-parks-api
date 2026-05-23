@@ -56,7 +56,7 @@ describe('repositories', () => {
     expect(parkVisits?.visits).toEqual([]);
   });
 
-  it('returns combined location for park responses and falls back to address when postal office is missing', async () => {
+  it('normalizes park location values for combined, duplicate, and missing-address cases', async () => {
     await expect(
       getParkBySlug(testDatabase.database, 'akasmannyn-kansallispuisto')
     ).resolves.toMatchObject({
@@ -65,7 +65,29 @@ describe('repositories', () => {
 
     await testDatabase.database
       .update(parks)
-      .set({ postalOffice: null })
+      .set({ postalOffice: 'Puistotie 1' })
+      .where(eq(parks.slug, 'akasmannyn-kansallispuisto'));
+
+    await expect(
+      getParkBySlug(testDatabase.database, 'akasmannyn-kansallispuisto')
+    ).resolves.toMatchObject({
+      location: 'Puistotie 1'
+    });
+
+    await testDatabase.database
+      .update(parks)
+      .set({ locationLabel: '', postalOffice: 'Testikylä' })
+      .where(eq(parks.slug, 'akasmannyn-kansallispuisto'));
+
+    await expect(
+      getParkBySlug(testDatabase.database, 'akasmannyn-kansallispuisto')
+    ).resolves.toMatchObject({
+      location: 'Testikylä'
+    });
+
+    await testDatabase.database
+      .update(parks)
+      .set({ locationLabel: 'Puistotie 1', postalOffice: null })
       .where(eq(parks.slug, 'akasmannyn-kansallispuisto'));
 
     await expect(

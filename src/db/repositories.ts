@@ -124,7 +124,18 @@ const visibleCatalogWhere = (typeSlug?: SupportedParkTypeSlug) => {
 const removedCatalogWhere = () => eq(parks.removed, true);
 
 const toLocation = (locationLabel: string, postalOffice: string | null) => {
-  return postalOffice ? `${locationLabel}, ${postalOffice}` : locationLabel;
+  const normalizedLocationLabel = locationLabel.trim();
+  const normalizedPostalOffice = postalOffice?.trim() ?? '';
+
+  if (!normalizedLocationLabel) {
+    return normalizedPostalOffice;
+  }
+
+  if (!normalizedPostalOffice || normalizedLocationLabel === normalizedPostalOffice) {
+    return normalizedLocationLabel;
+  }
+
+  return `${normalizedLocationLabel}, ${normalizedPostalOffice}`;
 };
 
 const toPark = (row: TypedParkRow) => {

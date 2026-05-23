@@ -53,7 +53,7 @@ Use mutation testing for:
 - `GET /api/parks/removed` returns a private admin list of removed parks for restore flows.
 - `GET /api/parks?type=...` filters the public catalog list by normalized type slug.
 - `GET /api/parks/:slug` returns catalog detail without visit state.
-- Park responses expose `location` instead of `locationLabel`, combining address and postal office when available.
+- Park responses expose `location` instead of `locationLabel`, combining address and postal office when both exist, but collapsing to one value when they are identical or only one exists.
 - `GET /api/public/home-summary` returns cache-friendly public summary data without notes, routes, or images.
 - `GET /api/public/map-summary` returns lightweight map data plus per-park visited summaries.
 - `GET /api/parks/:slug/visits` returns park-scoped visit history and visited summary.
