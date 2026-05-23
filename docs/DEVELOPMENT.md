@@ -132,13 +132,17 @@ Key route behavior:
 - `GET /api/parks` is optimized for map/list views and omits boundary geometry.
 - `GET /api/parks?type=state-hiking-area` filters by normalized protected-area type slug.
 - `GET /api/parks/:slug?includeBoundary=true` returns the stored boundary GeoJSON.
+- `GET /api/public/home-summary` returns public home-page summary data without visit notes, routes, or images.
+- `GET /api/public/map-summary` returns lightweight park map data plus per-park visited summaries.
 - `GET /api/parks/:slug/visits` returns visit history plus a visited summary for one visible park.
 - `GET /api/visits` returns flat visit resources with their parent park reference.
 - `GET /api/visits/:id` returns one visit with its parent park reference.
-- Catalog routes emit deterministic `ETag` headers and support `304 Not Modified`.
+- Catalog and public summary routes emit deterministic `ETag` headers and support `304 Not Modified`.
+- Public summary routes use shared-cache headers and expose a public visit-data `version` / `updatedAt` signal that changes on visit create/update/delete and visit image upload/delete/reorder.
 - Visit and management routes use `private, no-store`.
 - `PATCH /api/parks/:slug/removed` toggles whether a park is hidden from catalog and visit responses.
 - Auth routes (`/auth/*`) bypass API key authentication so the OAuth flow can complete without a bearer token.
+- Public summary routes (`/api/public/*`) also bypass API key authentication so public UI pages can use them remotely.
 - All other non-public endpoints require API key authentication; localhost requests are exempt.
 - Image upload routes (`POST /api/visits/:id/images`) accept multipart/form-data, resize images with Sharp, and store them in R2. They are only registered when R2 credentials (or `MEMORY_STORAGE=true`) are configured.
 - Image responses include time-limited presigned URLs so the R2 bucket can remain private.

@@ -3,7 +3,15 @@ import { and, asc, desc, eq, inArray, notInArray, sql } from 'drizzle-orm';
 import type { SupportedParkTypeSlug } from '../parks/park-types.js';
 import { supportedParkTypes } from '../parks/park-types.js';
 import type { Database, DbClient } from './database.js';
-import { admins, importRuns, parks, parkTypes, parkVisits, visitImages } from './schema.js';
+import {
+  admins,
+  importRuns,
+  parks,
+  parkTypes,
+  parkVisits,
+  publicDataVersions,
+  visitImages
+} from './schema.js';
 
 type PutVisitInput = {
   author?: string | null | undefined;
@@ -40,6 +48,43 @@ type VisitRowWithPark = {
   park: typeof parks.$inferSelect;
   visit: typeof parkVisits.$inferSelect;
 };
+
+type PublicParkRow = {
+  areaKm2: number | null;
+  bboxMaxLat: number;
+  bboxMaxLon: number;
+  bboxMinLat: number;
+  bboxMinLon: number;
+  establishmentYear: number | null;
+  locationLabel: string;
+  luontoonUrl: string | null;
+  markerLat: number;
+  markerLon: number;
+  name: string;
+  parkId: number;
+  slug: string;
+  typeCode: number;
+  typeId: number;
+  typeName: string;
+  typeSlug: string;
+};
+
+type PublicVisitRow = {
+  createdAt: string;
+  id: number;
+  parkId: number;
+  parkName: string;
+  parkSlug: string;
+  updatedAt: string;
+  visitedOn: string;
+};
+
+type PublicVisitVersion = {
+  updatedAt: string | null;
+  version: number;
+};
+
+const PUBLIC_VISIT_DATA_VERSION_KEY = 'public-visits';
 
 const toBoundingBox = (row: typeof parks.$inferSelect): BoundingBox => {
   return {
@@ -93,6 +138,33 @@ const toPark = (row: TypedParkRow) => {
     sourceEventDate: row.park.sourceEventDate,
     type: toParkType(row.parkType),
     updatedAt: row.park.updatedAt
+  };
+};
+
+const toPublicPark = (row: PublicParkRow) => {
+  return {
+    areaKm2: row.areaKm2,
+    boundingBox: {
+      maxLat: row.bboxMaxLat,
+      maxLon: row.bboxMaxLon,
+      minLat: row.bboxMinLat,
+      minLon: row.bboxMinLon
+    },
+    establishmentYear: row.establishmentYear,
+    locationLabel: row.locationLabel,
+    luontoonUrl: row.luontoonUrl,
+    markerPoint: {
+      lat: row.markerLat,
+      lon: row.markerLon
+    },
+    name: row.name,
+    slug: row.slug,
+    type: {
+      code: row.typeCode,
+      id: row.typeId,
+      name: row.typeName,
+      slug: row.typeSlug as SupportedParkTypeSlug
+    }
   };
 };
 
@@ -180,6 +252,33 @@ const listTypedParks = async (
     .orderBy(parks.name);
 };
 
+const listPublicParkRows = async (database: Database) => {
+  return database
+    .select({
+      areaKm2: parks.areaKm2,
+      bboxMaxLat: parks.bboxMaxLat,
+      bboxMaxLon: parks.bboxMaxLon,
+      bboxMinLat: parks.bboxMinLat,
+      bboxMinLon: parks.bboxMinLon,
+      establishmentYear: parks.establishmentYear,
+      locationLabel: parks.locationLabel,
+      luontoonUrl: parks.luontoonUrl,
+      markerLat: parks.markerLat,
+      markerLon: parks.markerLon,
+      name: parks.name,
+      parkId: parks.id,
+      slug: parks.slug,
+      typeCode: parkTypes.code,
+      typeId: parkTypes.id,
+      typeName: parkTypes.name,
+      typeSlug: parkTypes.slug
+    })
+    .from(parks)
+    .innerJoin(parkTypes, eq(parks.typeId, parkTypes.id))
+    .where(visibleCatalogWhere())
+    .orderBy(parks.name);
+};
+
 const getVisitsForPark = async (database: Database, parkId: number) => {
   return database.query.parkVisits.findMany({
     orderBy: [desc(parkVisits.visitedOn), desc(parkVisits.id)],
@@ -256,6 +355,53 @@ const listVisitRowsWithPark = async (database: Database) => {
     .innerJoin(parks, eq(parkVisits.parkId, parks.id))
     .where(eq(parks.removed, false))
     .orderBy(desc(parkVisits.visitedOn), desc(parkVisits.id));
+};
+
+const listPublicVisitRows = async (database: Database) => {
+  return database
+    .select({
+      createdAt: parkVisits.createdAt,
+      id: parkVisits.id,
+      parkId: parkVisits.parkId,
+      parkName: parks.name,
+      parkSlug: parks.slug,
+      updatedAt: parkVisits.updatedAt,
+      visitedOn: parkVisits.visitedOn
+    })
+    .from(parkVisits)
+    .innerJoin(parks, eq(parkVisits.parkId, parks.id))
+    .where(eq(parks.removed, false))
+    .orderBy(desc(parkVisits.visitedOn), desc(parkVisits.id));
+};
+
+const bumpPublicVisitDataVersion = async (database: DbClient, updatedAt: string) => {
+  await database
+    .insert(publicDataVersions)
+    .values({
+      key: PUBLIC_VISIT_DATA_VERSION_KEY,
+      updatedAt,
+      version: 1
+    })
+    .onConflictDoUpdate({
+      set: {
+        updatedAt,
+        version: sql`${publicDataVersions.version} + 1`
+      },
+      target: publicDataVersions.key
+    });
+};
+
+const getPublicVisitDataVersionRecord = async (database: Database) => {
+  const rows = await database
+    .select({
+      updatedAt: publicDataVersions.updatedAt,
+      version: publicDataVersions.version
+    })
+    .from(publicDataVersions)
+    .where(eq(publicDataVersions.key, PUBLIC_VISIT_DATA_VERSION_KEY))
+    .limit(1);
+
+  return rows[0] ?? null;
 };
 
 const getVisitRowWithParkById = async (database: Database, visitId: number) => {
@@ -376,6 +522,151 @@ export const getVisitById = async (
   return row ? buildVisitWithPark(database, row, getImagePublicUrl) : null;
 };
 
+export const getPublicVisitDataVersion = async (
+  database: Database
+): Promise<PublicVisitVersion> => {
+  const version = await getPublicVisitDataVersionRecord(database);
+
+  return version ?? { updatedAt: null, version: 0 };
+};
+
+export const getPublicHomeSummary = async (database: Database) => {
+  const [parkRows, visitRows, version] = await Promise.all([
+    listPublicParkRows(database),
+    listPublicVisitRows(database),
+    getPublicVisitDataVersion(database)
+  ]);
+
+  const publicParks = parkRows.map(toPublicPark);
+  const parksById = new Map(publicParks.map((park, index) => [parkRows[index]!.parkId, park]));
+  const visitsByParkId = new Map<number, PublicVisitRow[]>();
+
+  for (const visit of visitRows) {
+    const visits = visitsByParkId.get(visit.parkId) ?? [];
+    visits.push(visit);
+    visitsByParkId.set(visit.parkId, visits);
+  }
+
+  const progressByType = Array.from(
+    publicParks.reduce<
+      Map<
+        SupportedParkTypeSlug,
+        {
+          totalParks: number;
+          totalVisits: number;
+          type: (typeof publicParks)[number]['type'];
+          visitedParks: number;
+        }
+      >
+    >((accumulator, park, index) => {
+      const existing = accumulator.get(park.type.slug) ?? {
+        totalParks: 0,
+        totalVisits: 0,
+        type: park.type,
+        visitedParks: 0
+      };
+      const parkVisits = visitsByParkId.get(parkRows[index]!.parkId) ?? [];
+
+      existing.totalParks += 1;
+      existing.totalVisits += parkVisits.length;
+      if (parkVisits.length > 0) {
+        existing.visitedParks += 1;
+      }
+
+      accumulator.set(park.type.slug, existing);
+      return accumulator;
+    }, new Map())
+  )
+    .map(([, value]) => value)
+    .sort((a, b) => a.type.name.localeCompare(b.type.name));
+
+  const parkVisitSummaries = Array.from(visitsByParkId.entries()).map(([parkId, visits]) => {
+    const park = parksById.get(parkId)!;
+
+    return {
+      park: {
+        name: park.name,
+        slug: park.slug
+      },
+      visitedSummary: toVisitedSummary(visits)
+    };
+  });
+
+  const mostVisitedParks = [...parkVisitSummaries]
+    .sort((a, b) => {
+      if (b.visitedSummary.visitCount !== a.visitedSummary.visitCount) {
+        return b.visitedSummary.visitCount - a.visitedSummary.visitCount;
+      }
+
+      if (b.visitedSummary.lastVisitedOn !== a.visitedSummary.lastVisitedOn) {
+        return b.visitedSummary.lastVisitedOn!.localeCompare(a.visitedSummary.lastVisitedOn!);
+      }
+
+      return a.park.name.localeCompare(b.park.name);
+    })
+    .map(({ park, visitedSummary }) => ({
+      lastVisitedOn: visitedSummary.lastVisitedOn,
+      park,
+      visitCount: visitedSummary.visitCount
+    }))
+    .slice(0, 10);
+
+  const recentVisits = [...parkVisitSummaries]
+    .sort((a, b) => {
+      if (b.visitedSummary.lastVisitedOn !== a.visitedSummary.lastVisitedOn) {
+        return b.visitedSummary.lastVisitedOn!.localeCompare(a.visitedSummary.lastVisitedOn!);
+      }
+
+      return a.park.name.localeCompare(b.park.name);
+    })
+    .slice(0, 10);
+
+  return {
+    latestVisitEntries: visitRows.slice(0, 10).map((visit) => ({
+      createdAt: visit.createdAt,
+      id: visit.id,
+      park: {
+        name: visit.parkName,
+        slug: visit.parkSlug
+      },
+      updatedAt: visit.updatedAt,
+      visitedOn: visit.visitedOn
+    })),
+    mostVisitedParks,
+    progressByType,
+    recentVisits,
+    totalVisits: visitRows.length,
+    uniqueVisitedParks: visitsByParkId.size,
+    updatedAt: version.updatedAt,
+    version: version.version
+  };
+};
+
+export const getPublicMapSummary = async (database: Database) => {
+  const [parkRows, visitRows, version] = await Promise.all([
+    listPublicParkRows(database),
+    listPublicVisitRows(database),
+    getPublicVisitDataVersion(database)
+  ]);
+
+  const visitsByParkId = new Map<number, PublicVisitRow[]>();
+
+  for (const visit of visitRows) {
+    const visits = visitsByParkId.get(visit.parkId) ?? [];
+    visits.push(visit);
+    visitsByParkId.set(visit.parkId, visits);
+  }
+
+  return {
+    parks: parkRows.map((parkRow) => ({
+      ...toPublicPark(parkRow),
+      visitedSummary: toVisitedSummary(visitsByParkId.get(parkRow.parkId) ?? [])
+    })),
+    updatedAt: version.updatedAt,
+    version: version.version
+  };
+};
+
 export const createVisit = async (database: Database, slug: string, input: PutVisitInput) => {
   const park = await getParkRecordBySlug(database, slug);
 
@@ -398,6 +689,8 @@ export const createVisit = async (database: Database, slug: string, input: PutVi
       })
       .returning()
   )[0]!;
+
+  await bumpPublicVisitDataVersion(database, timestamp);
 
   return toVisit(row);
 };
@@ -447,11 +740,18 @@ export const updateVisit = async (database: Database, visitId: number, input: Up
     await database.select().from(parkVisits).where(eq(parkVisits.id, visitId))
   )[0]!;
 
+  await bumpPublicVisitDataVersion(database, timestamp);
+
   return toVisit(updatedVisit);
 };
 
 export const deleteVisit = async (database: Database, visitId: number) => {
   const result = await database.delete(parkVisits).where(eq(parkVisits.id, visitId));
+
+  if (Number(result.rowsAffected) > 0) {
+    await bumpPublicVisitDataVersion(database, new Date().toISOString());
+  }
+
   return Number(result.rowsAffected) > 0;
 };
 
@@ -460,6 +760,7 @@ export const createVisitImage = async (
   values: typeof visitImages.$inferInsert
 ) => {
   const row = (await database.insert(visitImages).values(values).returning())[0]!;
+  await bumpPublicVisitDataVersion(database, values.updatedAt);
   return row;
 };
 
@@ -474,6 +775,11 @@ export const findVisitImageById = async (database: Database, imageId: number) =>
 
 export const deleteVisitImage = async (database: Database, imageId: number) => {
   const result = await database.delete(visitImages).where(eq(visitImages.id, imageId));
+
+  if (Number(result.rowsAffected) > 0) {
+    await bumpPublicVisitDataVersion(database, new Date().toISOString());
+  }
+
   return Number(result.rowsAffected) > 0;
 };
 
@@ -504,6 +810,8 @@ export const reorderVisitImages = async (
       .set({ displayOrder: index, updatedAt: timestamp })
       .where(eq(visitImages.id, imageId));
   }
+
+  await bumpPublicVisitDataVersion(database, timestamp);
 };
 
 export const upsertImportedPark = async (

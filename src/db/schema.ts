@@ -109,6 +109,12 @@ export const visitImages = sqliteTable(
   })
 );
 
+export const publicDataVersions = sqliteTable('public_data_versions', {
+  key: text('key').primaryKey(),
+  version: integer('version').notNull(),
+  updatedAt: text('updated_at').notNull()
+});
+
 export const admins = sqliteTable(
   'admins',
   {

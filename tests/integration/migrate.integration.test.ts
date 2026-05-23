@@ -30,6 +30,9 @@ describe('migrateDatabase', () => {
     const migrations = await client.execute('SELECT name FROM schema_migrations ORDER BY name');
     const parkTypes = await client.execute('SELECT slug FROM park_types ORDER BY id');
     const parkColumns = await client.execute('PRAGMA table_info(parks)');
+    const publicDataVersionColumns = await client.execute(
+      'PRAGMA table_info(public_data_versions)'
+    );
 
     expect(migrations.rows.map((row) => String(row.name))).toEqual([
       '0000_init.sql',
@@ -37,7 +40,8 @@ describe('migrateDatabase', () => {
       '0002_admins.sql',
       '0003_visit_details.sql',
       '0004_visit_images.sql',
-      '0005_removed_parks.sql'
+      '0005_removed_parks.sql',
+      '0006_public_data_versions.sql'
     ]);
     expect(parkTypes.rows.map((row) => String(row.slug))).toEqual([
       'state-hiking-area',
@@ -46,5 +50,6 @@ describe('migrateDatabase', () => {
       'other-nature-reserve'
     ]);
     expect(parkColumns.rows.some((row) => String(row.name) === 'removed')).toBe(true);
+    expect(publicDataVersionColumns.rows.some((row) => String(row.name) === 'version')).toBe(true);
   });
 });

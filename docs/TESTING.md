@@ -52,10 +52,13 @@ Use mutation testing for:
 - `GET /api/parks` returns lightweight list/map data without full boundary geometry.
 - `GET /api/parks?type=...` filters the public catalog list by normalized type slug.
 - `GET /api/parks/:slug` returns catalog detail without visit state.
+- `GET /api/public/home-summary` returns cache-friendly public summary data without notes, routes, or images.
+- `GET /api/public/map-summary` returns lightweight map data plus per-park visited summaries.
 - `GET /api/parks/:slug/visits` returns park-scoped visit history and visited summary.
 - `GET /api/visits` and `GET /api/visits/:id` expose visit resources with parent park references.
-- Catalog `GET` endpoints emit ETags and return `304 Not Modified` for matching `If-None-Match`.
+- Catalog and public summary `GET` endpoints emit ETags and return `304 Not Modified` for matching `If-None-Match`.
 - Catalog `GET` endpoints are safe for public caching.
+- Public summary endpoints use shared-cache headers and bump their version signal when visit or visit-image public data changes.
 - Visit and management endpoints are private or no-store.
 - Park removal toggle can hide and restore a park through the authenticated park-management API.
 - Visit create/edit/delete supports optional route and author fields.

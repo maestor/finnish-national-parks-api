@@ -14,6 +14,8 @@ import {
   getCatalogListEtagSeed,
   getParkBySlug,
   getParkVisitsBySlug,
+  getPublicHomeSummary,
+  getPublicMapSummary,
   getVisitById,
   listParks,
   listVisits,
@@ -26,6 +28,7 @@ import {
   CATALOG_CACHE_CONTROL,
   createCatalogDetailEtag,
   createCatalogListEtag,
+  createPublicSummaryEtag,
   hasMatchingEtag,
   PRIVATE_CACHE_CONTROL
 } from './http/cache.js';
@@ -64,6 +67,8 @@ import {
   deleteVisitRoute,
   getParkRoute,
   getParkVisitsRoute,
+  getPublicHomeSummaryRoute,
+  getPublicMapSummaryRoute,
   getVisitRoute,
   listParksRoute,
   listVisitsRoute,
@@ -364,6 +369,52 @@ export const createApp = ({ apiKey, auth, database, storage }: AppDependencies =
         },
         200
       );
+    });
+
+    app.openapi(getPublicHomeSummaryRoute, async (context) => {
+      const summary = await getPublicHomeSummary(database);
+      const etag = createPublicSummaryEtag({
+        kind: 'home',
+        publicUpdatedAt: summary.updatedAt,
+        publicVersion: summary.version
+      });
+      context.header('Cache-Control', CATALOG_CACHE_CONTROL);
+      context.header('ETag', etag);
+
+      if (hasMatchingEtag(context.req.header('if-none-match'), etag)) {
+        return new Response(null, {
+          headers: context.res.headers,
+          status: 304
+        });
+      }
+
+      return context.json(summary, 200);
+    });
+
+    app.openapi(getPublicMapSummaryRoute, async (context) => {
+      const [catalogSeed, summary] = await Promise.all([
+        getCatalogListEtagSeed(database),
+        getPublicMapSummary(database)
+      ]);
+      const etag = createPublicSummaryEtag({
+        activeCount: catalogSeed.activeCount,
+        kind: 'map',
+        latestCatalogImportRunId: catalogSeed.latestImportRunId,
+        latestCatalogUpdatedAt: catalogSeed.latestUpdatedAt,
+        publicUpdatedAt: summary.updatedAt,
+        publicVersion: summary.version
+      });
+      context.header('Cache-Control', CATALOG_CACHE_CONTROL);
+      context.header('ETag', etag);
+
+      if (hasMatchingEtag(context.req.header('if-none-match'), etag)) {
+        return new Response(null, {
+          headers: context.res.headers,
+          status: 304
+        });
+      }
+
+      return context.json(summary, 200);
     });
 
     app.openapi(listVisitsRoute, async (context) => {

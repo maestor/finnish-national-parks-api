@@ -4,6 +4,7 @@ import { updateVisitRequestSchema } from '../../src/contracts/parks.js';
 import {
   createCatalogDetailEtag,
   createCatalogListEtag,
+  createPublicSummaryEtag,
   hasMatchingEtag
 } from '../../src/http/cache.js';
 
@@ -29,10 +30,20 @@ describe('contracts and cache helpers', () => {
       lipasId: 12345,
       updatedAt: '2026-05-01T00:00:00.000Z'
     });
+    const publicSummaryEtag = createPublicSummaryEtag({
+      activeCount: 3,
+      kind: 'map',
+      latestCatalogImportRunId: 42,
+      latestCatalogUpdatedAt: '2026-05-01T00:00:00.000Z',
+      publicUpdatedAt: '2026-05-02T00:00:00.000Z',
+      publicVersion: 7
+    });
 
     expect(emptyListEtag).toContain('none');
     expect(emptyListEtag).toContain('all');
     expect(detailEtag).toContain('summary');
+    expect(publicSummaryEtag).toContain('map');
+    expect(publicSummaryEtag).toContain(':7:');
     expect(hasMatchingEtag(undefined, emptyListEtag)).toBe(false);
     expect(hasMatchingEtag(`W/ignored, ${detailEtag}`, detailEtag)).toBe(true);
   });

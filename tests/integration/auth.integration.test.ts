@@ -100,4 +100,16 @@ describe('auth middleware', () => {
     expect(healthResponse.status).toBe(200);
     expect(openApiResponse.status).toBe(200);
   });
+
+  it('leaves public summary endpoints unprotected', async () => {
+    const app = createApp({ apiKey, database: testDatabase.database });
+
+    const response = await app.request('/api/public/home-summary', {
+      headers: {
+        'x-forwarded-for': '203.0.113.1'
+      }
+    });
+
+    expect(response.status).toBe(200);
+  });
 });
