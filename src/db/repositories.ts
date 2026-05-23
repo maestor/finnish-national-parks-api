@@ -62,6 +62,7 @@ type PublicParkRow = {
   markerLon: number;
   name: string;
   parkId: number;
+  postalCode: string | null;
   postalOffice: string | null;
   slug: string;
   typeCode: number;
@@ -123,20 +124,32 @@ const visibleCatalogWhere = (typeSlug?: SupportedParkTypeSlug) => {
 
 const removedCatalogWhere = () => eq(parks.removed, true);
 
-const toLocation = (locationLabel: string, postalOffice: string | null) => {
+const toLocation = (
+  locationLabel: string,
+  postalCode: string | null,
+  postalOffice: string | null
+) => {
   const capitalize = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
   const normalizedLocationLabel = locationLabel.trim();
+  const normalizedPostalCode = postalCode?.trim() ?? '';
   const normalizedPostalOffice = capitalize(postalOffice?.trim().toLowerCase() ?? '');
+  const postalLocation = [normalizedPostalCode, normalizedPostalOffice].filter(Boolean).join(' ');
 
   if (!normalizedLocationLabel || normalizedLocationLabel === '-') {
-    return normalizedPostalOffice;
+    return postalLocation;
   }
 
-  if (!normalizedPostalOffice || normalizedLocationLabel === normalizedPostalOffice) {
+  if (!postalLocation) {
     return normalizedLocationLabel;
   }
 
-  return `${normalizedLocationLabel}, ${normalizedPostalOffice}`;
+  if (normalizedLocationLabel === normalizedPostalOffice) {
+    return normalizedPostalCode
+      ? `${normalizedLocationLabel}, ${normalizedPostalCode}`
+      : normalizedLocationLabel;
+  }
+
+  return `${normalizedLocationLabel}, ${postalLocation}`;
 };
 
 const toPark = (row: TypedParkRow) => {
@@ -147,7 +160,7 @@ const toPark = (row: TypedParkRow) => {
     catalogStatus: row.park.catalogStatus as 'active' | 'inactive',
     establishmentYear: row.park.establishmentYear,
     lipasId: row.park.lipasId,
-    location: toLocation(row.park.locationLabel, row.park.postalOffice),
+    location: toLocation(row.park.locationLabel, row.park.postalCode, row.park.postalOffice),
     luontoonUrl: row.park.luontoonUrl,
     markerPoint: toMarkerPoint(row.park),
     municipalityCode: row.park.municipalityCode,
@@ -170,7 +183,7 @@ const toPublicPark = (row: PublicParkRow) => {
       minLon: row.bboxMinLon
     },
     establishmentYear: row.establishmentYear,
-    location: toLocation(row.locationLabel, row.postalOffice),
+    location: toLocation(row.locationLabel, row.postalCode, row.postalOffice),
     luontoonUrl: row.luontoonUrl,
     markerPoint: {
       lat: row.markerLat,
@@ -286,6 +299,7 @@ const listPublicParkRows = async (database: Database) => {
       markerLon: parks.markerLon,
       name: parks.name,
       parkId: parks.id,
+      postalCode: parks.postalCode,
       postalOffice: parks.postalOffice,
       slug: parks.slug,
       typeCode: parkTypes.code,
@@ -535,7 +549,7 @@ export const listRemovedParks = async (database: Database) => {
     boundingBox: toBoundingBox(row.park),
     catalogStatus: row.park.catalogStatus as 'active' | 'inactive',
     establishmentYear: row.park.establishmentYear,
-    location: toLocation(row.park.locationLabel, row.park.postalOffice),
+    location: toLocation(row.park.locationLabel, row.park.postalCode, row.park.postalOffice),
     luontoonUrl: row.park.luontoonUrl,
     markerPoint: toMarkerPoint(row.park),
     name: row.park.name,
