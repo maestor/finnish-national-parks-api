@@ -1,3 +1,4 @@
+import { eq } from 'drizzle-orm';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import {
@@ -9,10 +10,12 @@ import {
   getParkVisitsBySlug,
   getPublicHomeSummary,
   getVisitById,
+  listRemovedParks,
   listVisits,
   reorderVisitImages,
   updateVisit
 } from '../../src/db/repositories.js';
+import { parks } from '../../src/db/schema.js';
 import { importParks } from '../../src/importer/import-parks.js';
 import { createLipasPark } from '../fixtures/lipas.js';
 import { createTestDatabase } from '../helpers/test-db.js';
@@ -380,5 +383,23 @@ describe('repositories', () => {
     expect(summary.latestVisitEntries[0]).not.toHaveProperty('note');
     expect(summary.latestVisitEntries[0]).not.toHaveProperty('route');
     expect(summary.version).toBeGreaterThan(0);
+  });
+
+  it('lists only removed parks for admin restore workflows', async () => {
+    await testDatabase.database
+      .update(parks)
+      .set({ removed: true })
+      .where(eq(parks.slug, 'akasmannyn-kansallispuisto'));
+
+    const removedParks = await listRemovedParks(testDatabase.database);
+
+    expect(removedParks).toEqual([
+      expect.objectContaining({
+        catalogStatus: 'active',
+        name: 'Äkäsmännyn kansallispuisto',
+        removed: true,
+        slug: 'akasmannyn-kansallispuisto'
+      })
+    ]);
   });
 });

@@ -50,6 +50,7 @@ Use mutation testing for:
 - Re-import updates catalog fields without deleting visits.
 - Import prefers official Luontoon sitemap destination URLs over stale LIPAS `www` links and falls back when no sitemap match exists.
 - `GET /api/parks` returns lightweight list/map data without full boundary geometry.
+- `GET /api/parks/removed` returns a private admin list of removed parks for restore flows.
 - `GET /api/parks?type=...` filters the public catalog list by normalized type slug.
 - `GET /api/parks/:slug` returns catalog detail without visit state.
 - `GET /api/public/home-summary` returns cache-friendly public summary data without notes, routes, or images.

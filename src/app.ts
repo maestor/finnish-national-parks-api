@@ -18,6 +18,7 @@ import {
   getPublicMapSummary,
   getVisitById,
   listParks,
+  listRemovedParks,
   listVisits,
   reorderVisitImages,
   updateParkRemoved,
@@ -71,6 +72,7 @@ import {
   getPublicMapSummaryRoute,
   getVisitRoute,
   listParksRoute,
+  listRemovedParksRoute,
   listVisitsRoute,
   reorderVisitImagesRoute,
   updateParkRemovedRoute,
@@ -313,6 +315,19 @@ export const createApp = ({ apiKey, auth, database, storage }: AppDependencies =
               ...park
             }) => park
           )
+        },
+        200
+      );
+    });
+
+    app.openapi(listRemovedParksRoute, async (context) => {
+      context.header('Cache-Control', PRIVATE_CACHE_CONTROL);
+
+      const parks = await listRemovedParks(database);
+
+      return context.json(
+        {
+          parks
         },
         200
       );

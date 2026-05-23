@@ -83,6 +83,25 @@ describe('auth middleware', () => {
     expect(response.status).toBe(200);
   });
 
+  it('keeps removed-park admin listing protected', async () => {
+    const app = createApp({ apiKey, database: testDatabase.database });
+
+    const unauthorizedResponse = await app.request('/api/parks/removed', {
+      headers: {
+        'x-forwarded-for': '203.0.113.1'
+      }
+    });
+    const authorizedResponse = await app.request('/api/parks/removed', {
+      headers: {
+        authorization: `Bearer ${apiKey}`,
+        'x-forwarded-for': '203.0.113.1'
+      }
+    });
+
+    expect(unauthorizedResponse.status).toBe(401);
+    expect(authorizedResponse.status).toBe(200);
+  });
+
   it('leaves health and openapi.json unprotected', async () => {
     const app = createApp({ apiKey, database: testDatabase.database });
 

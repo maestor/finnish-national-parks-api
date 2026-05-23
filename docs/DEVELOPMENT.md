@@ -130,6 +130,7 @@ The API uses Zod schemas as the contract source of truth with OpenAPI exposed at
 Key route behavior:
 
 - `GET /api/parks` is optimized for map/list views and omits boundary geometry.
+- `GET /api/parks/removed` returns an auth-restricted admin list of removed parks for restore workflows.
 - `GET /api/parks?type=state-hiking-area` filters by normalized protected-area type slug.
 - `GET /api/parks/:slug?includeBoundary=true` returns the stored boundary GeoJSON.
 - `GET /api/public/home-summary` returns public home-page summary data without visit notes, routes, or images.

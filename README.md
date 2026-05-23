@@ -66,6 +66,7 @@ R2_SECRET_ACCESS_KEY=
 - `GET /health`
 - `GET /openapi.json`
 - `GET /api/parks`
+- `GET /api/parks/removed`
 - `GET /api/parks/:slug`
 - `GET /api/public/home-summary`
 - `GET /api/public/map-summary`
@@ -90,6 +91,7 @@ Auth endpoints for control-panel login:
 Catalog endpoints stay cache-friendly and database-backed:
 
 - `GET /api/parks` returns lightweight list data without boundary GeoJSON.
+- `GET /api/parks/removed` returns an auth-restricted admin list of removed parks so the UI can restore visibility when needed.
 - `GET /api/parks?type=state-hiking-area` filters by normalized type slug.
 - `GET /api/parks/:slug?includeBoundary=true` includes stored boundary geometry.
 - `GET /api/public/home-summary` returns public visit totals, type progress, recent activity, and a public data `version` / `updatedAt` signal without notes, routes, or images.
