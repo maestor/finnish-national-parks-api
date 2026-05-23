@@ -124,8 +124,9 @@ const visibleCatalogWhere = (typeSlug?: SupportedParkTypeSlug) => {
 const removedCatalogWhere = () => eq(parks.removed, true);
 
 const toLocation = (locationLabel: string, postalOffice: string | null) => {
+  const capitalize = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
   const normalizedLocationLabel = locationLabel.trim();
-  const normalizedPostalOffice = postalOffice?.trim() ?? '';
+  const normalizedPostalOffice = capitalize(postalOffice?.trim().toLowerCase() ?? '');
 
   if (!normalizedLocationLabel || normalizedLocationLabel === '-') {
     return normalizedPostalOffice;

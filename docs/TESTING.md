@@ -81,7 +81,7 @@ The implementation should provide these scripts:
 - `npm run lint`
 - `npm run verify`
 
-`npm run verify` is the main local quality gate. It must run at least typecheck, lint, and coverage tests.
+`npm run verify` is the main local quality gate. It must run at least typecheck, lint (with apply safe fixes), and coverage tests.
 
 Coverage thresholds should start high from the beginning. Aim for 100 percent on first-party application code, excluding generated artifacts, migrations, config, and unavoidable runtime glue explicitly rather than letting them lower the target silently.
 
