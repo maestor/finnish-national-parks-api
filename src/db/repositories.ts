@@ -62,6 +62,7 @@ type PublicParkRow = {
   markerLon: number;
   name: string;
   parkId: number;
+  postalOffice: string | null;
   slug: string;
   typeCode: number;
   typeId: number;
@@ -122,6 +123,10 @@ const visibleCatalogWhere = (typeSlug?: SupportedParkTypeSlug) => {
 
 const removedCatalogWhere = () => eq(parks.removed, true);
 
+const toLocation = (locationLabel: string, postalOffice: string | null) => {
+  return postalOffice ? `${locationLabel}, ${postalOffice}` : locationLabel;
+};
+
 const toPark = (row: TypedParkRow) => {
   return {
     areaKm2: row.park.areaKm2,
@@ -130,7 +135,7 @@ const toPark = (row: TypedParkRow) => {
     catalogStatus: row.park.catalogStatus as 'active' | 'inactive',
     establishmentYear: row.park.establishmentYear,
     lipasId: row.park.lipasId,
-    locationLabel: row.park.locationLabel,
+    location: toLocation(row.park.locationLabel, row.park.postalOffice),
     luontoonUrl: row.park.luontoonUrl,
     markerPoint: toMarkerPoint(row.park),
     municipalityCode: row.park.municipalityCode,
@@ -153,7 +158,7 @@ const toPublicPark = (row: PublicParkRow) => {
       minLon: row.bboxMinLon
     },
     establishmentYear: row.establishmentYear,
-    locationLabel: row.locationLabel,
+    location: toLocation(row.locationLabel, row.postalOffice),
     luontoonUrl: row.luontoonUrl,
     markerPoint: {
       lat: row.markerLat,
@@ -269,6 +274,7 @@ const listPublicParkRows = async (database: Database) => {
       markerLon: parks.markerLon,
       name: parks.name,
       parkId: parks.id,
+      postalOffice: parks.postalOffice,
       slug: parks.slug,
       typeCode: parkTypes.code,
       typeId: parkTypes.id,
@@ -517,7 +523,7 @@ export const listRemovedParks = async (database: Database) => {
     boundingBox: toBoundingBox(row.park),
     catalogStatus: row.park.catalogStatus as 'active' | 'inactive',
     establishmentYear: row.park.establishmentYear,
-    locationLabel: row.park.locationLabel,
+    location: toLocation(row.park.locationLabel, row.park.postalOffice),
     luontoonUrl: row.park.luontoonUrl,
     markerPoint: toMarkerPoint(row.park),
     name: row.park.name,
