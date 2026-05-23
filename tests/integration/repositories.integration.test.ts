@@ -56,11 +56,11 @@ describe('repositories', () => {
     expect(parkVisits?.visits).toEqual([]);
   });
 
-  it('normalizes park location values for combined, duplicate, and missing-address cases', async () => {
+  it('normalizes park location values for address, postal code, and postal office combinations', async () => {
     await expect(
       getParkBySlug(testDatabase.database, 'akasmannyn-kansallispuisto')
     ).resolves.toMatchObject({
-      location: 'Puistotie 1, Testikylä'
+      location: 'Puistotie 1, 00999 Testikylä'
     });
 
     await testDatabase.database
@@ -71,23 +71,34 @@ describe('repositories', () => {
     await expect(
       getParkBySlug(testDatabase.database, 'akasmannyn-kansallispuisto')
     ).resolves.toMatchObject({
-      location: 'Puistotie 1'
+      location: 'Puistotie 1, 00999'
     });
 
     await testDatabase.database
       .update(parks)
-      .set({ locationLabel: '', postalOffice: 'Testikylä' })
+      .set({ postalCode: null })
       .where(eq(parks.slug, 'akasmannyn-kansallispuisto'));
 
     await expect(
       getParkBySlug(testDatabase.database, 'akasmannyn-kansallispuisto')
     ).resolves.toMatchObject({
-      location: 'Testikylä'
+      location: 'Puistotie 1'
     });
 
     await testDatabase.database
       .update(parks)
-      .set({ locationLabel: 'Puistotie 1', postalOffice: null })
+      .set({ locationLabel: '', postalCode: '00999', postalOffice: 'Testikylä' })
+      .where(eq(parks.slug, 'akasmannyn-kansallispuisto'));
+
+    await expect(
+      getParkBySlug(testDatabase.database, 'akasmannyn-kansallispuisto')
+    ).resolves.toMatchObject({
+      location: '00999 Testikylä'
+    });
+
+    await testDatabase.database
+      .update(parks)
+      .set({ locationLabel: 'Puistotie 1', postalOffice: null, postalCode: null })
       .where(eq(parks.slug, 'akasmannyn-kansallispuisto'));
 
     await expect(
@@ -437,7 +448,7 @@ describe('repositories', () => {
     expect(removedParks).toEqual([
       expect.objectContaining({
         catalogStatus: 'active',
-        location: 'Puistotie 1, Testikylä',
+        location: 'Puistotie 1, 00999 Testikylä',
         name: 'Äkäsmännyn kansallispuisto',
         removed: true,
         slug: 'akasmannyn-kansallispuisto'

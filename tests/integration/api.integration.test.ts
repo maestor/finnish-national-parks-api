@@ -226,7 +226,7 @@ describe('API routes', () => {
     expect(summaryResponse.status).toBe(200);
     expect(summaryBody).not.toHaveProperty('boundaryGeoJson');
     expect(summaryBody).not.toHaveProperty('locationLabel');
-    expect(summaryBody).toHaveProperty('location', 'Puistotie 1, Testikylä');
+    expect(summaryBody).toHaveProperty('location', 'Puistotie 1, 00999 Testikylä');
     expect(response.status).toBe(200);
     expect(body).toHaveProperty('boundaryGeoJson');
     expect(body).not.toHaveProperty('note');
@@ -347,7 +347,7 @@ describe('API routes', () => {
     expect(detailBody.boundaryGeoJson.features[0]?.geometry.type).toBe('LineString');
   });
 
-  it('normalizes API location values when city duplicates or replaces the address', async () => {
+  it('normalizes API location values when postal fields duplicate or replace the address', async () => {
     const app = createApp({ database: testDatabase.database });
 
     await testDatabase.database
@@ -358,7 +358,7 @@ describe('API routes', () => {
     const duplicatedResponse = await app.request('/api/parks/akasmannyn-kansallispuisto');
     const duplicatedBody = (await duplicatedResponse.json()) as Record<string, unknown>;
 
-    expect(duplicatedBody).toHaveProperty('location', 'Puistotie 1');
+    expect(duplicatedBody).toHaveProperty('location', 'Puistotie 1, 00999');
 
     await testDatabase.database
       .update(parks)
@@ -368,7 +368,7 @@ describe('API routes', () => {
     const postalOnlyResponse = await app.request('/api/parks/akasmannyn-kansallispuisto');
     const postalOnlyBody = (await postalOnlyResponse.json()) as Record<string, unknown>;
 
-    expect(postalOnlyBody).toHaveProperty('location', 'Testikylä');
+    expect(postalOnlyBody).toHaveProperty('location', '00999 Testikylä');
   });
 
   it('explicitly omits boundary geometry when includeBoundary=false', async () => {
@@ -545,7 +545,7 @@ describe('API routes', () => {
       visitCount: 1,
       visited: true
     });
-    expect(akasmanty).toHaveProperty('location', 'Puistotie 1, Testikylä');
+    expect(akasmanty).toHaveProperty('location', 'Puistotie 1, 00999 Testikylä');
     expect(akasmanty).not.toHaveProperty('locationLabel');
     expect(akasmanty).not.toHaveProperty('boundaryGeoJson');
     expect(akasmanty).not.toHaveProperty('visits');
@@ -929,7 +929,7 @@ describe('API routes', () => {
     expect(body.parks).toEqual([
       expect.objectContaining({
         catalogStatus: 'active',
-        location: 'Puistotie 1, Testikylä',
+        location: 'Puistotie 1, 00999 Testikylä',
         name: 'Äkäsmännyn kansallispuisto',
         removed: true,
         slug: 'akasmannyn-kansallispuisto'
