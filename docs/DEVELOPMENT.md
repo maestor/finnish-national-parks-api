@@ -19,6 +19,7 @@ npm run dev
 ## Branch And PR Workflow
 
 - Create a dedicated branch for every change: `feature/<name>`, `bugfix/<name>`, `chore/<name>`, `docs/<name>`, etc.
+- If you are currently on `main`, create or switch to the correct work branch before editing files, running write-capable fixers, or staging changes.
 - Push the branch and open a pull request against `main`.
 - Ensure `npm run verify` passes locally before requesting review.
 - User review and explicit acceptance are required before merging.
