@@ -240,6 +240,30 @@ describe('API routes', () => {
     expect(cachedResponse.status).toBe(304);
   });
 
+  it('normalizes API location values when city duplicates or replaces the address', async () => {
+    const app = createApp({ database: testDatabase.database });
+
+    await testDatabase.database
+      .update(parks)
+      .set({ postalOffice: 'Puistotie 1' })
+      .where(eq(parks.slug, 'akasmannyn-kansallispuisto'));
+
+    const duplicatedResponse = await app.request('/api/parks/akasmannyn-kansallispuisto');
+    const duplicatedBody = (await duplicatedResponse.json()) as Record<string, unknown>;
+
+    expect(duplicatedBody).toHaveProperty('location', 'Puistotie 1');
+
+    await testDatabase.database
+      .update(parks)
+      .set({ locationLabel: '', postalOffice: 'Testikylä' })
+      .where(eq(parks.slug, 'akasmannyn-kansallispuisto'));
+
+    const postalOnlyResponse = await app.request('/api/parks/akasmannyn-kansallispuisto');
+    const postalOnlyBody = (await postalOnlyResponse.json()) as Record<string, unknown>;
+
+    expect(postalOnlyBody).toHaveProperty('location', 'Testikylä');
+  });
+
   it('explicitly omits boundary geometry when includeBoundary=false', async () => {
     const app = createApp({ database: testDatabase.database });
     const response = await app.request(

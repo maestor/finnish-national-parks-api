@@ -134,7 +134,7 @@ Key route behavior:
 - `GET /api/parks/removed` returns an auth-restricted admin list of removed parks for restore workflows.
 - `GET /api/parks?type=state-hiking-area` filters by normalized protected-area type slug.
 - `GET /api/parks/:slug?includeBoundary=true` returns the stored boundary GeoJSON.
-- Park responses expose `location` instead of `locationLabel`, formatted as `location_label, postal_office` when city data exists.
+- Park responses expose `location` instead of `locationLabel`, combining `location_label` and `postal_office` when both exist, but collapsing to one value when they are identical or only one exists.
 - `GET /api/public/home-summary` returns public home-page summary data without visit notes, routes, or images.
 - `GET /api/public/map-summary` returns lightweight park map data plus per-park visited summaries.
 - `GET /api/parks/:slug/visits` returns visit history plus a visited summary for one visible park.
