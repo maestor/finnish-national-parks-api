@@ -764,6 +764,41 @@ describe('API routes', () => {
     expect(missingResponse.status).toBe(404);
   });
 
+  it('lists removed parks for admin restore usage', async () => {
+    const app = createApp({ database: testDatabase.database });
+
+    await app.request('/api/parks/akasmannyn-kansallispuisto/removed', {
+      method: 'PATCH',
+      body: JSON.stringify({
+        removed: true
+      }),
+      headers: {
+        'content-type': 'application/json'
+      }
+    });
+
+    const response = await app.request('/api/parks/removed');
+    const body = (await response.json()) as {
+      parks: Array<{
+        catalogStatus: 'active' | 'inactive';
+        name: string;
+        removed: true;
+        slug: string;
+      }>;
+    };
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('cache-control')).toBe('private, no-store');
+    expect(body.parks).toEqual([
+      expect.objectContaining({
+        catalogStatus: 'active',
+        name: 'Äkäsmännyn kansallispuisto',
+        removed: true,
+        slug: 'akasmannyn-kansallispuisto'
+      })
+    ]);
+  });
+
   it('returns CORS headers for preflight requests on API routes', async () => {
     const app = createApp({ auth: authConfig, database: testDatabase.database });
     const response = await app.request('/api/parks/akasmannyn-kansallispuisto/visits', {

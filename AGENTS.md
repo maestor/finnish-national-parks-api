@@ -5,6 +5,7 @@ This repository is a local-first TypeScript API that imports Finnish national pa
 ## Shared Skills
 - Use `$project-documentation` when updating `README.md`, `docs/**`, contributor guidance, or repository workflow docs.
 - Use `$git-pr-workflow` for the standard branch, review, final-verify, commit, push, and PR-notes flow.
+- When using `$git-pr-workflow`, create or switch to the correct work branch before making any file edits.
 
 ## Code Style
 - Prefer `const fn = () => {}` arrow functions over `function fn() {}` declarations for top-level module functions.
@@ -54,6 +55,7 @@ This repository is a local-first TypeScript API that imports Finnish national pa
 
 ## Repo-Specific Workflow Overrides
 - Branches must follow the repo naming convention: `feature/<name>`, `bugfix/<name>`, `chore/<name>`, `docs/<name>`, `refactor/<name>`, or `test/<name>`.
+- If the current branch is `main`, create or switch to the correct work branch before editing any files, running fixers that may write files, or staging changes.
 - All changes are PR-based against `main`. Do not push directly to `main`.
 - `npm run verify` must pass before any task or PR is considered ready, except for pure documentation or repo-configuration changes that cannot affect code, tests, or generated types.
 - For docs-only skips, note the exception in the PR description.

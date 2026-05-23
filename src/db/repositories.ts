@@ -120,6 +120,8 @@ const visibleCatalogWhere = (typeSlug?: SupportedParkTypeSlug) => {
     : and(eq(parks.catalogStatus, 'active'), eq(parks.removed, false));
 };
 
+const removedCatalogWhere = () => eq(parks.removed, true);
+
 const toPark = (row: TypedParkRow) => {
   return {
     areaKm2: row.park.areaKm2,
@@ -497,6 +499,33 @@ export const listParks = async (
   options: { typeSlug?: SupportedParkTypeSlug } = {}
 ) => {
   return (await listTypedParks(database, options)).map(toPark);
+};
+
+export const listRemovedParks = async (database: Database) => {
+  const rows = await database
+    .select({
+      park: parks,
+      parkType: parkTypes
+    })
+    .from(parks)
+    .innerJoin(parkTypes, eq(parks.typeId, parkTypes.id))
+    .where(removedCatalogWhere())
+    .orderBy(parks.name);
+
+  return rows.map((row) => ({
+    areaKm2: row.park.areaKm2,
+    boundingBox: toBoundingBox(row.park),
+    catalogStatus: row.park.catalogStatus as 'active' | 'inactive',
+    establishmentYear: row.park.establishmentYear,
+    locationLabel: row.park.locationLabel,
+    luontoonUrl: row.park.luontoonUrl,
+    markerPoint: toMarkerPoint(row.park),
+    name: row.park.name,
+    removed: true as const,
+    slug: row.park.slug,
+    type: toParkType(row.parkType),
+    updatedAt: row.park.updatedAt
+  }));
 };
 
 export const getParkBySlug = async (database: Database, slug: string) => {

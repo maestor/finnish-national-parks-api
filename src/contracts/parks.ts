@@ -58,6 +58,12 @@ export const parkDetailSchema = parkListItemSchema.extend({
   updatedAt: z.string()
 });
 
+export const adminRemovedParkListItemSchema = parkListItemSchema.extend({
+  catalogStatus: z.enum(['active', 'inactive']),
+  removed: z.literal(true),
+  updatedAt: z.string()
+});
+
 export const visitImageSchema = z.object({
   id: z.number().int(),
   fullUrl: z.string().url(),
@@ -158,6 +164,10 @@ export const publicMapSummaryResponseSchema = publicVisitVersionSchema.extend({
 
 export const parkListResponseSchema = z.object({
   parks: z.array(parkListItemSchema)
+});
+
+export const removedParkListResponseSchema = z.object({
+  parks: z.array(adminRemovedParkListItemSchema)
 });
 
 export const visitListResponseSchema = z.object({

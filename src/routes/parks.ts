@@ -8,6 +8,7 @@ import {
   parkVisitsResponseSchema,
   publicHomeSummaryResponseSchema,
   publicMapSummaryResponseSchema,
+  removedParkListResponseSchema,
   reorderVisitImagesRequestSchema,
   updateParkRemovedRequestSchema,
   updateVisitRequestSchema,
@@ -73,6 +74,23 @@ export const getParkRoute = createRoute({
       content: {
         'application/json': {
           schema: errorSchema
+        }
+      }
+    }
+  }
+});
+
+export const listRemovedParksRoute = createRoute({
+  method: 'get',
+  path: '/api/parks/removed',
+  tags: ['Parks'],
+  security: [{ bearerAuth: [] }],
+  responses: {
+    200: {
+      description: 'Removed parks for admin visibility management',
+      content: {
+        'application/json': {
+          schema: removedParkListResponseSchema
         }
       }
     }
