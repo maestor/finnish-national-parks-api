@@ -885,6 +885,7 @@ export const upsertImportedPark = async (
         markerLon: values.markerLon,
         municipalityCode: values.municipalityCode,
         name: values.name,
+        postalCode: values.postalCode,
         postalOffice: values.postalOffice,
         slug: values.slug,
         sourceEventDate: values.sourceEventDate,

@@ -8,7 +8,10 @@ import {
   syncParkTypes,
   upsertImportedPark
 } from '../db/repositories.js';
+import { isNatureTrailTypeCode } from '../parks/park-types.js';
+import { isFullyInsideArea } from './geometry.js';
 import { createLuontoonUrlResolver } from './luontoon-sitemap.js';
+import type { MappedPark } from './map-lipas-park.js';
 import { mapLipasPark } from './map-lipas-park.js';
 
 const lipasResponseSchema = z.object({
@@ -35,6 +38,9 @@ type ImportParksOptions = {
 
 const RESPONSE_SHAPE_VERSION = 'catalog-v2';
 const LUONTOON_SITEMAP_URL = 'https://www.luontoon.fi/resources/sitemap/fi.xml';
+const SUPPORTED_LIPAS_TYPE_CODES = [103, 109, 110, 111, 112, 4404] as const;
+
+export const defaultLipasCatalogSourceUrl = `https://api.lipas.fi/v2/sports-sites?type-codes=${SUPPORTED_LIPAS_TYPE_CODES.join(',')}&page-size=100&page=1`;
 
 const defaultFetchSource = async (sourceUrl: string) => {
   const firstResponse = await fetch(sourceUrl);
@@ -103,9 +109,36 @@ const ensureUniqueSlug = (baseSlug: string, lipasId: number, takenSlugs: Set<str
   return candidate;
 };
 
+const normalizeLocationPart = (value: string | null) => value?.trim().toLowerCase() ?? '';
+
+const hasMatchingAreaLocationMetadata = (park: MappedPark, areas: MappedPark[]) => {
+  const parkLocationLabel = normalizeLocationPart(park.locationLabel);
+  const parkPostalCode = normalizeLocationPart(park.postalCode);
+  const parkPostalOffice = normalizeLocationPart(park.postalOffice);
+
+  if (!parkLocationLabel || !parkPostalCode || !parkPostalOffice) {
+    return false;
+  }
+
+  return areas.some(
+    (area) =>
+      normalizeLocationPart(area.locationLabel) === parkLocationLabel &&
+      normalizeLocationPart(area.postalCode) === parkPostalCode &&
+      normalizeLocationPart(area.postalOffice) === parkPostalOffice
+  );
+};
+
+const isContainedNatureTrail = (park: MappedPark, areas: MappedPark[]) => {
+  return (
+    isNatureTrailTypeCode(park.type.code) &&
+    (areas.some((area) => isFullyInsideArea(park.boundaryGeoJson, area.boundaryGeoJson)) ||
+      hasMatchingAreaLocationMetadata(park, areas))
+  );
+};
+
 export const importParks = async ({
   database,
-  expectedActiveCount = 373,
+  expectedActiveCount = 1174,
   beforeEachUpsert,
   fetchSource = defaultFetchSource,
   fetchLuontoonSitemap,
@@ -126,15 +159,23 @@ export const importParks = async ({
 
   if (activeItems.length !== expectedActiveCount) {
     throw new Error(
-      `Expected ${expectedActiveCount} active parks but received ${activeItems.length}.`
+      `Expected ${expectedActiveCount} active LIPAS records but received ${activeItems.length}.`
     );
   }
-
-  const lipasIds = activeItems.map((item) => (item as { 'lipas-id': number })['lipas-id']);
-  const existingParks = await listExistingParksByLipasIds(database, lipasIds);
+  const mappedActiveParks = activeItems.map((item) => mapLipasPark(item));
+  const importedAreas = mappedActiveParks.filter((park) => !isNatureTrailTypeCode(park.type.code));
+  const importedParks = mappedActiveParks.filter(
+    (park) => !isContainedNatureTrail(park, importedAreas)
+  );
+  const importedLipasIds = importedParks.map((park) => park.lipasId);
+  const existingParks = await listExistingParksByLipasIds(database, importedLipasIds);
   const existingSlugByLipasId = new Map(existingParks.map((park) => [park.lipasId, park.slug]));
   const takenSlugs = new Set(existingParks.map((park) => park.slug));
   const importedAt = now();
+  const parksByLipasId = new Map(importedParks.map((park) => [park.lipasId, park]));
+  const importableItems = activeItems.filter((item) =>
+    parksByLipasId.has((item as { 'lipas-id': number })['lipas-id'])
+  );
 
   await syncParkTypes(database);
 
@@ -142,14 +183,14 @@ export const importParks = async ({
 
   await database.transaction(async (tx) => {
     importRunId = await createImportRun(tx, {
-      activeCount: activeItems.length,
+      activeCount: importedParks.length,
       importedAt,
       responseShapeVersion: RESPONSE_SHAPE_VERSION,
       sourceUrl
     });
 
-    for (let index = 0; index < activeItems.length; index += 1) {
-      const item = activeItems[index];
+    for (let index = 0; index < importableItems.length; index += 1) {
+      const item = importableItems[index];
       const lipasId = (item as { 'lipas-id': number })['lipas-id'];
 
       if (beforeEachUpsert) {
@@ -179,6 +220,7 @@ export const importParks = async ({
         markerLon: mapped.markerPoint.lon,
         municipalityCode: mapped.municipalityCode,
         name: mapped.name,
+        postalCode: mapped.postalCode,
         postalOffice: mapped.postalOffice,
         slug,
         sourceEventDate: mapped.sourceEventDate,
@@ -187,11 +229,13 @@ export const importParks = async ({
       });
     }
 
-    await markMissingParksInactive(tx, lipasIds, importRunId, importedAt);
+    await markMissingParksInactive(tx, importedLipasIds, importRunId, importedAt);
   });
 
   return {
-    activeCount: activeItems.length,
+    activeCount: importedParks.length,
+    skippedContainedTrailCount: activeItems.length - importedParks.length,
+    sourceActiveCount: activeItems.length,
     importRunId: importRunId!,
     importedAt
   };

@@ -12,8 +12,6 @@ const envSchema = z.object({
   FRONTEND_URL: z.string().url().default('http://localhost:4300'),
   GOOGLE_CLIENT_ID: z.string().optional(),
   GOOGLE_CLIENT_SECRET: z.string().optional(),
-  LIPAS_NATIONAL_PARKS_URL: z.string().url().optional(),
-  LIPAS_PROTECTED_AREAS_URL: z.string().url().optional(),
   MEMORY_STORAGE: z.string().optional().default('false'),
   PORT: z.string().optional(),
   R2_ACCESS_KEY_ID: z.string().optional(),
@@ -24,13 +22,5 @@ const envSchema = z.object({
 });
 
 export const getEnv = () => {
-  const env = envSchema.parse(process.env);
-
-  return {
-    ...env,
-    LIPAS_PROTECTED_AREAS_URL:
-      env.LIPAS_PROTECTED_AREAS_URL ??
-      env.LIPAS_NATIONAL_PARKS_URL ??
-      'https://api.lipas.fi/v2/sports-sites?type-codes=103,109,110,111,112&page-size=100&page=1'
-  };
+  return envSchema.parse(process.env);
 };

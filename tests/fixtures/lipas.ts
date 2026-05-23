@@ -1,6 +1,7 @@
 export type LipasSourceItem = {
   properties: {
     'area-km2'?: number;
+    'route-length-km'?: number;
   };
   email?: string;
   'phone-number'?: string;
@@ -25,11 +26,12 @@ export type LipasSourceItem = {
       features: Array<{
         type: 'Feature';
         geometry: {
-          type: 'Polygon';
-          coordinates: number[][][];
+          type: 'Polygon' | 'LineString';
+          coordinates: number[][][] | number[][];
         };
       }>;
     };
+    'postal-code'?: string;
     'postal-office'?: string;
   };
   owner: string;
@@ -40,6 +42,11 @@ export const parkTypeFixtures = {
     name: 'Kansallispuisto',
     slug: 'national-park',
     typeCode: 111
+  },
+  natureTrail: {
+    name: 'Luontopolku',
+    slug: 'nature-trail',
+    typeCode: 4404
   },
   outdoorRecreationArea: {
     name: 'Ulkoilu-/virkistysalue',
@@ -110,6 +117,7 @@ export const createLipasPark = (
         }
       ]
     },
+    'postal-code': '00999',
     'postal-office': 'Testikylä'
   };
 
@@ -138,6 +146,73 @@ export const createLipasPark = (
       },
       address: locationOverrides?.address ?? 'Puistotie 1',
       geometries: locationOverrides?.geometries ?? baseLocation.geometries,
+      'postal-code': locationOverrides?.['postal-code'] ?? '00999',
+      'postal-office': locationOverrides?.['postal-office'] ?? 'Testikylä'
+    }
+  };
+};
+
+export const createLipasTrail = (
+  overrides: Omit<Partial<LipasSourceItem>, 'location' | 'properties'> & {
+    location?: Partial<LipasSourceItem['location']>;
+    properties?: Partial<LipasSourceItem['properties']>;
+  } = {}
+): LipasSourceItem => {
+  const {
+    location: locationOverrides,
+    properties: propertyOverrides,
+    ...rootOverrides
+  } = overrides;
+
+  const baseLocation: LipasSourceItem['location'] = {
+    city: {
+      'city-code': 734
+    },
+    address: 'Polkutie 1',
+    geometries: {
+      type: 'FeatureCollection',
+      features: [
+        {
+          type: 'Feature',
+          geometry: {
+            type: 'LineString',
+            coordinates: [
+              [24.2, 60.2],
+              [24.4, 60.4],
+              [24.6, 60.6],
+              [24.8, 60.8]
+            ]
+          }
+        }
+      ]
+    },
+    'postal-code': '00999',
+    'postal-office': 'Testikylä'
+  };
+
+  return {
+    properties: {
+      'route-length-km': 2.4,
+      ...propertyOverrides
+    },
+    admin: 'city-sports',
+    www: 'https://www.luontoon.fi/testi-luontopolku',
+    name: 'Testin luontopolku',
+    type: {
+      'type-code': parkTypeFixtures.natureTrail.typeCode
+    },
+    'lipas-id': 440401,
+    status: 'active',
+    'event-date': '2024-04-02T12:00:00.000Z',
+    owner: 'city',
+    ...rootOverrides,
+    location: {
+      city: {
+        'city-code': locationOverrides?.city?.['city-code'] ?? 734
+      },
+      address: locationOverrides?.address ?? 'Polkutie 1',
+      geometries: locationOverrides?.geometries ?? baseLocation.geometries,
+      'postal-code': locationOverrides?.['postal-code'] ?? '00999',
       'postal-office': locationOverrides?.['postal-office'] ?? 'Testikylä'
     }
   };

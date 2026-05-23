@@ -13,7 +13,7 @@ import { createApp } from '../../src/app.js';
 import { getParkBySlug } from '../../src/db/repositories.js';
 import { parks } from '../../src/db/schema.js';
 import { importParks } from '../../src/importer/import-parks.js';
-import { createLipasPark, parkTypeFixtures } from '../fixtures/lipas.js';
+import { createLipasPark, createLipasTrail, parkTypeFixtures } from '../fixtures/lipas.js';
 import { createTestDatabase } from '../helpers/test-db.js';
 
 describe('API routes', () => {
@@ -238,6 +238,113 @@ describe('API routes', () => {
       }
     });
     expect(cachedResponse.status).toBe(304);
+  });
+
+  it('serves standalone nature trails through the HTTP contract', async () => {
+    await importParks({
+      database: testDatabase.database,
+      expectedActiveCount: 5,
+      now: () => '2026-05-02T09:00:00.000Z',
+      sourceUrl: 'https://example.test/lipas',
+      fetchSource: async () => ({
+        items: [
+          createLipasPark(),
+          createLipasPark({
+            'lipas-id': 67889,
+            name: 'Kaupunkilaakson ulkoilualue',
+            type: {
+              'type-code': parkTypeFixtures.outdoorRecreationArea.typeCode
+            },
+            location: {
+              address: 'Laaksopolku 1',
+              'postal-office': 'Espoo'
+            },
+            properties: {
+              'area-km2': 22.4
+            },
+            www: 'https://www.luontoon.fi/kaupunkilaakso'
+          }),
+          createLipasPark({
+            'lipas-id': 67890,
+            name: 'Seitsemisen kansallispuisto',
+            location: {
+              address: 'Seitsemisentie 1',
+              'postal-office': 'Ylöjärvi'
+            },
+            properties: {
+              'area-km2': 45.2
+            },
+            www: 'https://www.luontoon.fi/seitseminen'
+          }),
+          createLipasPark({
+            'lipas-id': 67891,
+            name: 'Evon retkeilyalue',
+            type: {
+              'type-code': parkTypeFixtures.stateHikingArea.typeCode
+            },
+            location: {
+              address: 'Evontie 1',
+              'postal-office': 'Evo'
+            },
+            properties: {
+              'area-km2': 47.0
+            },
+            www: 'https://www.luontoon.fi/evo'
+          }),
+          createLipasTrail({
+            location: {
+              geometries: {
+                type: 'FeatureCollection',
+                features: [
+                  {
+                    type: 'Feature',
+                    geometry: {
+                      type: 'LineString',
+                      coordinates: [
+                        [35.2, 66.2],
+                        [35.4, 66.4],
+                        [35.6, 66.6]
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          })
+        ]
+      })
+    });
+
+    const app = createApp({ database: testDatabase.database });
+    const listResponse = await app.request('/api/parks?type=nature-trail');
+    const listBody = (await listResponse.json()) as {
+      parks: Array<Record<string, unknown>>;
+    };
+    const detailResponse = await app.request('/api/parks/testin-luontopolku?includeBoundary=true');
+    const detailBody = (await detailResponse.json()) as {
+      boundaryGeoJson: {
+        features: Array<{
+          geometry: {
+            type: string;
+          };
+        }>;
+      };
+      type: {
+        slug: string;
+      };
+    };
+
+    expect(listResponse.status).toBe(200);
+    expect(listBody.parks).toHaveLength(1);
+    expect(listBody.parks[0]).toMatchObject({
+      name: 'Testin luontopolku',
+      type: {
+        slug: 'nature-trail'
+      }
+    });
+    expect(detailResponse.status).toBe(200);
+    expect(detailBody.type.slug).toBe('nature-trail');
+    expect(detailBody.boundaryGeoJson.features[0]?.geometry.type).toBe('LineString');
   });
 
   it('normalizes API location values when city duplicates or replaces the address', async () => {

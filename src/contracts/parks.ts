@@ -14,6 +14,8 @@ export const pointSchema = z.object({
   lon: z.number()
 });
 
+export const geoJsonCoordinateSchema = z.tuple([z.number(), z.number()]).rest(z.number());
+
 export const boundingBoxSchema = z.object({
   maxLat: z.number(),
   maxLon: z.number(),
@@ -22,14 +24,19 @@ export const boundingBoxSchema = z.object({
 });
 
 export const geoJsonPolygonSchema = z.object({
-  coordinates: z.array(z.array(z.tuple([z.number(), z.number()]))),
+  coordinates: z.array(z.array(geoJsonCoordinateSchema)),
   type: z.literal('Polygon')
+});
+
+export const geoJsonLineStringSchema = z.object({
+  coordinates: z.array(geoJsonCoordinateSchema),
+  type: z.literal('LineString')
 });
 
 export const geoJsonFeatureCollectionSchema = z.object({
   features: z.array(
     z.object({
-      geometry: geoJsonPolygonSchema,
+      geometry: z.union([geoJsonPolygonSchema, geoJsonLineStringSchema]),
       type: z.literal('Feature')
     })
   ),

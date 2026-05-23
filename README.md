@@ -46,7 +46,6 @@ Key variables:
 DATABASE_URL=file:./data/local.db
 DATABASE_AUTH_TOKEN=
 API_KEY=your-local-dev-key
-LIPAS_PROTECTED_AREAS_URL=https://api.lipas.fi/v2/sports-sites?type-codes=103,109,110,111,112&page-size=100&page=1
 
 # Optional: enable Google OAuth login for the control panel
 GOOGLE_CLIENT_ID=
@@ -60,6 +59,8 @@ R2_ENDPOINT=
 R2_ACCESS_KEY_ID=
 R2_SECRET_ACCESS_KEY=
 ```
+
+The importer's LIPAS source URL and supported type-code list are internal configuration, not a normal `.env` setting.
 
 ## API Shape
 
@@ -111,21 +112,25 @@ Catalog endpoints stay cache-friendly and database-backed:
 The catalog importer should use:
 
 ```text
-https://api.lipas.fi/v2/sports-sites?type-codes=103,109,110,111,112&page-size=100&page=1
+https://api.lipas.fi/v2/sports-sites?type-codes=103,109,110,111,112,4404&page-size=100&page=1
 ```
 
 Importer expectations:
 
 - Keep only `status === "active"` records.
-- Expect 373 active records in the current dataset as of 2026-05-21.
-- Import these supported LIPAS protected-area types:
+- Expect 1174 active LIPAS records in the current source dataset as of 2026-05-24.
+- Import these supported LIPAS catalog types:
   - `103` Ulkoilu-/virkistysalue
   - `109` Valtion retkeilyalue
   - `110` Erämaa-alue
   - `111` Kansallispuisto
   - `112` Muu luonnonsuojelualue
+  - `4404` Luontopolku
 - Store normalized type metadata in a dedicated type table and reference it from catalog rows.
 - Store catalog fields needed for a map app.
+- Persist both `postalCode` and `postalOffice` from LIPAS so location matching can use the more stable numeric postal identifier.
+- Skip `4404` nature trails whose full route geometry is contained inside one imported area record, because visits should attach to the parent area instead of the nested route.
+- Skip `4404` nature trails whose normalized `locationLabel`, `postalCode`, and `postalOffice` exactly match one imported area record, because those are also treated as nested visit targets.
 - Exclude LIPAS contact email, phone number, and comment text.
 - Refresh `luontoonUrl` from Luontoon's official Finnish sitemap when a matching destination exists, instead of trusting LIPAS `www` blindly.
 - Preserve personal notes and visit history across imports.

@@ -8,7 +8,7 @@ import {
 } from '../../src/db/repositories.js';
 import { importRuns, parks } from '../../src/db/schema.js';
 import { importParks } from '../../src/importer/import-parks.js';
-import { createLipasPark, parkTypeFixtures } from '../fixtures/lipas.js';
+import { createLipasPark, createLipasTrail, parkTypeFixtures } from '../fixtures/lipas.js';
 import { createTestDatabase } from '../helpers/test-db.js';
 
 const emptyLuontoonSitemap = async () =>
@@ -43,7 +43,7 @@ describe('importParks', () => {
           ]
         })
       })
-    ).rejects.toThrow('Expected 41 active parks but received 1.');
+    ).rejects.toThrow('Expected 41 active LIPAS records but received 1.');
   });
 
   it('updates catalog rows without deleting personal visit data', async () => {
@@ -283,6 +283,153 @@ describe('importParks', () => {
         })
       ])
     );
+  });
+
+  it('imports standalone nature trails as catalog places', async () => {
+    await importParks({
+      database: testDatabase.database,
+      expectedActiveCount: 2,
+      now: () => '2026-05-01T08:00:00.000Z',
+      sourceUrl: 'https://example.test/lipas',
+      fetchSource: async () => ({
+        items: [
+          createLipasPark(),
+          createLipasTrail({
+            location: {
+              geometries: {
+                type: 'FeatureCollection',
+                features: [
+                  {
+                    type: 'Feature',
+                    geometry: {
+                      type: 'LineString',
+                      coordinates: [
+                        [35.2, 66.2],
+                        [35.4, 66.4],
+                        [35.6, 66.6]
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          })
+        ]
+      })
+    });
+
+    const trail = await getParkBySlug(testDatabase.database, 'testin-luontopolku');
+
+    expect(trail).toMatchObject({
+      lipasId: 440401,
+      name: 'Testin luontopolku',
+      postalOffice: 'Testikylä',
+      type: {
+        code: parkTypeFixtures.natureTrail.typeCode,
+        id: parkTypeFixtures.natureTrail.typeCode,
+        name: parkTypeFixtures.natureTrail.name,
+        slug: parkTypeFixtures.natureTrail.slug
+      }
+    });
+  });
+
+  it('skips nature trails that are fully inside an imported area', async () => {
+    await importParks({
+      database: testDatabase.database,
+      expectedActiveCount: 2,
+      now: () => '2026-05-01T08:00:00.000Z',
+      sourceUrl: 'https://example.test/lipas',
+      fetchSource: async () => ({
+        items: [createLipasPark(), createLipasTrail()]
+      })
+    });
+
+    await expect(getParkBySlug(testDatabase.database, 'testin-luontopolku')).resolves.toBeNull();
+    await expect(listParks(testDatabase.database)).resolves.toHaveLength(1);
+  });
+
+  it('skips nature trails whose location label and postal fields match an imported area', async () => {
+    await importParks({
+      database: testDatabase.database,
+      expectedActiveCount: 2,
+      now: () => '2026-05-01T08:00:00.000Z',
+      sourceUrl: 'https://example.test/lipas',
+      fetchSource: async () => ({
+        items: [
+          createLipasPark(),
+          createLipasTrail({
+            location: {
+              address: 'Puistotie 1',
+              'postal-code': '00999',
+              'postal-office': 'Testikylä',
+              geometries: {
+                type: 'FeatureCollection',
+                features: [
+                  {
+                    type: 'Feature',
+                    geometry: {
+                      type: 'LineString',
+                      coordinates: [
+                        [35.2, 66.2],
+                        [35.4, 66.4],
+                        [35.6, 66.6]
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          })
+        ]
+      })
+    });
+
+    await expect(getParkBySlug(testDatabase.database, 'testin-luontopolku')).resolves.toBeNull();
+    await expect(listParks(testDatabase.database)).resolves.toHaveLength(1);
+  });
+
+  it('does not apply metadata-match skipping when one location field is missing', async () => {
+    const trail = createLipasTrail({
+      location: {
+        address: 'Puistotie 1',
+        'postal-code': '00999',
+        'postal-office': 'Testikylä',
+        geometries: {
+          type: 'FeatureCollection',
+          features: [
+            {
+              type: 'Feature',
+              geometry: {
+                type: 'LineString',
+                coordinates: [
+                  [35.2, 66.2],
+                  [35.4, 66.4],
+                  [35.6, 66.6]
+                ]
+              }
+            }
+          ]
+        }
+      }
+    });
+    delete trail.location['postal-code'];
+
+    await importParks({
+      database: testDatabase.database,
+      expectedActiveCount: 2,
+      now: () => '2026-05-01T08:00:00.000Z',
+      sourceUrl: 'https://example.test/lipas',
+      fetchSource: async () => ({
+        items: [createLipasPark(), trail]
+      })
+    });
+
+    await expect(getParkBySlug(testDatabase.database, 'testin-luontopolku')).resolves.toMatchObject(
+      {
+        lipasId: 440401
+      }
+    );
+    await expect(listParks(testDatabase.database)).resolves.toHaveLength(2);
   });
 
   it('prefers official luontoon sitemap urls over stale lipas www values', async () => {

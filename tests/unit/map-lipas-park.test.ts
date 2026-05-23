@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { mapLipasPark } from '../../src/importer/map-lipas-park.js';
-import { createLipasPark, parkTypeFixtures } from '../fixtures/lipas.js';
+import { createLipasPark, createLipasTrail, parkTypeFixtures } from '../fixtures/lipas.js';
 
 describe('mapLipasPark', () => {
   it('maps the supported catalog fields and excludes upstream contact fields', () => {
@@ -98,6 +98,33 @@ describe('mapLipasPark', () => {
       type: {
         code: parkTypeFixtures.outdoorRecreationArea.typeCode,
         slug: parkTypeFixtures.outdoorRecreationArea.slug
+      }
+    });
+  });
+
+  it('maps linestring nature trails and derives bounds from route coordinates', () => {
+    const mapped = mapLipasPark(createLipasTrail());
+
+    expect(mapped).toMatchObject({
+      areaKm2: null,
+      lipasId: 440401,
+      name: 'Testin luontopolku',
+      postalOffice: 'Testikylä',
+      slug: 'testin-luontopolku',
+      luontoonUrl: 'https://www.luontoon.fi/testi-luontopolku',
+      boundingBox: {
+        minLon: 24.2,
+        minLat: 60.2,
+        maxLon: 24.8,
+        maxLat: 60.8
+      },
+      markerPoint: {
+        lon: 24.5,
+        lat: 60.5
+      },
+      type: {
+        code: parkTypeFixtures.natureTrail.typeCode,
+        slug: parkTypeFixtures.natureTrail.slug
       }
     });
   });
