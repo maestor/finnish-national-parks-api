@@ -41,7 +41,7 @@ Available variables:
 API_KEY=your-local-dev-key
 DATABASE_URL=file:./data/local.db
 DATABASE_AUTH_TOKEN=
-LIPAS_PROTECTED_AREAS_URL=https://api.lipas.fi/v2/sports-sites?type-codes=103,109,110,111,112&page-size=100&page=1
+LIPAS_PROTECTED_AREAS_URL=https://api.lipas.fi/v2/sports-sites?type-codes=103,109,110,111,112,4404&page-size=100&page=1
 PORT=3004
 
 # Google OAuth (optional — only needed for control-panel login)
@@ -77,11 +77,14 @@ The local SQLite/libSQL file and `.env` itself should not be committed.
 
 The importer should:
 
-- Fetch LIPAS sports sites with type codes `103,109,110,111,112`.
+- Fetch LIPAS sports sites with type codes `103,109,110,111,112,4404`.
 - Keep only records where `status` is `active`.
-- Expect 373 active records for the current dataset as of 2026-05-21.
+- Expect 1174 active LIPAS records from the current source dataset as of 2026-05-24.
 - Upsert catalog rows by `lipasId`.
-- Upsert normalized protected-area types in a dedicated `park_types` table.
+- Upsert normalized catalog types in a dedicated `park_types` table.
+- Persist both `postal_code` and `postal_office` from LIPAS for stronger location matching.
+- Skip `4404` nature trails whose full route geometry is contained inside one imported area record.
+- Skip `4404` nature trails whose normalized `location_label`, `postal_code`, and `postal_office` exactly match one imported area record.
 - Preserve personal visit history during catalog re-imports.
 - Preserve any manually set `parks.removed` flags during catalog re-imports.
 - Refresh destination `luontoonUrl` values from `https://www.luontoon.fi/resources/sitemap/fi.xml` when the official sitemap contains a matching base destination URL.
@@ -90,7 +93,7 @@ The importer should:
 - Exclude contact email, phone number, and comment text.
 - Update import metadata so catalog ETags change when imported catalog data changes.
 
-The current implementation fails the import if the active count does not match `373`, so upstream drift is visible immediately.
+The current implementation fails the import if the active LIPAS record count does not match `1174`, so upstream drift is visible immediately.
 If a destination cannot be matched from the official Luontoon sitemap, the importer falls back to the normalized LIPAS `www` value for that row.
 
 ## Database
@@ -102,7 +105,7 @@ The repository owns the database schema through:
 
 Current table groups:
 
-- protected-area types
+- catalog types
 - imported park catalog rows
 - personal visit records
 - visit images
@@ -132,7 +135,7 @@ Key route behavior:
 
 - `GET /api/parks` is optimized for map/list views and omits boundary geometry.
 - `GET /api/parks/removed` returns an auth-restricted admin list of removed parks for restore workflows.
-- `GET /api/parks?type=state-hiking-area` filters by normalized protected-area type slug.
+- `GET /api/parks?type=state-hiking-area` filters by normalized catalog type slug.
 - `GET /api/parks/:slug?includeBoundary=true` returns the stored boundary GeoJSON.
 - Park responses expose `location` instead of `locationLabel`, combining `location_label` and `postal_office` when both exist, but collapsing to one value when they are identical or only one exists.
 - `GET /api/public/home-summary` returns public home-page summary data without visit notes, routes, or images.

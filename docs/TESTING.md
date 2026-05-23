@@ -42,8 +42,9 @@ Use mutation testing for:
 
 ## Covered V1 Scenarios
 
-- Import keeps only active LIPAS protected-area records.
-- Import persists normalized protected-area type metadata and park-to-type references.
+- Import keeps only active supported LIPAS catalog records.
+- Import persists normalized catalog type metadata and park-to-type references.
+- Import accepts route-based `4404` nature trails and skips trails fully contained inside an imported area or matching an imported area's `locationLabel + postalCode + postalOffice`.
 - Import excludes contact email, phone number, and comment text.
 - Import stores the expected catalog fields.
 - Import derives stable slugs, marker points, and bounding boxes.

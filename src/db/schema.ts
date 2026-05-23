@@ -35,6 +35,7 @@ export const parks = sqliteTable(
     areaKm2: real('area_km2'),
     establishmentYear: integer('establishment_year'),
     locationLabel: text('location_label').notNull(),
+    postalCode: text('postal_code'),
     postalOffice: text('postal_office'),
     municipalityCode: integer('municipality_code'),
     luontoonUrl: text('luontoon_url'),

@@ -1,6 +1,6 @@
 # Agent Guide
 
-This repository is a local-first TypeScript API that imports Finnish national park catalog data, stores it in an owned database, and exposes it for a personal map application.
+This repository is a local-first TypeScript API that imports Finnish park, protected-area, and nature-trail catalog data, stores it in an owned database, and exposes it for a personal map application.
 
 ## Shared Skills
 - Use `$project-documentation` when updating `README.md`, `docs/**`, contributor guidance, or repository workflow docs.
@@ -28,10 +28,10 @@ This repository is a local-first TypeScript API that imports Finnish national pa
 - Prefer linking to source documents instead of duplicating long explanations.
 
 ## Data Rules
-- Use LIPAS as the machine-readable source for national park catalog data.
+- Use LIPAS as the machine-readable source for park, protected-area, and nature-trail catalog data.
 - Use Luontoon URLs only as official external references.
 - Do not scrape or republish Luontoon page content unless a future decision explicitly revisits licensing and terms.
-- The importer must filter LIPAS records to active national parks and exclude contact email, phone number, and comment text from stored catalog data.
+- The importer must filter LIPAS records to active supported catalog types, exclude contact email, phone number, and comment text from stored catalog data, and skip `4404` nature trails whose full route geometry is contained inside an imported area or whose normalized `locationLabel`, `postalCode`, and `postalOffice` exactly match an imported area.
 - Personal notes and visit history are owned local data and must survive catalog re-imports.
 - Normal API reads must use the local or Turso database, not live LIPAS calls.
 

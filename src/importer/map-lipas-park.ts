@@ -1,10 +1,18 @@
 import { z } from 'zod';
-
 import { getSupportedParkTypeByCode } from '../parks/park-types.js';
+import type { BoundingBox, GeoJsonFeatureCollection } from './geometry.js';
+import { deriveBoundingBox } from './geometry.js';
+
+const coordinateSchema = z.tuple([z.number(), z.number()]).rest(z.number());
 
 const geometryPolygonSchema = z.object({
-  coordinates: z.array(z.array(z.tuple([z.number(), z.number()]))),
+  coordinates: z.array(z.array(coordinateSchema)),
   type: z.literal('Polygon')
+});
+
+const geometryLineStringSchema = z.object({
+  coordinates: z.array(coordinateSchema),
+  type: z.literal('LineString')
 });
 
 const lipasParkSchema = z.object({
@@ -15,6 +23,7 @@ const lipasParkSchema = z.object({
   comment: z.string().optional(),
   email: z.string().optional(),
   location: z.object({
+    'postal-code': z.string().optional(),
     'postal-office': z.string().optional(),
     address: z.string().optional(),
     city: z
@@ -25,7 +34,7 @@ const lipasParkSchema = z.object({
     geometries: z.object({
       features: z.array(
         z.object({
-          geometry: geometryPolygonSchema,
+          geometry: z.union([geometryPolygonSchema, geometryLineStringSchema]),
           type: z.literal('Feature')
         })
       ),
@@ -39,6 +48,7 @@ const lipasParkSchema = z.object({
     .object({
       'area-km2': z.number().optional()
     })
+    .passthrough()
     .optional(),
   status: z.string(),
   type: z.object({
@@ -51,22 +61,8 @@ export type LipasPark = z.infer<typeof lipasParkSchema>;
 
 export type MappedPark = {
   areaKm2: number | null;
-  boundingBox: {
-    maxLat: number;
-    maxLon: number;
-    minLat: number;
-    minLon: number;
-  };
-  boundaryGeoJson: {
-    features: Array<{
-      geometry: {
-        coordinates: number[][][];
-        type: 'Polygon';
-      };
-      type: 'Feature';
-    }>;
-    type: 'FeatureCollection';
-  };
+  boundingBox: BoundingBox;
+  boundaryGeoJson: GeoJsonFeatureCollection;
   establishmentYear: number | null;
   lipasId: number;
   locationLabel: string;
@@ -77,6 +73,7 @@ export type MappedPark = {
   };
   municipalityCode: number | null;
   name: string;
+  postalCode: string | null;
   postalOffice: string | null;
   slug: string;
   sourceEventDate: string | null;
@@ -116,61 +113,16 @@ const createSlug = (name: string) => {
   return slug || 'park';
 };
 
-const deriveBoundingBox = (coordinates: number[][][]) => {
-  let minLon = Number.POSITIVE_INFINITY;
-  let minLat = Number.POSITIVE_INFINITY;
-  let maxLon = Number.NEGATIVE_INFINITY;
-  let maxLat = Number.NEGATIVE_INFINITY;
-
-  for (const ring of coordinates) {
-    for (const coordinate of ring) {
-      const lon = coordinate[0]!;
-      const lat = coordinate[1]!;
-
-      minLon = Math.min(minLon, lon);
-      minLat = Math.min(minLat, lat);
-      maxLon = Math.max(maxLon, lon);
-      maxLat = Math.max(maxLat, lat);
-    }
-  }
-
-  return {
-    maxLat,
-    maxLon,
-    minLat,
-    minLon
-  };
-};
-
-const combineBoundingBoxes = (boxes: Array<ReturnType<typeof deriveBoundingBox>>) => {
-  return boxes.reduce(
-    (combined, box) => ({
-      maxLat: Math.max(combined.maxLat, box.maxLat),
-      maxLon: Math.max(combined.maxLon, box.maxLon),
-      minLat: Math.min(combined.minLat, box.minLat),
-      minLon: Math.min(combined.minLon, box.minLon)
-    }),
-    {
-      maxLat: Number.NEGATIVE_INFINITY,
-      maxLon: Number.NEGATIVE_INFINITY,
-      minLat: Number.POSITIVE_INFINITY,
-      minLon: Number.POSITIVE_INFINITY
-    }
-  );
-};
-
 export const mapLipasPark = (source: unknown, existingSlug?: string): MappedPark => {
   const park = lipasParkSchema.parse(source);
   const parkType = getSupportedParkTypeByCode(park.type['type-code']);
-  const boxes = park.location.geometries.features.map((feature) =>
-    deriveBoundingBox(feature.geometry.coordinates)
-  );
-  const boundingBox = combineBoundingBoxes(boxes);
+  const boundaryGeoJson = park.location.geometries as GeoJsonFeatureCollection;
+  const boundingBox = deriveBoundingBox(boundaryGeoJson);
 
   return {
     areaKm2: park.properties?.['area-km2'] ?? null,
     boundingBox,
-    boundaryGeoJson: park.location.geometries,
+    boundaryGeoJson,
     establishmentYear: park['construction-year'] ?? null,
     lipasId: park['lipas-id'],
     locationLabel: park.location.address ?? park.location['postal-office'] ?? park.name,
@@ -181,6 +133,7 @@ export const mapLipasPark = (source: unknown, existingSlug?: string): MappedPark
     },
     municipalityCode: park.location.city?.['city-code'] ?? null,
     name: park.name,
+    postalCode: park.location['postal-code'] ?? null,
     postalOffice: park.location['postal-office'] ?? null,
     slug: existingSlug ?? createSlug(park.name),
     sourceEventDate: park['event-date'] ?? null,

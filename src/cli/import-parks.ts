@@ -16,4 +16,6 @@ const result = await importParks({
 
 await client.close();
 
-console.log(`Imported ${result.activeCount} active parks in run ${result.importRunId}.`);
+console.log(
+  `Imported ${result.activeCount} catalog places from ${result.sourceActiveCount} active LIPAS records in run ${result.importRunId}. Skipped ${result.skippedContainedTrailCount} fully contained nature trails.`
+);
