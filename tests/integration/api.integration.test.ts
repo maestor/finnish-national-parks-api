@@ -117,7 +117,9 @@ describe('API routes', () => {
     expect(response.headers.get('etag')).toBeTruthy();
     expect(body.parks).toHaveLength(4);
     expect(body.parks[0]).not.toHaveProperty('boundaryGeoJson');
+    expect(body.parks[0]).not.toHaveProperty('locationLabel');
     expect(body.parks[0]).toHaveProperty('type');
+    expect(body.parks[0]).toHaveProperty('location');
   });
 
   it('returns 304 when the public list ETag matches', async () => {
@@ -223,6 +225,8 @@ describe('API routes', () => {
 
     expect(summaryResponse.status).toBe(200);
     expect(summaryBody).not.toHaveProperty('boundaryGeoJson');
+    expect(summaryBody).not.toHaveProperty('locationLabel');
+    expect(summaryBody).toHaveProperty('location', 'Puistotie 1, Testikylä');
     expect(response.status).toBe(200);
     expect(body).toHaveProperty('boundaryGeoJson');
     expect(body).not.toHaveProperty('note');
@@ -410,6 +414,8 @@ describe('API routes', () => {
       visitCount: 1,
       visited: true
     });
+    expect(akasmanty).toHaveProperty('location', 'Puistotie 1, Testikylä');
+    expect(akasmanty).not.toHaveProperty('locationLabel');
     expect(akasmanty).not.toHaveProperty('boundaryGeoJson');
     expect(akasmanty).not.toHaveProperty('visits');
     expect(akasmanty).not.toHaveProperty('note');
@@ -792,11 +798,13 @@ describe('API routes', () => {
     expect(body.parks).toEqual([
       expect.objectContaining({
         catalogStatus: 'active',
+        location: 'Puistotie 1, Testikylä',
         name: 'Äkäsmännyn kansallispuisto',
         removed: true,
         slug: 'akasmannyn-kansallispuisto'
       })
     ]);
+    expect(body.parks[0]).not.toHaveProperty('locationLabel');
   });
 
   it('returns CORS headers for preflight requests on API routes', async () => {

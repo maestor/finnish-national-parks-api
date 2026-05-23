@@ -56,6 +56,25 @@ describe('repositories', () => {
     expect(parkVisits?.visits).toEqual([]);
   });
 
+  it('returns combined location for park responses and falls back to address when postal office is missing', async () => {
+    await expect(
+      getParkBySlug(testDatabase.database, 'akasmannyn-kansallispuisto')
+    ).resolves.toMatchObject({
+      location: 'Puistotie 1, Testikylä'
+    });
+
+    await testDatabase.database
+      .update(parks)
+      .set({ postalOffice: null })
+      .where(eq(parks.slug, 'akasmannyn-kansallispuisto'));
+
+    await expect(
+      getParkBySlug(testDatabase.database, 'akasmannyn-kansallispuisto')
+    ).resolves.toMatchObject({
+      location: 'Puistotie 1'
+    });
+  });
+
   it('preserves existing visit fields when only the date changes and reports missing deletes', async () => {
     const visit = await createVisit(testDatabase.database, 'akasmannyn-kansallispuisto', {
       author: 'Alice',
@@ -396,6 +415,7 @@ describe('repositories', () => {
     expect(removedParks).toEqual([
       expect.objectContaining({
         catalogStatus: 'active',
+        location: 'Puistotie 1, Testikylä',
         name: 'Äkäsmännyn kansallispuisto',
         removed: true,
         slug: 'akasmannyn-kansallispuisto'

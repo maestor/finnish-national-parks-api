@@ -40,7 +40,7 @@ export const parkListItemSchema = z.object({
   areaKm2: z.number().nullable(),
   boundingBox: boundingBoxSchema,
   establishmentYear: z.number().int().nullable(),
-  locationLabel: z.string(),
+  location: z.string(),
   luontoonUrl: z.string().nullable(),
   markerPoint: pointSchema,
   name: z.string(),
