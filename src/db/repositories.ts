@@ -127,7 +127,7 @@ const toLocation = (locationLabel: string, postalOffice: string | null) => {
   const normalizedLocationLabel = locationLabel.trim();
   const normalizedPostalOffice = postalOffice?.trim() ?? '';
 
-  if (!normalizedLocationLabel) {
+  if (!normalizedLocationLabel || normalizedLocationLabel === '-') {
     return normalizedPostalOffice;
   }
 
