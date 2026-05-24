@@ -9,6 +9,7 @@
   "scripts": {
     "dev": "tsx watch src/local-server.ts",
     "start": "tsx src/local-server.ts",
+    "db:backup": "tsx src/cli/backup-turso.ts",
     "db:migrate": "tsx src/cli/migrate.ts",
     "import:parks": "tsx src/cli/import-parks.ts",
     "typecheck": "tsc --noEmit",
