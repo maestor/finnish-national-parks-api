@@ -756,6 +756,11 @@ export const createVisit = async (database: Database, slug: string, input: PutVi
   return toVisit(row);
 };
 
+export const findVisitRecordById = async (database: Database, visitId: number) => {
+  const rows = await database.select().from(parkVisits).where(eq(parkVisits.id, visitId)).limit(1);
+  return rows[0] ?? null;
+};
+
 export const updateParkRemoved = async (database: Database, slug: string, removed: boolean) => {
   const park = await getParkRecordBySlugIncludingRemoved(database, slug);
 

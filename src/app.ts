@@ -11,6 +11,7 @@ import {
   deleteVisitImage,
   findAdminByEmail,
   findVisitImageById,
+  findVisitRecordById,
   getCatalogListEtagSeed,
   getParkBySlug,
   getParkVisitsBySlug,
@@ -546,9 +547,7 @@ export const createApp = ({ apiKey, auth, database, storage }: AppDependencies =
         }
 
         // Verify visit exists
-        const existingVisit = await database.query.parkVisits.findFirst({
-          where: (visits, { eq }) => eq(visits.id, id)
-        });
+        const existingVisit = await findVisitRecordById(database, id);
 
         if (!existingVisit) {
           return context.json(jsonNotFound('Visit not found.'), 404);
@@ -664,9 +663,7 @@ export const createApp = ({ apiKey, auth, database, storage }: AppDependencies =
         const { id } = context.req.valid('param');
         const { imageIds } = context.req.valid('json');
 
-        const existingVisit = await database.query.parkVisits.findFirst({
-          where: (visits, { eq }) => eq(visits.id, id)
-        });
+        const existingVisit = await findVisitRecordById(database, id);
 
         if (!existingVisit) {
           return context.json(jsonNotFound('Visit not found.'), 404);
