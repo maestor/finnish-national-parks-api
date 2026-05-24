@@ -22,7 +22,7 @@ The API imports selected park and outdoor-area data from the open LIPAS API into
 - Local database default: `DATABASE_URL=file:./data/local.db`.
 - Production database target: Turso.
 - Deployment target: Vercel Functions.
-- Vercel entrypoint: `src/index.ts`.
+- Vercel entrypoint: `src/index.ts` with a direct `hono` import for Vercel auto-detection.
 - Local long-running server entrypoint: `src/local-server.ts`.
 
 ## Setup
