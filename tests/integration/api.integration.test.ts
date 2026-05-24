@@ -500,13 +500,42 @@ describe('API routes', () => {
       })
     );
     expect(body.latestVisitEntries.map((entry) => entry.park.slug)).toEqual([
-      'akasmannyn-kansallispuisto',
       'seitsemisen-kansallispuisto',
+      'akasmannyn-kansallispuisto',
       'akasmannyn-kansallispuisto'
     ]);
     expect(body.latestVisitEntries[0]).not.toHaveProperty('note');
     expect(body.latestVisitEntries[0]).not.toHaveProperty('route');
     expect(body.latestVisitEntries[0]).not.toHaveProperty('images');
+  });
+
+  it('orders latest visit entries by addition time instead of visit date', async () => {
+    const app = createApp({ database: testDatabase.database });
+
+    await createVisit(app, 'akasmannyn-kansallispuisto', {
+      visitedOn: '2026-04-22'
+    });
+    await createVisit(app, 'seitsemisen-kansallispuisto', {
+      visitedOn: '2026-04-10'
+    });
+
+    const response = await app.request('/api/public/home-summary');
+    const body = (await response.json()) as {
+      latestVisitEntries: Array<{
+        park: { slug: string };
+        visitedOn: string;
+      }>;
+    };
+
+    expect(response.status).toBe(200);
+    expect(body.latestVisitEntries.map((entry) => entry.park.slug)).toEqual([
+      'seitsemisen-kansallispuisto',
+      'akasmannyn-kansallispuisto'
+    ]);
+    expect(body.latestVisitEntries.map((entry) => entry.visitedOn)).toEqual([
+      '2026-04-10',
+      '2026-04-22'
+    ]);
   });
 
   it('serves lightweight public map summary data with per-park visited summaries', async () => {

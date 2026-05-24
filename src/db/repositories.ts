@@ -405,7 +405,7 @@ const listPublicVisitRows = async (database: Database) => {
     .from(parkVisits)
     .innerJoin(parks, eq(parkVisits.parkId, parks.id))
     .where(eq(parks.removed, false))
-    .orderBy(desc(parkVisits.visitedOn), desc(parkVisits.id));
+    .orderBy(desc(parkVisits.createdAt), desc(parkVisits.id));
 };
 
 const bumpPublicVisitDataVersion = async (database: DbClient, updatedAt: string) => {
