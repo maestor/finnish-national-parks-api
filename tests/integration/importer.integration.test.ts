@@ -518,6 +518,83 @@ describe('importParks', () => {
     });
   });
 
+  it('prefers official luontoon route urls over stale lipas www values for nature trails', async () => {
+    await importParks({
+      database: testDatabase.database,
+      expectedActiveCount: 2,
+      now: () => '2026-05-01T08:00:00.000Z',
+      sourceUrl: 'https://example.test/lipas',
+      fetchSource: async () => ({
+        items: [
+          createLipasPark({
+            location: {
+              geometries: {
+                type: 'FeatureCollection',
+                features: [
+                  {
+                    type: 'Feature',
+                    geometry: {
+                      type: 'Polygon',
+                      coordinates: [
+                        [
+                          [10.0, 70.0],
+                          [11.0, 70.0],
+                          [11.0, 71.0],
+                          [10.0, 71.0],
+                          [10.0, 70.0]
+                        ]
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          }),
+          createLipasTrail({
+            'lipas-id': 527072,
+            name: 'Finnoon luontopolku',
+            www: 'https://www.luontoon.fi/finnoon-luontopolku',
+            location: {
+              geometries: {
+                type: 'FeatureCollection',
+                features: [
+                  {
+                    type: 'Feature',
+                    geometry: {
+                      type: 'LineString',
+                      coordinates: [
+                        [35.2, 66.2],
+                        [35.4, 66.4],
+                        [35.6, 66.6]
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          })
+        ]
+      }),
+      fetchLuontoonSitemap: async () => `
+        <?xml version="1.0" encoding="UTF-8"?>
+        <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+          <url>
+            <loc>https://www.luontoon.fi/fi/reitit/finnoon-luontopolku-espoo-527072</loc>
+          </url>
+          <url>
+            <loc>https://www.luontoon.fi/fi/kohteet/finnoonlahti-espoo-123456/reitit</loc>
+          </url>
+        </urlset>
+      `
+    });
+
+    await expect(
+      getParkBySlug(testDatabase.database, 'finnoon-luontopolku')
+    ).resolves.toMatchObject({
+      luontoonUrl: 'https://www.luontoon.fi/fi/reitit/finnoon-luontopolku-espoo-527072'
+    });
+  });
+
   it('uses the default fetcher and surfaces upstream failures', async () => {
     const originalFetch = globalThis.fetch;
 

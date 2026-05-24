@@ -41,7 +41,10 @@ describe('createLuontoonUrlResolver', () => {
           <loc>https://www.luontoon.fi/en/destinations/aittovuoren-ulkoilualue-jyvaskyla-72648-en</loc>
         </url>
         <url>
-          <loc>https://www.luontoon.fi/fi/reitit/aittovuoren-polku-jyvaskyla-509883</loc>
+          <loc>https://www.luontoon.fi/fi/ajankohtaista/jokin-artikkeli-72648</loc>
+        </url>
+        <url>
+          <loc>https://www.luontoon.fi/fi</loc>
         </url>
       </urlset>
     `);
@@ -52,5 +55,26 @@ describe('createLuontoonUrlResolver', () => {
         slug: 'aittovuoren-ulkoilualue'
       })
     ).toBeNull();
+  });
+
+  it('resolves official route urls for nature trails by lipas id', () => {
+    const resolveLuontoonUrl = createLuontoonUrlResolver(`
+      <?xml version="1.0" encoding="UTF-8"?>
+      <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+        <url>
+          <loc>https://www.luontoon.fi/fi/reitit/finnoon-luontopolku-espoo-527072</loc>
+        </url>
+        <url>
+          <loc>https://www.luontoon.fi/fi/kohteet/finnoonlahti-espoo-123456/reitit</loc>
+        </url>
+      </urlset>
+    `);
+
+    expect(
+      resolveLuontoonUrl({
+        lipasId: 527072,
+        slug: 'finnoon-luontopolku'
+      })
+    ).toBe('https://www.luontoon.fi/fi/reitit/finnoon-luontopolku-espoo-527072');
   });
 });

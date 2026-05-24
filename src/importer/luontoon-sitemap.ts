@@ -13,7 +13,11 @@ const toPathSegments = (rawUrl: string) => {
 const getDestinationUrl = (rawUrl: string) => {
   const segments = toPathSegments(rawUrl);
 
-  if (segments[0] !== 'fi' || segments[1] !== 'kohteet' || segments.length !== 3) {
+  if (
+    segments[0] !== 'fi' ||
+    !['kohteet', 'reitit'].includes(segments[1] ?? '') ||
+    segments.length !== 3
+  ) {
     return null;
   }
 
