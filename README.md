@@ -32,6 +32,7 @@ npm install
 cp .env.example .env
 npm run db:migrate
 npm run import:parks
+npm run db:backup
 npm run verify
 npm run dev
 ```
@@ -68,6 +69,7 @@ Production notes:
 - Vercel deployments should always set `API_KEY`, because non-public endpoints are bearer-protected outside localhost.
 - If Google OAuth is enabled in Vercel, `FRONTEND_URL` must be the deployed frontend origin and Google must allow `https://your-api-domain.vercel.app/auth/google/callback`.
 - `MEMORY_STORAGE=true` is for tests and local-only development, not Vercel.
+- `npm run db:backup` reads the current remote `DATABASE_URL` and `DATABASE_AUTH_TOKEN`, then writes a timestamped SQLite backup under `data/backups/`. You can append an optional label with `npm run db:backup -- before-import`.
 
 The importer's LIPAS source URL and supported type-code list are internal configuration, not a normal `.env` setting.
 

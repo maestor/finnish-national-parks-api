@@ -8,6 +8,7 @@ Current local workflow:
 npm install
 npm run db:migrate
 npm run import:parks
+npm run db:backup
 npm run verify
 npm run dev
 ```
@@ -136,6 +137,22 @@ sqlite3 data/local.db "INSERT INTO admins (email, created_at, updated_at) VALUES
 ```
 
 Local development should use a file database. Production should target Turso with the same Drizzle schema and libSQL client path.
+
+### Turso Backup Workflow
+
+When `.env` points `DATABASE_URL` at a remote Turso/libSQL database and includes `DATABASE_AUTH_TOKEN`, you can pull a local backup into this workspace with:
+
+```sh
+npm run db:backup
+```
+
+Backups are written to `data/backups/` with a timestamped filename and are not committed because the repo already ignores `data/`.
+
+You can append a short label when you want to mark why the backup was taken:
+
+```sh
+npm run db:backup -- before-import
+```
 
 ## API Contract
 
