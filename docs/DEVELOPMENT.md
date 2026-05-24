@@ -14,7 +14,7 @@ npm run dev
 ```
 
 `npm run dev` and `npm run start` use the local Node server entrypoint at `src/local-server.ts`.
-The Vercel deployment entrypoint is `src/index.ts`, which default-exports the Hono app for Vercel's zero-config Hono support.
+The Vercel deployment entrypoint is `src/index.ts`, which default-exports the Hono app and keeps a direct `hono` import so Vercel can auto-detect the project as Hono.
 
 ## Runtime Requirements
 
@@ -182,7 +182,7 @@ Key route behavior:
 
 ## Deployment Direction
 
-The production target is Vercel Functions plus Turso. This repository now matches Vercel's Hono zero-config deployment shape through `src/index.ts`.
+The production target is Vercel Functions plus Turso. This repository now matches Vercel's Hono zero-config deployment shape through `src/index.ts`, including the direct `hono` import Vercel looks for in a recognized entry file.
 
 ### Vercel Deployment Checklist
 
