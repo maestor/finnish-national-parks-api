@@ -7,8 +7,8 @@
     "node": ">=24"
   },
   "scripts": {
-    "dev": "tsx watch src/server.ts",
-    "start": "tsx src/server.ts",
+    "dev": "tsx watch src/local-server.ts",
+    "start": "tsx src/local-server.ts",
     "db:migrate": "tsx src/cli/migrate.ts",
     "import:parks": "tsx src/cli/import-parks.ts",
     "typecheck": "tsc --noEmit",

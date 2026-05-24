@@ -22,6 +22,8 @@ The API imports selected park and outdoor-area data from the open LIPAS API into
 - Local database default: `DATABASE_URL=file:./data/local.db`.
 - Production database target: Turso.
 - Deployment target: Vercel Functions.
+- Vercel entrypoint: `src/index.ts`.
+- Local long-running server entrypoint: `src/local-server.ts`.
 
 ## Setup
 
@@ -59,6 +61,13 @@ R2_ENDPOINT=
 R2_ACCESS_KEY_ID=
 R2_SECRET_ACCESS_KEY=
 ```
+
+Production notes:
+
+- Vercel deployments must set `DATABASE_URL` to a remote `libsql://...` database instead of the local file default.
+- Vercel deployments should always set `API_KEY`, because non-public endpoints are bearer-protected outside localhost.
+- If Google OAuth is enabled in Vercel, `FRONTEND_URL` must be the deployed frontend origin and Google must allow `https://your-api-domain.vercel.app/auth/google/callback`.
+- `MEMORY_STORAGE=true` is for tests and local-only development, not Vercel.
 
 The importer's LIPAS source URL and supported type-code list are internal configuration, not a normal `.env` setting.
 

@@ -12,6 +12,9 @@ npm run verify
 npm run dev
 ```
 
+`npm run dev` and `npm run start` use the local Node server entrypoint at `src/local-server.ts`.
+The Vercel deployment entrypoint is `src/index.ts`, which default-exports the Hono app for Vercel's zero-config Hono support.
+
 ## Runtime Requirements
 
 - Node.js 24 or newer.
@@ -70,6 +73,13 @@ Turso/Vercel deployment variables should use the same names where possible:
 DATABASE_URL=libsql://...
 DATABASE_AUTH_TOKEN=...
 ```
+
+Vercel guardrails in this repo:
+
+- `API_KEY` is required on Vercel so non-public endpoints are not exposed accidentally.
+- `DATABASE_URL` cannot use the local `file:` default on Vercel.
+- `MEMORY_STORAGE=true` is rejected on Vercel because it is ephemeral.
+- If Google OAuth is enabled on Vercel, `FRONTEND_URL` cannot point at localhost.
 
 The local SQLite/libSQL file and `.env` itself should not be committed.
 
@@ -155,4 +165,41 @@ Key route behavior:
 
 ## Deployment Direction
 
-The first target is local personal use, but production design decisions should assume Vercel Functions and Turso. Avoid adding deployment machinery before implementation needs it, but do not choose libraries or route shapes that make Vercel/Turso awkward later.
+The production target is Vercel Functions plus Turso. This repository now matches Vercel's Hono zero-config deployment shape through `src/index.ts`.
+
+### Vercel Deployment Checklist
+
+1. Create a Turso database for the deployed environment and copy its `libsql://...` URL plus auth token.
+2. In Vercel, create a new project from this repository.
+3. Keep the framework/build settings on auto-detect unless you have a repo-specific reason to override them.
+4. Set at least these environment variables in Vercel:
+   - `API_KEY`
+   - `DATABASE_URL`
+   - `DATABASE_AUTH_TOKEN`
+5. If you will use Google OAuth for a frontend control panel, also set:
+   - `GOOGLE_CLIENT_ID`
+   - `GOOGLE_CLIENT_SECRET`
+   - `AUTH_JWT_SECRET`
+   - `AUTH_COOKIE_NAME`
+   - `FRONTEND_URL`
+6. If you will use visit image uploads, also set the R2 variables:
+   - `R2_BUCKET_NAME`
+   - `R2_ENDPOINT`
+   - `R2_ACCESS_KEY_ID`
+   - `R2_SECRET_ACCESS_KEY`
+7. Add the deployed API callback URL to Google OAuth credentials if auth is enabled:
+   - `https://<your-api-domain>/auth/google/callback`
+8. Run database migrations against the production Turso database before relying on the deployment.
+9. Import catalog data into the production database after migrations.
+10. Verify `GET /health`, `GET /openapi.json`, and one real catalog endpoint on the deployed URL.
+
+### Production Data Operations
+
+Vercel only serves the HTTP API. Database migrations and park imports are still operational commands you run against the target Turso database:
+
+```sh
+DATABASE_URL=libsql://... DATABASE_AUTH_TOKEN=... npm run db:migrate
+DATABASE_URL=libsql://... DATABASE_AUTH_TOKEN=... npm run import:parks
+```
+
+Run those from your machine or CI with the production credentials before expecting the deployed API to serve real catalog data.
