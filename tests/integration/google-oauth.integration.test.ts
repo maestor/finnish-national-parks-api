@@ -90,6 +90,76 @@ describe('google oauth', () => {
     expect(cookies.__oauth_pkce).toBeDefined();
   });
 
+  it('uses configured public redirect uri for proxied oauth deployments', async () => {
+    const googleRedirectUri = 'https://parks.example.com/auth/google/callback';
+
+    global.fetch = vi.fn().mockImplementation((url: string, init?: RequestInit) => {
+      if (url === 'https://oauth2.googleapis.com/token') {
+        const body = init?.body;
+        expect(body).toBeInstanceOf(URLSearchParams);
+        expect((body as URLSearchParams).get('redirect_uri')).toBe(googleRedirectUri);
+
+        return Promise.resolve(
+          new Response(JSON.stringify({ id_token: 'mock-id-token' }), {
+            headers: { 'Content-Type': 'application/json' },
+            status: 200
+          })
+        );
+      }
+
+      if (url === 'https://oauth2.googleapis.com/tokeninfo?id_token=mock-id-token') {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              aud: 'test-google-client-id',
+              email: 'admin@example.com',
+              exp: String(Math.floor(Date.now() / 1000) + 3600),
+              iss: 'https://accounts.google.com',
+              sub: 'google-user-id'
+            }),
+            {
+              headers: { 'Content-Type': 'application/json' },
+              status: 200
+            }
+          )
+        );
+      }
+
+      return Promise.resolve(new Response('Not found', { status: 404 }));
+    }) as typeof fetch;
+
+    await testDatabase.database.insert(admins).values({
+      createdAt: '2026-05-01T10:00:00.000Z',
+      email: 'admin@example.com',
+      updatedAt: '2026-05-01T10:00:00.000Z'
+    });
+
+    const app = createApp({
+      auth: {
+        ...authConfig,
+        googleRedirectUri
+      },
+      database: testDatabase.database
+    });
+    const initResponse = await app.request('/auth/google');
+    const cookies = extractCookies(initResponse);
+    const location = new URL(initResponse.headers.get('location') ?? '');
+
+    expect(location.searchParams.get('redirect_uri')).toBe(googleRedirectUri);
+
+    const callbackResponse = await app.request(
+      `/auth/google/callback?code=auth-code&state=${cookies.__oauth_state}`,
+      {
+        headers: {
+          cookie: `__oauth_state=${cookies.__oauth_state}; __oauth_pkce=${cookies.__oauth_pkce}`
+        }
+      }
+    );
+
+    expect(callbackResponse.status).toBe(302);
+    expect(callbackResponse.headers.get('location')).toBe('http://localhost:4300/control-panel');
+  });
+
   it('completes callback and sets session cookie for allowed admin', async () => {
     global.fetch = mockFetch([
       {

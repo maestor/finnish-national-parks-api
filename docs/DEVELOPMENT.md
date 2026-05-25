@@ -50,6 +50,7 @@ PORT=3004
 # Google OAuth (optional — only needed for control-panel login)
 GOOGLE_CLIENT_ID=
 GOOGLE_CLIENT_SECRET=
+GOOGLE_REDIRECT_URI=
 AUTH_JWT_SECRET=change-me-to-a-long-random-string
 AUTH_COOKIE_NAME=__session
 FRONTEND_URL=http://localhost:4300
@@ -67,6 +68,7 @@ All variables are optional for local development — sensible defaults are built
 The importer's LIPAS source URL and supported type-code list are internal configuration rather than `.env` settings.
 
 OAuth routes (`/auth/*`) are only registered when `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, and `AUTH_JWT_SECRET` are all provided.
+`GOOGLE_REDIRECT_URI` is optional and only needed when the public OAuth callback is exposed through a frontend proxy or rewrite instead of the API domain itself.
 
 Turso/Vercel deployment variables should use the same names where possible:
 
@@ -81,6 +83,7 @@ Vercel guardrails in this repo:
 - `DATABASE_URL` cannot use the local `file:` default on Vercel.
 - `MEMORY_STORAGE=true` is rejected on Vercel because it is ephemeral.
 - If Google OAuth is enabled on Vercel, `FRONTEND_URL` cannot point at localhost.
+- If `GOOGLE_REDIRECT_URI` is set on Vercel, it cannot point at localhost.
 
 The local SQLite/libSQL file and `.env` itself should not be committed.
 
@@ -196,6 +199,7 @@ The production target is Vercel Functions plus Turso. This repository now matche
 5. If you will use Google OAuth for a frontend control panel, also set:
    - `GOOGLE_CLIENT_ID`
    - `GOOGLE_CLIENT_SECRET`
+   - `GOOGLE_REDIRECT_URI` only when `/auth/*` is served through a frontend proxy or rewrite
    - `AUTH_JWT_SECRET`
    - `AUTH_COOKIE_NAME`
    - `FRONTEND_URL`
@@ -204,11 +208,14 @@ The production target is Vercel Functions plus Turso. This repository now matche
    - `R2_ENDPOINT`
    - `R2_ACCESS_KEY_ID`
    - `R2_SECRET_ACCESS_KEY`
-7. Add the deployed API callback URL to Google OAuth credentials if auth is enabled:
-   - `https://<your-api-domain>/auth/google/callback`
-8. Run database migrations against the production Turso database before relying on the deployment.
-9. Import catalog data into the production database after migrations.
-10. Verify `GET /health`, `GET /openapi.json`, and one real catalog endpoint on the deployed URL.
+7. Add the deployed Google OAuth callback URL to Google OAuth credentials if auth is enabled:
+   - Direct API callback: `https://<your-api-domain>/auth/google/callback`
+   - Frontend proxy/rewrite callback: `https://<your-frontend-domain>/auth/google/callback`
+   - If you use `GOOGLE_REDIRECT_URI`, it must exactly match the URI registered in Google Cloud.
+8. Start the login flow through the same public domain that owns the callback URI so the OAuth state/session cookies stay on the correct host.
+9. Run database migrations against the production Turso database before relying on the deployment.
+10. Import catalog data into the production database after migrations.
+11. Verify `GET /health`, `GET /openapi.json`, and one real catalog endpoint on the deployed URL.
 
 ### Production Data Operations
 

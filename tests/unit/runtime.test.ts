@@ -12,6 +12,7 @@ const createEnv = (overrides: Partial<Env> = {}): Env => {
     FRONTEND_URL: 'https://parks.example.com',
     GOOGLE_CLIENT_ID: undefined,
     GOOGLE_CLIENT_SECRET: undefined,
+    GOOGLE_REDIRECT_URI: undefined,
     MEMORY_STORAGE: 'false',
     PORT: undefined,
     R2_ACCESS_KEY_ID: undefined,
@@ -49,7 +50,7 @@ describe('runtime helpers', () => {
     expect(typeof storage?.getPresignedUrl).toBe('function');
   });
 
-  it('creates auth config only when all OAuth variables are present', () => {
+  it('creates auth config only when all required OAuth variables are present', () => {
     expect(createAuthConfig(createEnv())).toBeUndefined();
 
     expect(
@@ -65,6 +66,26 @@ describe('runtime helpers', () => {
       frontendUrl: 'https://parks.example.com',
       googleClientId: 'google-client-id',
       googleClientSecret: 'google-client-secret',
+      jwtSecret: '12345678901234567890123456789012'
+    });
+  });
+
+  it('adds google redirect uri when one is configured', () => {
+    expect(
+      createAuthConfig(
+        createEnv({
+          AUTH_JWT_SECRET: '12345678901234567890123456789012',
+          GOOGLE_CLIENT_ID: 'google-client-id',
+          GOOGLE_CLIENT_SECRET: 'google-client-secret',
+          GOOGLE_REDIRECT_URI: 'https://parks.example.com/auth/google/callback'
+        })
+      )
+    ).toEqual({
+      cookieName: '__session',
+      frontendUrl: 'https://parks.example.com',
+      googleClientId: 'google-client-id',
+      googleClientSecret: 'google-client-secret',
+      googleRedirectUri: 'https://parks.example.com/auth/google/callback',
       jwtSecret: '12345678901234567890123456789012'
     });
   });

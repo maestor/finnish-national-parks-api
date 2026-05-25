@@ -53,6 +53,7 @@ API_KEY=your-local-dev-key
 # Optional: enable Google OAuth login for the control panel
 GOOGLE_CLIENT_ID=
 GOOGLE_CLIENT_SECRET=
+GOOGLE_REDIRECT_URI=
 AUTH_JWT_SECRET=change-me-to-a-long-random-string
 FRONTEND_URL=http://localhost:4300
 
@@ -67,7 +68,9 @@ Production notes:
 
 - Vercel deployments must set `DATABASE_URL` to a remote `libsql://...` database instead of the local file default.
 - Vercel deployments should always set `API_KEY`, because non-public endpoints are bearer-protected outside localhost.
-- If Google OAuth is enabled in Vercel, `FRONTEND_URL` must be the deployed frontend origin and Google must allow `https://your-api-domain.vercel.app/auth/google/callback`.
+- If Google OAuth is enabled in Vercel, `FRONTEND_URL` must be the deployed frontend origin.
+- If Google calls the API directly, Google must allow `https://your-api-domain.vercel.app/auth/google/callback`.
+- If `/auth/*` is exposed through a frontend proxy or rewrite, set `GOOGLE_REDIRECT_URI=https://your-frontend-domain/auth/google/callback`, register that exact URI in Google Cloud, and start the login flow through that same public domain so the OAuth cookies stay on the right host.
 - `MEMORY_STORAGE=true` is for tests and local-only development, not Vercel.
 - `npm run db:backup` reads the current remote `DATABASE_URL` and `DATABASE_AUTH_TOKEN`, then writes a timestamped SQLite backup under `data/backups/`. You can append an optional label with `npm run db:backup -- before-import`.
 
