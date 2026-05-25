@@ -12,6 +12,7 @@ const createEnv = (overrides: Partial<Env> = {}): Env => {
     FRONTEND_URL: 'https://parks.example.com',
     GOOGLE_CLIENT_ID: undefined,
     GOOGLE_CLIENT_SECRET: undefined,
+    GOOGLE_REDIRECT_URI: undefined,
     MEMORY_STORAGE: 'false',
     PORT: undefined,
     R2_ACCESS_KEY_ID: undefined,
@@ -70,5 +71,21 @@ describe('deployment environment guardrails', () => {
         }
       )
     ).toThrow('Vercel deployments with Google OAuth enabled require FRONTEND_URL');
+
+    expect(() =>
+      assertDeploymentEnv(
+        createEnv({
+          AUTH_JWT_SECRET: '12345678901234567890123456789012',
+          FRONTEND_URL: 'https://parks.example.com',
+          GOOGLE_CLIENT_ID: 'google-client-id',
+          GOOGLE_CLIENT_SECRET: 'google-client-secret',
+          GOOGLE_REDIRECT_URI: 'http://localhost:4300/auth/google/callback'
+        }),
+        {
+          VERCEL: '1',
+          VERCEL_ENV: 'production'
+        }
+      )
+    ).toThrow('Vercel deployments with Google OAuth enabled require GOOGLE_REDIRECT_URI');
   });
 });

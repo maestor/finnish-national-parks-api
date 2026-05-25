@@ -32,6 +32,7 @@ export const createAuthConfig = (env: Env) => {
     frontendUrl: env.FRONTEND_URL,
     googleClientId: env.GOOGLE_CLIENT_ID,
     googleClientSecret: env.GOOGLE_CLIENT_SECRET,
+    ...(env.GOOGLE_REDIRECT_URI ? { googleRedirectUri: env.GOOGLE_REDIRECT_URI } : {}),
     jwtSecret: env.AUTH_JWT_SECRET
   };
 };

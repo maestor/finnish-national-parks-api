@@ -86,6 +86,7 @@ type AuthConfig = {
   frontendUrl: string;
   googleClientId: string;
   googleClientSecret: string;
+  googleRedirectUri?: string;
   jwtSecret: string;
 };
 
@@ -169,7 +170,8 @@ export const createApp = ({ apiKey, auth, database, storage }: AppDependencies =
       setOAuthStateCookie(c, state);
       setPkceCookie(c, codeVerifier);
 
-      const redirectUri = new URL('/auth/google/callback', c.req.url).toString();
+      const redirectUri =
+        auth.googleRedirectUri ?? new URL('/auth/google/callback', c.req.url).toString();
       const url = buildGoogleAuthUrl({
         clientId: auth.googleClientId,
         codeChallenge,
@@ -210,7 +212,8 @@ export const createApp = ({ apiKey, auth, database, storage }: AppDependencies =
         clearOAuthStateCookie(c);
         clearPkceCookie(c);
 
-        const redirectUri = new URL('/auth/google/callback', c.req.url).toString();
+        const redirectUri =
+          auth.googleRedirectUri ?? new URL('/auth/google/callback', c.req.url).toString();
         const tokens = await exchangeCodeForTokens({
           clientId: auth.googleClientId,
           clientSecret: auth.googleClientSecret,

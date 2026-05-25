@@ -12,6 +12,7 @@ const envSchema = z.object({
   FRONTEND_URL: z.string().url().default('http://localhost:4300'),
   GOOGLE_CLIENT_ID: z.string().optional(),
   GOOGLE_CLIENT_SECRET: z.string().optional(),
+  GOOGLE_REDIRECT_URI: z.string().url().optional(),
   MEMORY_STORAGE: z.enum(['true', 'false']).default('false'),
   PORT: z.string().optional(),
   R2_ACCESS_KEY_ID: z.string().optional(),
@@ -57,6 +58,12 @@ export const assertDeploymentEnv = (env: Env, runtimeEnv: NodeJS.ProcessEnv = pr
   if (hasOAuthConfig(env) && env.FRONTEND_URL.startsWith('http://localhost')) {
     throw new Error(
       'Vercel deployments with Google OAuth enabled require FRONTEND_URL to use the deployed frontend URL.'
+    );
+  }
+
+  if (hasOAuthConfig(env) && env.GOOGLE_REDIRECT_URI?.startsWith('http://localhost')) {
+    throw new Error(
+      'Vercel deployments with Google OAuth enabled require GOOGLE_REDIRECT_URI to use a deployed callback URL when it is set.'
     );
   }
 };
