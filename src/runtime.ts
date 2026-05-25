@@ -27,13 +27,21 @@ export const createAuthConfig = (env: Env) => {
     return undefined;
   }
 
-  return {
+  const authConfig = {
     cookieName: env.AUTH_COOKIE_NAME,
     frontendUrl: env.FRONTEND_URL,
     googleClientId: env.GOOGLE_CLIENT_ID,
     googleClientSecret: env.GOOGLE_CLIENT_SECRET,
-    ...(env.GOOGLE_REDIRECT_URI ? { googleRedirectUri: env.GOOGLE_REDIRECT_URI } : {}),
     jwtSecret: env.AUTH_JWT_SECRET
+  };
+
+  if (!env.GOOGLE_REDIRECT_URI) {
+    return authConfig;
+  }
+
+  return {
+    ...authConfig,
+    googleRedirectUri: env.GOOGLE_REDIRECT_URI
   };
 };
 
