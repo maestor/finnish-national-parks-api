@@ -46,8 +46,10 @@ describe('runtime helpers', () => {
 
     expect(storage).toBeDefined();
     expect(typeof storage?.delete).toBe('function');
+    expect(typeof storage?.getObjectMetadata).toBe('function');
     expect(typeof storage?.upload).toBe('function');
     expect(typeof storage?.getPresignedUrl).toBe('function');
+    expect(typeof storage?.getPresignedUploadUrl).toBe('function');
   });
 
   it('creates auth config only when all required OAuth variables are present', () => {

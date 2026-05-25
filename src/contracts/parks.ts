@@ -84,6 +84,33 @@ export const visitImageSchema = z.object({
   createdAt: z.string()
 });
 
+export const directVisitImageUploadRequestSchema = z.object({
+  contentType: z.enum(['image/jpeg', 'image/png', 'image/webp']),
+  fileSizeBytes: z.number().int().positive(),
+  originalName: z.string().trim().min(1).max(255)
+});
+
+export const directVisitImageUploadPlanSchema = z.object({
+  expiresAt: z.string().datetime(),
+  headers: z.object({
+    'content-type': z.string()
+  }),
+  key: z.string(),
+  method: z.literal('PUT'),
+  uploadUrl: z.string().url()
+});
+
+export const completeDirectVisitImageUploadRequestSchema = z.object({
+  fullHeight: z.number().int().positive().nullable().optional(),
+  fullWidth: z.number().int().positive().nullable().optional(),
+  key: z.string().min(1),
+  originalName: z.string().trim().min(1).max(255).nullable().optional()
+});
+
+export const completeDirectVisitImageUploadResponseSchema = z.object({
+  image: visitImageSchema
+});
+
 export const visitSchema = z.object({
   author: z.string().nullable(),
   createdAt: z.string(),

@@ -64,6 +64,8 @@ import {
 } from './routes/auth.js';
 import { healthRoute } from './routes/health.js';
 import {
+  completeVisitImageUploadRoute,
+  createVisitImageUploadUrlRoute,
   createVisitRoute,
   deleteVisitImageRoute,
   deleteVisitRoute,
@@ -94,10 +96,15 @@ import type { StorageClient } from './storage/types.js';
 
 type AppDependencies = {
   apiKey?: string | undefined;
+  allowServerImageUploads?: boolean | undefined;
   auth?: AuthConfig | undefined;
   database?: Database | undefined;
   storage?: StorageClient | undefined;
 };
+
+const MAX_VISIT_IMAGE_FILE_SIZE = 15 * 1024 * 1024;
+const ACCEPTED_VISIT_IMAGE_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+const DIRECT_VISIT_UPLOAD_URL_TTL_SECONDS = 15 * 60;
 
 const jsonNotFound = (error: string) => {
   return {
@@ -105,7 +112,58 @@ const jsonNotFound = (error: string) => {
   };
 };
 
-export const createApp = ({ apiKey, auth, database, storage }: AppDependencies = {}) => {
+const getVisitImageFileExtension = (contentType: string) => {
+  if (contentType === 'image/png') {
+    return 'png';
+  }
+
+  if (contentType === 'image/webp') {
+    return 'webp';
+  }
+
+  return 'jpg';
+};
+
+const normalizeOptionalOriginalName = (originalName?: string | null) => {
+  return originalName?.trim() || null;
+};
+
+const toVisitImageResponse = async (
+  storage: StorageClient,
+  row: {
+    createdAt: string;
+    displayOrder: number;
+    fullHeight: number | null;
+    fullKey: string;
+    fullWidth: number | null;
+    id: number;
+    originalName: string | null;
+    thumbHeight: number | null;
+    thumbKey: string;
+    thumbWidth: number | null;
+  }
+) => {
+  return {
+    createdAt: row.createdAt,
+    displayOrder: row.displayOrder,
+    fullHeight: row.fullHeight,
+    fullUrl: await storage.getPresignedUrl(row.fullKey, 3600),
+    fullWidth: row.fullWidth,
+    id: row.id,
+    originalName: row.originalName,
+    thumbHeight: row.thumbHeight,
+    thumbUrl: await storage.getPresignedUrl(row.thumbKey, 3600),
+    thumbWidth: row.thumbWidth
+  };
+};
+
+export const createApp = ({
+  apiKey,
+  allowServerImageUploads = true,
+  auth,
+  database,
+  storage
+}: AppDependencies = {}) => {
   const getImagePublicUrl = async (key: string) => {
     if (storage) {
       return storage.getPresignedUrl(key, 3600);
@@ -524,11 +582,109 @@ export const createApp = ({ apiKey, auth, database, storage }: AppDependencies =
     });
 
     if (storage) {
-      const MAX_FILE_SIZE = 15 * 1024 * 1024; // 15 MB
-      const ACCEPTED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+      app.openapi(createVisitImageUploadUrlRoute, async (context) => {
+        context.header('Cache-Control', PRIVATE_CACHE_CONTROL);
+
+        const { id } = context.req.valid('param');
+        const { contentType, fileSizeBytes } = context.req.valid('json');
+
+        const existingVisit = await findVisitRecordById(database, id);
+
+        if (!existingVisit) {
+          return context.json(jsonNotFound('Visit not found.'), 404);
+        }
+
+        if (fileSizeBytes > MAX_VISIT_IMAGE_FILE_SIZE) {
+          return context.json({ error: 'File too large.' }, 413);
+        }
+
+        const key = `visits/${id}/${randomUUID()}.${getVisitImageFileExtension(contentType)}`;
+        const uploadUrl = await storage.getPresignedUploadUrl(
+          key,
+          contentType,
+          DIRECT_VISIT_UPLOAD_URL_TTL_SECONDS
+        );
+
+        return context.json(
+          {
+            expiresAt: new Date(
+              Date.now() + DIRECT_VISIT_UPLOAD_URL_TTL_SECONDS * 1000
+            ).toISOString(),
+            headers: {
+              'content-type': contentType
+            },
+            key,
+            method: 'PUT' as const,
+            uploadUrl
+          },
+          201
+        );
+      });
+
+      app.openapi(completeVisitImageUploadRoute, async (context) => {
+        context.header('Cache-Control', PRIVATE_CACHE_CONTROL);
+
+        const { id } = context.req.valid('param');
+        const { fullHeight, fullWidth, key, originalName } = context.req.valid('json');
+
+        const existingVisit = await findVisitRecordById(database, id);
+
+        if (!existingVisit) {
+          return context.json(jsonNotFound('Visit not found.'), 404);
+        }
+
+        if (!key.startsWith(`visits/${id}/`)) {
+          return context.json({ error: 'Upload key does not belong to this visit.' }, 422);
+        }
+
+        const objectMetadata = await storage.getObjectMetadata(key);
+
+        if (!objectMetadata) {
+          return context.json({ error: 'Upload is missing from storage.' }, 422);
+        }
+
+        const resolvedContentType = objectMetadata.contentType ?? 'application/octet-stream';
+
+        if (!ACCEPTED_VISIT_IMAGE_MIME_TYPES.includes(resolvedContentType)) {
+          return context.json({ error: 'Unsupported file type.' }, 422);
+        }
+
+        const timestamp = new Date().toISOString();
+        const row = await createVisitImage(database, {
+          createdAt: timestamp,
+          displayOrder: 0,
+          fileSizeBytes: objectMetadata.contentLength,
+          fullHeight: fullHeight ?? null,
+          fullKey: key,
+          fullWidth: fullWidth ?? null,
+          mimeType: resolvedContentType,
+          originalName: normalizeOptionalOriginalName(originalName),
+          thumbHeight: fullHeight ?? null,
+          thumbKey: key,
+          thumbWidth: fullWidth ?? null,
+          updatedAt: timestamp,
+          visitId: id
+        });
+
+        return context.json(
+          {
+            image: await toVisitImageResponse(storage, row)
+          },
+          201
+        );
+      });
 
       app.openapi(uploadVisitImagesRoute, async (context) => {
         context.header('Cache-Control', PRIVATE_CACHE_CONTROL);
+
+        if (!allowServerImageUploads) {
+          return context.json(
+            {
+              error: 'Server-side multipart uploads are disabled here. Use the direct upload flow.'
+            },
+            501
+          );
+        }
 
         const { id } = context.req.valid('param');
         const body = await context.req.parseBody({ all: true });
@@ -573,12 +729,12 @@ export const createApp = ({ apiKey, auth, database, storage }: AppDependencies =
         const errors: { originalName: string; reason: string }[] = [];
 
         for (const file of files) {
-          if (!ACCEPTED_MIME_TYPES.includes(file.type)) {
+          if (!ACCEPTED_VISIT_IMAGE_MIME_TYPES.includes(file.type)) {
             errors.push({ originalName: file.name, reason: 'Unsupported file type.' });
             continue;
           }
 
-          if (file.size > MAX_FILE_SIZE) {
+          if (file.size > MAX_VISIT_IMAGE_FILE_SIZE) {
             errors.push({ originalName: file.name, reason: 'File too large.' });
             continue;
           }
@@ -612,18 +768,7 @@ export const createApp = ({ apiKey, auth, database, storage }: AppDependencies =
               visitId: id
             });
 
-            results.push({
-              createdAt: row.createdAt,
-              displayOrder: row.displayOrder,
-              fullHeight: row.fullHeight,
-              fullUrl: await storage.getPresignedUrl(row.fullKey, 3600),
-              fullWidth: row.fullWidth,
-              id: row.id,
-              originalName: row.originalName,
-              thumbHeight: row.thumbHeight,
-              thumbUrl: await storage.getPresignedUrl(row.thumbKey, 3600),
-              thumbWidth: row.thumbWidth
-            });
+            results.push(await toVisitImageResponse(storage, row));
           } catch (err) {
             logger.error(
               { err: (err as Error).message, fileName: file.name },

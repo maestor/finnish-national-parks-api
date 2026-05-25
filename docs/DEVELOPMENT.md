@@ -180,7 +180,10 @@ Key route behavior:
 - Auth routes (`/auth/*`) bypass API key authentication so the OAuth flow can complete without a bearer token.
 - Public summary routes (`/api/public/*`) also bypass API key authentication so public UI pages can use them remotely.
 - All other non-public endpoints require API key authentication; localhost requests are exempt.
-- Image upload routes (`POST /api/visits/:id/images`) accept multipart/form-data, resize images with Sharp, and store them in R2. They are only registered when R2 credentials (or `MEMORY_STORAGE=true`) are configured.
+- Image routes are only registered when R2 credentials (or `MEMORY_STORAGE=true`) are configured.
+- Localhost-style server uploads still use `POST /api/visits/:id/images`, which accepts multipart/form-data, resizes images with Sharp, and stores derived JPEGs in R2 or memory storage.
+- Deployed clients should use the Vercel-safe direct flow instead: `POST /api/visits/:id/images/upload-url`, upload the file to the returned presigned `PUT` URL, then call `POST /api/visits/:id/images/complete`.
+- The direct flow currently stores the uploaded object as both the full-size and thumbnail asset, so it avoids Vercel body and Sharp runtime limits without requiring server-side image processing.
 - Image responses include time-limited presigned URLs so the R2 bucket can remain private.
 
 ## Deployment Direction
@@ -208,14 +211,15 @@ The production target is Vercel Functions plus Turso. This repository now matche
    - `R2_ENDPOINT`
    - `R2_ACCESS_KEY_ID`
    - `R2_SECRET_ACCESS_KEY`
-7. Add the deployed Google OAuth callback URL to Google OAuth credentials if auth is enabled:
+7. Frontends deployed against Vercel should call the direct upload endpoints instead of posting image bytes to `POST /api/visits/:id/images`.
+8. Add the deployed Google OAuth callback URL to Google OAuth credentials if auth is enabled:
    - Direct API callback: `https://<your-api-domain>/auth/google/callback`
    - Frontend proxy/rewrite callback: `https://<your-frontend-domain>/auth/google/callback`
    - If you use `GOOGLE_REDIRECT_URI`, it must exactly match the URI registered in Google Cloud.
-8. Start the login flow through the same public domain that owns the callback URI so the OAuth state/session cookies stay on the correct host.
-9. Run database migrations against the production Turso database before relying on the deployment.
-10. Import catalog data into the production database after migrations.
-11. Verify `GET /health`, `GET /openapi.json`, and one real catalog endpoint on the deployed URL.
+9. Start the login flow through the same public domain that owns the callback URI so the OAuth state/session cookies stay on the correct host.
+10. Run database migrations against the production Turso database before relying on the deployment.
+11. Import catalog data into the production database after migrations.
+12. Verify `GET /health`, `GET /openapi.json`, and one real catalog endpoint on the deployed URL.
 
 ### Production Data Operations
 

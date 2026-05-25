@@ -1,6 +1,7 @@
 import {
   DeleteObjectCommand,
   GetObjectCommand,
+  HeadObjectCommand,
   PutObjectCommand,
   S3Client
 } from '@aws-sdk/client-s3';
@@ -35,10 +36,45 @@ export const createR2Client = (config: R2Config): StorageClient => {
         })
       );
     },
+    getObjectMetadata: async (key: string) => {
+      try {
+        const response = await s3.send(
+          new HeadObjectCommand({
+            Bucket: config.bucketName,
+            Key: key
+          })
+        );
+
+        return {
+          contentLength: response.ContentLength ?? null,
+          contentType: response.ContentType ?? null
+        };
+      } catch (error) {
+        const errorName = (error as { name?: string }).name;
+        if (errorName === 'NotFound' || errorName === 'NoSuchKey') {
+          return null;
+        }
+
+        throw error;
+      }
+    },
     getPresignedUrl: async (key: string, expiresInSeconds: number) => {
       return getSignedUrl(s3, new GetObjectCommand({ Bucket: config.bucketName, Key: key }), {
         expiresIn: expiresInSeconds
       });
+    },
+    getPresignedUploadUrl: async (key: string, contentType: string, expiresInSeconds: number) => {
+      return getSignedUrl(
+        s3,
+        new PutObjectCommand({
+          Bucket: config.bucketName,
+          ContentType: contentType,
+          Key: key
+        }),
+        {
+          expiresIn: expiresInSeconds
+        }
+      );
     },
     upload: async (key: string, buffer: Buffer, contentType: string) => {
       await s3.send(

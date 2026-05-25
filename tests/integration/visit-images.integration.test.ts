@@ -66,6 +66,26 @@ describe('Visit image routes', () => {
     });
   };
 
+  const createDirectUploadPlan = async (
+    visitId: number,
+    file: File,
+    app = createApp({
+      allowServerImageUploads: false,
+      database: testDatabase.database,
+      storage
+    })
+  ) => {
+    return app.request(`/api/visits/${visitId}/images/upload-url`, {
+      body: JSON.stringify({
+        contentType: file.type,
+        fileSizeBytes: file.size,
+        originalName: file.name
+      }),
+      headers: { 'content-type': 'application/json' },
+      method: 'POST'
+    });
+  };
+
   it('uploads images, resizes them, and returns metadata with public URLs', async () => {
     const visitId = await createVisit();
     const buffer = await createTestImageBuffer(1200, 800);
@@ -97,6 +117,86 @@ describe('Visit image routes', () => {
     expect(storedKeys).toHaveLength(2);
     expect(storedKeys.some((k) => k.endsWith('-full.jpg'))).toBe(true);
     expect(storedKeys.some((k) => k.endsWith('-thumb.jpg'))).toBe(true);
+  });
+
+  it('creates direct upload plans and completes uploaded images without server-side resizing', async () => {
+    const visitId = await createVisit();
+    const buffer = await createTestImageBuffer(1400, 900);
+    const file = new File([buffer], 'cloud.jpg', { type: 'image/jpeg' });
+    const app = createApp({
+      allowServerImageUploads: false,
+      database: testDatabase.database,
+      storage
+    });
+
+    const initResponse = await createDirectUploadPlan(visitId, file, app);
+    const initBody = (await initResponse.json()) as {
+      expiresAt: string;
+      headers: { 'content-type': string };
+      key: string;
+      method: string;
+      uploadUrl: string;
+    };
+
+    expect(initResponse.status).toBe(201);
+    expect(initBody.method).toBe('PUT');
+    expect(initBody.headers['content-type']).toBe('image/jpeg');
+    expect(initBody.key).toContain(`visits/${visitId}/`);
+    expect(initBody.uploadUrl).toContain(initBody.key);
+    expect(initBody.expiresAt).toMatch(/T/);
+
+    await storage.upload(initBody.key, buffer, file.type);
+
+    const completeResponse = await app.request(`/api/visits/${visitId}/images/complete`, {
+      body: JSON.stringify({
+        fullHeight: 900,
+        fullWidth: 1400,
+        key: initBody.key,
+        originalName: file.name
+      }),
+      headers: { 'content-type': 'application/json' },
+      method: 'POST'
+    });
+    const completeBody = (await completeResponse.json()) as {
+      image: {
+        fullHeight: number | null;
+        fullUrl: string;
+        fullWidth: number | null;
+        originalName: string | null;
+        thumbHeight: number | null;
+        thumbUrl: string;
+        thumbWidth: number | null;
+      };
+    };
+
+    expect(completeResponse.status).toBe(201);
+    expect(completeBody.image.originalName).toBe('cloud.jpg');
+    expect(completeBody.image.fullWidth).toBe(1400);
+    expect(completeBody.image.thumbWidth).toBe(1400);
+    expect(completeBody.image.fullUrl).toContain('memory-storage.test');
+    expect(completeBody.image.thumbUrl).toBe(completeBody.image.fullUrl);
+  });
+
+  it('creates a direct upload plan with a png key extension for png uploads', async () => {
+    const visitId = await createVisit();
+    const file = new File([Buffer.from('png-data')], 'cloud.png', { type: 'image/png' });
+
+    const response = await createDirectUploadPlan(visitId, file);
+    const body = (await response.json()) as { key: string };
+
+    expect(response.status).toBe(201);
+    expect(body.key.endsWith('.png')).toBe(true);
+  });
+
+  it('creates a direct upload plan with a webp key extension for webp uploads', async () => {
+    const visitId = await createVisit();
+    const file = new File([Buffer.from('webp-data')], 'cloud.webp', { type: 'image/webp' });
+
+    const response = await createDirectUploadPlan(visitId, file);
+    const body = (await response.json()) as { key: string };
+
+    expect(response.status).toBe(201);
+    expect(body.key.endsWith('.webp')).toBe(true);
   });
 
   it('includes images in park visit history responses', async () => {
@@ -246,6 +346,37 @@ describe('Visit image routes', () => {
     expect(response.status).toBe(404);
   });
 
+  it('returns 404 when creating a direct upload plan for a missing visit', async () => {
+    const file = new File([await createTestImageBuffer()], 'orphan.jpg', { type: 'image/jpeg' });
+
+    const response = await createDirectUploadPlan(99999, file);
+
+    expect(response.status).toBe(404);
+  });
+
+  it('returns 413 when a direct upload plan declares a file above the size limit', async () => {
+    const visitId = await createVisit();
+    const app = createApp({
+      allowServerImageUploads: false,
+      database: testDatabase.database,
+      storage
+    });
+
+    const response = await app.request(`/api/visits/${visitId}/images/upload-url`, {
+      body: JSON.stringify({
+        contentType: 'image/jpeg',
+        fileSizeBytes: 16 * 1024 * 1024,
+        originalName: 'huge.jpg'
+      }),
+      headers: { 'content-type': 'application/json' },
+      method: 'POST'
+    });
+    const body = (await response.json()) as { error: string };
+
+    expect(response.status).toBe(413);
+    expect(body.error).toContain('File too large');
+  });
+
   it('returns 404 when reordering a missing visit', async () => {
     const app = createApp({ database: testDatabase.database, storage });
     const response = await app.request('/api/visits/99999/images/reorder', {
@@ -290,6 +421,190 @@ describe('Visit image routes', () => {
     });
 
     expect(response.status).toBe(400);
+  });
+
+  it('returns 422 when completing a direct upload before the object exists in storage', async () => {
+    const visitId = await createVisit();
+    const file = new File([await createTestImageBuffer()], 'pending.jpg', { type: 'image/jpeg' });
+    const app = createApp({
+      allowServerImageUploads: false,
+      database: testDatabase.database,
+      storage
+    });
+    const initResponse = await createDirectUploadPlan(visitId, file, app);
+    const initBody = (await initResponse.json()) as { key: string };
+
+    const completeResponse = await app.request(`/api/visits/${visitId}/images/complete`, {
+      body: JSON.stringify({
+        fullHeight: 600,
+        fullWidth: 800,
+        key: initBody.key,
+        originalName: file.name
+      }),
+      headers: { 'content-type': 'application/json' },
+      method: 'POST'
+    });
+    const completeBody = (await completeResponse.json()) as { error: string };
+
+    expect(completeResponse.status).toBe(422);
+    expect(completeBody.error).toContain('Upload is missing');
+  });
+
+  it('returns 404 when completing a direct upload for a missing visit', async () => {
+    const app = createApp({
+      allowServerImageUploads: false,
+      database: testDatabase.database,
+      storage
+    });
+
+    const response = await app.request('/api/visits/99999/images/complete', {
+      body: JSON.stringify({
+        key: 'visits/99999/missing.jpg',
+        originalName: 'missing.jpg'
+      }),
+      headers: { 'content-type': 'application/json' },
+      method: 'POST'
+    });
+    const body = (await response.json()) as { error: string };
+
+    expect(response.status).toBe(404);
+    expect(body.error).toContain('Visit not found');
+  });
+
+  it('returns 422 when a direct upload key belongs to a different visit', async () => {
+    const visitId = await createVisit();
+    const app = createApp({
+      allowServerImageUploads: false,
+      database: testDatabase.database,
+      storage
+    });
+
+    const response = await app.request(`/api/visits/${visitId}/images/complete`, {
+      body: JSON.stringify({
+        key: 'visits/99999/wrong.jpg',
+        originalName: 'wrong.jpg'
+      }),
+      headers: { 'content-type': 'application/json' },
+      method: 'POST'
+    });
+    const body = (await response.json()) as { error: string };
+
+    expect(response.status).toBe(422);
+    expect(body.error).toContain('does not belong to this visit');
+  });
+
+  it('returns 422 when a stored direct upload has an unsupported content type', async () => {
+    const visitId = await createVisit();
+    const app = createApp({
+      allowServerImageUploads: false,
+      database: testDatabase.database,
+      storage
+    });
+    const initResponse = await createDirectUploadPlan(
+      visitId,
+      new File(['hello'], 'bad.jpg', { type: 'image/jpeg' }),
+      app
+    );
+    const initBody = (await initResponse.json()) as { key: string };
+
+    await storage.upload(initBody.key, Buffer.from('hello'), 'text/plain');
+
+    const response = await app.request(`/api/visits/${visitId}/images/complete`, {
+      body: JSON.stringify({
+        key: initBody.key,
+        originalName: 'bad.jpg'
+      }),
+      headers: { 'content-type': 'application/json' },
+      method: 'POST'
+    });
+    const body = (await response.json()) as { error: string };
+
+    expect(response.status).toBe(422);
+    expect(body.error).toContain('Unsupported file type');
+  });
+
+  it('stores null optional direct upload fields when metadata is incomplete or blank', async () => {
+    const visitId = await createVisit();
+    const baseStorage = createMemoryStorage();
+    const storageWithNullMetadata = {
+      ...baseStorage,
+      getObjectMetadata: async () => ({
+        contentLength: null,
+        contentType: 'image/jpeg'
+      })
+    };
+    const app = createApp({
+      allowServerImageUploads: false,
+      database: testDatabase.database,
+      storage: storageWithNullMetadata
+    });
+
+    const initResponse = await app.request(`/api/visits/${visitId}/images/upload-url`, {
+      body: JSON.stringify({
+        contentType: 'image/jpeg',
+        fileSizeBytes: 100,
+        originalName: 'blank.jpg'
+      }),
+      headers: { 'content-type': 'application/json' },
+      method: 'POST'
+    });
+    const initBody = (await initResponse.json()) as { key: string };
+
+    await baseStorage.upload(initBody.key, Buffer.from('jpeg-data'), 'image/jpeg');
+
+    const response = await app.request(`/api/visits/${visitId}/images/complete`, {
+      body: JSON.stringify({
+        key: initBody.key
+      }),
+      headers: { 'content-type': 'application/json' },
+      method: 'POST'
+    });
+    const body = (await response.json()) as {
+      image: {
+        fullHeight: number | null;
+        fullWidth: number | null;
+        originalName: string | null;
+        thumbHeight: number | null;
+        thumbWidth: number | null;
+      };
+    };
+
+    expect(response.status).toBe(201);
+    expect(body.image.originalName).toBeNull();
+    expect(body.image.fullHeight).toBeNull();
+    expect(body.image.fullWidth).toBeNull();
+    expect(body.image.thumbHeight).toBeNull();
+    expect(body.image.thumbWidth).toBeNull();
+  });
+
+  it('falls back to application/octet-stream when storage metadata has no content type', async () => {
+    const visitId = await createVisit();
+    const baseStorage = createMemoryStorage();
+    const storageWithMissingContentType = {
+      ...baseStorage,
+      getObjectMetadata: async () => ({
+        contentLength: null,
+        contentType: null
+      })
+    };
+    const app = createApp({
+      allowServerImageUploads: false,
+      database: testDatabase.database,
+      storage: storageWithMissingContentType
+    });
+
+    const response = await app.request(`/api/visits/${visitId}/images/complete`, {
+      body: JSON.stringify({
+        key: `visits/${visitId}/missing-type.jpg`,
+        originalName: 'missing-type.jpg'
+      }),
+      headers: { 'content-type': 'application/json' },
+      method: 'POST'
+    });
+    const body = (await response.json()) as { error: string };
+
+    expect(response.status).toBe(422);
+    expect(body.error).toContain('Unsupported file type');
   });
 
   it('returns empty URLs when storage is not configured', async () => {
@@ -374,5 +689,28 @@ describe('Visit image routes', () => {
     expect(body.images).toHaveLength(1);
     expect(body.errors).toHaveLength(1);
     expect(body.errors[0]!.originalName).toBe('bad.txt');
+  });
+
+  it('returns 501 for server-side multipart uploads when that mode is disabled', async () => {
+    const visitId = await createVisit();
+    const file = new File([await createTestImageBuffer()], 'local-only.jpg', {
+      type: 'image/jpeg'
+    });
+    const app = createApp({
+      allowServerImageUploads: false,
+      database: testDatabase.database,
+      storage
+    });
+    const formData = new FormData();
+    formData.append('images', file);
+
+    const response = await app.request(`/api/visits/${visitId}/images`, {
+      body: formData,
+      method: 'POST'
+    });
+    const body = (await response.json()) as { error: string };
+
+    expect(response.status).toBe(501);
+    expect(body.error).toContain('direct upload');
   });
 });
