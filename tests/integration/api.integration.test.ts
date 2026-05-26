@@ -580,9 +580,7 @@ describe('API routes', () => {
     };
 
     expect(response.status).toBe(200);
-    expect(response.headers.get('cache-control')).toBe(
-      'public, max-age=0, s-maxage=3600, stale-while-revalidate=86400'
-    );
+    expect(response.headers.get('cache-control')).toBe('public, max-age=0, s-maxage=600');
     expect(response.headers.get('etag')).toBeTruthy();
     expect(body.totalVisits).toBe(3);
     expect(body.uniqueVisitedParks).toBe(2);
@@ -683,9 +681,7 @@ describe('API routes', () => {
     const akasmanty = body.parks.find((park) => park.slug === 'akasmannyn-kansallispuisto');
 
     expect(response.status).toBe(200);
-    expect(response.headers.get('cache-control')).toBe(
-      'public, max-age=0, s-maxage=3600, stale-while-revalidate=86400'
-    );
+    expect(response.headers.get('cache-control')).toBe('public, max-age=0, s-maxage=600');
     expect(response.headers.get('etag')).toBeTruthy();
     expect(body.parks).toHaveLength(4);
     expect(body.version).toBeGreaterThan(0);

@@ -32,7 +32,8 @@ import {
   createCatalogListEtag,
   createPublicSummaryEtag,
   hasMatchingEtag,
-  PRIVATE_CACHE_CONTROL
+  PRIVATE_CACHE_CONTROL,
+  PUBLIC_SUMMARY_CACHE_CONTROL
 } from './http/cache.js';
 import {
   buildGoogleAuthUrl,
@@ -464,7 +465,7 @@ export const createApp = ({
         publicUpdatedAt: summary.updatedAt,
         publicVersion: summary.version
       });
-      context.header('Cache-Control', CATALOG_CACHE_CONTROL);
+      context.header('Cache-Control', PUBLIC_SUMMARY_CACHE_CONTROL);
       context.header('ETag', etag);
 
       if (hasMatchingEtag(context.req.header('if-none-match'), etag)) {
@@ -490,7 +491,7 @@ export const createApp = ({
         publicUpdatedAt: summary.updatedAt,
         publicVersion: summary.version
       });
-      context.header('Cache-Control', CATALOG_CACHE_CONTROL);
+      context.header('Cache-Control', PUBLIC_SUMMARY_CACHE_CONTROL);
       context.header('ETag', etag);
 
       if (hasMatchingEtag(context.req.header('if-none-match'), etag)) {
