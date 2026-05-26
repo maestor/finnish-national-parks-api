@@ -135,6 +135,7 @@ export const getPublicHomeSummaryRoute = createRoute({
   method: 'get',
   path: '/api/public/home-summary',
   tags: ['Public'],
+  security: [{ bearerAuth: [] }],
   responses: {
     200: {
       description: 'Public visit summary for the home page',
@@ -154,6 +155,7 @@ export const getPublicMapSummaryRoute = createRoute({
   method: 'get',
   path: '/api/public/map-summary',
   tags: ['Public'],
+  security: [{ bearerAuth: [] }],
   responses: {
     200: {
       description: 'Public park and visit summary for the map page',

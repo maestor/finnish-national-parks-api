@@ -7,12 +7,7 @@ export const createAuthMiddleware = (apiKey: string | undefined) => {
     }
 
     const path = c.req.path;
-    if (
-      path === '/health' ||
-      path === '/openapi.json' ||
-      path.startsWith('/auth/') ||
-      path.startsWith('/api/public/')
-    ) {
+    if (path === '/health' || path === '/openapi.json' || path.startsWith('/auth/')) {
       return next();
     }
 
