@@ -4,6 +4,7 @@ const PUBLIC_SUMMARY_RESPONSE_VERSION = 'v1';
 export const CATALOG_CACHE_CONTROL =
   'public, max-age=0, s-maxage=3600, stale-while-revalidate=86400';
 export const PRIVATE_CACHE_CONTROL = 'private, no-store';
+export const PUBLIC_SUMMARY_CACHE_CONTROL = 'public, max-age=0, s-maxage=600';
 
 export const createCatalogListEtag = (seed: {
   activeCount: number;
