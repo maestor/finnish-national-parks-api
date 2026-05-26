@@ -24,7 +24,7 @@ const envSchema = z.object({
 
 export type Env = z.infer<typeof envSchema>;
 
-const isVercelDeployment = (runtimeEnv: NodeJS.ProcessEnv = process.env) => {
+export const isVercelDeployment = (runtimeEnv: NodeJS.ProcessEnv = process.env) => {
   return (
     runtimeEnv.VERCEL === '1' ||
     runtimeEnv.VERCEL === 'true' ||

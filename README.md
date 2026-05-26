@@ -92,6 +92,8 @@ The importer's LIPAS source URL and supported type-code list are internal config
 - `GET /api/visits/:id`
 - `PATCH /api/visits/:id`
 - `DELETE /api/visits/:id`
+- `POST /api/visits/:id/images/upload-url`
+- `POST /api/visits/:id/images/complete`
 - `POST /api/visits/:id/images`
 - `DELETE /api/visits/:visitId/images/:imageId`
 - `PATCH /api/visits/:id/images/reorder`
@@ -120,6 +122,8 @@ Catalog endpoints stay cache-friendly and database-backed:
 - Public summary versions bump when public visit data changes, including visit create/update/delete and visit image upload/delete/reorder.
 - Visit and management endpoints use `Cache-Control: private, no-store`.
 - `PATCH /api/parks/:slug/removed` lets the UI hide or restore a park by toggling its persisted `removed` flag.
+- Deployed clients should use the two-step direct upload flow: `POST /api/visits/:id/images/upload-url`, upload the file to R2 with the returned `PUT` URL, then call `POST /api/visits/:id/images/complete`.
+- `POST /api/visits/:id/images` remains available for localhost-style server uploads, but Vercel runtime disables that Sharp-based path so uploads do not pass through the function body limit.
 
 ## Data Source
 

@@ -18,6 +18,9 @@ describe('createMemoryStorage', () => {
     expect(await storage.getPresignedUrl('foo.jpg', 3600)).toBe(
       'https://memory-storage.test/foo.jpg'
     );
+    expect(await storage.getPresignedUploadUrl('foo.jpg', 'image/jpeg', 900)).toBe(
+      'https://memory-storage-upload.test/foo.jpg'
+    );
   });
 
   it('removes stored buffers on delete', async () => {
@@ -33,5 +36,17 @@ describe('createMemoryStorage', () => {
     const storage = createMemoryStorage();
 
     await expect(storage.delete('missing')).resolves.toBeUndefined();
+  });
+
+  it('returns stored object metadata when a key exists', async () => {
+    const storage = createMemoryStorage();
+
+    await storage.upload('photo.jpg', Buffer.from('hello'), 'image/jpeg');
+
+    await expect(storage.getObjectMetadata('photo.jpg')).resolves.toEqual({
+      contentLength: 5,
+      contentType: 'image/jpeg'
+    });
+    await expect(storage.getObjectMetadata('missing.jpg')).resolves.toBeNull();
   });
 });

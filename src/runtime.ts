@@ -1,7 +1,7 @@
 import { createApp } from './app.js';
 import { createDatabaseClient } from './db/client.js';
 import { createDatabase } from './db/database.js';
-import { type Env, getEnv } from './env.js';
+import { type Env, getEnv, isVercelDeployment } from './env.js';
 import { createMemoryStorage } from './storage/memory-storage.js';
 import { createR2Client } from './storage/r2-client.js';
 
@@ -49,6 +49,7 @@ export const env = getEnv();
 export const databaseClient = createDatabaseClient();
 export const app = createApp({
   apiKey: env.API_KEY,
+  allowServerImageUploads: !isVercelDeployment(),
   auth: createAuthConfig(env),
   database: createDatabase(databaseClient),
   storage: createStorage(env)

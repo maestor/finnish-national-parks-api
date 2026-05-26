@@ -2,7 +2,11 @@ import { createRoute, z } from '@hono/zod-openapi';
 
 import { errorSchema } from '../contracts/common.js';
 import {
+  completeDirectVisitImageUploadRequestSchema,
+  completeDirectVisitImageUploadResponseSchema,
   createVisitRequestSchema,
+  directVisitImageUploadPlanSchema,
+  directVisitImageUploadRequestSchema,
   parkDetailSchema,
   parkListResponseSchema,
   parkVisitsResponseSchema,
@@ -343,6 +347,104 @@ export const deleteVisitRoute = createRoute({
   }
 });
 
+export const createVisitImageUploadUrlRoute = createRoute({
+  method: 'post',
+  path: '/api/visits/{id}/images/upload-url',
+  tags: ['Visits'],
+  security: [{ bearerAuth: [] }],
+  request: {
+    params: z.object({
+      id: z.coerce.number().int()
+    }),
+    body: {
+      content: {
+        'application/json': {
+          schema: directVisitImageUploadRequestSchema
+        }
+      }
+    }
+  },
+  responses: {
+    201: {
+      description: 'Created a direct upload plan for one visit image',
+      content: {
+        'application/json': {
+          schema: directVisitImageUploadPlanSchema
+        }
+      }
+    },
+    404: {
+      description: 'Visit was not found',
+      content: {
+        'application/json': {
+          schema: errorSchema
+        }
+      }
+    },
+    413: {
+      description: 'Declared file size exceeds the allowed upload limit',
+      content: {
+        'application/json': {
+          schema: errorSchema
+        }
+      }
+    },
+    422: {
+      description: 'Invalid upload request',
+      content: {
+        'application/json': {
+          schema: errorSchema
+        }
+      }
+    }
+  }
+});
+
+export const completeVisitImageUploadRoute = createRoute({
+  method: 'post',
+  path: '/api/visits/{id}/images/complete',
+  tags: ['Visits'],
+  security: [{ bearerAuth: [] }],
+  request: {
+    params: z.object({
+      id: z.coerce.number().int()
+    }),
+    body: {
+      content: {
+        'application/json': {
+          schema: completeDirectVisitImageUploadRequestSchema
+        }
+      }
+    }
+  },
+  responses: {
+    201: {
+      description: 'Stored one directly uploaded visit image',
+      content: {
+        'application/json': {
+          schema: completeDirectVisitImageUploadResponseSchema
+        }
+      }
+    },
+    404: {
+      description: 'Visit was not found',
+      content: {
+        'application/json': {
+          schema: errorSchema
+        }
+      }
+    },
+    422: {
+      description: 'Upload is missing or invalid',
+      content: {
+        'application/json': {
+          schema: errorSchema
+        }
+      }
+    }
+  }
+});
+
 export const uploadVisitImagesRoute = createRoute({
   method: 'post',
   path: '/api/visits/{id}/images',
@@ -397,6 +499,14 @@ export const uploadVisitImagesRoute = createRoute({
     },
     413: {
       description: 'File too large',
+      content: {
+        'application/json': {
+          schema: errorSchema
+        }
+      }
+    },
+    501: {
+      description: 'Server-side multipart uploads are disabled for this runtime',
       content: {
         'application/json': {
           schema: errorSchema
