@@ -12,6 +12,7 @@ const authConfig = {
 import { createApp } from '../../src/app.js';
 import { getParkBySlug } from '../../src/db/repositories.js';
 import { parks } from '../../src/db/schema.js';
+import { importMerenkurkkuWorldHeritage } from '../../src/importer/import-merenkurkku-world-heritage.js';
 import { importParks } from '../../src/importer/import-parks.js';
 import { createLipasPark, createLipasTrail, parkTypeFixtures } from '../fixtures/lipas.js';
 import { createTestDatabase } from '../helpers/test-db.js';
@@ -120,6 +121,86 @@ describe('API routes', () => {
     expect(body.parks[0]).not.toHaveProperty('locationLabel');
     expect(body.parks[0]).toHaveProperty('type');
     expect(body.parks[0]).toHaveProperty('location');
+  });
+
+  it('includes an optional display type name for manual catalog parks', async () => {
+    await importMerenkurkkuWorldHeritage({
+      database: testDatabase.database,
+      fetchSource: async () => ({
+        features: [
+          {
+            geometry: {
+              coordinates: [
+                [
+                  [21.0, 63.0],
+                  [21.0, 63.2],
+                  [21.2, 63.2],
+                  [21.2, 63.0],
+                  [21.0, 63.0]
+                ]
+              ],
+              type: 'Polygon'
+            },
+            properties: {
+              ID: 898,
+              Nimi: 'Merenkurkun saaristo A',
+              URL: 'https://example.test/merenkurkku',
+              aluetyyppi: 'Kohde'
+            },
+            type: 'Feature'
+          },
+          {
+            geometry: {
+              coordinates: [
+                [
+                  [20.7, 63.3],
+                  [20.7, 63.5],
+                  [21.1, 63.5],
+                  [21.1, 63.3],
+                  [20.7, 63.3]
+                ]
+              ],
+              type: 'Polygon'
+            },
+            properties: {
+              ID: 898,
+              Nimi: 'Merenkurkun saaristo B',
+              URL: 'https://example.test/merenkurkku',
+              aluetyyppi: 'Kohde'
+            },
+            type: 'Feature'
+          }
+        ]
+      }),
+      now: () => '2026-05-01T10:00:00.000Z',
+      sourceUrl: 'https://example.test/world-heritage'
+    });
+
+    const app = createApp({ database: testDatabase.database });
+    const listResponse = await app.request('/api/parks?type=other-nature-reserve');
+    const detailResponse = await app.request('/api/parks/merenkurkun-maailmanperintoalue');
+    const listBody = (await listResponse.json()) as {
+      parks: Array<Record<string, unknown>>;
+    };
+    const detailBody = (await detailResponse.json()) as Record<string, unknown>;
+    const merenkurkku = listBody.parks.find(
+      (park) => park.slug === 'merenkurkun-maailmanperintoalue'
+    );
+
+    expect(listResponse.status).toBe(200);
+    expect(detailResponse.status).toBe(200);
+    expect(merenkurkku).toMatchObject({
+      displayTypeName: 'Maailmanperintökohde',
+      location: 'Raippaluodontie 2, 65800 Raippaluoto',
+      slug: 'merenkurkun-maailmanperintoalue',
+      type: {
+        slug: 'other-nature-reserve'
+      }
+    });
+    expect(detailBody).toMatchObject({
+      displayTypeName: 'Maailmanperintökohde',
+      slug: 'merenkurkun-maailmanperintoalue'
+    });
   });
 
   it('returns 304 when the public list ETag matches', async () => {

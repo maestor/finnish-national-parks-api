@@ -42,7 +42,8 @@ describe('migrateDatabase', () => {
       '0004_visit_images.sql',
       '0005_removed_parks.sql',
       '0006_public_data_versions.sql',
-      '0007_postal_code_and_nature_trails.sql'
+      '0007_postal_code_and_nature_trails.sql',
+      '0008_manual_catalog_parks.sql'
     ]);
     expect(parkTypes.rows.map((row) => String(row.slug))).toEqual([
       'outdoor-recreation-area',
@@ -54,6 +55,10 @@ describe('migrateDatabase', () => {
     ]);
     expect(parkColumns.rows.some((row) => String(row.name) === 'removed')).toBe(true);
     expect(parkColumns.rows.some((row) => String(row.name) === 'postal_code')).toBe(true);
+    expect(parkColumns.rows.some((row) => String(row.name) === 'display_type_name')).toBe(true);
+    expect(parkColumns.rows.some((row) => String(row.name) === 'managed_by_lipas_import')).toBe(
+      true
+    );
     expect(publicDataVersionColumns.rows.some((row) => String(row.name) === 'version')).toBe(true);
   });
 });

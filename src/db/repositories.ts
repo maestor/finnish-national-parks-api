@@ -55,6 +55,7 @@ type PublicParkRow = {
   bboxMaxLon: number;
   bboxMinLat: number;
   bboxMinLon: number;
+  displayTypeName: string | null;
   establishmentYear: number | null;
   locationLabel: string;
   luontoonUrl: string | null;
@@ -124,6 +125,20 @@ const visibleCatalogWhere = (typeSlug?: SupportedParkTypeSlug) => {
 
 const removedCatalogWhere = () => eq(parks.removed, true);
 
+const withOptionalDisplayTypeName = <T extends object>(
+  park: { displayTypeName: string | null },
+  value: T
+) => {
+  if (!park.displayTypeName) {
+    return value;
+  }
+
+  return {
+    ...value,
+    displayTypeName: park.displayTypeName
+  };
+};
+
 const toLocation = (
   locationLabel: string,
   postalCode: string | null,
@@ -153,7 +168,7 @@ const toLocation = (
 };
 
 const toPark = (row: TypedParkRow) => {
-  return {
+  return withOptionalDisplayTypeName(row.park, {
     areaKm2: row.park.areaKm2,
     boundingBox: toBoundingBox(row.park),
     boundaryGeoJson: JSON.parse(row.park.boundaryGeojson) as Record<string, unknown>,
@@ -170,11 +185,11 @@ const toPark = (row: TypedParkRow) => {
     sourceEventDate: row.park.sourceEventDate,
     type: toParkType(row.parkType),
     updatedAt: row.park.updatedAt
-  };
+  });
 };
 
 const toPublicPark = (row: PublicParkRow) => {
-  return {
+  return withOptionalDisplayTypeName(row, {
     areaKm2: row.areaKm2,
     boundingBox: {
       maxLat: row.bboxMaxLat,
@@ -197,7 +212,7 @@ const toPublicPark = (row: PublicParkRow) => {
       name: row.typeName,
       slug: row.typeSlug as SupportedParkTypeSlug
     }
-  };
+  });
 };
 
 export type VisitImage = {
@@ -292,6 +307,7 @@ const listPublicParkRows = async (database: Database) => {
       bboxMaxLon: parks.bboxMaxLon,
       bboxMinLat: parks.bboxMinLat,
       bboxMinLon: parks.bboxMinLon,
+      displayTypeName: parks.displayTypeName,
       establishmentYear: parks.establishmentYear,
       locationLabel: parks.locationLabel,
       luontoonUrl: parks.luontoonUrl,
@@ -522,7 +538,7 @@ export const listExistingParksByLipasIds = async (database: Database, lipasIds: 
   }
 
   return database.query.parks.findMany({
-    where: inArray(parks.lipasId, lipasIds)
+    where: and(inArray(parks.lipasId, lipasIds), eq(parks.managedByLipasImport, true))
   });
 };
 
@@ -544,20 +560,22 @@ export const listRemovedParks = async (database: Database) => {
     .where(removedCatalogWhere())
     .orderBy(parks.name);
 
-  return rows.map((row) => ({
-    areaKm2: row.park.areaKm2,
-    boundingBox: toBoundingBox(row.park),
-    catalogStatus: row.park.catalogStatus as 'active' | 'inactive',
-    establishmentYear: row.park.establishmentYear,
-    location: toLocation(row.park.locationLabel, row.park.postalCode, row.park.postalOffice),
-    luontoonUrl: row.park.luontoonUrl,
-    markerPoint: toMarkerPoint(row.park),
-    name: row.park.name,
-    removed: true as const,
-    slug: row.park.slug,
-    type: toParkType(row.parkType),
-    updatedAt: row.park.updatedAt
-  }));
+  return rows.map((row) =>
+    withOptionalDisplayTypeName(row.park, {
+      areaKm2: row.park.areaKm2,
+      boundingBox: toBoundingBox(row.park),
+      catalogStatus: row.park.catalogStatus as 'active' | 'inactive',
+      establishmentYear: row.park.establishmentYear,
+      location: toLocation(row.park.locationLabel, row.park.postalCode, row.park.postalOffice),
+      luontoonUrl: row.park.luontoonUrl,
+      markerPoint: toMarkerPoint(row.park),
+      name: row.park.name,
+      removed: true as const,
+      slug: row.park.slug,
+      type: toParkType(row.parkType),
+      updatedAt: row.park.updatedAt
+    })
+  );
 };
 
 export const getParkBySlug = async (database: Database, slug: string) => {
@@ -880,7 +898,7 @@ export const reorderVisitImages = async (
   await bumpPublicVisitDataVersion(database, timestamp);
 };
 
-export const upsertImportedPark = async (
+export const upsertCatalogPark = async (
   database: DbClient,
   values: Omit<typeof parks.$inferInsert, 'id'>
 ) => {
@@ -896,10 +914,12 @@ export const upsertImportedPark = async (
         bboxMinLon: values.bboxMinLon,
         boundaryGeojson: values.boundaryGeojson,
         catalogStatus: values.catalogStatus,
+        displayTypeName: values.displayTypeName,
         establishmentYear: values.establishmentYear,
         lastImportRunId: values.lastImportRunId,
         locationLabel: values.locationLabel,
         luontoonUrl: values.luontoonUrl,
+        managedByLipasImport: values.managedByLipasImport,
         markerLat: values.markerLat,
         markerLon: values.markerLon,
         municipalityCode: values.municipalityCode,
@@ -915,6 +935,11 @@ export const upsertImportedPark = async (
     });
 };
 
+export const upsertImportedPark = async (
+  database: DbClient,
+  values: Omit<typeof parks.$inferInsert, 'id'>
+) => upsertCatalogPark(database, values);
+
 export const markMissingParksInactive = async (
   database: DbClient,
   activeLipasIds: number[],
@@ -922,11 +947,14 @@ export const markMissingParksInactive = async (
   updatedAt: string
 ) => {
   if (activeLipasIds.length === 0) {
-    await database.update(parks).set({
-      catalogStatus: 'inactive',
-      lastImportRunId,
-      updatedAt
-    });
+    await database
+      .update(parks)
+      .set({
+        catalogStatus: 'inactive',
+        lastImportRunId,
+        updatedAt
+      })
+      .where(eq(parks.managedByLipasImport, true));
     return;
   }
 
@@ -937,7 +965,13 @@ export const markMissingParksInactive = async (
       lastImportRunId,
       updatedAt
     })
-    .where(and(eq(parks.catalogStatus, 'active'), notInArray(parks.lipasId, activeLipasIds)));
+    .where(
+      and(
+        eq(parks.catalogStatus, 'active'),
+        eq(parks.managedByLipasImport, true),
+        notInArray(parks.lipasId, activeLipasIds)
+      )
+    );
 };
 
 export const getCatalogListEtagSeed = async (

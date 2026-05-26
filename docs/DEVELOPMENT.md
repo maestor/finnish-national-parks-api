@@ -8,6 +8,7 @@ Current local workflow:
 npm install
 npm run db:migrate
 npm run import:parks
+npm run import:merenkurkku
 npm run db:backup
 npm run verify
 npm run dev
@@ -106,9 +107,26 @@ The importer should:
 - Store boundary GeoJSON for detail/map-boundary usage.
 - Exclude contact email, phone number, and comment text.
 - Update import metadata so catalog ETags change when imported catalog data changes.
+- Keep non-LIPAS-managed catalog rows outside the normal LIPAS deactivation pass.
 
 The current implementation fails the import if the active LIPAS record count does not match `1174`, so upstream drift is visible immediately.
 If a destination cannot be matched from the official Luontoon sitemap, the importer falls back to the normalized LIPAS `www` value for that row.
+
+### Manual Catalog Imports
+
+This repo also supports a one-off manual catalog import for Merenkurkun maailmanperintöalue:
+
+```sh
+npm run import:merenkurkku
+```
+
+That command:
+
+- imports the official world-heritage geometry into the existing `parks` table
+- stores the row under the normalized `other-nature-reserve` type
+- sets a park-level `displayTypeName` of `Maailmanperintökohde` for UI use
+- uses `Raippaluodontie 2, 65800 Raippaluoto` as the generated location source
+- marks the row as not managed by the LIPAS cleanup step, so later `npm run import:parks` executions do not deactivate it
 
 ## Database
 

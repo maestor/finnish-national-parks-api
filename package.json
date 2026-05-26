@@ -12,6 +12,7 @@
     "db:backup": "tsx src/cli/backup-turso.ts",
     "db:migrate": "tsx src/cli/migrate.ts",
     "import:parks": "tsx src/cli/import-parks.ts",
+    "import:merenkurkku": "tsx src/cli/import-merenkurkku-world-heritage.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
