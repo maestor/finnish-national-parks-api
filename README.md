@@ -117,7 +117,7 @@ Catalog endpoints stay cache-friendly and database-backed:
 - `GET /api/parks/:slug?includeBoundary=true` includes stored boundary geometry.
 - Park list, detail, removed, and public map responses include `logo: { key, updatedAt, url } | null` when a logo has been linked to the park.
 - Park responses now expose `location` instead of `locationLabel`, combining `location_label` and `postal_office` when both exist, but collapsing to a single value when they are identical or only one exists.
-- `GET /api/public/home-summary` returns public visit totals, type progress, recent activity, and a public data `version` / `updatedAt` signal without notes, routes, or images.
+- `GET /api/public/home-summary` returns public visit totals, seasonal visit counts, type progress, recent activity, and a public data `version` / `updatedAt` signal without notes, routes, or images.
 - `GET /api/public/map-summary` returns lightweight park map data plus per-park visited summaries and the same public data version signal.
 - `GET /api/parks/:slug/visits` returns visit history plus a visited summary for one park.
 - `GET /api/visits` returns flat visit resources with their parent park reference.

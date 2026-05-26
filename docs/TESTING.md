@@ -57,7 +57,7 @@ Use mutation testing for:
 - `GET /api/parks/:slug` returns catalog detail without visit state.
 - Park catalog responses expose linked logo metadata and stable logo URLs when a park logo has been configured.
 - Park responses expose `location` instead of `locationLabel`, combining address and postal office when both exist, but collapsing to one value when they are identical or only one exists.
-- `GET /api/public/home-summary` returns cache-friendly public summary data without notes, routes, or images.
+- `GET /api/public/home-summary` returns cache-friendly public summary data including seasonal visit counts, without notes, routes, or images.
 - `GET /api/public/map-summary` returns lightweight map data plus per-park visited summaries.
 - `GET /api/parks/:slug/visits` returns park-scoped visit history and visited summary.
 - `GET /api/visits` and `GET /api/visits/:id` expose visit resources with parent park references.

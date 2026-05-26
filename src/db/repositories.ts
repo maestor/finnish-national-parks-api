@@ -419,6 +419,34 @@ const toVisitedSummary = (visits: Array<{ visitedOn: string }>) => {
   };
 };
 
+const getSeasonFromVisitedOn = (visitedOn: string) => {
+  const month = Number(visitedOn.slice(5, 7));
+
+  if (month >= 3 && month <= 5) {
+    return 'spring';
+  }
+
+  if (month >= 6 && month <= 8) {
+    return 'summer';
+  }
+
+  if (month >= 9 && month <= 11) {
+    return 'autumn';
+  }
+
+  return 'winter';
+};
+
+const countVisitsBySeason = (visits: Array<{ visitedOn: string }>) => {
+  const counts = { autumn: 0, spring: 0, summer: 0, winter: 0 };
+
+  for (const visit of visits) {
+    counts[getSeasonFromVisitedOn(visit.visitedOn)] += 1;
+  }
+
+  return counts;
+};
+
 const listVisitRowsWithPark = async (database: Database) => {
   return database
     .select({
@@ -748,6 +776,7 @@ export const getPublicHomeSummary = async (database: Database) => {
     mostVisitedParks,
     progressByType,
     recentVisits,
+    seasonalVisitCounts: countVisitsBySeason(visitRows),
     totalVisits: visitRows.length,
     uniqueVisitedParks: visitsByParkId.size,
     updatedAt: version.updatedAt,

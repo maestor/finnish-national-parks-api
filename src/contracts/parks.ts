@@ -187,11 +187,19 @@ export const publicVisitEntrySchema = z.object({
   visitedOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/)
 });
 
+export const seasonalVisitCountsSchema = z.object({
+  autumn: z.number().int(),
+  spring: z.number().int(),
+  summer: z.number().int(),
+  winter: z.number().int()
+});
+
 export const publicHomeSummaryResponseSchema = publicVisitVersionSchema.extend({
   latestVisitEntries: z.array(publicVisitEntrySchema),
   mostVisitedParks: z.array(publicMostVisitedParkSchema),
   progressByType: z.array(publicTypeProgressSchema),
   recentVisits: z.array(publicRecentParkVisitSchema),
+  seasonalVisitCounts: seasonalVisitCountsSchema,
   totalVisits: z.number().int(),
   uniqueVisitedParks: z.number().int()
 });
