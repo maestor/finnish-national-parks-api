@@ -46,6 +46,7 @@ export const geoJsonFeatureCollectionSchema = z.object({
 export const parkListItemSchema = z.object({
   areaKm2: z.number().nullable(),
   boundingBox: boundingBoxSchema,
+  displayTypeName: z.string().nullable().optional(),
   establishmentYear: z.number().int().nullable(),
   location: z.string(),
   luontoonUrl: z.string().nullable(),

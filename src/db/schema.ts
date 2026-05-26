@@ -27,11 +27,15 @@ export const parks = sqliteTable(
   {
     id: integer('id').primaryKey({ autoIncrement: true }),
     lipasId: integer('lipas_id').notNull(),
+    managedByLipasImport: integer('managed_by_lipas_import', { mode: 'boolean' })
+      .notNull()
+      .default(true),
     typeId: integer('type_id')
       .notNull()
       .references(() => parkTypes.id),
     slug: text('slug').notNull(),
     name: text('name').notNull(),
+    displayTypeName: text('display_type_name'),
     areaKm2: real('area_km2'),
     establishmentYear: integer('establishment_year'),
     locationLabel: text('location_label').notNull(),
@@ -57,6 +61,9 @@ export const parks = sqliteTable(
   },
   (table) => ({
     lipasIdIndex: uniqueIndex('parks_lipas_id_idx').on(table.lipasId),
+    managedByLipasImportIndex: index('parks_managed_by_lipas_import_idx').on(
+      table.managedByLipasImport
+    ),
     slugIndex: uniqueIndex('parks_slug_idx').on(table.slug),
     typeIndex: index('parks_type_id_idx').on(table.typeId),
     statusIndex: index('parks_catalog_status_idx').on(table.catalogStatus),

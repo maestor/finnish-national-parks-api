@@ -32,6 +32,7 @@ npm install
 cp .env.example .env
 npm run db:migrate
 npm run import:parks
+npm run import:merenkurkku
 npm run db:backup
 npm run verify
 npm run dev
@@ -153,7 +154,16 @@ Importer expectations:
 - Refresh `luontoonUrl` from Luontoon's official Finnish sitemap when a matching destination exists, instead of trusting LIPAS `www` blindly.
 - Preserve personal notes and visit history across imports.
 - Preserve manual park removals across imports and exclude removed rows from API responses.
+- Allow manually imported catalog rows, such as Merenkurkun maailmanperintöalue, to stay active outside the normal LIPAS cleanup path.
 - Read from the local/libSQL database during normal API requests instead of calling LIPAS live.
+
+One supported manual catalog import currently exists:
+
+```sh
+npm run import:merenkurkku
+```
+
+It imports Merenkurkun maailmanperintöalue into the existing catalog model as `other-nature-reserve`, keeps its full heritage geometry, sets a park-level display label of `Maailmanperintökohde`, and protects the row from later LIPAS deactivation.
 
 ## Verification
 
