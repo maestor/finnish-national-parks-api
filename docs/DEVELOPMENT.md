@@ -209,7 +209,7 @@ Key route behavior:
 - `GET /api/parks/:slug?includeBoundary=true` returns the stored boundary GeoJSON.
 - Park list, detail, removed, and public map responses expose `logo: { key, updatedAt, url } | null` when one has been linked to the park.
 - Park responses expose `location` instead of `locationLabel`, combining `location_label` and `postal_office` when both exist, but collapsing to one value when they are identical or only one exists.
-- `GET /api/public/home-summary` returns public home-page summary data without visit notes, routes, or images.
+- `GET /api/public/home-summary` returns public home-page summary data including seasonal visit counts, without visit notes, routes, or images.
 - `GET /api/public/map-summary` returns lightweight park map data plus per-park visited summaries.
 - `GET /api/parks/:slug/visits` returns visit history plus a visited summary for one visible park.
 - `GET /api/visits` returns flat visit resources with their parent park reference.

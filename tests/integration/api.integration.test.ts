@@ -573,6 +573,12 @@ describe('API routes', () => {
           visited: boolean;
         };
       }>;
+      seasonalVisitCounts: {
+        autumn: number;
+        spring: number;
+        summer: number;
+        winter: number;
+      };
       totalVisits: number;
       uniqueVisitedParks: number;
       updatedAt: string | null;
@@ -584,6 +590,7 @@ describe('API routes', () => {
     expect(response.headers.get('etag')).toBeTruthy();
     expect(body.totalVisits).toBe(3);
     expect(body.uniqueVisitedParks).toBe(2);
+    expect(body.seasonalVisitCounts).toEqual({ autumn: 0, spring: 3, summer: 0, winter: 0 });
     expect(body.version).toBeGreaterThan(0);
     expect(body.updatedAt).toBeTruthy();
     expect(body.progressByType).toEqual(
