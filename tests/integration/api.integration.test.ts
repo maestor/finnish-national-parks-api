@@ -123,6 +123,47 @@ describe('API routes', () => {
     expect(body.parks[0]).toHaveProperty('location');
   });
 
+  it('exposes logo details in park list and park detail responses when a logo is set', async () => {
+    await testDatabase.database
+      .update(parks)
+      .set({
+        logoKey: 'logos/akasmannyn-kansallispuisto.png',
+        logoUpdatedAt: '2026-05-02T08:00:00.000Z',
+        updatedAt: '2026-05-02T08:00:00.000Z'
+      })
+      .where(eq(parks.slug, 'akasmannyn-kansallispuisto'));
+
+    const app = createApp({
+      database: testDatabase.database,
+      getLogoPublicUrl: (key, updatedAt) =>
+        `https://assets.example.com/${key}?v=${encodeURIComponent(updatedAt)}`
+    });
+    const listResponse = await app.request('/api/parks');
+    const detailResponse = await app.request('/api/parks/akasmannyn-kansallispuisto');
+    const listBody = (await listResponse.json()) as {
+      parks: Array<Record<string, unknown>>;
+    };
+    const detailBody = (await detailResponse.json()) as Record<string, unknown>;
+    const park = listBody.parks.find((entry) => entry.slug === 'akasmannyn-kansallispuisto');
+
+    expect(listResponse.status).toBe(200);
+    expect(detailResponse.status).toBe(200);
+    expect(park).toMatchObject({
+      logo: {
+        key: 'logos/akasmannyn-kansallispuisto.png',
+        updatedAt: '2026-05-02T08:00:00.000Z',
+        url: 'https://assets.example.com/logos/akasmannyn-kansallispuisto.png?v=2026-05-02T08%3A00%3A00.000Z'
+      }
+    });
+    expect(detailBody).toMatchObject({
+      logo: {
+        key: 'logos/akasmannyn-kansallispuisto.png',
+        updatedAt: '2026-05-02T08:00:00.000Z',
+        url: 'https://assets.example.com/logos/akasmannyn-kansallispuisto.png?v=2026-05-02T08%3A00%3A00.000Z'
+      }
+    });
+  });
+
   it('includes an optional display type name for manual catalog parks', async () => {
     await importMerenkurkkuWorldHeritage({
       database: testDatabase.database,

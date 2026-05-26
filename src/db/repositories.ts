@@ -39,6 +39,8 @@ type MarkerPoint = {
   lon: number;
 };
 
+type GetLogoPublicUrl = (key: string, updatedAt: string) => string;
+
 type TypedParkRow = {
   park: typeof parks.$inferSelect;
   parkType: typeof parkTypes.$inferSelect;
@@ -58,6 +60,8 @@ type PublicParkRow = {
   displayTypeName: string | null;
   establishmentYear: number | null;
   locationLabel: string;
+  logoKey: string | null;
+  logoUpdatedAt: string | null;
   luontoonUrl: string | null;
   markerLat: number;
   markerLon: number;
@@ -114,6 +118,22 @@ const toParkType = (row: typeof parkTypes.$inferSelect) => {
   };
 };
 
+const toLogo = (
+  logoKey: string | null,
+  logoUpdatedAt: string | null,
+  getLogoPublicUrl?: GetLogoPublicUrl
+) => {
+  if (!(logoKey && logoUpdatedAt && getLogoPublicUrl)) {
+    return null;
+  }
+
+  return {
+    key: logoKey,
+    updatedAt: logoUpdatedAt,
+    url: getLogoPublicUrl(logoKey, logoUpdatedAt)
+  };
+};
+
 const visibleParkBySlugWhere = (slug: string) =>
   and(eq(parks.slug, slug), eq(parks.removed, false));
 
@@ -167,7 +187,7 @@ const toLocation = (
   return `${normalizedLocationLabel}, ${postalLocation}`;
 };
 
-const toPark = (row: TypedParkRow) => {
+const toPark = (row: TypedParkRow, getLogoPublicUrl?: GetLogoPublicUrl) => {
   return withOptionalDisplayTypeName(row.park, {
     areaKm2: row.park.areaKm2,
     boundingBox: toBoundingBox(row.park),
@@ -176,6 +196,7 @@ const toPark = (row: TypedParkRow) => {
     establishmentYear: row.park.establishmentYear,
     lipasId: row.park.lipasId,
     location: toLocation(row.park.locationLabel, row.park.postalCode, row.park.postalOffice),
+    logo: toLogo(row.park.logoKey, row.park.logoUpdatedAt, getLogoPublicUrl),
     luontoonUrl: row.park.luontoonUrl,
     markerPoint: toMarkerPoint(row.park),
     municipalityCode: row.park.municipalityCode,
@@ -188,7 +209,7 @@ const toPark = (row: TypedParkRow) => {
   });
 };
 
-const toPublicPark = (row: PublicParkRow) => {
+const toPublicPark = (row: PublicParkRow, getLogoPublicUrl?: GetLogoPublicUrl) => {
   return withOptionalDisplayTypeName(row, {
     areaKm2: row.areaKm2,
     boundingBox: {
@@ -199,6 +220,7 @@ const toPublicPark = (row: PublicParkRow) => {
     },
     establishmentYear: row.establishmentYear,
     location: toLocation(row.locationLabel, row.postalCode, row.postalOffice),
+    logo: toLogo(row.logoKey, row.logoUpdatedAt, getLogoPublicUrl),
     luontoonUrl: row.luontoonUrl,
     markerPoint: {
       lat: row.markerLat,
@@ -263,7 +285,7 @@ const getParkRecordBySlug = async (database: Database, slug: string) => {
   });
 };
 
-const getParkRecordBySlugIncludingRemoved = async (database: Database, slug: string) => {
+export const findParkRecordBySlugIncludingRemoved = async (database: Database, slug: string) => {
   return database.query.parks.findFirst({
     where: eq(parks.slug, slug)
   });
@@ -310,6 +332,8 @@ const listPublicParkRows = async (database: Database) => {
       displayTypeName: parks.displayTypeName,
       establishmentYear: parks.establishmentYear,
       locationLabel: parks.locationLabel,
+      logoKey: parks.logoKey,
+      logoUpdatedAt: parks.logoUpdatedAt,
       luontoonUrl: parks.luontoonUrl,
       markerLat: parks.markerLat,
       markerLon: parks.markerLon,
@@ -544,12 +568,13 @@ export const listExistingParksByLipasIds = async (database: Database, lipasIds: 
 
 export const listParks = async (
   database: Database,
-  options: { typeSlug?: SupportedParkTypeSlug } = {}
+  options: { typeSlug?: SupportedParkTypeSlug } = {},
+  getLogoPublicUrl?: GetLogoPublicUrl
 ) => {
-  return (await listTypedParks(database, options)).map(toPark);
+  return (await listTypedParks(database, options)).map((row) => toPark(row, getLogoPublicUrl));
 };
 
-export const listRemovedParks = async (database: Database) => {
+export const listRemovedParks = async (database: Database, getLogoPublicUrl?: GetLogoPublicUrl) => {
   const rows = await database
     .select({
       park: parks,
@@ -567,6 +592,7 @@ export const listRemovedParks = async (database: Database) => {
       catalogStatus: row.park.catalogStatus as 'active' | 'inactive',
       establishmentYear: row.park.establishmentYear,
       location: toLocation(row.park.locationLabel, row.park.postalCode, row.park.postalOffice),
+      logo: toLogo(row.park.logoKey, row.park.logoUpdatedAt, getLogoPublicUrl),
       luontoonUrl: row.park.luontoonUrl,
       markerPoint: toMarkerPoint(row.park),
       name: row.park.name,
@@ -578,9 +604,13 @@ export const listRemovedParks = async (database: Database) => {
   );
 };
 
-export const getParkBySlug = async (database: Database, slug: string) => {
+export const getParkBySlug = async (
+  database: Database,
+  slug: string,
+  getLogoPublicUrl?: GetLogoPublicUrl
+) => {
   const row = await getTypedParkBySlug(database, slug);
-  return row ? toPark(row) : null;
+  return row ? toPark(row, getLogoPublicUrl) : null;
 };
 
 export const listVisits = async (
@@ -616,7 +646,7 @@ export const getPublicHomeSummary = async (database: Database) => {
     getPublicVisitDataVersion(database)
   ]);
 
-  const publicParks = parkRows.map(toPublicPark);
+  const publicParks = parkRows.map((row) => toPublicPark(row));
   const parksById = new Map(publicParks.map((park, index) => [parkRows[index]!.parkId, park]));
   const visitsByParkId = new Map<number, PublicVisitRow[]>();
 
@@ -721,7 +751,10 @@ export const getPublicHomeSummary = async (database: Database) => {
   };
 };
 
-export const getPublicMapSummary = async (database: Database) => {
+export const getPublicMapSummary = async (
+  database: Database,
+  getLogoPublicUrl?: GetLogoPublicUrl
+) => {
   const [parkRows, visitRows, version] = await Promise.all([
     listPublicParkRows(database),
     listPublicVisitRows(database),
@@ -738,7 +771,7 @@ export const getPublicMapSummary = async (database: Database) => {
 
   return {
     parks: parkRows.map((parkRow) => ({
-      ...toPublicPark(parkRow),
+      ...toPublicPark(parkRow, getLogoPublicUrl),
       visitedSummary: toVisitedSummary(visitsByParkId.get(parkRow.parkId) ?? [])
     })),
     updatedAt: version.updatedAt,
@@ -780,7 +813,7 @@ export const findVisitRecordById = async (database: Database, visitId: number) =
 };
 
 export const updateParkRemoved = async (database: Database, slug: string, removed: boolean) => {
-  const park = await getParkRecordBySlugIncludingRemoved(database, slug);
+  const park = await findParkRecordBySlugIncludingRemoved(database, slug);
 
   if (!park) {
     return false;
@@ -795,6 +828,33 @@ export const updateParkRemoved = async (database: Database, slug: string, remove
     .where(eq(parks.id, park.id));
 
   return true;
+};
+
+export const updateParkLogo = async (
+  database: Database,
+  slug: string,
+  logo: { key: string; updatedAt: string }
+) => {
+  const park = await findParkRecordBySlugIncludingRemoved(database, slug);
+
+  if (!park) {
+    return null;
+  }
+
+  await database
+    .update(parks)
+    .set({
+      logoKey: logo.key,
+      logoUpdatedAt: logo.updatedAt,
+      updatedAt: logo.updatedAt
+    })
+    .where(eq(parks.id, park.id));
+
+  return {
+    id: park.id,
+    name: park.name,
+    slug: park.slug
+  };
 };
 
 export const updateVisit = async (database: Database, visitId: number, input: UpdateVisitInput) => {

@@ -99,6 +99,7 @@ type AppDependencies = {
   allowServerImageUploads?: boolean | undefined;
   auth?: AuthConfig | undefined;
   database?: Database | undefined;
+  getLogoPublicUrl?: ((key: string, updatedAt: string) => string) | undefined;
   storage?: StorageClient | undefined;
 };
 
@@ -162,6 +163,7 @@ export const createApp = ({
   allowServerImageUploads = true,
   auth,
   database,
+  getLogoPublicUrl,
   storage
 }: AppDependencies = {}) => {
   const getImagePublicUrl = async (key: string) => {
@@ -361,7 +363,7 @@ export const createApp = ({
         });
       }
 
-      const parks = await listParks(database, filter);
+      const parks = await listParks(database, filter, getLogoPublicUrl);
 
       return context.json(
         {
@@ -385,7 +387,7 @@ export const createApp = ({
     app.openapi(listRemovedParksRoute, async (context) => {
       context.header('Cache-Control', PRIVATE_CACHE_CONTROL);
 
-      const parks = await listRemovedParks(database);
+      const parks = await listRemovedParks(database, getLogoPublicUrl);
 
       return context.json(
         {
@@ -400,7 +402,7 @@ export const createApp = ({
       const query = context.req.valid('query');
       const includeBoundary = query.includeBoundary === 'true';
       const omitBoundary = query.includeBoundary === 'false' || !query.includeBoundary;
-      const park = await getParkBySlug(database, slug);
+      const park = await getParkBySlug(database, slug, getLogoPublicUrl);
 
       if (!park) {
         return context.json(jsonNotFound('Park not found.'), 404);
@@ -471,7 +473,7 @@ export const createApp = ({
     app.openapi(getPublicMapSummaryRoute, async (context) => {
       const [catalogSeed, summary] = await Promise.all([
         getCatalogListEtagSeed(database),
-        getPublicMapSummary(database)
+        getPublicMapSummary(database, getLogoPublicUrl)
       ]);
       const etag = createPublicSummaryEtag({
         activeCount: catalogSeed.activeCount,

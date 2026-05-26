@@ -13,6 +13,7 @@ import {
   listRemovedParks,
   listVisits,
   reorderVisitImages,
+  updateParkLogo,
   updateVisit
 } from '../../src/db/repositories.js';
 import { parks } from '../../src/db/schema.js';
@@ -54,6 +55,15 @@ describe('repositories', () => {
       async () => ''
     );
     expect(parkVisits?.visits).toEqual([]);
+  });
+
+  it('returns null when updating logo for a missing park', async () => {
+    const result = await updateParkLogo(testDatabase.database, 'missing-park', {
+      key: 'logos/test.png',
+      updatedAt: '2026-05-01T10:00:00.000Z'
+    });
+
+    expect(result).toBeNull();
   });
 
   it('normalizes park location values for address, postal code, and postal office combinations', async () => {

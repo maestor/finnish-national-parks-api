@@ -9,6 +9,7 @@ npm install
 npm run db:migrate
 npm run import:parks
 npm run import:merenkurkku
+npm run park:logo -- <park-slug>
 npm run db:backup
 npm run verify
 npm run dev
@@ -56,10 +57,11 @@ AUTH_JWT_SECRET=change-me-to-a-long-random-string
 AUTH_COOKIE_NAME=__session
 FRONTEND_URL=http://localhost:4300
 
-# Cloudflare R2 (optional — only needed for visit image uploads)
-# The bucket can be private; the API generates presigned URLs for frontend access.
+# Cloudflare R2 (optional — needed for visit image uploads and park logo uploads)
+# Visit images can stay private; set R2_PUBLIC_URL if catalog APIs should expose stable logo URLs.
 R2_BUCKET_NAME=
 R2_ENDPOINT=
+R2_PUBLIC_URL=
 R2_ACCESS_KEY_ID=
 R2_SECRET_ACCESS_KEY=
 MEMORY_STORAGE=false
@@ -128,6 +130,26 @@ That command:
 - uses `Raippaluodontie 2, 65800 Raippaluoto` as the generated location source
 - marks the row as not managed by the LIPAS cleanup step, so later `npm run import:parks` executions do not deactivate it
 
+### Park Logos
+
+Downloaded source logo PNG files can live under `data/logos/` and stay local because the repository ignores `data/`.
+
+To attach one logo to one existing park row:
+
+```sh
+npm run park:logo -- <park-slug>
+```
+
+That command:
+
+- loads the current `.env` automatically
+- uses `DATABASE_URL` and `DATABASE_AUTH_TOKEN` to target either local SQLite or remote Turso
+- requires the matching `data/logos/<park-slug>.png` file to exist locally
+- uploads the file to the R2 object key `logos/<park-slug>.png`
+- stores the logo key plus a logo timestamp on the matching park row so catalog ETags and logo URLs change together
+
+For UI rendering, set `R2_PUBLIC_URL` to the public base URL that serves those logo objects.
+
 ## Database
 
 The repository owns the database schema through:
@@ -185,6 +207,7 @@ Key route behavior:
 - `GET /api/parks/removed` returns an auth-restricted admin list of removed parks for restore workflows.
 - `GET /api/parks?type=state-hiking-area` filters by normalized catalog type slug.
 - `GET /api/parks/:slug?includeBoundary=true` returns the stored boundary GeoJSON.
+- Park list, detail, removed, and public map responses expose `logo: { key, updatedAt, url } | null` when one has been linked to the park.
 - Park responses expose `location` instead of `locationLabel`, combining `location_label` and `postal_office` when both exist, but collapsing to one value when they are identical or only one exists.
 - `GET /api/public/home-summary` returns public home-page summary data without visit notes, routes, or images.
 - `GET /api/public/map-summary` returns lightweight park map data plus per-park visited summaries.
@@ -224,9 +247,10 @@ The production target is Vercel Functions plus Turso. This repository now matche
    - `AUTH_JWT_SECRET`
    - `AUTH_COOKIE_NAME`
    - `FRONTEND_URL`
-6. If you will use visit image uploads, also set the R2 variables:
+6. If you will use visit image uploads or park logo uploads, also set the R2 variables:
    - `R2_BUCKET_NAME`
    - `R2_ENDPOINT`
+   - `R2_PUBLIC_URL` for stable park logo URLs returned by catalog APIs
    - `R2_ACCESS_KEY_ID`
    - `R2_SECRET_ACCESS_KEY`
 7. Frontends deployed against Vercel should call the direct upload endpoints instead of posting image bytes to `POST /api/visits/:id/images`.

@@ -55,6 +55,7 @@ Use mutation testing for:
 - `GET /api/parks/removed` returns a private admin list of removed parks for restore flows.
 - `GET /api/parks?type=...` filters the public catalog list by normalized type slug.
 - `GET /api/parks/:slug` returns catalog detail without visit state.
+- Park catalog responses expose linked logo metadata and stable logo URLs when a park logo has been configured.
 - Park responses expose `location` instead of `locationLabel`, combining address and postal office when both exist, but collapsing to one value when they are identical or only one exists.
 - `GET /api/public/home-summary` returns cache-friendly public summary data without notes, routes, or images.
 - `GET /api/public/map-summary` returns lightweight map data plus per-park visited summaries.
@@ -67,6 +68,7 @@ Use mutation testing for:
 - Park removal toggle can hide and restore a park through the authenticated park-management API.
 - Visit create/edit/delete supports optional route and author fields.
 - Visit create/edit/delete works against a real temporary database.
+- Park logo upload logic verifies the park slug, requires the matching local PNG file, uploads `logos/<slug>.png`, and persists the logo reference in the database.
 - Auth routes bypass bearer-token middleware.
 - Google OAuth callback validates state/PKCE, verifies the ID token, checks the admin allowlist, and sets a session cookie.
 - `GET /auth/me` returns the current user from a valid session or `401` otherwise.

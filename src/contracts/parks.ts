@@ -23,6 +23,12 @@ export const boundingBoxSchema = z.object({
   minLon: z.number()
 });
 
+export const parkLogoSchema = z.object({
+  key: z.string(),
+  updatedAt: z.string().datetime(),
+  url: z.string().url()
+});
+
 export const geoJsonPolygonSchema = z.object({
   coordinates: z.array(z.array(geoJsonCoordinateSchema)),
   type: z.literal('Polygon')
@@ -49,6 +55,7 @@ export const parkListItemSchema = z.object({
   displayTypeName: z.string().nullable().optional(),
   establishmentYear: z.number().int().nullable(),
   location: z.string(),
+  logo: parkLogoSchema.nullable(),
   luontoonUrl: z.string().nullable(),
   markerPoint: pointSchema,
   name: z.string(),

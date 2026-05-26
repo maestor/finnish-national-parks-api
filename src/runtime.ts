@@ -5,6 +5,15 @@ import { type Env, getEnv, isVercelDeployment } from './env.js';
 import { createMemoryStorage } from './storage/memory-storage.js';
 import { createR2Client } from './storage/r2-client.js';
 
+const trimTrailingSlash = (value: string) => value.replace(/\/+$/, '');
+
+const encodeObjectKey = (key: string) => {
+  return key
+    .split('/')
+    .map((segment) => encodeURIComponent(segment))
+    .join('/');
+};
+
 export const createStorage = (env: Env) => {
   if (env.MEMORY_STORAGE === 'true') {
     return createMemoryStorage();
@@ -20,6 +29,24 @@ export const createStorage = (env: Env) => {
   }
 
   return undefined;
+};
+
+export const createLogoPublicUrl = (env: Env) => {
+  const baseUrl =
+    env.R2_PUBLIC_URL?.trim() ||
+    (env.R2_BUCKET_NAME && env.R2_ENDPOINT
+      ? `${trimTrailingSlash(env.R2_ENDPOINT)}/${encodeURIComponent(env.R2_BUCKET_NAME)}`
+      : undefined);
+
+  if (!baseUrl) {
+    return undefined;
+  }
+
+  const normalizedBaseUrl = trimTrailingSlash(baseUrl);
+
+  return (key: string, updatedAt: string) => {
+    return `${normalizedBaseUrl}/${encodeObjectKey(key)}?v=${encodeURIComponent(updatedAt)}`;
+  };
 };
 
 export const createAuthConfig = (env: Env) => {
@@ -52,5 +79,6 @@ export const app = createApp({
   allowServerImageUploads: !isVercelDeployment(),
   auth: createAuthConfig(env),
   database: createDatabase(databaseClient),
+  getLogoPublicUrl: createLogoPublicUrl(env),
   storage: createStorage(env)
 });
