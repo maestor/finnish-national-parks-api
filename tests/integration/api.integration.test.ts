@@ -14,6 +14,7 @@ import { getParkBySlug } from '../../src/db/repositories.js';
 import { parks } from '../../src/db/schema.js';
 import { importMerenkurkkuWorldHeritage } from '../../src/importer/import-merenkurkku-world-heritage.js';
 import { importParks } from '../../src/importer/import-parks.js';
+import { createMemoryStorage } from '../../src/storage/memory-storage.js';
 import { createLipasPark, createLipasTrail, parkTypeFixtures } from '../fixtures/lipas.js';
 import { createTestDatabase } from '../helpers/test-db.js';
 
@@ -121,6 +122,46 @@ describe('API routes', () => {
     expect(body.parks[0]).not.toHaveProperty('locationLabel');
     expect(body.parks[0]).toHaveProperty('type');
     expect(body.parks[0]).toHaveProperty('location');
+  });
+
+  it('exposes logo details in park list and park detail responses when a logo is set', async () => {
+    await testDatabase.database
+      .update(parks)
+      .set({
+        logoKey: 'logos/akasmannyn-kansallispuisto.png',
+        logoUpdatedAt: '2026-05-02T08:00:00.000Z',
+        updatedAt: '2026-05-02T08:00:00.000Z'
+      })
+      .where(eq(parks.slug, 'akasmannyn-kansallispuisto'));
+
+    const app = createApp({
+      database: testDatabase.database,
+      storage: createMemoryStorage()
+    });
+    const listResponse = await app.request('/api/parks');
+    const detailResponse = await app.request('/api/parks/akasmannyn-kansallispuisto');
+    const listBody = (await listResponse.json()) as {
+      parks: Array<Record<string, unknown>>;
+    };
+    const detailBody = (await detailResponse.json()) as Record<string, unknown>;
+    const park = listBody.parks.find((entry) => entry.slug === 'akasmannyn-kansallispuisto');
+
+    expect(listResponse.status).toBe(200);
+    expect(detailResponse.status).toBe(200);
+    expect(park).toMatchObject({
+      logo: {
+        key: 'logos/akasmannyn-kansallispuisto.png',
+        updatedAt: '2026-05-02T08:00:00.000Z',
+        url: 'https://memory-storage.test/logos/akasmannyn-kansallispuisto.png'
+      }
+    });
+    expect(detailBody).toMatchObject({
+      logo: {
+        key: 'logos/akasmannyn-kansallispuisto.png',
+        updatedAt: '2026-05-02T08:00:00.000Z',
+        url: 'https://memory-storage.test/logos/akasmannyn-kansallispuisto.png'
+      }
+    });
   });
 
   it('includes an optional display type name for manual catalog parks', async () => {

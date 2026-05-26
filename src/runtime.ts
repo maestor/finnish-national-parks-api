@@ -52,5 +52,6 @@ export const app = createApp({
   allowServerImageUploads: !isVercelDeployment(),
   auth: createAuthConfig(env),
   database: createDatabase(databaseClient),
+  getLogoPublicUrl: undefined,
   storage: createStorage(env)
 });

@@ -33,6 +33,7 @@ cp .env.example .env
 npm run db:migrate
 npm run import:parks
 npm run import:merenkurkku
+npm run park:logo -- <park-slug>
 npm run db:backup
 npm run verify
 npm run dev
@@ -58,9 +59,10 @@ GOOGLE_REDIRECT_URI=
 AUTH_JWT_SECRET=change-me-to-a-long-random-string
 FRONTEND_URL=http://localhost:4300
 
-# Optional: Cloudflare R2 storage for visit images (bucket can be private)
+# Optional: Cloudflare R2 storage for visit images and park logos
 R2_BUCKET_NAME=
 R2_ENDPOINT=
+R2_PUBLIC_URL=
 R2_ACCESS_KEY_ID=
 R2_SECRET_ACCESS_KEY=
 ```
@@ -74,6 +76,7 @@ Production notes:
 - If `/auth/*` is exposed through a frontend proxy or rewrite, set `GOOGLE_REDIRECT_URI=https://your-frontend-domain/auth/google/callback`, register that exact URI in Google Cloud, and start the login flow through that same public domain so the OAuth cookies stay on the right host.
 - `MEMORY_STORAGE=true` is for tests and local-only development, not Vercel.
 - `npm run db:backup` reads the current remote `DATABASE_URL` and `DATABASE_AUTH_TOKEN`, then writes a timestamped SQLite backup under `data/backups/`. You can append an optional label with `npm run db:backup -- before-import`.
+- `npm run park:logo -- <park-slug>` uploads `data/logos/<park-slug>.png` to the `logos/` folder in R2 and persists that logo reference on the matching park row. Set `R2_PUBLIC_URL` if you want park APIs to return a stable public logo URL for the UI.
 
 The importer's LIPAS source URL and supported type-code list are internal configuration, not a normal `.env` setting.
 
@@ -112,6 +115,7 @@ Catalog endpoints stay cache-friendly and database-backed:
 - `GET /api/parks/removed` returns an auth-restricted admin list of removed parks so the UI can restore visibility when needed.
 - `GET /api/parks?type=state-hiking-area` filters by normalized type slug.
 - `GET /api/parks/:slug?includeBoundary=true` includes stored boundary geometry.
+- Park list, detail, removed, and public map responses include `logo: { key, updatedAt, url } | null` when a logo has been linked to the park.
 - Park responses now expose `location` instead of `locationLabel`, combining `location_label` and `postal_office` when both exist, but collapsing to a single value when they are identical or only one exists.
 - `GET /api/public/home-summary` returns public visit totals, type progress, recent activity, and a public data `version` / `updatedAt` signal without notes, routes, or images.
 - `GET /api/public/map-summary` returns lightweight park map data plus per-park visited summaries and the same public data version signal.

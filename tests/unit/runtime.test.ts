@@ -18,7 +18,6 @@ const createEnv = (overrides: Partial<Env> = {}): Env => {
     R2_ACCESS_KEY_ID: undefined,
     R2_BUCKET_NAME: undefined,
     R2_ENDPOINT: undefined,
-    R2_PUBLIC_URL: undefined,
     R2_SECRET_ACCESS_KEY: undefined,
     ...overrides
   };
