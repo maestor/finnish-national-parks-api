@@ -14,6 +14,7 @@ import { getParkBySlug } from '../../src/db/repositories.js';
 import { parks } from '../../src/db/schema.js';
 import { importMerenkurkkuWorldHeritage } from '../../src/importer/import-merenkurkku-world-heritage.js';
 import { importParks } from '../../src/importer/import-parks.js';
+import { createMemoryStorage } from '../../src/storage/memory-storage.js';
 import { createLipasPark, createLipasTrail, parkTypeFixtures } from '../fixtures/lipas.js';
 import { createTestDatabase } from '../helpers/test-db.js';
 
@@ -135,8 +136,7 @@ describe('API routes', () => {
 
     const app = createApp({
       database: testDatabase.database,
-      getLogoPublicUrl: (key, updatedAt) =>
-        `https://assets.example.com/${key}?v=${encodeURIComponent(updatedAt)}`
+      storage: createMemoryStorage()
     });
     const listResponse = await app.request('/api/parks');
     const detailResponse = await app.request('/api/parks/akasmannyn-kansallispuisto');
@@ -152,14 +152,14 @@ describe('API routes', () => {
       logo: {
         key: 'logos/akasmannyn-kansallispuisto.png',
         updatedAt: '2026-05-02T08:00:00.000Z',
-        url: 'https://assets.example.com/logos/akasmannyn-kansallispuisto.png?v=2026-05-02T08%3A00%3A00.000Z'
+        url: 'https://memory-storage.test/logos/akasmannyn-kansallispuisto.png'
       }
     });
     expect(detailBody).toMatchObject({
       logo: {
         key: 'logos/akasmannyn-kansallispuisto.png',
         updatedAt: '2026-05-02T08:00:00.000Z',
-        url: 'https://assets.example.com/logos/akasmannyn-kansallispuisto.png?v=2026-05-02T08%3A00%3A00.000Z'
+        url: 'https://memory-storage.test/logos/akasmannyn-kansallispuisto.png'
       }
     });
   });

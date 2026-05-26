@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Env } from '../../src/env.js';
-import { createAuthConfig, createLogoPublicUrl, createStorage } from '../../src/runtime.js';
+import { createAuthConfig, createStorage } from '../../src/runtime.js';
 
 const createEnv = (overrides: Partial<Env> = {}): Env => {
   return {
@@ -18,7 +18,6 @@ const createEnv = (overrides: Partial<Env> = {}): Env => {
     R2_ACCESS_KEY_ID: undefined,
     R2_BUCKET_NAME: undefined,
     R2_ENDPOINT: undefined,
-    R2_PUBLIC_URL: undefined,
     R2_SECRET_ACCESS_KEY: undefined,
     ...overrides
   };
@@ -90,30 +89,5 @@ describe('runtime helpers', () => {
       googleRedirectUri: 'https://parks.example.com/auth/google/callback',
       jwtSecret: '12345678901234567890123456789012'
     });
-  });
-
-  it('creates stable public logo urls from a custom public base url or the R2 endpoint fallback', () => {
-    const customDomainUrl = createLogoPublicUrl(
-      createEnv({
-        R2_PUBLIC_URL: 'https://assets.example.com/'
-      })
-    );
-    const endpointFallbackUrl = createLogoPublicUrl(
-      createEnv({
-        R2_BUCKET_NAME: 'park-assets',
-        R2_ENDPOINT: 'https://r2.example.com/'
-      })
-    );
-
-    expect(customDomainUrl?.('logos/teijo.png', '2026-05-03T12:00:00.000Z')).toBe(
-      'https://assets.example.com/logos/teijo.png?v=2026-05-03T12%3A00%3A00.000Z'
-    );
-    expect(endpointFallbackUrl?.('logos/teijo.png', '2026-05-03T12:00:00.000Z')).toBe(
-      'https://r2.example.com/park-assets/logos/teijo.png?v=2026-05-03T12%3A00%3A00.000Z'
-    );
-  });
-
-  it('returns undefined when no logo public url or R2 config is available', () => {
-    expect(createLogoPublicUrl(createEnv())).toBeUndefined();
   });
 });

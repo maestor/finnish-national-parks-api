@@ -39,7 +39,7 @@ type MarkerPoint = {
   lon: number;
 };
 
-type GetLogoPublicUrl = (key: string, updatedAt: string) => string;
+type GetLogoPublicUrl = (key: string, updatedAt: string) => string | Promise<string>;
 
 type TypedParkRow = {
   park: typeof parks.$inferSelect;
@@ -118,7 +118,7 @@ const toParkType = (row: typeof parkTypes.$inferSelect) => {
   };
 };
 
-const toLogo = (
+const toLogo = async (
   logoKey: string | null,
   logoUpdatedAt: string | null,
   getLogoPublicUrl?: GetLogoPublicUrl
@@ -130,7 +130,7 @@ const toLogo = (
   return {
     key: logoKey,
     updatedAt: logoUpdatedAt,
-    url: getLogoPublicUrl(logoKey, logoUpdatedAt)
+    url: await getLogoPublicUrl(logoKey, logoUpdatedAt)
   };
 };
 
@@ -187,7 +187,7 @@ const toLocation = (
   return `${normalizedLocationLabel}, ${postalLocation}`;
 };
 
-const toPark = (row: TypedParkRow, getLogoPublicUrl?: GetLogoPublicUrl) => {
+const toPark = async (row: TypedParkRow, getLogoPublicUrl?: GetLogoPublicUrl) => {
   return withOptionalDisplayTypeName(row.park, {
     areaKm2: row.park.areaKm2,
     boundingBox: toBoundingBox(row.park),
@@ -196,7 +196,7 @@ const toPark = (row: TypedParkRow, getLogoPublicUrl?: GetLogoPublicUrl) => {
     establishmentYear: row.park.establishmentYear,
     lipasId: row.park.lipasId,
     location: toLocation(row.park.locationLabel, row.park.postalCode, row.park.postalOffice),
-    logo: toLogo(row.park.logoKey, row.park.logoUpdatedAt, getLogoPublicUrl),
+    logo: await toLogo(row.park.logoKey, row.park.logoUpdatedAt, getLogoPublicUrl),
     luontoonUrl: row.park.luontoonUrl,
     markerPoint: toMarkerPoint(row.park),
     municipalityCode: row.park.municipalityCode,
@@ -209,7 +209,7 @@ const toPark = (row: TypedParkRow, getLogoPublicUrl?: GetLogoPublicUrl) => {
   });
 };
 
-const toPublicPark = (row: PublicParkRow, getLogoPublicUrl?: GetLogoPublicUrl) => {
+const toPublicPark = async (row: PublicParkRow, getLogoPublicUrl?: GetLogoPublicUrl) => {
   return withOptionalDisplayTypeName(row, {
     areaKm2: row.areaKm2,
     boundingBox: {
@@ -220,7 +220,7 @@ const toPublicPark = (row: PublicParkRow, getLogoPublicUrl?: GetLogoPublicUrl) =
     },
     establishmentYear: row.establishmentYear,
     location: toLocation(row.locationLabel, row.postalCode, row.postalOffice),
-    logo: toLogo(row.logoKey, row.logoUpdatedAt, getLogoPublicUrl),
+    logo: await toLogo(row.logoKey, row.logoUpdatedAt, getLogoPublicUrl),
     luontoonUrl: row.luontoonUrl,
     markerPoint: {
       lat: row.markerLat,
@@ -571,7 +571,9 @@ export const listParks = async (
   options: { typeSlug?: SupportedParkTypeSlug } = {},
   getLogoPublicUrl?: GetLogoPublicUrl
 ) => {
-  return (await listTypedParks(database, options)).map((row) => toPark(row, getLogoPublicUrl));
+  return Promise.all(
+    (await listTypedParks(database, options)).map((row) => toPark(row, getLogoPublicUrl))
+  );
 };
 
 export const listRemovedParks = async (database: Database, getLogoPublicUrl?: GetLogoPublicUrl) => {
@@ -585,22 +587,24 @@ export const listRemovedParks = async (database: Database, getLogoPublicUrl?: Ge
     .where(removedCatalogWhere())
     .orderBy(parks.name);
 
-  return rows.map((row) =>
-    withOptionalDisplayTypeName(row.park, {
-      areaKm2: row.park.areaKm2,
-      boundingBox: toBoundingBox(row.park),
-      catalogStatus: row.park.catalogStatus as 'active' | 'inactive',
-      establishmentYear: row.park.establishmentYear,
-      location: toLocation(row.park.locationLabel, row.park.postalCode, row.park.postalOffice),
-      logo: toLogo(row.park.logoKey, row.park.logoUpdatedAt, getLogoPublicUrl),
-      luontoonUrl: row.park.luontoonUrl,
-      markerPoint: toMarkerPoint(row.park),
-      name: row.park.name,
-      removed: true as const,
-      slug: row.park.slug,
-      type: toParkType(row.parkType),
-      updatedAt: row.park.updatedAt
-    })
+  return Promise.all(
+    rows.map(async (row) =>
+      withOptionalDisplayTypeName(row.park, {
+        areaKm2: row.park.areaKm2,
+        boundingBox: toBoundingBox(row.park),
+        catalogStatus: row.park.catalogStatus as 'active' | 'inactive',
+        establishmentYear: row.park.establishmentYear,
+        location: toLocation(row.park.locationLabel, row.park.postalCode, row.park.postalOffice),
+        logo: await toLogo(row.park.logoKey, row.park.logoUpdatedAt, getLogoPublicUrl),
+        luontoonUrl: row.park.luontoonUrl,
+        markerPoint: toMarkerPoint(row.park),
+        name: row.park.name,
+        removed: true as const,
+        slug: row.park.slug,
+        type: toParkType(row.parkType),
+        updatedAt: row.park.updatedAt
+      })
+    )
   );
 };
 
@@ -610,7 +614,7 @@ export const getParkBySlug = async (
   getLogoPublicUrl?: GetLogoPublicUrl
 ) => {
   const row = await getTypedParkBySlug(database, slug);
-  return row ? toPark(row, getLogoPublicUrl) : null;
+  return row ? await toPark(row, getLogoPublicUrl) : null;
 };
 
 export const listVisits = async (
@@ -646,7 +650,7 @@ export const getPublicHomeSummary = async (database: Database) => {
     getPublicVisitDataVersion(database)
   ]);
 
-  const publicParks = parkRows.map((row) => toPublicPark(row));
+  const publicParks = await Promise.all(parkRows.map((row) => toPublicPark(row)));
   const parksById = new Map(publicParks.map((park, index) => [parkRows[index]!.parkId, park]));
   const visitsByParkId = new Map<number, PublicVisitRow[]>();
 
@@ -770,10 +774,12 @@ export const getPublicMapSummary = async (
   }
 
   return {
-    parks: parkRows.map((parkRow) => ({
-      ...toPublicPark(parkRow, getLogoPublicUrl),
-      visitedSummary: toVisitedSummary(visitsByParkId.get(parkRow.parkId) ?? [])
-    })),
+    parks: await Promise.all(
+      parkRows.map(async (parkRow) => ({
+        ...(await toPublicPark(parkRow, getLogoPublicUrl)),
+        visitedSummary: toVisitedSummary(visitsByParkId.get(parkRow.parkId) ?? [])
+      }))
+    ),
     updatedAt: version.updatedAt,
     version: version.version
   };
