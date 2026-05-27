@@ -44,7 +44,8 @@ describe('migrateDatabase', () => {
       '0006_public_data_versions.sql',
       '0007_postal_code_and_nature_trails.sql',
       '0008_manual_catalog_parks.sql',
-      '0009_park_logos.sql'
+      '0009_park_logos.sql',
+      '0010_park_maps.sql'
     ]);
     expect(parkTypes.rows.map((row) => String(row.slug))).toEqual([
       'outdoor-recreation-area',
@@ -62,6 +63,8 @@ describe('migrateDatabase', () => {
     );
     expect(parkColumns.rows.some((row) => String(row.name) === 'logo_key')).toBe(true);
     expect(parkColumns.rows.some((row) => String(row.name) === 'logo_updated_at')).toBe(true);
+    expect(parkColumns.rows.some((row) => String(row.name) === 'map_key')).toBe(true);
+    expect(parkColumns.rows.some((row) => String(row.name) === 'map_updated_at')).toBe(true);
     expect(publicDataVersionColumns.rows.some((row) => String(row.name) === 'version')).toBe(true);
   });
 });
