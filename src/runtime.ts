@@ -53,5 +53,6 @@ export const app = createApp({
   auth: createAuthConfig(env),
   database: createDatabase(databaseClient),
   getLogoPublicUrl: undefined,
+  getMapPublicUrl: undefined,
   storage: createStorage(env)
 });

@@ -29,6 +29,12 @@ export const parkLogoSchema = z.object({
   url: z.string().url()
 });
 
+export const parkMapSchema = z.object({
+  key: z.string(),
+  updatedAt: z.string().datetime(),
+  url: z.string().url()
+});
+
 export const geoJsonPolygonSchema = z.object({
   coordinates: z.array(z.array(geoJsonCoordinateSchema)),
   type: z.literal('Polygon')
@@ -57,6 +63,7 @@ export const parkListItemSchema = z.object({
   location: z.string(),
   logo: parkLogoSchema.nullable(),
   luontoonUrl: z.string().nullable(),
+  map: parkMapSchema.nullable(),
   markerPoint: pointSchema,
   name: z.string(),
   slug: z.string(),

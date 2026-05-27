@@ -40,6 +40,7 @@ type MarkerPoint = {
 };
 
 type GetLogoPublicUrl = (key: string, updatedAt: string) => string | Promise<string>;
+type GetMapPublicUrl = (key: string, updatedAt: string) => string | Promise<string>;
 
 type TypedParkRow = {
   park: typeof parks.$inferSelect;
@@ -63,6 +64,8 @@ type PublicParkRow = {
   logoKey: string | null;
   logoUpdatedAt: string | null;
   luontoonUrl: string | null;
+  mapKey: string | null;
+  mapUpdatedAt: string | null;
   markerLat: number;
   markerLon: number;
   name: string;
@@ -134,6 +137,22 @@ const toLogo = async (
   };
 };
 
+const toMap = async (
+  mapKey: string | null,
+  mapUpdatedAt: string | null,
+  getMapPublicUrl?: GetMapPublicUrl
+) => {
+  if (!(mapKey && mapUpdatedAt && getMapPublicUrl)) {
+    return null;
+  }
+
+  return {
+    key: mapKey,
+    updatedAt: mapUpdatedAt,
+    url: await getMapPublicUrl(mapKey, mapUpdatedAt)
+  };
+};
+
 const visibleParkBySlugWhere = (slug: string) =>
   and(eq(parks.slug, slug), eq(parks.removed, false));
 
@@ -187,7 +206,11 @@ const toLocation = (
   return `${normalizedLocationLabel}, ${postalLocation}`;
 };
 
-const toPark = async (row: TypedParkRow, getLogoPublicUrl?: GetLogoPublicUrl) => {
+const toPark = async (
+  row: TypedParkRow,
+  getLogoPublicUrl?: GetLogoPublicUrl,
+  getMapPublicUrl?: GetMapPublicUrl
+) => {
   return withOptionalDisplayTypeName(row.park, {
     areaKm2: row.park.areaKm2,
     boundingBox: toBoundingBox(row.park),
@@ -198,6 +221,7 @@ const toPark = async (row: TypedParkRow, getLogoPublicUrl?: GetLogoPublicUrl) =>
     location: toLocation(row.park.locationLabel, row.park.postalCode, row.park.postalOffice),
     logo: await toLogo(row.park.logoKey, row.park.logoUpdatedAt, getLogoPublicUrl),
     luontoonUrl: row.park.luontoonUrl,
+    map: await toMap(row.park.mapKey, row.park.mapUpdatedAt, getMapPublicUrl),
     markerPoint: toMarkerPoint(row.park),
     municipalityCode: row.park.municipalityCode,
     name: row.park.name,
@@ -209,7 +233,11 @@ const toPark = async (row: TypedParkRow, getLogoPublicUrl?: GetLogoPublicUrl) =>
   });
 };
 
-const toPublicPark = async (row: PublicParkRow, getLogoPublicUrl?: GetLogoPublicUrl) => {
+const toPublicPark = async (
+  row: PublicParkRow,
+  getLogoPublicUrl?: GetLogoPublicUrl,
+  getMapPublicUrl?: GetMapPublicUrl
+) => {
   return withOptionalDisplayTypeName(row, {
     areaKm2: row.areaKm2,
     boundingBox: {
@@ -222,6 +250,7 @@ const toPublicPark = async (row: PublicParkRow, getLogoPublicUrl?: GetLogoPublic
     location: toLocation(row.locationLabel, row.postalCode, row.postalOffice),
     logo: await toLogo(row.logoKey, row.logoUpdatedAt, getLogoPublicUrl),
     luontoonUrl: row.luontoonUrl,
+    map: await toMap(row.mapKey, row.mapUpdatedAt, getMapPublicUrl),
     markerPoint: {
       lat: row.markerLat,
       lon: row.markerLon
@@ -335,6 +364,8 @@ const listPublicParkRows = async (database: Database) => {
       logoKey: parks.logoKey,
       logoUpdatedAt: parks.logoUpdatedAt,
       luontoonUrl: parks.luontoonUrl,
+      mapKey: parks.mapKey,
+      mapUpdatedAt: parks.mapUpdatedAt,
       markerLat: parks.markerLat,
       markerLon: parks.markerLon,
       name: parks.name,
@@ -597,14 +628,21 @@ export const listExistingParksByLipasIds = async (database: Database, lipasIds: 
 export const listParks = async (
   database: Database,
   options: { typeSlug?: SupportedParkTypeSlug } = {},
-  getLogoPublicUrl?: GetLogoPublicUrl
+  getLogoPublicUrl?: GetLogoPublicUrl,
+  getMapPublicUrl?: GetMapPublicUrl
 ) => {
   return Promise.all(
-    (await listTypedParks(database, options)).map((row) => toPark(row, getLogoPublicUrl))
+    (await listTypedParks(database, options)).map((row) =>
+      toPark(row, getLogoPublicUrl, getMapPublicUrl)
+    )
   );
 };
 
-export const listRemovedParks = async (database: Database, getLogoPublicUrl?: GetLogoPublicUrl) => {
+export const listRemovedParks = async (
+  database: Database,
+  getLogoPublicUrl?: GetLogoPublicUrl,
+  getMapPublicUrl?: GetMapPublicUrl
+) => {
   const rows = await database
     .select({
       park: parks,
@@ -625,6 +663,7 @@ export const listRemovedParks = async (database: Database, getLogoPublicUrl?: Ge
         location: toLocation(row.park.locationLabel, row.park.postalCode, row.park.postalOffice),
         logo: await toLogo(row.park.logoKey, row.park.logoUpdatedAt, getLogoPublicUrl),
         luontoonUrl: row.park.luontoonUrl,
+        map: await toMap(row.park.mapKey, row.park.mapUpdatedAt, getMapPublicUrl),
         markerPoint: toMarkerPoint(row.park),
         name: row.park.name,
         removed: true as const,
@@ -639,10 +678,11 @@ export const listRemovedParks = async (database: Database, getLogoPublicUrl?: Ge
 export const getParkBySlug = async (
   database: Database,
   slug: string,
-  getLogoPublicUrl?: GetLogoPublicUrl
+  getLogoPublicUrl?: GetLogoPublicUrl,
+  getMapPublicUrl?: GetMapPublicUrl
 ) => {
   const row = await getTypedParkBySlug(database, slug);
-  return row ? await toPark(row, getLogoPublicUrl) : null;
+  return row ? await toPark(row, getLogoPublicUrl, getMapPublicUrl) : null;
 };
 
 export const listVisits = async (
@@ -786,7 +826,8 @@ export const getPublicHomeSummary = async (database: Database) => {
 
 export const getPublicMapSummary = async (
   database: Database,
-  getLogoPublicUrl?: GetLogoPublicUrl
+  getLogoPublicUrl?: GetLogoPublicUrl,
+  getMapPublicUrl?: GetMapPublicUrl
 ) => {
   const [parkRows, visitRows, version] = await Promise.all([
     listPublicParkRows(database),
@@ -805,7 +846,7 @@ export const getPublicMapSummary = async (
   return {
     parks: await Promise.all(
       parkRows.map(async (parkRow) => ({
-        ...(await toPublicPark(parkRow, getLogoPublicUrl)),
+        ...(await toPublicPark(parkRow, getLogoPublicUrl, getMapPublicUrl)),
         visitedSummary: toVisitedSummary(visitsByParkId.get(parkRow.parkId) ?? [])
       }))
     ),
@@ -882,6 +923,33 @@ export const updateParkLogo = async (
       logoKey: logo.key,
       logoUpdatedAt: logo.updatedAt,
       updatedAt: logo.updatedAt
+    })
+    .where(eq(parks.id, park.id));
+
+  return {
+    id: park.id,
+    name: park.name,
+    slug: park.slug
+  };
+};
+
+export const updateParkMap = async (
+  database: Database,
+  slug: string,
+  map: { key: string; updatedAt: string }
+) => {
+  const park = await findParkRecordBySlugIncludingRemoved(database, slug);
+
+  if (!park) {
+    return null;
+  }
+
+  await database
+    .update(parks)
+    .set({
+      mapKey: map.key,
+      mapUpdatedAt: map.updatedAt,
+      updatedAt: map.updatedAt
     })
     .where(eq(parks.id, park.id));
 
