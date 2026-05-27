@@ -379,14 +379,14 @@ describe('manual catalog imports', () => {
       where: eq(parks.slug, 'kevon-luonnonpuisto')
     });
 
-    expect(kevo?.areaKm2).toBeCloseTo(710.648647, 6);
+    expect(kevo?.areaKm2).toBe(710.65);
     expect(kevo?.establishmentYear).toBe(1956);
 
     const liminganlahti = await testDatabase.database.query.parks.findFirst({
       where: eq(parks.slug, 'liminganlahti')
     });
 
-    expect(liminganlahti?.areaKm2).toBeCloseTo(3.700869, 6);
+    expect(liminganlahti?.areaKm2).toBe(3.7);
     expect(liminganlahti?.establishmentYear).toBe(1998);
   });
 
@@ -401,7 +401,7 @@ describe('manual catalog imports', () => {
       where: eq(parks.slug, 'laajalahden-luonnonsuojelualue')
     });
 
-    expect(laajalahti?.areaKm2).toBeCloseTo(1.894414, 6);
+    expect(laajalahti?.areaKm2).toBe(1.89);
     expect(laajalahti?.establishmentYear).toBe(1989);
   });
 

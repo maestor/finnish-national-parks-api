@@ -223,7 +223,9 @@ const parseMerenkurkkuFeatures = (payload: unknown) => {
 };
 
 const extractSykeMetadata = (
-  features: Array<{ properties: { paatpvm?: string | undefined; shape_area?: number | undefined } }>
+  features: Array<{
+    properties: { paatpvm?: string | undefined; shape_area?: number | undefined };
+  }>
 ) => {
   const totalAreaM2 = features.reduce((sum, f) => sum + (f.properties.shape_area ?? 0), 0);
   const earliestDate = features
@@ -232,7 +234,7 @@ const extractSykeMetadata = (
     .sort()[0];
 
   return {
-    areaKm2: totalAreaM2 > 0 ? totalAreaM2 / 1_000_000 : null,
+    areaKm2: totalAreaM2 > 0 ? Math.round((totalAreaM2 / 1_000_000) * 100) / 100 : null,
     establishmentYear: earliestDate ? new Date(earliestDate).getFullYear() : null
   };
 };
