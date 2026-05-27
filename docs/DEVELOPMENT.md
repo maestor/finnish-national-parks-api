@@ -8,7 +8,7 @@ Current local workflow:
 npm install
 npm run db:migrate
 npm run import:parks
-npm run import:merenkurkku
+npm run import:special-parks
 npm run park:logo -- <park-slug>
 npm run db:backup
 npm run verify
@@ -119,7 +119,7 @@ If a destination cannot be matched from the official Luontoon sitemap, the impor
 This repo also supports a one-off manual catalog import for Merenkurkun maailmanperintöalue:
 
 ```sh
-npm run import:merenkurkku
+npm run import:special-parks
 ```
 
 That command:

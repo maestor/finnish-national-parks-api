@@ -32,7 +32,7 @@ npm install
 cp .env.example .env
 npm run db:migrate
 npm run import:parks
-npm run import:merenkurkku
+npm run import:special-parks
 npm run park:logo -- <park-slug>
 npm run db:backup
 npm run verify
@@ -164,7 +164,7 @@ Importer expectations:
 One supported manual catalog import currently exists:
 
 ```sh
-npm run import:merenkurkku
+npm run import:special-parks
 ```
 
 It imports Merenkurkun maailmanperintöalue into the existing catalog model as `other-nature-reserve`, keeps its full heritage geometry, sets a park-level display label of `Maailmanperintökohde`, and protects the row from later LIPAS deactivation.

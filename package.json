@@ -12,7 +12,7 @@
     "db:backup": "tsx src/cli/backup-turso.ts",
     "db:migrate": "tsx src/cli/migrate.ts",
     "import:parks": "tsx src/cli/import-parks.ts",
-    "import:merenkurkku": "tsx src/cli/import-merenkurkku-world-heritage.ts",
+    "import:special-parks": "tsx src/cli/import-special-parks.ts",
     "park:logo": "tsx src/cli/upload-park-logo.ts",
     "park:logos": "tsx src/cli/upload-all-park-logos.ts",
     "park:map": "tsx src/cli/upload-park-map.ts",

@@ -26,7 +26,7 @@ export const supportedParkTypes = [
   {
     code: 112,
     id: 112,
-    name: 'Muu luonnonsuojelualue',
+    name: 'Luonnonsuojelualue',
     slug: 'other-nature-reserve'
   },
   {

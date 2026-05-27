@@ -12,8 +12,8 @@ const authConfig = {
 import { createApp } from '../../src/app.js';
 import { getParkBySlug } from '../../src/db/repositories.js';
 import { parks } from '../../src/db/schema.js';
-import { importMerenkurkkuWorldHeritage } from '../../src/importer/import-merenkurkku-world-heritage.js';
 import { importParks } from '../../src/importer/import-parks.js';
+import { importSpecialParks } from '../../src/importer/import-special-parks.js';
 import { createMemoryStorage } from '../../src/storage/memory-storage.js';
 import { createLipasPark, createLipasTrail, parkTypeFixtures } from '../fixtures/lipas.js';
 import { createTestDatabase } from '../helpers/test-db.js';
@@ -205,56 +205,11 @@ describe('API routes', () => {
   });
 
   it('includes an optional display type name for manual catalog parks', async () => {
-    await importMerenkurkkuWorldHeritage({
+    const { createSpecialParksSource } = await import('../fixtures/special-parks.js');
+    await importSpecialParks({
       database: testDatabase.database,
-      fetchSource: async () => ({
-        features: [
-          {
-            geometry: {
-              coordinates: [
-                [
-                  [21.0, 63.0],
-                  [21.0, 63.2],
-                  [21.2, 63.2],
-                  [21.2, 63.0],
-                  [21.0, 63.0]
-                ]
-              ],
-              type: 'Polygon'
-            },
-            properties: {
-              ID: 898,
-              Nimi: 'Merenkurkun saaristo A',
-              URL: 'https://example.test/merenkurkku',
-              aluetyyppi: 'Kohde'
-            },
-            type: 'Feature'
-          },
-          {
-            geometry: {
-              coordinates: [
-                [
-                  [20.7, 63.3],
-                  [20.7, 63.5],
-                  [21.1, 63.5],
-                  [21.1, 63.3],
-                  [20.7, 63.3]
-                ]
-              ],
-              type: 'Polygon'
-            },
-            properties: {
-              ID: 898,
-              Nimi: 'Merenkurkun saaristo B',
-              URL: 'https://example.test/merenkurkku',
-              aluetyyppi: 'Kohde'
-            },
-            type: 'Feature'
-          }
-        ]
-      }),
-      now: () => '2026-05-01T10:00:00.000Z',
-      sourceUrl: 'https://example.test/world-heritage'
+      fetchSource: createSpecialParksSource(),
+      now: () => '2026-05-01T10:00:00.000Z'
     });
 
     const app = createApp({ database: testDatabase.database });

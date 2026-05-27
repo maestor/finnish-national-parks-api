@@ -3,98 +3,37 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { getParkBySlug, listParks } from '../../src/db/repositories.js';
 import { parks } from '../../src/db/schema.js';
-import { importMerenkurkkuWorldHeritage } from '../../src/importer/import-merenkurkku-world-heritage.js';
 import { importParks } from '../../src/importer/import-parks.js';
+import { importSpecialParks } from '../../src/importer/import-special-parks.js';
 import { createLipasPark } from '../fixtures/lipas.js';
+import { createSpecialParksSource } from '../fixtures/special-parks.js';
 import { createTestDatabase } from '../helpers/test-db.js';
 
-const createWorldHeritageSource = () => ({
-  features: [
-    {
-      geometry: {
-        coordinates: [
-          [
-            [21.0, 63.0],
-            [21.0, 63.2],
-            [21.2, 63.2],
-            [21.2, 63.0],
-            [21.0, 63.0]
-          ]
-        ],
-        type: 'Polygon'
-      },
-      properties: {
-        ID: 898,
-        Nimi: 'Merenkurkun saaristo B',
-        URL: 'https://example.test/merenkurkku',
-        aluetyyppi: 'Kohde'
-      },
-      type: 'Feature'
-    },
-    {
-      geometry: {
-        coordinates: [
-          [
-            [20.7, 63.3],
-            [20.7, 63.5],
-            [21.1, 63.5],
-            [21.1, 63.3],
-            [20.7, 63.3]
-          ]
-        ],
-        type: 'Polygon'
-      },
-      properties: {
-        ID: 898,
-        Nimi: 'Merenkurkun saaristo A',
-        URL: 'https://example.test/merenkurkku',
-        aluetyyppi: 'Kohde'
-      },
-      type: 'Feature'
-    },
-    {
-      geometry: {
-        coordinates: [
-          [
-            [20.6, 62.9],
-            [20.6, 63.6],
-            [21.3, 63.6],
-            [21.3, 62.9],
-            [20.6, 62.9]
-          ]
-        ],
-        type: 'Polygon'
-      },
-      properties: {
-        ID: 898,
-        Nimi: 'Merenkurkun saaristo suojavyöhyke',
-        URL: 'https://example.test/merenkurkku',
-        aluetyyppi: 'Suoja-alue'
-      },
-      type: 'Feature'
-    },
-    {
-      geometry: {
-        coordinates: [
-          [
-            [24.0, 60.1],
-            [24.0, 60.2],
-            [24.1, 60.2],
-            [24.1, 60.1],
-            [24.0, 60.1]
-          ]
-        ],
-        type: 'Polygon'
-      },
-      properties: {
-        ID: 583,
-        Nimi: 'Suomenlinna',
-        URL: 'https://example.test/suomenlinna',
-        aluetyyppi: 'Kohde'
-      },
-      type: 'Feature'
-    }
-  ]
+const merenkurkkuSourceUrl =
+  'https://geoserver.museovirasto.fi/geoserver/rajapinta_suojellut/wfs?service=WFS&request=GetFeature&version=2.0.0&typeNames=rajapinta_suojellut:maailmanperinto_alue&outputFormat=application/json&srsName=EPSG:4326';
+
+const kevoSourceUrl =
+  "https://paikkatiedot.ymparisto.fi/geoserver/inspire_ps/wfs?service=WFS&request=GetFeature&version=2.0.0&typeNames=inspire_ps:PS.ProtectedSitesValtionOmistamaLuonnonsuojelualue&outputFormat=application/json&srsName=EPSG:4326&cql_filter=nimi='Kevon luonnonpuisto'";
+
+const laajalahtiSourceUrl =
+  "https://paikkatiedot.ymparisto.fi/geoserver/inspire_ps/wfs?service=WFS&request=GetFeature&version=2.0.0&typeNames=inspire_ps:PS.ProtectedSitesValtionOmistamaLuonnonsuojelualue&outputFormat=application/json&srsName=EPSG:4326&cql_filter=nimi='Laajalahden luonnonsuojelualue'";
+
+const liminganlahtiSourceUrl =
+  "https://paikkatiedot.ymparisto.fi/geoserver/inspire_ps/wfs?service=WFS&request=GetFeature&version=2.0.0&typeNames=inspire_ps:PS.ProtectedSitesYksityistenMaillaOlevaLuonnonsuojelualue&outputFormat=application/json&srsName=EPSG:4326&cql_filter=nimi='Liminganlahden luonnonsuojelualue'";
+
+const mallaSourceUrl =
+  "https://paikkatiedot.ymparisto.fi/geoserver/inspire_ps/wfs?service=WFS&request=GetFeature&version=2.0.0&typeNames=inspire_ps:PS.ProtectedSitesValtionOmistamaLuonnonsuojelualue&outputFormat=application/json&srsName=EPSG:4326&cql_filter=nimi='Mallan luonnonpuisto'";
+
+const siikalahtiSourceUrl =
+  "https://paikkatiedot.ymparisto.fi/geoserver/inspire_ps/wfs?service=WFS&request=GetFeature&version=2.0.0&typeNames=inspire_ps:PS.ProtectedSitesValtionOmistamaLuonnonsuojelualue&outputFormat=application/json&srsName=EPSG:4326&cql_filter=nimi='Siikalahden luonnonsuojelualue'";
+
+const createPolygonFeature = (
+  coordinates: number[][][],
+  properties: Record<string, unknown> = {}
+) => ({
+  geometry: { coordinates, type: 'Polygon' },
+  properties,
+  type: 'Feature'
 });
 
 describe('manual catalog imports', () => {
@@ -109,53 +48,85 @@ describe('manual catalog imports', () => {
     await testDatabase.dispose();
   });
 
-  it('imports Merenkurkku as a protected non-LIPAS-managed catalog park', async () => {
-    await importMerenkurkkuWorldHeritage({
+  it('imports all special parks with correct metadata', async () => {
+    const result = await importSpecialParks({
       database: testDatabase.database,
-      fetchSource: async () => createWorldHeritageSource(),
-      now: () => '2026-05-26T08:00:00.000Z',
-      sourceUrl: 'https://example.test/world-heritage'
+      fetchSource: createSpecialParksSource(),
+      now: () => '2026-05-27T08:00:00.000Z'
     });
 
-    const park = await getParkBySlug(testDatabase.database, 'merenkurkun-maailmanperintoalue');
-    const rawPark = await testDatabase.database.query.parks.findFirst({
-      where: eq(parks.slug, 'merenkurkun-maailmanperintoalue')
-    });
+    expect(result.results).toHaveLength(6);
 
-    expect(park).toMatchObject({
+    const merenkurkku = await getParkBySlug(
+      testDatabase.database,
+      'merenkurkun-maailmanperintoalue'
+    );
+    expect(merenkurkku).toMatchObject({
       displayTypeName: 'Maailmanperintökohde',
       lipasId: 9000898,
-      location: 'Raippaluodontie 2, 65800 Raippaluoto',
-      luontoonUrl: 'https://www.luontoon.fi/fi/kohteet/merenkurkun-maailmanperintoalue',
       name: 'Merenkurkun maailmanperintöalue',
-      type: {
-        slug: 'other-nature-reserve'
-      }
+      type: { slug: 'other-nature-reserve' }
     });
-    expect(park?.boundaryGeoJson).toMatchObject({
-      features: [{ geometry: { type: 'Polygon' } }, { geometry: { type: 'Polygon' } }],
-      type: 'FeatureCollection'
+    const rawMerenkurkku = await testDatabase.database.query.parks.findFirst({
+      where: eq(parks.slug, 'merenkurkun-maailmanperintoalue')
     });
-    expect(rawPark).toMatchObject({
-      displayTypeName: 'Maailmanperintökohde',
+    expect(rawMerenkurkku).toMatchObject({
       managedByLipasImport: false,
       postalCode: '65800',
       postalOffice: 'Raippaluoto'
     });
+
+    const kevo = await getParkBySlug(testDatabase.database, 'kevon-luonnonpuisto');
+    expect(kevo).toMatchObject({
+      displayTypeName: 'Luonnonpuisto',
+      lipasId: 9000915,
+      name: 'Kevon luonnonpuisto',
+      type: { slug: 'other-nature-reserve' }
+    });
+    expect(rawMerenkurkku).toMatchObject({ managedByLipasImport: false });
+
+    const laajalahti = await getParkBySlug(testDatabase.database, 'laajalahden-luonnonsuojelualue');
+    expect(laajalahti).toMatchObject({
+      lipasId: 9000824,
+      name: 'Laajalahden luonnonsuojelualue',
+      type: { slug: 'other-nature-reserve' }
+    });
+
+    const liminganlahti = await getParkBySlug(testDatabase.database, 'liminganlahti');
+    expect(liminganlahti).toMatchObject({
+      displayTypeName: 'Lintuvesi',
+      lipasId: 900070433,
+      name: 'Liminganlahti',
+      type: { slug: 'other-nature-reserve' }
+    });
+
+    const malla = await getParkBySlug(testDatabase.database, 'mallan-luonnonpuisto');
+    expect(malla).toMatchObject({
+      displayTypeName: 'Luonnonpuisto',
+      lipasId: 900042160,
+      name: 'Mallan luonnonpuisto',
+      type: { slug: 'other-nature-reserve' }
+    });
+
+    const siikalahti = await getParkBySlug(testDatabase.database, 'siikalahden-luonnonsuojelualue');
+    expect(siikalahti).toMatchObject({
+      lipasId: 9000102829,
+      name: 'Siikalahden luonnonsuojelualue',
+      type: { slug: 'other-nature-reserve' }
+    });
   });
 
   it('keeps non-LIPAS-managed parks active when a later LIPAS import deactivates managed rows', async () => {
-    await importMerenkurkkuWorldHeritage({
+    await importSpecialParks({
       database: testDatabase.database,
-      fetchSource: async () => createWorldHeritageSource(),
-      now: () => '2026-05-26T08:00:00.000Z',
-      sourceUrl: 'https://example.test/world-heritage'
+      fetchSource: createSpecialParksSource(),
+      now: () => '2026-05-27T08:00:00.000Z'
     });
 
     await importParks({
       database: testDatabase.database,
       expectedActiveCount: 0,
-      now: () => '2026-05-27T08:00:00.000Z',
+      now: () => '2026-05-28T08:00:00.000Z',
       sourceUrl: 'https://example.test/lipas',
       fetchSource: async () => ({
         items: [
@@ -166,21 +137,19 @@ describe('manual catalog imports', () => {
       })
     });
 
-    const parksAfterImport = await listParks(testDatabase.database);
+    const allParks = await listParks(testDatabase.database);
     const merenkurkku = await getParkBySlug(
       testDatabase.database,
       'merenkurkun-maailmanperintoalue'
     );
+    const kevo = await getParkBySlug(testDatabase.database, 'kevon-luonnonpuisto');
 
-    expect(parksAfterImport).toHaveLength(1);
-    expect(merenkurkku).toMatchObject({
-      catalogStatus: 'active',
-      displayTypeName: 'Maailmanperintökohde',
-      slug: 'merenkurkun-maailmanperintoalue'
-    });
+    expect(allParks).toHaveLength(6);
+    expect(merenkurkku).toMatchObject({ catalogStatus: 'active' });
+    expect(kevo).toMatchObject({ catalogStatus: 'active' });
   });
 
-  it('fails loudly when the official world heritage fetch returns a non-ok response', async () => {
+  it('fails loudly when a source fetch returns a non-ok response', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue({
@@ -190,155 +159,360 @@ describe('manual catalog imports', () => {
     );
 
     await expect(
-      importMerenkurkkuWorldHeritage({
+      importSpecialParks({
         database: testDatabase.database
       })
-    ).rejects.toThrow('Merenkurkku world heritage import failed with status 503.');
+    ).rejects.toThrow('Special parks import failed with status 503');
   });
 
-  it('fails when the source payload has no matching Merenkurkku area features', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue({
-        json: async () => ({ features: [] }),
-        ok: true
-      })
-    );
-
+  it('fails when a source payload has no matching features', async () => {
     await expect(
-      importMerenkurkkuWorldHeritage({
-        database: testDatabase.database
+      importSpecialParks({
+        database: testDatabase.database,
+        fetchSource: async (sourceUrl) => {
+          if (sourceUrl === kevoSourceUrl) {
+            return { type: 'FeatureCollection', features: [] };
+          }
+
+          return createSpecialParksSource()(sourceUrl);
+        }
       })
-    ).rejects.toThrow('No Merenkurkku world heritage area features were found in the source.');
+    ).rejects.toThrow('No features found for Kevon luonnonpuisto in the SYKE source.');
   });
 
   it('supports the default fetch path used by the CLI importer', async () => {
     vi.stubGlobal(
       'fetch',
-      vi.fn().mockResolvedValue({
-        json: async () => ({
-          features: [
-            {
-              geometry: {
-                coordinates: [
+      vi.fn().mockImplementation(async (url: string) => {
+        if (url === merenkurkkuSourceUrl) {
+          return {
+            json: async () => ({
+              type: 'FeatureCollection',
+              features: [
+                createPolygonFeature(
                   [
-                    [21.0, 63.0],
-                    [21.0, 63.2],
-                    [21.2, 63.2],
-                    [21.2, 63.0],
-                    [21.0, 63.0]
-                  ]
-                ],
-                type: 'Polygon'
-              },
-              properties: {
-                ID: 898,
-                URL: 'https://example.test/merenkurkku',
-                aluetyyppi: 'Kohde'
-              },
-              type: 'Feature'
-            },
-            {
-              geometry: {
-                coordinates: [
+                    [
+                      [21.0, 63.0],
+                      [21.0, 63.2],
+                      [21.2, 63.2],
+                      [21.2, 63.0],
+                      [21.0, 63.0]
+                    ]
+                  ],
+                  {
+                    ID: 898,
+                    Nimi: 'Merenkurkun saaristo',
+                    URL: 'https://example.test/merenkurkku',
+                    aluetyyppi: 'Kohde'
+                  }
+                )
+              ]
+            }),
+            ok: true
+          };
+        }
+
+        if (url === kevoSourceUrl) {
+          return {
+            json: async () => ({
+              type: 'FeatureCollection',
+              features: [
+                createPolygonFeature(
                   [
-                    [20.7, 63.3],
-                    [20.7, 63.5],
-                    [21.1, 63.5],
-                    [21.1, 63.3],
-                    [20.7, 63.3]
-                  ]
-                ],
-                type: 'Polygon'
-              },
-              properties: {
-                ID: 898,
-                Nimi: 'Merenkurkun saaristo B',
-                URL: 'https://example.test/merenkurkku',
-                aluetyyppi: 'Kohde'
-              },
-              type: 'Feature'
-            }
-          ]
-        }),
-        ok: true
+                    [
+                      [27.0, 69.5],
+                      [27.0, 69.7],
+                      [27.3, 69.7],
+                      [27.3, 69.5],
+                      [27.0, 69.5]
+                    ]
+                  ],
+                  {
+                    nimi: 'Kevon luonnonpuisto',
+                    paatpvm: '1956-12-21T00:00:00Z',
+                    shape_area: 710_648_647
+                  }
+                )
+              ]
+            }),
+            ok: true
+          };
+        }
+
+        if (url === laajalahtiSourceUrl) {
+          return {
+            json: async () => ({
+              type: 'FeatureCollection',
+              features: [
+                createPolygonFeature(
+                  [
+                    [
+                      [24.8, 60.2],
+                      [24.8, 60.22],
+                      [24.85, 60.22],
+                      [24.85, 60.2],
+                      [24.8, 60.2]
+                    ]
+                  ],
+                  {
+                    ely: 'Uudenmaan ELY-keskus',
+                    nimi: 'Laajalahden luonnonsuojelualue',
+                    paatpvm: '1989-11-10T00:00:00Z',
+                    shape_area: 1_894_414
+                  }
+                )
+              ]
+            }),
+            ok: true
+          };
+        }
+
+        if (url === liminganlahtiSourceUrl) {
+          return {
+            json: async () => ({
+              type: 'FeatureCollection',
+              features: [
+                createPolygonFeature(
+                  [
+                    [
+                      [25.2, 64.8],
+                      [25.2, 64.82],
+                      [25.25, 64.82],
+                      [25.25, 64.8],
+                      [25.2, 64.8]
+                    ]
+                  ],
+                  {
+                    nimi: 'Liminganlahden luonnonsuojelualue',
+                    paatpvm: '1998-11-25T00:00:00Z',
+                    shape_area: 23_784
+                  }
+                )
+              ]
+            }),
+            ok: true
+          };
+        }
+
+        if (url === mallaSourceUrl) {
+          return {
+            json: async () => ({
+              type: 'FeatureCollection',
+              features: [
+                createPolygonFeature(
+                  [
+                    [
+                      [20.7, 69.0],
+                      [20.7, 69.05],
+                      [20.8, 69.05],
+                      [20.8, 69.0],
+                      [20.7, 69.0]
+                    ]
+                  ],
+                  {
+                    nimi: 'Mallan luonnonpuisto',
+                    paatpvm: '1938-02-18T00:00:00Z',
+                    shape_area: 30_796_806
+                  }
+                )
+              ]
+            }),
+            ok: true
+          };
+        }
+
+        if (url === siikalahtiSourceUrl) {
+          return {
+            json: async () => ({
+              type: 'FeatureCollection',
+              features: [
+                createPolygonFeature(
+                  [
+                    [
+                      [29.3, 61.5],
+                      [29.3, 61.55],
+                      [29.4, 61.55],
+                      [29.4, 61.5],
+                      [29.3, 61.5]
+                    ]
+                  ],
+                  {
+                    nimi: 'Siikalahden luonnonsuojelualue',
+                    paatpvm: '2019-11-14T00:00:00Z',
+                    shape_area: 4_469_391
+                  }
+                )
+              ]
+            }),
+            ok: true
+          };
+        }
+
+        throw new Error(`Unexpected URL: ${url}`);
       })
     );
 
-    const result = await importMerenkurkkuWorldHeritage({
+    const result = await importSpecialParks({
       database: testDatabase.database
     });
-    const park = await getParkBySlug(testDatabase.database, 'merenkurkun-maailmanperintoalue');
 
-    expect(result.featureCount).toBe(2);
-    expect(result.importedAt).toBeTruthy();
-    expect(park).toMatchObject({
+    expect(result.results).toHaveLength(6);
+
+    const merenkurkku = await getParkBySlug(
+      testDatabase.database,
+      'merenkurkun-maailmanperintoalue'
+    );
+    expect(merenkurkku).toMatchObject({
       displayTypeName: 'Maailmanperintökohde',
-      slug: 'merenkurkun-maailmanperintoalue'
+      name: 'Merenkurkun maailmanperintöalue'
     });
   });
 
-  it('sorts Merenkurkku polygons predictably even when some source names are missing', async () => {
-    await importMerenkurkkuWorldHeritage({
+  it('derives area and establishment year from SYKE features', async () => {
+    await importSpecialParks({
       database: testDatabase.database,
-      fetchSource: async () => ({
-        features: [
-          {
-            geometry: {
-              coordinates: [
-                [
-                  [21.0, 63.0],
-                  [21.0, 63.2],
-                  [21.2, 63.2],
-                  [21.2, 63.0],
-                  [21.0, 63.0]
-                ]
-              ],
-              type: 'Polygon'
-            },
-            properties: {
-              ID: 898,
-              Nimi: 'Merenkurkun saaristo B',
-              URL: 'https://example.test/merenkurkku',
-              aluetyyppi: 'Kohde'
-            },
-            type: 'Feature'
-          },
-          {
-            geometry: {
-              coordinates: [
-                [
-                  [20.7, 63.3],
-                  [20.7, 63.5],
-                  [21.1, 63.5],
-                  [21.1, 63.3],
-                  [20.7, 63.3]
-                ]
-              ],
-              type: 'Polygon'
-            },
-            properties: {
-              ID: 898,
-              URL: 'https://example.test/merenkurkku',
-              aluetyyppi: 'Kohde'
-            },
-            type: 'Feature'
-          }
-        ]
-      }),
-      now: () => '2026-05-26T08:00:00.000Z',
-      sourceUrl: 'https://example.test/world-heritage'
+      fetchSource: createSpecialParksSource(),
+      now: () => '2026-05-27T08:00:00.000Z'
     });
 
-    const park = await getParkBySlug(testDatabase.database, 'merenkurkun-maailmanperintoalue');
-    const boundaryFeatures = (
-      park?.boundaryGeoJson as
-        | { features: Array<{ geometry: { coordinates: number[][][] } }> }
-        | undefined
-    )?.features;
+    const kevo = await testDatabase.database.query.parks.findFirst({
+      where: eq(parks.slug, 'kevon-luonnonpuisto')
+    });
 
-    expect(park?.boundaryGeoJson?.type).toBe('FeatureCollection');
-    expect(boundaryFeatures?.[0]?.geometry.coordinates[0]?.[0]).toEqual([20.7, 63.3]);
-    expect(boundaryFeatures?.[1]?.geometry.coordinates[0]?.[0]).toEqual([21.0, 63.0]);
+    expect(kevo?.areaKm2).toBeCloseTo(710.648647, 6);
+    expect(kevo?.establishmentYear).toBe(1956);
+
+    const liminganlahti = await testDatabase.database.query.parks.findFirst({
+      where: eq(parks.slug, 'liminganlahti')
+    });
+
+    expect(liminganlahti?.areaKm2).toBeCloseTo(3.700869, 6);
+    expect(liminganlahti?.establishmentYear).toBe(1998);
+  });
+
+  it('filters Laajalahti by ELY to pick the Espoo feature', async () => {
+    await importSpecialParks({
+      database: testDatabase.database,
+      fetchSource: createSpecialParksSource(),
+      now: () => '2026-05-27T08:00:00.000Z'
+    });
+
+    const laajalahti = await testDatabase.database.query.parks.findFirst({
+      where: eq(parks.slug, 'laajalahden-luonnonsuojelualue')
+    });
+
+    expect(laajalahti?.areaKm2).toBeCloseTo(1.894414, 6);
+    expect(laajalahti?.establishmentYear).toBe(1989);
+  });
+
+  it('fails when Merenkurkku source has no matching features', async () => {
+    await expect(
+      importSpecialParks({
+        database: testDatabase.database,
+        fetchSource: async (sourceUrl) => {
+          if (sourceUrl === merenkurkkuSourceUrl) {
+            return { type: 'FeatureCollection', features: [] };
+          }
+
+          return createSpecialParksSource()(sourceUrl);
+        }
+      })
+    ).rejects.toThrow('No Merenkurkku world heritage area features were found in the source.');
+  });
+
+  it('handles MultiPolygon geometries from SYKE', async () => {
+    await importSpecialParks({
+      database: testDatabase.database,
+      fetchSource: async (sourceUrl) => {
+        if (sourceUrl === kevoSourceUrl) {
+          return {
+            type: 'FeatureCollection',
+            features: [
+              {
+                geometry: {
+                  coordinates: [
+                    [
+                      [
+                        [27.0, 69.5],
+                        [27.0, 69.7],
+                        [27.3, 69.7],
+                        [27.3, 69.5],
+                        [27.0, 69.5]
+                      ]
+                    ],
+                    [
+                      [
+                        [27.4, 69.5],
+                        [27.4, 69.6],
+                        [27.5, 69.6],
+                        [27.5, 69.5],
+                        [27.4, 69.5]
+                      ]
+                    ]
+                  ],
+                  type: 'MultiPolygon'
+                },
+                properties: {
+                  nimi: 'Kevon luonnonpuisto',
+                  paatpvm: '1956-12-21T00:00:00Z',
+                  shape_area: 710_648_647
+                },
+                type: 'Feature'
+              }
+            ]
+          };
+        }
+
+        return createSpecialParksSource()(sourceUrl);
+      }
+    });
+
+    const kevo = await getParkBySlug(testDatabase.database, 'kevon-luonnonpuisto');
+    const boundaryFeatures = (kevo?.boundaryGeoJson as { features: unknown[] } | undefined)
+      ?.features;
+
+    expect(boundaryFeatures).toHaveLength(2);
+  });
+
+  it('handles missing SYKE metadata fields gracefully', async () => {
+    await importSpecialParks({
+      database: testDatabase.database,
+      fetchSource: async (sourceUrl) => {
+        if (sourceUrl === kevoSourceUrl) {
+          return {
+            type: 'FeatureCollection',
+            features: [
+              {
+                geometry: {
+                  coordinates: [
+                    [
+                      [
+                        [27.0, 69.5],
+                        [27.0, 69.7],
+                        [27.3, 69.7],
+                        [27.3, 69.5],
+                        [27.0, 69.5]
+                      ]
+                    ]
+                  ],
+                  type: 'MultiPolygon'
+                },
+                properties: { nimi: 'Kevon luonnonpuisto' },
+                type: 'Feature'
+              }
+            ]
+          };
+        }
+
+        return createSpecialParksSource()(sourceUrl);
+      }
+    });
+
+    const kevo = await testDatabase.database.query.parks.findFirst({
+      where: eq(parks.slug, 'kevon-luonnonpuisto')
+    });
+
+    expect(kevo?.areaKm2).toBeNull();
+    expect(kevo?.establishmentYear).toBeNull();
   });
 });

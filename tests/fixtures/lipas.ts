@@ -54,7 +54,7 @@ export const parkTypeFixtures = {
     typeCode: 103
   },
   otherNatureReserve: {
-    name: 'Muu luonnonsuojelualue',
+    name: 'Luonnonsuojelualue',
     slug: 'other-nature-reserve',
     typeCode: 112
   },
