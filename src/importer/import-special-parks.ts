@@ -1,7 +1,11 @@
+import { readFile } from 'node:fs/promises';
+import { fileURLToPath } from 'node:url';
+
 import { z } from 'zod';
 
 import type { Database } from '../db/database.js';
 import { createImportRun, syncParkTypes, upsertCatalogPark } from '../db/repositories.js';
+import type { SupportedParkTypeSlug } from '../parks/park-types.js';
 import { getSupportedParkTypeBySlug } from '../parks/park-types.js';
 import type { GeoJsonFeatureCollection, PolygonGeometry } from './geometry.js';
 import { deriveBoundingBox } from './geometry.js';
@@ -55,11 +59,23 @@ const sykeResponseSchema = z.object({
   type: z.literal('FeatureCollection')
 });
 
+const geoJsonFeatureCollectionSchema = z.object({
+  features: z.array(
+    z.object({
+      geometry: z.object({
+        coordinates: z.unknown(),
+        type: z.string()
+      }),
+      properties: z.record(z.string(), z.unknown()).optional(),
+      type: z.literal('Feature')
+    })
+  ),
+  type: z.literal('FeatureCollection')
+});
+
 type SpecialParkConfig = {
   displayTypeName: string | null;
-  extractMetadata?: (
-    features: Array<{ properties: { paatpvm?: string; shape_area?: number } }>
-  ) => {
+  extractMetadata?: (features: Array<{ properties?: Record<string, unknown> | undefined }>) => {
     areaKm2: number | null;
     establishmentYear: number | null;
   };
@@ -67,7 +83,7 @@ type SpecialParkConfig = {
   locationLabel: string;
   luontoonUrl: string;
   name: string;
-  parkTypeSlug: 'other-nature-reserve';
+  parkTypeSlug: SupportedParkTypeSlug;
   postalCode: string | null;
   postalOffice: string | null;
   responseShapeVersion: string;
@@ -77,6 +93,13 @@ type SpecialParkConfig = {
 };
 
 const defaultFetchSource = async (sourceUrl: string) => {
+  if (sourceUrl.startsWith('special://')) {
+    const slug = sourceUrl.slice('special://'.length);
+    const fileUrl = new URL(`./data/${slug}.json`, import.meta.url);
+    const content = await readFile(fileURLToPath(fileUrl), 'utf-8');
+    return JSON.parse(content);
+  }
+
   const response = await fetch(sourceUrl);
 
   if (!response.ok) {
@@ -115,6 +138,27 @@ const toBoundaryGeoJson = (
     })),
   type: 'FeatureCollection'
 });
+
+const parseGeoJsonFeatures = (payload: unknown) => {
+  const parsed = geoJsonFeatureCollectionSchema.parse(payload);
+  return parsed.features;
+};
+
+export const extractHikingAreaMetadata = (
+  features: Array<{
+    properties?: Record<string, unknown> | undefined;
+  }>
+) => {
+  const totalAreaM2 = features.reduce(
+    (sum, f) => sum + ((f.properties?.shape_area as number | undefined) ?? 0),
+    0
+  );
+
+  return {
+    areaKm2: totalAreaM2 > 0 ? Math.round((totalAreaM2 / 1_000_000) * 100) / 100 : null,
+    establishmentYear: null
+  };
+};
 
 const specialParkConfigs: SpecialParkConfig[] = [
   {
@@ -201,6 +245,33 @@ const specialParkConfigs: SpecialParkConfig[] = [
     sourceUrl:
       "https://paikkatiedot.ymparisto.fi/geoserver/inspire_ps/wfs?service=WFS&request=GetFeature&version=2.0.0&typeNames=inspire_ps:PS.ProtectedSitesValtionOmistamaLuonnonsuojelualue&outputFormat=application/json&srsName=EPSG:4326&cql_filter=nimi='Siikalahden luonnonsuojelualue'",
     syntheticLipasId: 9_000_102829
+  },
+  {
+    displayTypeName: null,
+    extractMetadata: extractHikingAreaMetadata,
+    locationLabel: 'Vaattunkikönkääntie',
+    luontoonUrl: 'https://www.luontoon.fi/fi/kohteet/napapiirin-retkeilyalue',
+    name: 'Napapiirin retkeilyalue',
+    parkTypeSlug: 'state-hiking-area',
+    postalCode: '96930',
+    postalOffice: 'Rovaniemi',
+    responseShapeVersion: 'syke-state-hiking-areas-v1',
+    slug: 'napapiirin-retkeilyalue',
+    sourceUrl: 'special://napapiirin-retkeilyalue',
+    syntheticLipasId: 9_000_126_313
+  },
+  {
+    displayTypeName: null,
+    locationLabel: 'Inarintie 46',
+    luontoonUrl: 'https://www.luontoon.fi/fi/kohteet/inarin-retkeilyalue',
+    name: 'Inarin retkeilyalue',
+    parkTypeSlug: 'state-hiking-area',
+    postalCode: '99870',
+    postalOffice: 'Inari',
+    responseShapeVersion: 'lipas-state-hiking-area-v1',
+    slug: 'inarin-retkeilyalue',
+    sourceUrl: 'special://inarin-retkeilyalue',
+    syntheticLipasId: 606_689
   }
 ];
 
@@ -259,7 +330,7 @@ export const importSpecialParks = async ({
 
     let sourceFeatures: Array<{
       geometry: { coordinates: unknown; type: string };
-      properties: Record<string, unknown>;
+      properties?: Record<string, unknown> | undefined;
       type: string;
     }>;
     let metadata: { areaKm2: number | null; establishmentYear: number | null };
@@ -271,6 +342,15 @@ export const importSpecialParks = async ({
       }
       sourceFeatures = features;
       metadata = { areaKm2: null, establishmentYear: null };
+    } else if (config.sourceUrl.startsWith('special://')) {
+      const features = parseGeoJsonFeatures(payload);
+      if (features.length === 0) {
+        throw new Error(`No features found for ${config.name} in the source.`);
+      }
+      sourceFeatures = features;
+      metadata = config.extractMetadata
+        ? config.extractMetadata(features)
+        : { areaKm2: null, establishmentYear: null };
     } else {
       const features = parseSykeFeatures(payload);
       const filteredFeatures = config.filterFeatures
