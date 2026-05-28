@@ -1,5 +1,6 @@
 node_modules/
 coverage/
 data/
+!src/importer/data/
 .env
 docs/plans/

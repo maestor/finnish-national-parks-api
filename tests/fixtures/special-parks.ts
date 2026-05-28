@@ -16,6 +16,9 @@ const mallaSourceUrl =
 const siikalahtiSourceUrl =
   "https://paikkatiedot.ymparisto.fi/geoserver/inspire_ps/wfs?service=WFS&request=GetFeature&version=2.0.0&typeNames=inspire_ps:PS.ProtectedSitesValtionOmistamaLuonnonsuojelualue&outputFormat=application/json&srsName=EPSG:4326&cql_filter=nimi='Siikalahden luonnonsuojelualue'";
 
+const napapiiriSourceUrl = 'special://napapiirin-retkeilyalue';
+const inariSourceUrl = 'special://inarin-retkeilyalue';
+
 const createPolygonFeature = (
   coordinates: number[][][],
   properties: Record<string, unknown> = {}
@@ -237,6 +240,54 @@ export const createSpecialParksSource = () => {
               shape_area: 4_469_391
             }
           )
+        ]
+      }
+    ],
+    [
+      napapiiriSourceUrl,
+      {
+        type: 'FeatureCollection',
+        features: [
+          createPolygonFeature(
+            [
+              [
+                [25.8, 66.5],
+                [25.8, 66.55],
+                [25.85, 66.55],
+                [25.85, 66.5],
+                [25.8, 66.5]
+              ]
+            ],
+            {
+              shape_area: 26_156_780
+            }
+          ),
+          createPolygonFeature([
+            [
+              [25.85, 66.5],
+              [25.85, 66.52],
+              [25.87, 66.52],
+              [25.87, 66.5],
+              [25.85, 66.5]
+            ]
+          ])
+        ]
+      }
+    ],
+    [
+      inariSourceUrl,
+      {
+        type: 'FeatureCollection',
+        features: [
+          createPolygonFeature([
+            [
+              [27.0, 68.9],
+              [27.0, 69.0],
+              [27.1, 69.0],
+              [27.1, 68.9],
+              [27.0, 68.9]
+            ]
+          ])
         ]
       }
     ]

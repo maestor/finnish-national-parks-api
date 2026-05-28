@@ -55,7 +55,7 @@ describe('manual catalog imports', () => {
       now: () => '2026-05-27T08:00:00.000Z'
     });
 
-    expect(result.results).toHaveLength(6);
+    expect(result.results).toHaveLength(8);
 
     const merenkurkku = await getParkBySlug(
       testDatabase.database,
@@ -114,6 +114,38 @@ describe('manual catalog imports', () => {
       name: 'Siikalahden luonnonsuojelualue',
       type: { slug: 'other-nature-reserve' }
     });
+
+    const napapiiri = await getParkBySlug(testDatabase.database, 'napapiirin-retkeilyalue');
+    expect(napapiiri).toMatchObject({
+      lipasId: 9000126313,
+      name: 'Napapiirin retkeilyalue',
+      type: { slug: 'state-hiking-area' }
+    });
+    const rawNapapiiri = await testDatabase.database.query.parks.findFirst({
+      where: eq(parks.slug, 'napapiirin-retkeilyalue')
+    });
+    expect(rawNapapiiri).toMatchObject({
+      locationLabel: 'Vaattunkikönkääntie',
+      managedByLipasImport: false,
+      postalCode: '96930',
+      postalOffice: 'Rovaniemi'
+    });
+
+    const inari = await getParkBySlug(testDatabase.database, 'inarin-retkeilyalue');
+    expect(inari).toMatchObject({
+      lipasId: 606689,
+      name: 'Inarin retkeilyalue',
+      type: { slug: 'state-hiking-area' }
+    });
+    const rawInari = await testDatabase.database.query.parks.findFirst({
+      where: eq(parks.slug, 'inarin-retkeilyalue')
+    });
+    expect(rawInari).toMatchObject({
+      locationLabel: 'Inarintie 46',
+      managedByLipasImport: false,
+      postalCode: '99870',
+      postalOffice: 'Inari'
+    });
   });
 
   it('keeps non-LIPAS-managed parks active when a later LIPAS import deactivates managed rows', async () => {
@@ -144,7 +176,7 @@ describe('manual catalog imports', () => {
     );
     const kevo = await getParkBySlug(testDatabase.database, 'kevon-luonnonpuisto');
 
-    expect(allParks).toHaveLength(6);
+    expect(allParks).toHaveLength(8);
     expect(merenkurkku).toMatchObject({ catalogStatus: 'active' });
     expect(kevo).toMatchObject({ catalogStatus: 'active' });
   });
@@ -356,7 +388,7 @@ describe('manual catalog imports', () => {
       database: testDatabase.database
     });
 
-    expect(result.results).toHaveLength(6);
+    expect(result.results).toHaveLength(8);
 
     const merenkurkku = await getParkBySlug(
       testDatabase.database,
@@ -365,6 +397,18 @@ describe('manual catalog imports', () => {
     expect(merenkurkku).toMatchObject({
       displayTypeName: 'Maailmanperintökohde',
       name: 'Merenkurkun maailmanperintöalue'
+    });
+
+    const napapiiri = await getParkBySlug(testDatabase.database, 'napapiirin-retkeilyalue');
+    expect(napapiiri).toMatchObject({
+      name: 'Napapiirin retkeilyalue',
+      type: { slug: 'state-hiking-area' }
+    });
+
+    const inari = await getParkBySlug(testDatabase.database, 'inarin-retkeilyalue');
+    expect(inari).toMatchObject({
+      name: 'Inarin retkeilyalue',
+      type: { slug: 'state-hiking-area' }
     });
   });
 
@@ -472,6 +516,43 @@ describe('manual catalog imports', () => {
       ?.features;
 
     expect(boundaryFeatures).toHaveLength(2);
+  });
+
+  it('derives area from GeoJSON shapefile features for hiking areas', async () => {
+    await importSpecialParks({
+      database: testDatabase.database,
+      fetchSource: createSpecialParksSource(),
+      now: () => '2026-05-27T08:00:00.000Z'
+    });
+
+    const napapiiri = await testDatabase.database.query.parks.findFirst({
+      where: eq(parks.slug, 'napapiirin-retkeilyalue')
+    });
+
+    expect(napapiiri?.areaKm2).toBe(26.16);
+    expect(napapiiri?.establishmentYear).toBeNull();
+
+    const inari = await testDatabase.database.query.parks.findFirst({
+      where: eq(parks.slug, 'inarin-retkeilyalue')
+    });
+
+    expect(inari?.areaKm2).toBeNull();
+    expect(inari?.establishmentYear).toBeNull();
+  });
+
+  it('fails when a special:// source has no matching features', async () => {
+    await expect(
+      importSpecialParks({
+        database: testDatabase.database,
+        fetchSource: async (sourceUrl) => {
+          if (sourceUrl === 'special://napapiirin-retkeilyalue') {
+            return { type: 'FeatureCollection', features: [] };
+          }
+
+          return createSpecialParksSource()(sourceUrl);
+        }
+      })
+    ).rejects.toThrow('No features found for Napapiirin retkeilyalue in the source.');
   });
 
   it('handles missing SYKE metadata fields gracefully', async () => {
