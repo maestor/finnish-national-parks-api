@@ -7,6 +7,8 @@ import { getEnv } from '../env.js';
 import { uploadParkMap } from '../parks/upload-park-map.js';
 import { createR2Client } from '../storage/r2-client.js';
 
+const force = process.argv.slice(2).includes('--force');
+
 const getR2Config = () => {
   const env = getEnv();
 
@@ -48,19 +50,27 @@ const client = createDatabaseClient();
 const storage = createR2Client(getR2Config());
 const database = createDatabase(client);
 
-const successes: string[] = [];
+const uploaded: string[] = [];
+const skipped: string[] = [];
 const failures: { slug: string; error: string }[] = [];
 
 for (const slug of slugs) {
   try {
     const result = await uploadParkMap({
       database,
+      force,
       mapsDirectory,
       slug,
       storage
     });
-    console.log(`✓ ${result.slug} → ${result.mapKey}`);
-    successes.push(result.slug);
+
+    if (result.action === 'skipped') {
+      console.log(`∘ ${result.slug} → ${result.mapKey} (already up to date)`);
+      skipped.push(result.slug);
+    } else {
+      console.log(`✓ ${result.slug} → ${result.mapKey}`);
+      uploaded.push(result.slug);
+    }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.error(`✗ ${slug}: ${message}`);
@@ -71,7 +81,9 @@ for (const slug of slugs) {
 await client.close();
 
 console.log('');
-console.log(`Done. ${successes.length} uploaded, ${failures.length} failed.`);
+console.log(
+  `Done. ${uploaded.length} uploaded, ${skipped.length} skipped, ${failures.length} failed.`
+);
 
 if (failures.length > 0) {
   process.exit(1);

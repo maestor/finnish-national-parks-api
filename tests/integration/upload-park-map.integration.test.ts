@@ -48,6 +48,7 @@ describe('uploadParkMap', () => {
       now: () => '2026-05-03T12:34:56.000Z',
       slug: 'akasmannyn-kansallispuisto',
       storage: {
+        getObjectMetadata: async () => null,
         upload: async (key, buffer, contentType) => {
           uploads.push({ buffer, contentType, key });
         }
@@ -55,6 +56,7 @@ describe('uploadParkMap', () => {
     });
 
     expect(result).toEqual({
+      action: 'uploaded',
       mapKey: 'pdf-maps/akasmannyn-kansallispuisto.pdf',
       parkName: 'Äkäsmännyn kansallispuisto',
       slug: 'akasmannyn-kansallispuisto'
@@ -83,6 +85,153 @@ describe('uploadParkMap', () => {
     });
   });
 
+  it('skips upload when both storage and db already have the map', async () => {
+    const uploads: Array<{ buffer: Buffer; contentType: string; key: string }> = [];
+    const localMapPath = join(mapsDirectory, 'akasmannyn-kansallispuisto.pdf');
+
+    await writeFile(localMapPath, Buffer.from('fake-pdf-data'));
+
+    await uploadParkMap({
+      database: testDatabase.database,
+      mapsDirectory,
+      now: () => '2026-05-03T12:34:56.000Z',
+      slug: 'akasmannyn-kansallispuisto',
+      storage: {
+        getObjectMetadata: async () => null,
+        upload: async (key, buffer, contentType) => {
+          uploads.push({ buffer, contentType, key });
+        }
+      }
+    });
+
+    uploads.length = 0;
+
+    const result = await uploadParkMap({
+      database: testDatabase.database,
+      mapsDirectory,
+      slug: 'akasmannyn-kansallispuisto',
+      storage: {
+        getObjectMetadata: async () => ({ contentLength: 100, contentType: 'application/pdf' }),
+        upload: async (key, buffer, contentType) => {
+          uploads.push({ buffer, contentType, key });
+        }
+      }
+    });
+
+    expect(result).toEqual({
+      action: 'skipped',
+      mapKey: 'pdf-maps/akasmannyn-kansallispuisto.pdf',
+      parkName: 'Äkäsmännyn kansallispuisto',
+      slug: 'akasmannyn-kansallispuisto'
+    });
+    expect(uploads).toHaveLength(0);
+  });
+
+  it('recovers storage when db has the key but storage is missing', async () => {
+    const uploads: Array<{ buffer: Buffer; contentType: string; key: string }> = [];
+    const localMapPath = join(mapsDirectory, 'akasmannyn-kansallispuisto.pdf');
+
+    await writeFile(localMapPath, Buffer.from('fake-pdf-data'));
+
+    await uploadParkMap({
+      database: testDatabase.database,
+      mapsDirectory,
+      now: () => '2026-05-03T12:34:56.000Z',
+      slug: 'akasmannyn-kansallispuisto',
+      storage: {
+        getObjectMetadata: async () => null,
+        upload: async (key, buffer, contentType) => {
+          uploads.push({ buffer, contentType, key });
+        }
+      }
+    });
+
+    uploads.length = 0;
+
+    const result = await uploadParkMap({
+      database: testDatabase.database,
+      mapsDirectory,
+      now: () => '2026-05-04T12:34:56.000Z',
+      slug: 'akasmannyn-kansallispuisto',
+      storage: {
+        getObjectMetadata: async () => null,
+        upload: async (key, buffer, contentType) => {
+          uploads.push({ buffer, contentType, key });
+        }
+      }
+    });
+
+    expect(result.action).toBe('uploaded');
+    expect(uploads).toHaveLength(1);
+  });
+
+  it('writes only to db when storage has the file but db is missing the key', async () => {
+    const uploads: Array<{ buffer: Buffer; contentType: string; key: string }> = [];
+    const localMapPath = join(mapsDirectory, 'akasmannyn-kansallispuisto.pdf');
+
+    await writeFile(localMapPath, Buffer.from('fake-pdf-data'));
+
+    const result = await uploadParkMap({
+      database: testDatabase.database,
+      mapsDirectory,
+      now: () => '2026-05-04T12:34:56.000Z',
+      slug: 'akasmannyn-kansallispuisto',
+      storage: {
+        getObjectMetadata: async () => ({ contentLength: 100, contentType: 'application/pdf' }),
+        upload: async (key, buffer, contentType) => {
+          uploads.push({ buffer, contentType, key });
+        }
+      }
+    });
+
+    expect(result).toEqual({
+      action: 'db-only',
+      mapKey: 'pdf-maps/akasmannyn-kansallispuisto.pdf',
+      parkName: 'Äkäsmännyn kansallispuisto',
+      slug: 'akasmannyn-kansallispuisto'
+    });
+    expect(uploads).toHaveLength(0);
+    await expect(
+      getParkBySlug(
+        testDatabase.database,
+        'akasmannyn-kansallispuisto',
+        undefined,
+        (key, updatedAt) => {
+          return `https://assets.example.com/${key}?v=${encodeURIComponent(updatedAt)}`;
+        }
+      )
+    ).resolves.toMatchObject({
+      map: {
+        key: 'pdf-maps/akasmannyn-kansallispuisto.pdf',
+        updatedAt: '2026-05-04T12:34:56.000Z'
+      }
+    });
+  });
+
+  it('forces upload and db write when force is true even if both exist', async () => {
+    const uploads: Array<{ buffer: Buffer; contentType: string; key: string }> = [];
+    const localMapPath = join(mapsDirectory, 'akasmannyn-kansallispuisto.pdf');
+
+    await writeFile(localMapPath, Buffer.from('fake-pdf-data'));
+
+    const result = await uploadParkMap({
+      database: testDatabase.database,
+      force: true,
+      mapsDirectory,
+      now: () => '2026-05-03T12:34:56.000Z',
+      slug: 'akasmannyn-kansallispuisto',
+      storage: {
+        getObjectMetadata: async () => ({ contentLength: 100, contentType: 'application/pdf' }),
+        upload: async (key, buffer, contentType) => {
+          uploads.push({ buffer, contentType, key });
+        }
+      }
+    });
+
+    expect(result.action).toBe('uploaded');
+    expect(uploads).toHaveLength(1);
+  });
+
   it('fails when the local pdf file does not exist or the slug is unknown', async () => {
     await expect(
       uploadParkMap({
@@ -90,6 +239,7 @@ describe('uploadParkMap', () => {
         mapsDirectory,
         slug: 'akasmannyn-kansallispuisto',
         storage: {
+          getObjectMetadata: async () => null,
           upload: async () => {}
         }
       })
@@ -103,6 +253,7 @@ describe('uploadParkMap', () => {
         mapsDirectory,
         slug: 'missing-park',
         storage: {
+          getObjectMetadata: async () => null,
           upload: async () => {}
         }
       })
@@ -118,6 +269,7 @@ describe('uploadParkMap', () => {
         mapsDirectory,
         slug: 'akasmannyn-kansallispuisto',
         storage: {
+          getObjectMetadata: async () => null,
           upload: async () => {}
         }
       })
@@ -138,6 +290,7 @@ describe('uploadParkMap', () => {
         mapsDirectory,
         slug: 'akasmannyn-kansallispuisto',
         storage: {
+          getObjectMetadata: async () => null,
           upload: async () => {}
         }
       })

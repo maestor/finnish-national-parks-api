@@ -48,6 +48,7 @@ describe('uploadParkLogo', () => {
       now: () => '2026-05-03T12:34:56.000Z',
       slug: 'akasmannyn-kansallispuisto',
       storage: {
+        getObjectMetadata: async () => null,
         upload: async (key, buffer, contentType) => {
           uploads.push({ buffer, contentType, key });
         }
@@ -55,6 +56,7 @@ describe('uploadParkLogo', () => {
     });
 
     expect(result).toEqual({
+      action: 'uploaded',
       logoKey: 'logos/akasmannyn-kansallispuisto.png',
       parkName: 'Äkäsmännyn kansallispuisto',
       slug: 'akasmannyn-kansallispuisto'
@@ -78,6 +80,148 @@ describe('uploadParkLogo', () => {
     });
   });
 
+  it('skips upload when both storage and db already have the logo', async () => {
+    const uploads: Array<{ buffer: Buffer; contentType: string; key: string }> = [];
+    const localLogoPath = join(logosDirectory, 'akasmannyn-kansallispuisto.png');
+
+    await writeFile(localLogoPath, Buffer.from('fake-png-data'));
+
+    await uploadParkLogo({
+      database: testDatabase.database,
+      logosDirectory,
+      now: () => '2026-05-03T12:34:56.000Z',
+      slug: 'akasmannyn-kansallispuisto',
+      storage: {
+        getObjectMetadata: async () => null,
+        upload: async (key, buffer, contentType) => {
+          uploads.push({ buffer, contentType, key });
+        }
+      }
+    });
+
+    uploads.length = 0;
+
+    const result = await uploadParkLogo({
+      database: testDatabase.database,
+      logosDirectory,
+      slug: 'akasmannyn-kansallispuisto',
+      storage: {
+        getObjectMetadata: async () => ({ contentLength: 100, contentType: 'image/png' }),
+        upload: async (key, buffer, contentType) => {
+          uploads.push({ buffer, contentType, key });
+        }
+      }
+    });
+
+    expect(result).toEqual({
+      action: 'skipped',
+      logoKey: 'logos/akasmannyn-kansallispuisto.png',
+      parkName: 'Äkäsmännyn kansallispuisto',
+      slug: 'akasmannyn-kansallispuisto'
+    });
+    expect(uploads).toHaveLength(0);
+  });
+
+  it('recovers storage when db has the key but storage is missing', async () => {
+    const uploads: Array<{ buffer: Buffer; contentType: string; key: string }> = [];
+    const localLogoPath = join(logosDirectory, 'akasmannyn-kansallispuisto.png');
+
+    await writeFile(localLogoPath, Buffer.from('fake-png-data'));
+
+    await uploadParkLogo({
+      database: testDatabase.database,
+      logosDirectory,
+      now: () => '2026-05-03T12:34:56.000Z',
+      slug: 'akasmannyn-kansallispuisto',
+      storage: {
+        getObjectMetadata: async () => null,
+        upload: async (key, buffer, contentType) => {
+          uploads.push({ buffer, contentType, key });
+        }
+      }
+    });
+
+    uploads.length = 0;
+
+    const result = await uploadParkLogo({
+      database: testDatabase.database,
+      logosDirectory,
+      now: () => '2026-05-04T12:34:56.000Z',
+      slug: 'akasmannyn-kansallispuisto',
+      storage: {
+        getObjectMetadata: async () => null,
+        upload: async (key, buffer, contentType) => {
+          uploads.push({ buffer, contentType, key });
+        }
+      }
+    });
+
+    expect(result.action).toBe('uploaded');
+    expect(uploads).toHaveLength(1);
+  });
+
+  it('writes only to db when storage has the file but db is missing the key', async () => {
+    const uploads: Array<{ buffer: Buffer; contentType: string; key: string }> = [];
+    const localLogoPath = join(logosDirectory, 'akasmannyn-kansallispuisto.png');
+
+    await writeFile(localLogoPath, Buffer.from('fake-png-data'));
+
+    const result = await uploadParkLogo({
+      database: testDatabase.database,
+      logosDirectory,
+      now: () => '2026-05-04T12:34:56.000Z',
+      slug: 'akasmannyn-kansallispuisto',
+      storage: {
+        getObjectMetadata: async () => ({ contentLength: 100, contentType: 'image/png' }),
+        upload: async (key, buffer, contentType) => {
+          uploads.push({ buffer, contentType, key });
+        }
+      }
+    });
+
+    expect(result).toEqual({
+      action: 'db-only',
+      logoKey: 'logos/akasmannyn-kansallispuisto.png',
+      parkName: 'Äkäsmännyn kansallispuisto',
+      slug: 'akasmannyn-kansallispuisto'
+    });
+    expect(uploads).toHaveLength(0);
+    await expect(
+      getParkBySlug(testDatabase.database, 'akasmannyn-kansallispuisto', (key, updatedAt) => {
+        return `https://assets.example.com/${key}?v=${encodeURIComponent(updatedAt)}`;
+      })
+    ).resolves.toMatchObject({
+      logo: {
+        key: 'logos/akasmannyn-kansallispuisto.png',
+        updatedAt: '2026-05-04T12:34:56.000Z'
+      }
+    });
+  });
+
+  it('forces upload and db write when force is true even if both exist', async () => {
+    const uploads: Array<{ buffer: Buffer; contentType: string; key: string }> = [];
+    const localLogoPath = join(logosDirectory, 'akasmannyn-kansallispuisto.png');
+
+    await writeFile(localLogoPath, Buffer.from('fake-png-data'));
+
+    const result = await uploadParkLogo({
+      database: testDatabase.database,
+      force: true,
+      logosDirectory,
+      now: () => '2026-05-03T12:34:56.000Z',
+      slug: 'akasmannyn-kansallispuisto',
+      storage: {
+        getObjectMetadata: async () => ({ contentLength: 100, contentType: 'image/png' }),
+        upload: async (key, buffer, contentType) => {
+          uploads.push({ buffer, contentType, key });
+        }
+      }
+    });
+
+    expect(result.action).toBe('uploaded');
+    expect(uploads).toHaveLength(1);
+  });
+
   it('fails when the local png file does not exist or the slug is unknown', async () => {
     await expect(
       uploadParkLogo({
@@ -85,6 +229,7 @@ describe('uploadParkLogo', () => {
         logosDirectory,
         slug: 'akasmannyn-kansallispuisto',
         storage: {
+          getObjectMetadata: async () => null,
           upload: async () => {}
         }
       })
@@ -98,6 +243,7 @@ describe('uploadParkLogo', () => {
         logosDirectory,
         slug: 'missing-park',
         storage: {
+          getObjectMetadata: async () => null,
           upload: async () => {}
         }
       })
@@ -113,6 +259,7 @@ describe('uploadParkLogo', () => {
         logosDirectory,
         slug: 'akasmannyn-kansallispuisto',
         storage: {
+          getObjectMetadata: async () => null,
           upload: async () => {}
         }
       })
@@ -133,6 +280,7 @@ describe('uploadParkLogo', () => {
         logosDirectory,
         slug: 'akasmannyn-kansallispuisto',
         storage: {
+          getObjectMetadata: async () => null,
           upload: async () => {}
         }
       })
