@@ -6,14 +6,16 @@ import { getEnv } from '../env.js';
 import { uploadParkLogo } from '../parks/upload-park-logo.js';
 import { createR2Client } from '../storage/r2-client.js';
 
-const getSlug = () => {
-  const slug = process.argv[2];
+const parseArgs = () => {
+  const args = process.argv.slice(2);
+  const force = args.includes('--force');
+  const slug = args.find((arg) => arg !== '--force');
 
-  if (!slug || process.argv[3]) {
-    throw new Error('Usage: npm run park:logo -- <park-slug>');
+  if (!slug) {
+    throw new Error('Usage: npm run park:logo -- <park-slug> [--force]');
   }
 
-  return slug;
+  return { force, slug };
 };
 
 const getR2Config = () => {
@@ -43,15 +45,24 @@ const getR2Config = () => {
 
 const client = createDatabaseClient();
 
+const { force, slug } = parseArgs();
+
 try {
   const result = await uploadParkLogo({
     database: createDatabase(client),
+    force,
     logosDirectory: resolve('data/logos'),
-    slug: getSlug(),
+    slug,
     storage: createR2Client(getR2Config())
   });
 
-  console.log(`Uploaded ${result.logoKey} for ${result.parkName} (${result.slug}).`);
+  if (result.action === 'skipped') {
+    console.log(
+      `Skipped ${result.logoKey} for ${result.parkName} (${result.slug}) — already up to date.`
+    );
+  } else {
+    console.log(`Uploaded ${result.logoKey} for ${result.parkName} (${result.slug}).`);
+  }
 } finally {
   await client.close();
 }

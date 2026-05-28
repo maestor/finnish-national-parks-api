@@ -3,17 +3,22 @@ import { resolve } from 'node:path';
 
 import type { Database } from '../db/database.js';
 import { findParkRecordBySlugIncludingRemoved, updateParkMap } from '../db/repositories.js';
-
-type MapUploadStorage = {
-  upload(key: string, buffer: Buffer, contentType: string): Promise<void>;
-};
+import type { StorageClient } from '../storage/types.js';
 
 type UploadParkMapOptions = {
   database: Database;
+  force?: boolean;
   mapsDirectory: string;
   now?: () => string;
   slug: string;
-  storage: MapUploadStorage;
+  storage: Pick<StorageClient, 'getObjectMetadata' | 'upload'>;
+};
+
+type UploadParkMapResult = {
+  action: 'db-only' | 'skipped' | 'uploaded';
+  mapKey: string;
+  parkName: string;
+  slug: string;
 };
 
 const createMapFilePath = (mapsDirectory: string, slug: string) => {
@@ -26,15 +31,30 @@ const createMapKey = (slug: string) => {
 
 export const uploadParkMap = async ({
   database,
+  force = false,
   mapsDirectory,
   now = () => new Date().toISOString(),
   slug,
   storage
-}: UploadParkMapOptions) => {
+}: UploadParkMapOptions): Promise<UploadParkMapResult> => {
   const existingPark = await findParkRecordBySlugIncludingRemoved(database, slug);
 
   if (!existingPark) {
     throw new Error(`Park not found for slug "${slug}".`);
+  }
+
+  const mapKey = createMapKey(slug);
+  const storageMetadata = await storage.getObjectMetadata(mapKey);
+  const storageExists = storageMetadata !== null;
+  const dbExists = existingPark.mapKey === mapKey;
+
+  if (!force && storageExists && dbExists) {
+    return {
+      action: 'skipped',
+      mapKey,
+      parkName: existingPark.name,
+      slug
+    };
   }
 
   const localMapPath = createMapFilePath(mapsDirectory, slug);
@@ -52,21 +72,32 @@ export const uploadParkMap = async ({
     throw error;
   }
 
-  const mapKey = createMapKey(slug);
-  await storage.upload(mapKey, buffer, 'application/pdf');
+  if (force || !storageExists) {
+    await storage.upload(mapKey, buffer, 'application/pdf');
+  }
 
-  const park = await updateParkMap(database, slug, {
-    key: mapKey,
-    updatedAt: now()
-  });
+  if (force || !dbExists) {
+    const park = await updateParkMap(database, slug, {
+      key: mapKey,
+      updatedAt: now()
+    });
 
-  if (!park) {
-    throw new Error(`Park not found for slug "${slug}".`);
+    if (!park) {
+      throw new Error(`Park not found for slug "${slug}".`);
+    }
+
+    return {
+      action: force || !storageExists ? 'uploaded' : 'db-only',
+      mapKey,
+      parkName: park.name,
+      slug: park.slug
+    };
   }
 
   return {
+    action: 'uploaded',
     mapKey,
-    parkName: park.name,
-    slug: park.slug
+    parkName: existingPark.name,
+    slug
   };
 };

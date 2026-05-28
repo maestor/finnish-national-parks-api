@@ -6,14 +6,16 @@ import { getEnv } from '../env.js';
 import { uploadParkMap } from '../parks/upload-park-map.js';
 import { createR2Client } from '../storage/r2-client.js';
 
-const getSlug = () => {
-  const slug = process.argv[2];
+const parseArgs = () => {
+  const args = process.argv.slice(2);
+  const force = args.includes('--force');
+  const slug = args.find((arg) => arg !== '--force');
 
-  if (!slug || process.argv[3]) {
-    throw new Error('Usage: npm run park:map -- <park-slug>');
+  if (!slug) {
+    throw new Error('Usage: npm run park:map -- <park-slug> [--force]');
   }
 
-  return slug;
+  return { force, slug };
 };
 
 const getR2Config = () => {
@@ -41,15 +43,24 @@ const getR2Config = () => {
 
 const client = createDatabaseClient();
 
+const { force, slug } = parseArgs();
+
 try {
   const result = await uploadParkMap({
     database: createDatabase(client),
+    force,
     mapsDirectory: resolve('data/maps'),
-    slug: getSlug(),
+    slug,
     storage: createR2Client(getR2Config())
   });
 
-  console.log(`Uploaded ${result.mapKey} for ${result.parkName} (${result.slug}).`);
+  if (result.action === 'skipped') {
+    console.log(
+      `Skipped ${result.mapKey} for ${result.parkName} (${result.slug}) — already up to date.`
+    );
+  } else {
+    console.log(`Uploaded ${result.mapKey} for ${result.parkName} (${result.slug}).`);
+  }
 } finally {
   await client.close();
 }
