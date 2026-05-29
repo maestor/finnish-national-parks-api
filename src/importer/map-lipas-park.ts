@@ -96,10 +96,15 @@ const normalizeLuontoonUrl = (value?: string) => {
       : value.startsWith('/')
         ? `https://www.luontoon.fi${value}`
         : `https://${value}`;
-  const url = new URL(normalizedInput);
-  const pathname = url.pathname.replace(/\/+$/, '');
 
-  return `https://www.luontoon.fi${pathname}`;
+  try {
+    const url = new URL(normalizedInput);
+    const pathname = url.pathname.replace(/\/+$/, '');
+
+    return `https://www.luontoon.fi${pathname}`;
+  } catch {
+    return null;
+  }
 };
 
 const createSlug = (name: string) => {

@@ -48,6 +48,11 @@ export const parkTypeFixtures = {
     slug: 'nature-trail',
     typeCode: 4404
   },
+  hikingTrail: {
+    name: 'Retkeilyreitti',
+    slug: 'hiking-trail',
+    typeCode: 4405
+  },
   outdoorRecreationArea: {
     name: 'Ulkoilu-/virkistysalue',
     slug: 'outdoor-recreation-area',
@@ -211,6 +216,71 @@ export const createLipasTrail = (
         'city-code': locationOverrides?.city?.['city-code'] ?? 734
       },
       address: locationOverrides?.address ?? 'Polkutie 1',
+      geometries: locationOverrides?.geometries ?? baseLocation.geometries,
+      'postal-code': locationOverrides?.['postal-code'] ?? '00999',
+      'postal-office': locationOverrides?.['postal-office'] ?? 'Testikylä'
+    }
+  };
+};
+
+export const createLipasHikingTrail = (
+  overrides: Omit<Partial<LipasSourceItem>, 'location' | 'properties'> & {
+    location?: Partial<LipasSourceItem['location']>;
+    properties?: Partial<LipasSourceItem['properties']>;
+  } = {}
+): LipasSourceItem => {
+  const {
+    location: locationOverrides,
+    properties: propertyOverrides,
+    ...rootOverrides
+  } = overrides;
+
+  const baseLocation: LipasSourceItem['location'] = {
+    city: {
+      'city-code': 734
+    },
+    address: 'Vaellustie 1',
+    geometries: {
+      type: 'FeatureCollection',
+      features: [
+        {
+          type: 'Feature',
+          geometry: {
+            type: 'LineString',
+            coordinates: [
+              [35.2, 66.2],
+              [35.4, 66.4],
+              [35.6, 66.6]
+            ]
+          }
+        }
+      ]
+    },
+    'postal-code': '00999',
+    'postal-office': 'Testikylä'
+  };
+
+  return {
+    properties: {
+      'route-length-km': 5.0,
+      ...propertyOverrides
+    },
+    admin: 'city-sports',
+    www: 'https://www.luontoon.fi/testi-retkeilyreitti',
+    name: 'Testin retkeilyreitti',
+    type: {
+      'type-code': parkTypeFixtures.hikingTrail.typeCode
+    },
+    'lipas-id': 440501,
+    status: 'active',
+    'event-date': '2024-04-03T12:00:00.000Z',
+    owner: 'city',
+    ...rootOverrides,
+    location: {
+      city: {
+        'city-code': locationOverrides?.city?.['city-code'] ?? 734
+      },
+      address: locationOverrides?.address ?? 'Vaellustie 1',
       geometries: locationOverrides?.geometries ?? baseLocation.geometries,
       'postal-code': locationOverrides?.['postal-code'] ?? '00999',
       'postal-office': locationOverrides?.['postal-office'] ?? 'Testikylä'

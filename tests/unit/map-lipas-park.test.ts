@@ -128,4 +128,14 @@ describe('mapLipasPark', () => {
       }
     });
   });
+
+  it('falls back to null when www contains an invalid url', () => {
+    const mapped = mapLipasPark(
+      createLipasPark({
+        www: 'https://www.rauma.fi › Koe kaupunki › Meri ja saaristo › Saariston retkeilyreitit'
+      })
+    );
+
+    expect(mapped.luontoonUrl).toBeNull();
+  });
 });

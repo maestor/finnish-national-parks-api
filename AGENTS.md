@@ -2,11 +2,6 @@
 
 This repository is a local-first TypeScript API that imports Finnish park, protected-area, and nature-trail catalog data, stores it in an owned database, and exposes it for a personal map application.
 
-## Shared Skills
-- Use `$project-documentation` when updating `README.md`, `docs/**`, contributor guidance, or repository workflow docs.
-- Use `$git-pr-workflow` for the standard branch, review, final-verify, commit, push, and PR-notes flow.
-- When using `$git-pr-workflow`, create or switch to the correct work branch before making any file edits.
-
 ## Code Style
 - Prefer `const fn = () => {}` arrow functions over `function fn() {}` declarations for top-level module functions.
 - `function` declarations are acceptable only when hoisting is genuinely required.
@@ -53,12 +48,51 @@ This repository is a local-first TypeScript API that imports Finnish park, prote
 - Keep coverage thresholds high from the start for first-party application code, with explicit exclusions for generated or non-application files.
 - Use scoped mutation testing for meaningful backend logic after normal tests pass.
 
-## Repo-Specific Workflow Overrides
-- Branches must follow the repo naming convention: `feature/<name>`, `bugfix/<name>`, `chore/<name>`, `docs/<name>`, `refactor/<name>`, or `test/<name>`.
-- If the current branch is `main`, create or switch to the correct work branch before editing any files, running fixers that may write files, or staging changes.
-- All changes are PR-based against `main`. Do not push directly to `main`.
-- `npm run verify` must pass before any task or PR is considered ready, except for pure documentation or repo-configuration changes that cannot affect code, tests, or generated types.
-- For docs-only skips, note the exception in the PR description.
+## Mandatory Git Workflow
+
+**Never edit, stage, commit, or push directly on `main`.** All changes must go through a working branch and a pull request.
+
+### Before any edits
+1. Check the current branch with `git branch --show-current`.
+2. If on `main`, create and switch to a working branch first.
+3. Branch naming convention:
+   - `feature/<name>`
+   - `bugfix/<name>`
+   - `chore/<name>`
+   - `docs/<name>`
+   - `refactor/<name>`
+   - `test/<name>`
+4. Only after confirming you are on a working branch may you edit files.
+
+### Anti-patterns
+- Starting implementation on `main`.
+- Running fixers or generators that write files while on `main`.
+- Staging or committing while on `main`.
+- Treating targeted tests as a substitute for the final verify gate.
+- Running final verify before the user has reviewed the batch.
+- Skipping the review pause before the final verification gate.
+- Building one giant end-of-task commit when the work had obvious batch boundaries.
+
+### During implementation
+- Implement in coherent batches.
+- Use targeted checks (focused tests, typecheck, lint) while working.
+- Do not run the full `npm run verify` gate until after user review.
+
+### Review pause
+- After finishing a batch, summarize the change and pause for user review.
+- Wait for explicit acceptance before proceeding to the final gate.
+
+### Final verification and delivery
+1. Run `npm run verify` after user acceptance.
+2. Fix any failures and rerun until it passes.
+3. Commit in coherent batches with prefixes: `Feature:`, `Fix:`, `Docs:`, `Chore:`, `Refactor:`, or `Test:`.
+4. Push the branch.
+5. Provide a clickable GitHub compare link and copy-pasteable PR notes.
+
+### Docs-only exception
+Docs-only or workflow-only changes may skip the full verify gate when the touched files are limited to documentation or repo workflow text. Note the exception in the PR description.
+
+## Delivery Rules
 - User review and explicit acceptance are required before merge.
 - Keep documentation-only changes separate from implementation changes when practical.
 - Do not revert user changes.

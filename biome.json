@@ -43,6 +43,12 @@
   },
   "overrides": [
     {
+      "includes": ["**/src/importer/data/**/*.json"],
+      "formatter": {
+        "enabled": false
+      }
+    },
+    {
       "includes": ["**/src/cli/**/*.ts"],
       "linter": {
         "rules": {
