@@ -20,6 +20,10 @@ describe('park type helpers', () => {
       code: 4404,
       slug: 'nature-trail'
     });
+    expect(getSupportedParkTypeByCode(4405)).toMatchObject({
+      code: 4405,
+      slug: 'hiking-trail'
+    });
     expect(getSupportedParkTypeBySlug('state-hiking-area')).toMatchObject({
       code: 109,
       name: 'Valtion retkeilyalue'
@@ -28,13 +32,18 @@ describe('park type helpers', () => {
       code: 4404,
       name: 'Luontopolku'
     });
+    expect(getSupportedParkTypeBySlug('hiking-trail')).toMatchObject({
+      code: 4405,
+      name: 'Retkeilyreitti'
+    });
     expect(supportedParkTypeSlugs).toEqual([
       'outdoor-recreation-area',
       'state-hiking-area',
       'wilderness-area',
       'national-park',
       'other-nature-reserve',
-      'nature-trail'
+      'nature-trail',
+      'hiking-trail'
     ]);
   });
 

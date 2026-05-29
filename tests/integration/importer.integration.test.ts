@@ -8,7 +8,12 @@ import {
 } from '../../src/db/repositories.js';
 import { importRuns, parks } from '../../src/db/schema.js';
 import { importParks } from '../../src/importer/import-parks.js';
-import { createLipasPark, createLipasTrail, parkTypeFixtures } from '../fixtures/lipas.js';
+import {
+  createLipasHikingTrail,
+  createLipasPark,
+  createLipasTrail,
+  parkTypeFixtures
+} from '../fixtures/lipas.js';
 import { createTestDatabase } from '../helpers/test-db.js';
 
 const emptyLuontoonSitemap = async () =>
@@ -114,6 +119,185 @@ describe('importParks', () => {
       visitedOn: '2026-04-10'
     });
     expect(parks).toHaveLength(1);
+  });
+
+  it('imports hiking trails as removed catalog entries', async () => {
+    await importParks({
+      database: testDatabase.database,
+      expectedActiveCount: 2,
+      now: () => '2026-05-01T08:00:00.000Z',
+      sourceUrl: 'https://example.test/lipas',
+      fetchSource: async () => ({
+        items: [
+          createLipasPark(),
+          createLipasHikingTrail({
+            location: {
+              geometries: {
+                type: 'FeatureCollection',
+                features: [
+                  {
+                    type: 'Feature',
+                    geometry: {
+                      type: 'LineString',
+                      coordinates: [
+                        [35.2, 66.2],
+                        [35.4, 66.4],
+                        [35.6, 66.6]
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          })
+        ]
+      })
+    });
+
+    const rawPark = await testDatabase.database.query.parks.findFirst({
+      where: eq(parks.slug, 'testin-retkeilyreitti')
+    });
+
+    expect(rawPark).toMatchObject({
+      name: 'Testin retkeilyreitti',
+      removed: true,
+      catalogStatus: 'active'
+    });
+    await expect(getParkBySlug(testDatabase.database, 'testin-retkeilyreitti')).resolves.toBeNull();
+  });
+
+  it('preserves removed hiking trails across re-imports', async () => {
+    await importParks({
+      database: testDatabase.database,
+      expectedActiveCount: 1,
+      now: () => '2026-05-01T08:00:00.000Z',
+      sourceUrl: 'https://example.test/lipas',
+      fetchSource: async () => ({
+        items: [
+          createLipasHikingTrail({
+            location: {
+              geometries: {
+                type: 'FeatureCollection',
+                features: [
+                  {
+                    type: 'Feature',
+                    geometry: {
+                      type: 'LineString',
+                      coordinates: [
+                        [35.2, 66.2],
+                        [35.4, 66.4],
+                        [35.6, 66.6]
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          })
+        ]
+      })
+    });
+
+    await testDatabase.database
+      .update(parks)
+      .set({ removed: false })
+      .where(eq(parks.slug, 'testin-retkeilyreitti'));
+
+    await importParks({
+      database: testDatabase.database,
+      expectedActiveCount: 1,
+      now: () => '2026-05-02T08:00:00.000Z',
+      sourceUrl: 'https://example.test/lipas',
+      fetchSource: async () => ({
+        items: [
+          createLipasHikingTrail({
+            name: 'Testin retkeilyreitti uudistettu',
+            location: {
+              geometries: {
+                type: 'FeatureCollection',
+                features: [
+                  {
+                    type: 'Feature',
+                    geometry: {
+                      type: 'LineString',
+                      coordinates: [
+                        [35.2, 66.2],
+                        [35.4, 66.4],
+                        [35.6, 66.6]
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          })
+        ]
+      })
+    });
+
+    const rawPark = await testDatabase.database.query.parks.findFirst({
+      where: eq(parks.slug, 'testin-retkeilyreitti')
+    });
+
+    expect(rawPark).toMatchObject({
+      name: 'Testin retkeilyreitti uudistettu',
+      removed: false
+    });
+  });
+
+  it('skips hiking trails that are fully inside an imported area', async () => {
+    await importParks({
+      database: testDatabase.database,
+      expectedActiveCount: 2,
+      now: () => '2026-05-01T08:00:00.000Z',
+      sourceUrl: 'https://example.test/lipas',
+      fetchSource: async () => ({
+        items: [createLipasPark(), createLipasHikingTrail()]
+      })
+    });
+
+    await expect(getParkBySlug(testDatabase.database, 'testin-retkeilyreitti')).resolves.toBeNull();
+    await expect(listParks(testDatabase.database)).resolves.toHaveLength(1);
+  });
+
+  it('skips hiking trails whose location label and postal fields match an imported area', async () => {
+    await importParks({
+      database: testDatabase.database,
+      expectedActiveCount: 2,
+      now: () => '2026-05-01T08:00:00.000Z',
+      sourceUrl: 'https://example.test/lipas',
+      fetchSource: async () => ({
+        items: [
+          createLipasPark(),
+          createLipasHikingTrail({
+            location: {
+              address: 'Puistotie 1',
+              'postal-code': '00999',
+              'postal-office': 'Testikylä',
+              geometries: {
+                type: 'FeatureCollection',
+                features: [
+                  {
+                    type: 'Feature',
+                    geometry: {
+                      type: 'LineString',
+                      coordinates: [
+                        [35.2, 66.2],
+                        [35.4, 66.4],
+                        [35.6, 66.6]
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          })
+        ]
+      })
+    });
+
+    await expect(getParkBySlug(testDatabase.database, 'testin-retkeilyreitti')).resolves.toBeNull();
+    await expect(listParks(testDatabase.database)).resolves.toHaveLength(1);
   });
 
   it('preserves manually removed parks across imports', async () => {

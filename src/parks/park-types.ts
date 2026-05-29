@@ -34,12 +34,19 @@ export const supportedParkTypes = [
     id: 4404,
     name: 'Luontopolku',
     slug: 'nature-trail'
+  },
+  {
+    code: 4405,
+    id: 4405,
+    name: 'Retkeilyreitti',
+    slug: 'hiking-trail'
   }
 ] as const;
 
 export type SupportedParkType = (typeof supportedParkTypes)[number];
 export type SupportedParkTypeSlug = SupportedParkType['slug'];
 export const natureTrailTypeCode = 4404;
+export const hikingTrailTypeCode = 4405;
 
 export const supportedParkTypeSlugs = supportedParkTypes.map((parkType) => parkType.slug) as [
   SupportedParkTypeSlug,
@@ -74,3 +81,6 @@ export const getSupportedParkTypeBySlug = (slug: string) => {
 };
 
 export const isNatureTrailTypeCode = (code: number) => code === natureTrailTypeCode;
+export const isHikingTrailTypeCode = (code: number) => code === hikingTrailTypeCode;
+export const isTrailTypeCode = (code: number) =>
+  isNatureTrailTypeCode(code) || isHikingTrailTypeCode(code);
