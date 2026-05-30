@@ -320,6 +320,16 @@ export const findParkRecordBySlugIncludingRemoved = async (database: Database, s
   });
 };
 
+export const listParkRecordsIncludingRemoved = async (database: Database) => {
+  return database.query.parks.findMany({
+    columns: {
+      displayTypeName: true,
+      slug: true
+    },
+    orderBy: parks.slug
+  });
+};
+
 const getTypedParkBySlug = async (database: Database, slug: string) => {
   return (
     (

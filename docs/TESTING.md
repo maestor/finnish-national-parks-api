@@ -68,7 +68,7 @@ Use mutation testing for:
 - Park removal toggle can hide and restore a park through the authenticated park-management API.
 - Visit create/edit/delete supports optional route and author fields.
 - Visit create/edit/delete works against a real temporary database.
-- Park logo upload logic verifies the park slug, requires the matching local PNG file, uploads `logos/<slug>.png`, and persists the logo reference in the database.
+- Park logo upload logic verifies the park slug, prefers `data/logos/<slug>.png`, falls back to `data/logos/display-types/<normalized-display-type>.png` when a park shares a display type, uploads the resolved file once to the matching R2 key, and persists the logo reference in the database.
 - Auth routes bypass bearer-token middleware.
 - Google OAuth callback validates state/PKCE, verifies the ID token, checks the admin allowlist, and sets a session cookie.
 - `GET /auth/me` returns the current user from a valid session or `401` otherwise.

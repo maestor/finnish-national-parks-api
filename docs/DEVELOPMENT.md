@@ -144,8 +144,10 @@ That command:
 
 - loads the current `.env` automatically
 - uses `DATABASE_URL` and `DATABASE_AUTH_TOKEN` to target either local SQLite or remote Turso
-- requires the matching `data/logos/<park-slug>.png` file to exist locally
-- uploads the file to the R2 object key `logos/<park-slug>.png`
+- first looks for a park-specific `data/logos/<park-slug>.png`
+- if no park-specific file exists and the park has a `displayTypeName`, falls back to `data/logos/display-types/<normalized-display-type>.png`
+- uploads park-specific files to `logos/<park-slug>.png`
+- uploads shared display-type files once to `logos/display-types/<normalized-display-type>.png` and then reuses that same key for every matching park
 - stores the logo key plus a logo timestamp on the matching park row so catalog ETags and logo URLs change together
 
 For UI rendering, set `R2_PUBLIC_URL` to the public base URL that serves those logo objects.
