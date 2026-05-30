@@ -39,6 +39,10 @@ const buildSykeProtectedSitesSourceUrl = (
   return `https://paikkatiedot.ymparisto.fi/geoserver/inspire_ps/wfs?service=WFS&request=GetFeature&version=2.0.0&typeNames=${typeName}&outputFormat=application/json&srsName=EPSG:4326&cql_filter=nimi='${sourceName}'`;
 };
 
+const buildMuseovirastoProtectedSitesSourceUrl = (sourceName: string) => {
+  return `https://geoserver.museovirasto.fi/geoserver/rajapinta_suojellut/wfs?service=WFS&request=GetFeature&version=2.0.0&typeNames=rajapinta_suojellut:muinaisjaannos_alue&outputFormat=application/json&srsName=EPSG:4326&cql_filter=kohdenimi='${sourceName}'`;
+};
+
 const generatedSykeSources: GeneratedSykeSource[] = [
   {
     name: 'Elimyssalon luonnonsuojelualue',
@@ -107,6 +111,8 @@ const generatedSykeSources: GeneratedSykeSource[] = [
   },
   { name: 'Olvassuo', sourceName: 'Olvassuon luonnonpuisto' }
 ];
+
+const generatedMuseovirastoSources = ['Harola', 'Kajaanin linna', 'Raaseporin linna', 'Svartholma'];
 
 const createPolygonFeature = (
   coordinates: number[][][],
@@ -405,6 +411,37 @@ export const createSpecialParksSource = () => {
             shape_area: 1_500_000 + index * 10_000
           }
         )
+      ]
+    });
+  });
+
+  generatedMuseovirastoSources.forEach((sourceName, index) => {
+    const lon = 25 + index * 0.1;
+    const lat = 61 + index * 0.1;
+
+    responses.set(buildMuseovirastoProtectedSitesSourceUrl(sourceName), {
+      type: 'FeatureCollection',
+      features: [
+        {
+          type: 'Feature',
+          geometry: {
+            type: 'MultiPolygon',
+            coordinates: [
+              [
+                [
+                  [lon, lat],
+                  [lon, lat + 0.02],
+                  [lon + 0.02, lat + 0.02],
+                  [lon + 0.02, lat],
+                  [lon, lat]
+                ]
+              ]
+            ]
+          },
+          properties: {
+            kohdenimi: sourceName
+          }
+        }
       ]
     });
   });

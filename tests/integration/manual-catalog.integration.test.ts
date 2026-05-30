@@ -34,7 +34,7 @@ describe('manual catalog imports', () => {
       now: () => '2026-05-27T08:00:00.000Z'
     });
 
-    expect(result.results).toHaveLength(37);
+    expect(result.results).toHaveLength(41);
 
     const merenkurkku = await getParkBySlug(
       testDatabase.database,
@@ -152,6 +152,21 @@ describe('manual catalog imports', () => {
       name: 'Olvassuo',
       type: { slug: 'outdoor-recreation-area' }
     });
+
+    const harola = await getParkBySlug(testDatabase.database, 'harola');
+    expect(harola).toMatchObject({
+      lipasId: 9001030,
+      name: 'Harola',
+      type: { slug: 'outdoor-recreation-area' }
+    });
+
+    const kajaaninLinna = await getParkBySlug(testDatabase.database, 'kajaanin-linna');
+    expect(kajaaninLinna).toMatchObject({
+      displayTypeName: 'Historia-alue',
+      lipasId: 9001031,
+      name: 'Kajaanin linna',
+      type: { slug: 'outdoor-recreation-area' }
+    });
   });
 
   it('keeps non-LIPAS-managed parks active when a later LIPAS import deactivates managed rows', async () => {
@@ -182,7 +197,7 @@ describe('manual catalog imports', () => {
     );
     const kevo = await getParkBySlug(testDatabase.database, 'kevon-luonnonpuisto');
 
-    expect(allParks).toHaveLength(37);
+    expect(allParks).toHaveLength(41);
     expect(merenkurkku).toMatchObject({ catalogStatus: 'active' });
     expect(kevo).toMatchObject({ catalogStatus: 'active' });
   });
@@ -233,7 +248,7 @@ describe('manual catalog imports', () => {
       database: testDatabase.database
     });
 
-    expect(result.results).toHaveLength(37);
+    expect(result.results).toHaveLength(41);
 
     const merenkurkku = await getParkBySlug(
       testDatabase.database,

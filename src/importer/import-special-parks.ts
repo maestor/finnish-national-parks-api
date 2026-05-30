@@ -88,6 +88,7 @@ type SpecialParkConfig = {
   postalOffice: string | null;
   responseShapeVersion: string;
   slug: string;
+  sourceParser?: 'geojson' | 'merenkurkku' | 'syke';
   sourceUrl: string;
   syntheticLipasId: number;
 };
@@ -207,6 +208,34 @@ const createSykeSpecialParkConfig = ({
   responseShapeVersion: 'syke-protected-sites-v1',
   slug,
   sourceUrl: buildSykeProtectedSitesSourceUrl(sourceName, sourceType),
+  syntheticLipasId
+});
+
+const buildMuseovirastoProtectedSitesSourceUrl = (sourceName: string) => {
+  return `https://geoserver.museovirasto.fi/geoserver/rajapinta_suojellut/wfs?service=WFS&request=GetFeature&version=2.0.0&typeNames=rajapinta_suojellut:muinaisjaannos_alue&outputFormat=application/json&srsName=EPSG:4326&cql_filter=kohdenimi='${sourceName}'`;
+};
+
+const createMuseovirastoSpecialParkConfig = ({
+  displayTypeName,
+  locationLabel,
+  luontoonUrl,
+  name,
+  parkTypeSlug,
+  slug,
+  sourceName,
+  syntheticLipasId
+}: SykeSpecialParkSeed): SpecialParkConfig => ({
+  displayTypeName,
+  locationLabel: locationLabel ?? name,
+  luontoonUrl,
+  name,
+  parkTypeSlug,
+  postalCode: null,
+  postalOffice: null,
+  responseShapeVersion: 'museovirasto-protected-sites-v1',
+  slug,
+  sourceParser: 'geojson',
+  sourceUrl: buildMuseovirastoProtectedSitesSourceUrl(sourceName),
   syntheticLipasId
 });
 
@@ -597,10 +626,50 @@ const sourceReadyDestinationAreaSeeds: SykeSpecialParkSeed[] = [
   }
 ];
 
+const sourceReadyHistoryAreaSeeds: SykeSpecialParkSeed[] = [
+  {
+    displayTypeName: null,
+    luontoonUrl: 'https://www.luontoon.fi/fi/kohteet/harola',
+    name: 'Harola',
+    parkTypeSlug: 'outdoor-recreation-area',
+    slug: 'harola',
+    sourceName: 'Harola',
+    syntheticLipasId: 9_001_030
+  },
+  {
+    displayTypeName: 'Historia-alue',
+    luontoonUrl: 'https://www.luontoon.fi/fi/kohteet/kajaanin-linna',
+    name: 'Kajaanin linna',
+    parkTypeSlug: 'outdoor-recreation-area',
+    slug: 'kajaanin-linna',
+    sourceName: 'Kajaanin linna',
+    syntheticLipasId: 9_001_031
+  },
+  {
+    displayTypeName: 'Historia-alue',
+    luontoonUrl: 'https://www.luontoon.fi/fi/kohteet/raaseporin-linna',
+    name: 'Raaseporin linna',
+    parkTypeSlug: 'outdoor-recreation-area',
+    slug: 'raaseporin-linna',
+    sourceName: 'Raaseporin linna',
+    syntheticLipasId: 9_001_032
+  },
+  {
+    displayTypeName: 'Historia-alue',
+    luontoonUrl: 'https://www.luontoon.fi/fi/kohteet/svartholma',
+    name: 'Svartholma',
+    parkTypeSlug: 'outdoor-recreation-area',
+    slug: 'svartholma',
+    sourceName: 'Svartholma',
+    syntheticLipasId: 9_001_033
+  }
+];
+
 const specialParkConfigs: SpecialParkConfig[] = [
   ...baseSpecialParkConfigs,
   ...sourceReadyReserveParkSeeds.map(createSykeSpecialParkConfig),
-  ...sourceReadyDestinationAreaSeeds.map(createSykeSpecialParkConfig)
+  ...sourceReadyDestinationAreaSeeds.map(createSykeSpecialParkConfig),
+  ...sourceReadyHistoryAreaSeeds.map(createMuseovirastoSpecialParkConfig)
 ];
 
 type ImportSpecialParksOptions = {
@@ -663,14 +732,17 @@ export const importSpecialParks = async ({
     }>;
     let metadata: { areaKm2: number | null; establishmentYear: number | null };
 
-    if (config.slug === 'merenkurkun-maailmanperintoalue') {
+    if (
+      config.sourceParser === 'merenkurkku' ||
+      config.slug === 'merenkurkun-maailmanperintoalue'
+    ) {
       const features = parseMerenkurkkuFeatures(payload);
       if (features.length === 0) {
         throw new Error('No Merenkurkku world heritage area features were found in the source.');
       }
       sourceFeatures = features;
       metadata = { areaKm2: null, establishmentYear: null };
-    } else if (config.sourceUrl.startsWith('special://')) {
+    } else if (config.sourceParser === 'geojson' || config.sourceUrl.startsWith('special://')) {
       const features = parseGeoJsonFeatures(payload);
       if (features.length === 0) {
         throw new Error(`No features found for ${config.name} in the source.`);
