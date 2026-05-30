@@ -24,9 +24,9 @@ describe('park type helpers', () => {
       code: 4405,
       slug: 'hiking-trail'
     });
-    expect(getSupportedParkTypeBySlug('state-hiking-area')).toMatchObject({
+    expect(getSupportedParkTypeBySlug('hiking-area')).toMatchObject({
       code: 109,
-      name: 'Valtion retkeilyalue'
+      name: 'Retkeilyalue'
     });
     expect(getSupportedParkTypeBySlug('nature-trail')).toMatchObject({
       code: 4404,
@@ -38,10 +38,10 @@ describe('park type helpers', () => {
     });
     expect(supportedParkTypeSlugs).toEqual([
       'outdoor-recreation-area',
-      'state-hiking-area',
+      'hiking-area',
       'wilderness-area',
       'national-park',
-      'other-nature-reserve',
+      'nature-reserve-area',
       'nature-trail',
       'hiking-trail'
     ]);

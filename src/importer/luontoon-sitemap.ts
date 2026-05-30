@@ -3,6 +3,10 @@ type LuontoonParkRef = {
   slug: string;
 };
 
+const canonicalSlugAliases = new Map<string, string>([
+  ['puurijarven-ja-isosuon-kansallispuisto', 'puurijarven-ja-isonsuon-kansallispuisto']
+]);
+
 const locPattern = /<loc>([^<]+)<\/loc>/g;
 
 const toPathSegments = (rawUrl: string) => {
@@ -35,6 +39,22 @@ const getSlugFromDestinationUrl = (rawUrl: string) => {
   return rawUrl.split('/').at(-1)!;
 };
 
+const getSlugCandidates = (slug: string) => {
+  const candidates = new Set([slug]);
+
+  if (slug.endsWith('-eramaa-alue')) {
+    candidates.add(slug.slice(0, -'-alue'.length));
+  }
+
+  const canonicalAlias = canonicalSlugAliases.get(slug);
+
+  if (canonicalAlias) {
+    candidates.add(canonicalAlias);
+  }
+
+  return [...candidates];
+};
+
 export const createLuontoonUrlResolver = (sitemapXml: string) => {
   const byLipasId = new Map<number, string>();
   const bySlug = new Map<string, string>();
@@ -60,6 +80,18 @@ export const createLuontoonUrlResolver = (sitemapXml: string) => {
   }
 
   return ({ lipasId, slug }: LuontoonParkRef) => {
-    return byLipasId.get(lipasId) ?? bySlug.get(slug) ?? null;
+    if (byLipasId.has(lipasId)) {
+      return byLipasId.get(lipasId)!;
+    }
+
+    for (const candidateSlug of getSlugCandidates(slug)) {
+      const candidateUrl = bySlug.get(candidateSlug);
+
+      if (candidateUrl) {
+        return candidateUrl;
+      }
+    }
+
+    return null;
   };
 };

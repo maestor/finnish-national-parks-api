@@ -65,7 +65,7 @@ describe('manual catalog imports', () => {
       displayTypeName: 'Maailmanperintökohde',
       lipasId: 9000898,
       name: 'Merenkurkun maailmanperintöalue',
-      type: { slug: 'other-nature-reserve' }
+      type: { slug: 'nature-reserve-area' }
     });
     const rawMerenkurkku = await testDatabase.database.query.parks.findFirst({
       where: eq(parks.slug, 'merenkurkun-maailmanperintoalue')
@@ -81,7 +81,7 @@ describe('manual catalog imports', () => {
       displayTypeName: 'Luonnonpuisto',
       lipasId: 9000915,
       name: 'Kevon luonnonpuisto',
-      type: { slug: 'other-nature-reserve' }
+      type: { slug: 'nature-reserve-area' }
     });
     expect(rawMerenkurkku).toMatchObject({ managedByLipasImport: false });
 
@@ -89,7 +89,7 @@ describe('manual catalog imports', () => {
     expect(laajalahti).toMatchObject({
       lipasId: 9000824,
       name: 'Laajalahden luonnonsuojelualue',
-      type: { slug: 'other-nature-reserve' }
+      type: { slug: 'nature-reserve-area' }
     });
 
     const liminganlahti = await getParkBySlug(testDatabase.database, 'liminganlahti');
@@ -97,7 +97,7 @@ describe('manual catalog imports', () => {
       displayTypeName: 'Lintuvesi',
       lipasId: 900070433,
       name: 'Liminganlahti',
-      type: { slug: 'other-nature-reserve' }
+      type: { slug: 'nature-reserve-area' }
     });
 
     const malla = await getParkBySlug(testDatabase.database, 'mallan-luonnonpuisto');
@@ -105,21 +105,22 @@ describe('manual catalog imports', () => {
       displayTypeName: 'Luonnonpuisto',
       lipasId: 900042160,
       name: 'Mallan luonnonpuisto',
-      type: { slug: 'other-nature-reserve' }
+      type: { slug: 'nature-reserve-area' }
     });
 
     const siikalahti = await getParkBySlug(testDatabase.database, 'siikalahden-luonnonsuojelualue');
     expect(siikalahti).toMatchObject({
       lipasId: 9000102829,
       name: 'Siikalahden luonnonsuojelualue',
-      type: { slug: 'other-nature-reserve' }
+      type: { slug: 'nature-reserve-area' }
     });
 
     const napapiiri = await getParkBySlug(testDatabase.database, 'napapiirin-retkeilyalue');
     expect(napapiiri).toMatchObject({
       lipasId: 9000126313,
       name: 'Napapiirin retkeilyalue',
-      type: { slug: 'state-hiking-area' }
+      displayTypeName: 'Valtion retkeilyalue',
+      type: { slug: 'hiking-area' }
     });
     const rawNapapiiri = await testDatabase.database.query.parks.findFirst({
       where: eq(parks.slug, 'napapiirin-retkeilyalue')
@@ -135,7 +136,8 @@ describe('manual catalog imports', () => {
     expect(inari).toMatchObject({
       lipasId: 606689,
       name: 'Inarin retkeilyalue',
-      type: { slug: 'state-hiking-area' }
+      displayTypeName: 'Valtion retkeilyalue',
+      type: { slug: 'hiking-area' }
     });
     const rawInari = await testDatabase.database.query.parks.findFirst({
       where: eq(parks.slug, 'inarin-retkeilyalue')
@@ -402,13 +404,15 @@ describe('manual catalog imports', () => {
     const napapiiri = await getParkBySlug(testDatabase.database, 'napapiirin-retkeilyalue');
     expect(napapiiri).toMatchObject({
       name: 'Napapiirin retkeilyalue',
-      type: { slug: 'state-hiking-area' }
+      displayTypeName: 'Valtion retkeilyalue',
+      type: { slug: 'hiking-area' }
     });
 
     const inari = await getParkBySlug(testDatabase.database, 'inarin-retkeilyalue');
     expect(inari).toMatchObject({
       name: 'Inarin retkeilyalue',
-      type: { slug: 'state-hiking-area' }
+      displayTypeName: 'Valtion retkeilyalue',
+      type: { slug: 'hiking-area' }
     });
   });
 

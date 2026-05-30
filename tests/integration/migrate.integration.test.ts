@@ -45,14 +45,15 @@ describe('migrateDatabase', () => {
       '0007_postal_code_and_nature_trails.sql',
       '0008_manual_catalog_parks.sql',
       '0009_park_logos.sql',
-      '0010_park_maps.sql'
+      '0010_park_maps.sql',
+      '0011_refresh_park_type_slugs.sql'
     ]);
     expect(parkTypes.rows.map((row) => String(row.slug))).toEqual([
       'outdoor-recreation-area',
-      'state-hiking-area',
+      'hiking-area',
       'wilderness-area',
       'national-park',
-      'other-nature-reserve',
+      'nature-reserve-area',
       'nature-trail'
     ]);
     expect(parkColumns.rows.some((row) => String(row.name) === 'removed')).toBe(true);

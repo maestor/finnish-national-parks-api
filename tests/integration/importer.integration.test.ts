@@ -702,6 +702,41 @@ describe('importParks', () => {
     });
   });
 
+  it('uses canonical Luontoon destination slugs for wilderness areas even when the local slug still ends with -alue', async () => {
+    await importParks({
+      database: testDatabase.database,
+      expectedActiveCount: 1,
+      now: () => '2026-05-01T08:00:00.000Z',
+      sourceUrl: 'https://example.test/lipas',
+      fetchSource: async () => ({
+        items: [
+          createLipasPark({
+            'lipas-id': 81234,
+            name: 'Hammastunturin erämaa-alue',
+            type: {
+              'type-code': parkTypeFixtures.wildernessArea.typeCode
+            },
+            www: 'https://www.luontoon.fi/hammastunturin-eramaa-alue'
+          })
+        ]
+      }),
+      fetchLuontoonSitemap: async () => `
+        <?xml version="1.0" encoding="UTF-8"?>
+        <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+          <url>
+            <loc>https://www.luontoon.fi/fi/kohteet/hammastunturin-eramaa</loc>
+          </url>
+        </urlset>
+      `
+    });
+
+    await expect(
+      getParkBySlug(testDatabase.database, 'hammastunturin-eramaa-alue')
+    ).resolves.toMatchObject({
+      luontoonUrl: 'https://www.luontoon.fi/fi/kohteet/hammastunturin-eramaa'
+    });
+  });
+
   it('prefers official luontoon route urls over stale lipas www values for nature trails', async () => {
     await importParks({
       database: testDatabase.database,
@@ -776,6 +811,35 @@ describe('importParks', () => {
       getParkBySlug(testDatabase.database, 'finnoon-luontopolku')
     ).resolves.toMatchObject({
       luontoonUrl: 'https://www.luontoon.fi/fi/reitit/finnoon-luontopolku-espoo-527072'
+    });
+  });
+
+  it('uses the generic hiking-area type with a Valtion retkeilyalue display label for type 109 imports', async () => {
+    await importParks({
+      database: testDatabase.database,
+      expectedActiveCount: 1,
+      now: () => '2026-05-01T08:00:00.000Z',
+      sourceUrl: 'https://example.test/lipas',
+      fetchSource: async () => ({
+        items: [
+          createLipasPark({
+            name: 'Testin retkeilyalue',
+            type: {
+              'type-code': parkTypeFixtures.stateHikingArea.typeCode
+            }
+          })
+        ]
+      })
+    });
+
+    await expect(
+      getParkBySlug(testDatabase.database, 'testin-retkeilyalue')
+    ).resolves.toMatchObject({
+      displayTypeName: 'Valtion retkeilyalue',
+      type: {
+        name: 'Retkeilyalue',
+        slug: 'hiking-area'
+      }
     });
   });
 

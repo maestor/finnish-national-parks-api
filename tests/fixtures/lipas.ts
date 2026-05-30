@@ -60,12 +60,12 @@ export const parkTypeFixtures = {
   },
   otherNatureReserve: {
     name: 'Luonnonsuojelualue',
-    slug: 'other-nature-reserve',
+    slug: 'nature-reserve-area',
     typeCode: 112
   },
   stateHikingArea: {
-    name: 'Valtion retkeilyalue',
-    slug: 'state-hiking-area',
+    name: 'Retkeilyalue',
+    slug: 'hiking-area',
     typeCode: 109
   },
   wildernessArea: {

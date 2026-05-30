@@ -77,4 +77,31 @@ describe('createLuontoonUrlResolver', () => {
       })
     ).toBe('https://www.luontoon.fi/fi/reitit/finnoon-luontopolku-espoo-527072');
   });
+
+  it('resolves known canonical slug aliases for wilderness areas and renamed destinations', () => {
+    const resolveLuontoonUrl = createLuontoonUrlResolver(`
+      <?xml version="1.0" encoding="UTF-8"?>
+      <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+        <url>
+          <loc>https://www.luontoon.fi/fi/kohteet/hammastunturin-eramaa</loc>
+        </url>
+        <url>
+          <loc>https://www.luontoon.fi/fi/kohteet/puurijarven-ja-isonsuon-kansallispuisto</loc>
+        </url>
+      </urlset>
+    `);
+
+    expect(
+      resolveLuontoonUrl({
+        lipasId: 1001,
+        slug: 'hammastunturin-eramaa-alue'
+      })
+    ).toBe('https://www.luontoon.fi/fi/kohteet/hammastunturin-eramaa');
+    expect(
+      resolveLuontoonUrl({
+        lipasId: 1002,
+        slug: 'puurijarven-ja-isosuon-kansallispuisto'
+      })
+    ).toBe('https://www.luontoon.fi/fi/kohteet/puurijarven-ja-isonsuon-kansallispuisto');
+  });
 });
