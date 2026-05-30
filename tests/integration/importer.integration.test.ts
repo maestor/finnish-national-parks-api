@@ -843,6 +843,59 @@ describe('importParks', () => {
     });
   });
 
+  it('promotes non-109 retkeilyalue names into hiking-area without the Valtion retkeilyalue display label', async () => {
+    await importParks({
+      database: testDatabase.database,
+      expectedActiveCount: 2,
+      now: () => '2026-05-01T08:00:00.000Z',
+      sourceUrl: 'https://example.test/lipas',
+      fetchSource: async () => ({
+        items: [
+          createLipasPark({
+            name: 'Kaupungin retkeilyalue',
+            type: {
+              'type-code': parkTypeFixtures.outdoorRecreationArea.typeCode
+            }
+          }),
+          createLipasPark({
+            'lipas-id': 22346,
+            name: 'Suojeltu retkeilyalue',
+            type: {
+              'type-code': parkTypeFixtures.otherNatureReserve.typeCode
+            }
+          })
+        ]
+      })
+    });
+
+    await expect(
+      getParkBySlug(testDatabase.database, 'kaupungin-retkeilyalue')
+    ).resolves.toMatchObject({
+      type: {
+        name: 'Retkeilyalue',
+        slug: 'hiking-area'
+      }
+    });
+    await expect(
+      getParkBySlug(testDatabase.database, 'suojeltu-retkeilyalue')
+    ).resolves.toMatchObject({
+      type: {
+        name: 'Retkeilyalue',
+        slug: 'hiking-area'
+      }
+    });
+
+    const promotedOutdoor = await testDatabase.database.query.parks.findFirst({
+      where: eq(parks.slug, 'kaupungin-retkeilyalue')
+    });
+    const promotedReserve = await testDatabase.database.query.parks.findFirst({
+      where: eq(parks.slug, 'suojeltu-retkeilyalue')
+    });
+
+    expect(promotedOutdoor?.displayTypeName).toBeNull();
+    expect(promotedReserve?.displayTypeName).toBeNull();
+  });
+
   it('uses the default fetcher and surfaces upstream failures', async () => {
     const originalFetch = globalThis.fetch;
 

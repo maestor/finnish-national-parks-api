@@ -214,7 +214,8 @@ export const importParks = async ({
         boundaryGeojson: JSON.stringify(mapped.boundaryGeoJson),
         catalogStatus: 'active',
         createdAt: importedAt,
-        displayTypeName: mapped.type.code === hikingAreaTypeCode ? hikingAreaDisplayTypeName : null,
+        displayTypeName:
+          mapped.sourceTypeCode === hikingAreaTypeCode ? hikingAreaDisplayTypeName : null,
         establishmentYear: mapped.establishmentYear,
         lastImportRunId: importRunId,
         lipasId: mapped.lipasId,
