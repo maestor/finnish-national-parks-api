@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { getSupportedParkTypeByCode } from '../parks/park-types.js';
+import { getSupportedParkTypeByCode, getSupportedParkTypeBySlug } from '../parks/park-types.js';
 import type { BoundingBox, GeoJsonFeatureCollection } from './geometry.js';
 import { deriveBoundingBox } from './geometry.js';
 
@@ -75,6 +75,7 @@ export type MappedPark = {
   name: string;
   postalCode: string | null;
   postalOffice: string | null;
+  sourceTypeCode: number;
   slug: string;
   sourceEventDate: string | null;
   type: {
@@ -118,9 +119,19 @@ const createSlug = (name: string) => {
   return slug || 'park';
 };
 
+const shouldPromoteToHikingArea = (park: LipasPark) => {
+  const normalizedName = park.name.trim().toLowerCase();
+  const typeCode = park.type['type-code'];
+
+  return normalizedName.endsWith('retkeilyalue') && (typeCode === 103 || typeCode === 112);
+};
+
 export const mapLipasPark = (source: unknown, existingSlug?: string): MappedPark => {
   const park = lipasParkSchema.parse(source);
-  const parkType = getSupportedParkTypeByCode(park.type['type-code']);
+  const sourceTypeCode = park.type['type-code'];
+  const parkType = shouldPromoteToHikingArea(park)
+    ? getSupportedParkTypeBySlug('hiking-area')
+    : getSupportedParkTypeByCode(sourceTypeCode);
   const boundaryGeoJson = park.location.geometries as GeoJsonFeatureCollection;
   const boundingBox = deriveBoundingBox(boundaryGeoJson);
 
@@ -140,6 +151,7 @@ export const mapLipasPark = (source: unknown, existingSlug?: string): MappedPark
     name: park.name,
     postalCode: park.location['postal-code'] ?? null,
     postalOffice: park.location['postal-office'] ?? null,
+    sourceTypeCode,
     slug: existingSlug ?? createSlug(park.name),
     sourceEventDate: park['event-date'] ?? null,
     type: parkType

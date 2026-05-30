@@ -213,7 +213,7 @@ describe('API routes', () => {
     });
 
     const app = createApp({ database: testDatabase.database });
-    const listResponse = await app.request('/api/parks?type=other-nature-reserve');
+    const listResponse = await app.request('/api/parks?type=nature-reserve-area');
     const detailResponse = await app.request('/api/parks/merenkurkun-maailmanperintoalue');
     const listBody = (await listResponse.json()) as {
       parks: Array<Record<string, unknown>>;
@@ -230,7 +230,7 @@ describe('API routes', () => {
       location: 'Raippaluodontie 2, 65800 Raippaluoto',
       slug: 'merenkurkun-maailmanperintoalue',
       type: {
-        slug: 'other-nature-reserve'
+        slug: 'nature-reserve-area'
       }
     });
     expect(detailBody).toMatchObject({

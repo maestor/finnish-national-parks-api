@@ -8,7 +8,12 @@ import {
   syncParkTypes,
   upsertImportedPark
 } from '../db/repositories.js';
-import { isHikingTrailTypeCode, isTrailTypeCode } from '../parks/park-types.js';
+import {
+  hikingAreaDisplayTypeName,
+  hikingAreaTypeCode,
+  isHikingTrailTypeCode,
+  isTrailTypeCode
+} from '../parks/park-types.js';
 import { isFullyInsideArea } from './geometry.js';
 import { createLuontoonUrlResolver } from './luontoon-sitemap.js';
 import type { MappedPark } from './map-lipas-park.js';
@@ -209,7 +214,8 @@ export const importParks = async ({
         boundaryGeojson: JSON.stringify(mapped.boundaryGeoJson),
         catalogStatus: 'active',
         createdAt: importedAt,
-        displayTypeName: null,
+        displayTypeName:
+          mapped.sourceTypeCode === hikingAreaTypeCode ? hikingAreaDisplayTypeName : null,
         establishmentYear: mapped.establishmentYear,
         lastImportRunId: importRunId,
         lipasId: mapped.lipasId,

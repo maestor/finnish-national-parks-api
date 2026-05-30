@@ -8,8 +8,8 @@ export const supportedParkTypes = [
   {
     code: 109,
     id: 109,
-    name: 'Valtion retkeilyalue',
-    slug: 'state-hiking-area'
+    name: 'Retkeilyalue',
+    slug: 'hiking-area'
   },
   {
     code: 110,
@@ -27,7 +27,7 @@ export const supportedParkTypes = [
     code: 112,
     id: 112,
     name: 'Luonnonsuojelualue',
-    slug: 'other-nature-reserve'
+    slug: 'nature-reserve-area'
   },
   {
     code: 4404,
@@ -45,6 +45,8 @@ export const supportedParkTypes = [
 
 export type SupportedParkType = (typeof supportedParkTypes)[number];
 export type SupportedParkTypeSlug = SupportedParkType['slug'];
+export const hikingAreaTypeCode = 109;
+export const hikingAreaDisplayTypeName = 'Valtion retkeilyalue';
 export const natureTrailTypeCode = 4404;
 export const hikingTrailTypeCode = 4405;
 

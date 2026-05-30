@@ -129,6 +129,40 @@ describe('mapLipasPark', () => {
     });
   });
 
+  it('promotes outdoor recreation retkeilyalue names into the generic hiking-area category', () => {
+    const mapped = mapLipasPark(
+      createLipasPark({
+        name: 'Testin retkeilyalue',
+        type: {
+          'type-code': parkTypeFixtures.outdoorRecreationArea.typeCode
+        }
+      })
+    );
+
+    expect(mapped.type).toMatchObject({
+      code: parkTypeFixtures.stateHikingArea.typeCode,
+      name: parkTypeFixtures.stateHikingArea.name,
+      slug: parkTypeFixtures.stateHikingArea.slug
+    });
+  });
+
+  it('promotes nature reserve retkeilyalue names into the generic hiking-area category', () => {
+    const mapped = mapLipasPark(
+      createLipasPark({
+        name: 'Suojeltu retkeilyalue',
+        type: {
+          'type-code': parkTypeFixtures.otherNatureReserve.typeCode
+        }
+      })
+    );
+
+    expect(mapped.type).toMatchObject({
+      code: parkTypeFixtures.stateHikingArea.typeCode,
+      name: parkTypeFixtures.stateHikingArea.name,
+      slug: parkTypeFixtures.stateHikingArea.slug
+    });
+  });
+
   it('falls back to null when www contains an invalid url', () => {
     const mapped = mapLipasPark(
       createLipasPark({
