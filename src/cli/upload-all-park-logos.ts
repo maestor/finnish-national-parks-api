@@ -1,9 +1,10 @@
-import { readdir } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
 import { createDatabaseClient } from '../db/client.js';
 import { createDatabase } from '../db/database.js';
+import { listParkRecordsIncludingRemoved } from '../db/repositories.js';
 import { getEnv } from '../env.js';
+import { findParkLogoAsset } from '../parks/logo-assets.js';
 import { uploadParkLogo } from '../parks/upload-park-logo.js';
 import { createR2Client } from '../storage/r2-client.js';
 
@@ -36,25 +37,31 @@ const getR2Config = () => {
 
 const logosDirectory = resolve('data/logos');
 
-const entries = await readdir(logosDirectory, { withFileTypes: true });
-const slugs = entries
-  .filter((entry) => entry.isFile() && entry.name.endsWith('.png'))
-  .map((entry) => entry.name.replace(/\.png$/, ''));
-
-if (slugs.length === 0) {
-  console.log('No logo PNG files found in data/logos.');
-  process.exit(0);
-}
-
 const client = createDatabaseClient();
 const storage = createR2Client(getR2Config());
 const database = createDatabase(client);
+const parks = await listParkRecordsIncludingRemoved(database);
+const uploadableSlugs: string[] = [];
+
+for (const park of parks) {
+  const logoAsset = await findParkLogoAsset(logosDirectory, park);
+
+  if (logoAsset) {
+    uploadableSlugs.push(park.slug);
+  }
+}
+
+if (uploadableSlugs.length === 0) {
+  console.log('No park logo PNG files found in data/logos or data/logos/display-types.');
+  await client.close();
+  process.exit(0);
+}
 
 const uploaded: string[] = [];
 const skipped: string[] = [];
 const failures: { slug: string; error: string }[] = [];
 
-for (const slug of slugs) {
+for (const slug of uploadableSlugs) {
   try {
     const result = await uploadParkLogo({
       database,

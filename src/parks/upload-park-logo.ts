@@ -1,9 +1,9 @@
 import { readFile } from 'node:fs/promises';
-import { resolve } from 'node:path';
 
 import type { Database } from '../db/database.js';
 import { findParkRecordBySlugIncludingRemoved, updateParkLogo } from '../db/repositories.js';
 import type { StorageClient } from '../storage/types.js';
+import { findParkLogoAsset } from './logo-assets.js';
 
 type UploadParkLogoOptions = {
   database: Database;
@@ -21,14 +21,6 @@ type UploadParkLogoResult = {
   slug: string;
 };
 
-const createLogoFilePath = (logosDirectory: string, slug: string) => {
-  return resolve(logosDirectory, `${slug}.png`);
-};
-
-const createLogoKey = (slug: string) => {
-  return `logos/${slug}.png`;
-};
-
 export const uploadParkLogo = async ({
   database,
   force = false,
@@ -43,7 +35,13 @@ export const uploadParkLogo = async ({
     throw new Error(`Park not found for slug "${slug}".`);
   }
 
-  const logoKey = createLogoKey(slug);
+  const logoAsset = await findParkLogoAsset(logosDirectory, existingPark);
+
+  if (!logoAsset) {
+    throw new Error(`Logo PNG not found for slug "${slug}".`);
+  }
+
+  const { localFilePath: localLogoPath, logoKey } = logoAsset;
   const storageMetadata = await storage.getObjectMetadata(logoKey);
   const storageExists = storageMetadata !== null;
   const dbExists = existingPark.logoKey === logoKey;
@@ -57,7 +55,6 @@ export const uploadParkLogo = async ({
     };
   }
 
-  const localLogoPath = createLogoFilePath(logosDirectory, slug);
   let buffer: Buffer;
 
   try {

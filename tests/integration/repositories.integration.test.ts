@@ -10,6 +10,7 @@ import {
   getParkVisitsBySlug,
   getPublicHomeSummary,
   getVisitById,
+  listParkRecordsIncludingRemoved,
   listRemovedParks,
   listVisits,
   reorderVisitImages,
@@ -74,6 +75,23 @@ describe('repositories', () => {
     });
 
     expect(result).toBeNull();
+  });
+
+  it('lists park records including removed rows with display type names', async () => {
+    await testDatabase.database
+      .update(parks)
+      .set({
+        displayTypeName: 'Ystävyyden puisto',
+        removed: true
+      })
+      .where(eq(parks.slug, 'akasmannyn-kansallispuisto'));
+
+    await expect(listParkRecordsIncludingRemoved(testDatabase.database)).resolves.toEqual([
+      {
+        displayTypeName: 'Ystävyyden puisto',
+        slug: 'akasmannyn-kansallispuisto'
+      }
+    ]);
   });
 
   it('normalizes park location values for address, postal code, and postal office combinations', async () => {
