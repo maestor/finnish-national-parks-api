@@ -15,27 +15,6 @@ const merenkurkkuSourceUrl =
 const kevoSourceUrl =
   "https://paikkatiedot.ymparisto.fi/geoserver/inspire_ps/wfs?service=WFS&request=GetFeature&version=2.0.0&typeNames=inspire_ps:PS.ProtectedSitesValtionOmistamaLuonnonsuojelualue&outputFormat=application/json&srsName=EPSG:4326&cql_filter=nimi='Kevon luonnonpuisto'";
 
-const laajalahtiSourceUrl =
-  "https://paikkatiedot.ymparisto.fi/geoserver/inspire_ps/wfs?service=WFS&request=GetFeature&version=2.0.0&typeNames=inspire_ps:PS.ProtectedSitesValtionOmistamaLuonnonsuojelualue&outputFormat=application/json&srsName=EPSG:4326&cql_filter=nimi='Laajalahden luonnonsuojelualue'";
-
-const liminganlahtiSourceUrl =
-  "https://paikkatiedot.ymparisto.fi/geoserver/inspire_ps/wfs?service=WFS&request=GetFeature&version=2.0.0&typeNames=inspire_ps:PS.ProtectedSitesYksityistenMaillaOlevaLuonnonsuojelualue&outputFormat=application/json&srsName=EPSG:4326&cql_filter=nimi='Liminganlahden luonnonsuojelualue'";
-
-const mallaSourceUrl =
-  "https://paikkatiedot.ymparisto.fi/geoserver/inspire_ps/wfs?service=WFS&request=GetFeature&version=2.0.0&typeNames=inspire_ps:PS.ProtectedSitesValtionOmistamaLuonnonsuojelualue&outputFormat=application/json&srsName=EPSG:4326&cql_filter=nimi='Mallan luonnonpuisto'";
-
-const siikalahtiSourceUrl =
-  "https://paikkatiedot.ymparisto.fi/geoserver/inspire_ps/wfs?service=WFS&request=GetFeature&version=2.0.0&typeNames=inspire_ps:PS.ProtectedSitesValtionOmistamaLuonnonsuojelualue&outputFormat=application/json&srsName=EPSG:4326&cql_filter=nimi='Siikalahden luonnonsuojelualue'";
-
-const createPolygonFeature = (
-  coordinates: number[][][],
-  properties: Record<string, unknown> = {}
-) => ({
-  geometry: { coordinates, type: 'Polygon' },
-  properties,
-  type: 'Feature'
-});
-
 describe('manual catalog imports', () => {
   let testDatabase: Awaited<ReturnType<typeof createTestDatabase>>;
 
@@ -55,7 +34,7 @@ describe('manual catalog imports', () => {
       now: () => '2026-05-27T08:00:00.000Z'
     });
 
-    expect(result.results).toHaveLength(8);
+    expect(result.results).toHaveLength(37);
 
     const merenkurkku = await getParkBySlug(
       testDatabase.database,
@@ -148,6 +127,31 @@ describe('manual catalog imports', () => {
       postalCode: '99870',
       postalOffice: 'Inari'
     });
+
+    const dagmarinPuisto = await getParkBySlug(testDatabase.database, 'dagmarin-puisto');
+    expect(dagmarinPuisto).toMatchObject({
+      displayTypeName: 'Historia-alue',
+      lipasId: 9001028,
+      name: 'Dagmarin puisto',
+      type: { slug: 'outdoor-recreation-area' }
+    });
+
+    const liimanninkoski = await getParkBySlug(
+      testDatabase.database,
+      'liimanninkosken-lehtojensuojelualue'
+    );
+    expect(liimanninkoski).toMatchObject({
+      lipasId: 9001027,
+      name: 'Liimanninkosken lehtojensuojelualue',
+      type: { slug: 'nature-reserve-area' }
+    });
+
+    const olvassuo = await getParkBySlug(testDatabase.database, 'olvassuo');
+    expect(olvassuo).toMatchObject({
+      lipasId: 9001029,
+      name: 'Olvassuo',
+      type: { slug: 'outdoor-recreation-area' }
+    });
   });
 
   it('keeps non-LIPAS-managed parks active when a later LIPAS import deactivates managed rows', async () => {
@@ -178,7 +182,7 @@ describe('manual catalog imports', () => {
     );
     const kevo = await getParkBySlug(testDatabase.database, 'kevon-luonnonpuisto');
 
-    expect(allParks).toHaveLength(8);
+    expect(allParks).toHaveLength(37);
     expect(merenkurkku).toMatchObject({ catalogStatus: 'active' });
     expect(kevo).toMatchObject({ catalogStatus: 'active' });
   });
@@ -215,182 +219,21 @@ describe('manual catalog imports', () => {
   });
 
   it('supports the default fetch path used by the CLI importer', async () => {
+    const fetchSource = createSpecialParksSource();
+
     vi.stubGlobal(
       'fetch',
-      vi.fn().mockImplementation(async (url: string) => {
-        if (url === merenkurkkuSourceUrl) {
-          return {
-            json: async () => ({
-              type: 'FeatureCollection',
-              features: [
-                createPolygonFeature(
-                  [
-                    [
-                      [21.0, 63.0],
-                      [21.0, 63.2],
-                      [21.2, 63.2],
-                      [21.2, 63.0],
-                      [21.0, 63.0]
-                    ]
-                  ],
-                  {
-                    ID: 898,
-                    Nimi: 'Merenkurkun saaristo',
-                    URL: 'https://example.test/merenkurkku',
-                    aluetyyppi: 'Kohde'
-                  }
-                )
-              ]
-            }),
-            ok: true
-          };
-        }
-
-        if (url === kevoSourceUrl) {
-          return {
-            json: async () => ({
-              type: 'FeatureCollection',
-              features: [
-                createPolygonFeature(
-                  [
-                    [
-                      [27.0, 69.5],
-                      [27.0, 69.7],
-                      [27.3, 69.7],
-                      [27.3, 69.5],
-                      [27.0, 69.5]
-                    ]
-                  ],
-                  {
-                    nimi: 'Kevon luonnonpuisto',
-                    paatpvm: '1956-12-21T00:00:00Z',
-                    shape_area: 710_648_647
-                  }
-                )
-              ]
-            }),
-            ok: true
-          };
-        }
-
-        if (url === laajalahtiSourceUrl) {
-          return {
-            json: async () => ({
-              type: 'FeatureCollection',
-              features: [
-                createPolygonFeature(
-                  [
-                    [
-                      [24.8, 60.2],
-                      [24.8, 60.22],
-                      [24.85, 60.22],
-                      [24.85, 60.2],
-                      [24.8, 60.2]
-                    ]
-                  ],
-                  {
-                    ely: 'Uudenmaan ELY-keskus',
-                    nimi: 'Laajalahden luonnonsuojelualue',
-                    paatpvm: '1989-11-10T00:00:00Z',
-                    shape_area: 1_894_414
-                  }
-                )
-              ]
-            }),
-            ok: true
-          };
-        }
-
-        if (url === liminganlahtiSourceUrl) {
-          return {
-            json: async () => ({
-              type: 'FeatureCollection',
-              features: [
-                createPolygonFeature(
-                  [
-                    [
-                      [25.2, 64.8],
-                      [25.2, 64.82],
-                      [25.25, 64.82],
-                      [25.25, 64.8],
-                      [25.2, 64.8]
-                    ]
-                  ],
-                  {
-                    nimi: 'Liminganlahden luonnonsuojelualue',
-                    paatpvm: '1998-11-25T00:00:00Z',
-                    shape_area: 23_784
-                  }
-                )
-              ]
-            }),
-            ok: true
-          };
-        }
-
-        if (url === mallaSourceUrl) {
-          return {
-            json: async () => ({
-              type: 'FeatureCollection',
-              features: [
-                createPolygonFeature(
-                  [
-                    [
-                      [20.7, 69.0],
-                      [20.7, 69.05],
-                      [20.8, 69.05],
-                      [20.8, 69.0],
-                      [20.7, 69.0]
-                    ]
-                  ],
-                  {
-                    nimi: 'Mallan luonnonpuisto',
-                    paatpvm: '1938-02-18T00:00:00Z',
-                    shape_area: 30_796_806
-                  }
-                )
-              ]
-            }),
-            ok: true
-          };
-        }
-
-        if (url === siikalahtiSourceUrl) {
-          return {
-            json: async () => ({
-              type: 'FeatureCollection',
-              features: [
-                createPolygonFeature(
-                  [
-                    [
-                      [29.3, 61.5],
-                      [29.3, 61.55],
-                      [29.4, 61.55],
-                      [29.4, 61.5],
-                      [29.3, 61.5]
-                    ]
-                  ],
-                  {
-                    nimi: 'Siikalahden luonnonsuojelualue',
-                    paatpvm: '2019-11-14T00:00:00Z',
-                    shape_area: 4_469_391
-                  }
-                )
-              ]
-            }),
-            ok: true
-          };
-        }
-
-        throw new Error(`Unexpected URL: ${url}`);
-      })
+      vi.fn().mockImplementation(async (url: string) => ({
+        json: async () => fetchSource(url),
+        ok: true
+      }))
     );
 
     const result = await importSpecialParks({
       database: testDatabase.database
     });
 
-    expect(result.results).toHaveLength(8);
+    expect(result.results).toHaveLength(37);
 
     const merenkurkku = await getParkBySlug(
       testDatabase.database,

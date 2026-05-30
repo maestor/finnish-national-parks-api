@@ -19,6 +19,95 @@ const siikalahtiSourceUrl =
 const napapiiriSourceUrl = 'special://napapiirin-retkeilyalue';
 const inariSourceUrl = 'special://inarin-retkeilyalue';
 
+type SykeSourceType = 'private' | 'state';
+
+type GeneratedSykeSource = {
+  name: string;
+  sourceName: string;
+  sourceType?: SykeSourceType;
+};
+
+const buildSykeProtectedSitesSourceUrl = (
+  sourceName: string,
+  sourceType: SykeSourceType = 'state'
+) => {
+  const typeName =
+    sourceType === 'state'
+      ? 'inspire_ps:PS.ProtectedSitesValtionOmistamaLuonnonsuojelualue'
+      : 'inspire_ps:PS.ProtectedSitesYksityistenMaillaOlevaLuonnonsuojelualue';
+
+  return `https://paikkatiedot.ymparisto.fi/geoserver/inspire_ps/wfs?service=WFS&request=GetFeature&version=2.0.0&typeNames=${typeName}&outputFormat=application/json&srsName=EPSG:4326&cql_filter=nimi='${sourceName}'`;
+};
+
+const generatedSykeSources: GeneratedSykeSource[] = [
+  {
+    name: 'Elimyssalon luonnonsuojelualue',
+    sourceName: 'Elimyssalon luonnonsuojelualue (Ystävyyden puisto)'
+  },
+  { name: 'Hiidenvaaran luonnonsuojelualue', sourceName: 'Hiidenvaaran luonnonsuojelualue' },
+  {
+    name: 'Ison-Palosen ja Maariansarkkien luonnonsuojelualue',
+    sourceName: 'Ison-Palosen ja Maariansärkkien luonnonsuojelualue (Ystävyyden puisto)'
+  },
+  { name: 'Jouhtenisen luonnonsuojelualue', sourceName: 'Jouhtenisen luonnonsuojelualue' },
+  { name: 'Kermajärven luonnonsuojelualue', sourceName: 'Kermajärven luonnonsuojelualue' },
+  {
+    name: 'Lentuan luonnonsuojelualue',
+    sourceName: 'Lentuan luonnonsuojelualue (Ystävyyden puisto)'
+  },
+  { name: 'Levänevan luonnonsuojelualue', sourceName: 'Levanevan luonnonsuojelualue' },
+  {
+    name: 'Medvastön ja Stormossenin luonnonsuojelualue',
+    sourceName: 'Medvastön ja Stormossenin luonnonsuojelualue'
+  },
+  {
+    name: 'Mietoistenlahden luonnonsuojelualue',
+    sourceName: 'Mietoistenlahden luonnonsuojelualue'
+  },
+  { name: 'Mujejärven luonnonsuojelualue', sourceName: 'Mujejärven luonnonsuojelualue' },
+  { name: 'Otajärven luonnonsuojelualue', sourceName: 'Otajärven luonnonsuojelualue' },
+  {
+    name: 'Pihlajaveden luonnonsuojelualue',
+    sourceName: 'Pihlajaveden luonnonsuojelualue'
+  },
+  { name: 'Punkaharjun luonnonsuojelualue', sourceName: 'Punkaharjun luonnonsuojelualue' },
+  {
+    name: 'Saltfjärdenin luonnonsuojelualue',
+    sourceName: 'Saltfjärdenin luonnonsuojelualue'
+  },
+  {
+    name: 'Täktominlahden ja Svanvikenin luonnonsuojelualue',
+    sourceName: 'Täktominlahden ja Svanvikenin luonnonsuojelualue'
+  },
+  { name: 'Vaisakon luonnonsuojelualue', sourceName: 'Vaisakon luonnonsuojelualue' },
+  {
+    name: 'Valtavaaran ja Pyhävaaran luonnonsuojelualue',
+    sourceName: 'Valtavaaran ja Pyhävaaran luonnonsuojelualue'
+  },
+  { name: 'Ilmakkiaavan soidensuojelualue', sourceName: 'Ilmakkiaavan soidensuojelualue' },
+  {
+    name: 'Juortanansalon-Lapinsuon soidensuojelualue',
+    sourceName: 'Juortanansalon-Lapinsuon soidensuojelualue (Ystävyyden p.)'
+  },
+  { name: 'Siikanevan soidensuojelualue', sourceName: 'Siikanevan soidensuojelualue' },
+  { name: 'Viiankiaavan soidensuojelualue', sourceName: 'Viiankiaavan soidensuojelualue' },
+  { name: 'Karkalin luonnonpuisto', sourceName: 'Karkalin luonnonpuisto' },
+  { name: 'Paljakan luonnonpuisto', sourceName: 'Paljakan  luonnonpuisto' },
+  { name: 'Salamanperän luonnonpuisto', sourceName: 'Salamanperän luonnonpuisto' },
+  { name: 'Sompion luonnonpuisto', sourceName: 'Sompion luonnonpuisto' },
+  { name: 'Vaskijärven luonnonpuisto', sourceName: 'Vaskijärven luonnonpuisto' },
+  {
+    name: 'Liimanninkosken lehtojensuojelualue',
+    sourceName: 'Liimanninkosken lehtojensuojelualue'
+  },
+  {
+    name: 'Dagmarin puisto',
+    sourceName: 'Dagmarin puisto',
+    sourceType: 'private'
+  },
+  { name: 'Olvassuo', sourceName: 'Olvassuon luonnonpuisto' }
+];
+
 const createPolygonFeature = (
   coordinates: number[][][],
   properties: Record<string, unknown> = {}
@@ -292,6 +381,33 @@ export const createSpecialParksSource = () => {
       }
     ]
   ]);
+
+  generatedSykeSources.forEach((entry, index) => {
+    const lon = 22 + index * 0.1;
+    const lat = 60 + index * 0.1;
+
+    responses.set(buildSykeProtectedSitesSourceUrl(entry.sourceName, entry.sourceType), {
+      type: 'FeatureCollection',
+      features: [
+        createPolygonFeature(
+          [
+            [
+              [lon, lat],
+              [lon, lat + 0.03],
+              [lon + 0.03, lat + 0.03],
+              [lon + 0.03, lat],
+              [lon, lat]
+            ]
+          ],
+          {
+            nimi: entry.sourceName,
+            paatpvm: '2001-01-01T00:00:00Z',
+            shape_area: 1_500_000 + index * 10_000
+          }
+        )
+      ]
+    });
+  });
 
   return async (sourceUrl: string) => {
     const response = responses.get(sourceUrl);
