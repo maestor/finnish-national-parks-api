@@ -34,7 +34,7 @@ describe('manual catalog imports', () => {
       now: () => '2026-05-27T08:00:00.000Z'
     });
 
-    expect(result.results).toHaveLength(41);
+    expect(result.results).toHaveLength(44);
 
     const merenkurkku = await getParkBySlug(
       testDatabase.database,
@@ -128,6 +128,28 @@ describe('manual catalog imports', () => {
       postalOffice: 'Inari'
     });
 
+    const seili = await getParkBySlug(testDatabase.database, 'seili');
+    expect(seili).toMatchObject({
+      displayTypeName: 'Historia-alue',
+      lipasId: 9001034,
+      name: 'Seili',
+      type: { slug: 'outdoor-recreation-area' }
+    });
+
+    const vallisaari = await getParkBySlug(testDatabase.database, 'vallisaari');
+    expect(vallisaari).toMatchObject({
+      lipasId: 9001035,
+      name: 'Vallisaari',
+      type: { slug: 'outdoor-recreation-area' }
+    });
+
+    const hailuoto = await getParkBySlug(testDatabase.database, 'hailuoto');
+    expect(hailuoto).toMatchObject({
+      lipasId: 9001036,
+      name: 'Hailuoto',
+      type: { slug: 'outdoor-recreation-area' }
+    });
+
     const dagmarinPuisto = await getParkBySlug(testDatabase.database, 'dagmarin-puisto');
     expect(dagmarinPuisto).toMatchObject({
       displayTypeName: 'Historia-alue',
@@ -197,7 +219,7 @@ describe('manual catalog imports', () => {
     );
     const kevo = await getParkBySlug(testDatabase.database, 'kevon-luonnonpuisto');
 
-    expect(allParks).toHaveLength(41);
+    expect(allParks).toHaveLength(44);
     expect(merenkurkku).toMatchObject({ catalogStatus: 'active' });
     expect(kevo).toMatchObject({ catalogStatus: 'active' });
   });
@@ -248,7 +270,7 @@ describe('manual catalog imports', () => {
       database: testDatabase.database
     });
 
-    expect(result.results).toHaveLength(41);
+    expect(result.results).toHaveLength(44);
 
     const merenkurkku = await getParkBySlug(
       testDatabase.database,
@@ -271,6 +293,25 @@ describe('manual catalog imports', () => {
       name: 'Inarin retkeilyalue',
       displayTypeName: 'Valtion retkeilyalue',
       type: { slug: 'hiking-area' }
+    });
+
+    const seili = await getParkBySlug(testDatabase.database, 'seili');
+    expect(seili).toMatchObject({
+      displayTypeName: 'Historia-alue',
+      name: 'Seili',
+      type: { slug: 'outdoor-recreation-area' }
+    });
+
+    const vallisaari = await getParkBySlug(testDatabase.database, 'vallisaari');
+    expect(vallisaari).toMatchObject({
+      name: 'Vallisaari',
+      type: { slug: 'outdoor-recreation-area' }
+    });
+
+    const hailuoto = await getParkBySlug(testDatabase.database, 'hailuoto');
+    expect(hailuoto).toMatchObject({
+      name: 'Hailuoto',
+      type: { slug: 'outdoor-recreation-area' }
     });
   });
 
