@@ -9,6 +9,7 @@ npm install
 npm run db:migrate
 npm run import:parks
 npm run import:special-parks
+npm run park:move-visits -- --from <source-slug> --to <target-slug> [--dry-run]
 npm run park:logo -- <park-slug>
 npm run db:backup
 npm run verify

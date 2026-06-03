@@ -27,6 +27,29 @@ type UpdateVisitInput = {
   visitedOn?: string | undefined;
 };
 
+type ReassignParkVisitsInput = {
+  dryRun?: boolean | undefined;
+  fromSlug: string;
+  toSlug: string;
+};
+
+type ReassignParkVisitsResult = {
+  dryRun: boolean;
+  fromPark: {
+    id: number;
+    name: string;
+    slug: string;
+  };
+  movedImageCount: number;
+  movedVisitCount: number;
+  movedVisitIds: number[];
+  toPark: {
+    id: number;
+    name: string;
+    slug: string;
+  };
+};
+
 type BoundingBox = {
   maxLat: number;
   maxLon: number;
@@ -891,6 +914,91 @@ export const createVisit = async (database: Database, slug: string, input: PutVi
   await bumpPublicVisitDataVersion(database, timestamp);
 
   return toVisit(row);
+};
+
+export const reassignParkVisits = async (
+  database: Database,
+  input: ReassignParkVisitsInput
+): Promise<ReassignParkVisitsResult> => {
+  const fromSlug = input.fromSlug.trim();
+  const toSlug = input.toSlug.trim();
+  const dryRun = input.dryRun ?? false;
+
+  if (!fromSlug || !toSlug) {
+    throw new Error('Both fromSlug and toSlug are required.');
+  }
+
+  if (fromSlug === toSlug) {
+    throw new Error('Source and target park slugs must be different.');
+  }
+
+  const [fromPark] = await database.select().from(parks).where(eq(parks.slug, fromSlug)).limit(1);
+
+  if (!fromPark) {
+    throw new Error(`Source park not found for slug "${fromSlug}".`);
+  }
+
+  const [toPark] = await database.select().from(parks).where(eq(parks.slug, toSlug)).limit(1);
+
+  if (!toPark) {
+    throw new Error(`Target park not found for slug "${toSlug}".`);
+  }
+
+  if (toPark.removed) {
+    throw new Error(`Target park "${toSlug}" is removed and cannot receive visits.`);
+  }
+
+  const visitRows = await database
+    .select({ id: parkVisits.id })
+    .from(parkVisits)
+    .where(eq(parkVisits.parkId, fromPark.id))
+    .orderBy(asc(parkVisits.id));
+
+  const movedVisitIds = visitRows.map((visit) => visit.id);
+  const movedVisitCount = movedVisitIds.length;
+
+  const imageRows =
+    movedVisitIds.length === 0
+      ? []
+      : await database
+          .select({ id: visitImages.id })
+          .from(visitImages)
+          .where(inArray(visitImages.visitId, movedVisitIds));
+
+  const movedImageCount = imageRows.length;
+
+  if (!dryRun && movedVisitCount > 0) {
+    const timestamp = new Date().toISOString();
+
+    await database.transaction(async (tx) => {
+      await tx
+        .update(parkVisits)
+        .set({
+          parkId: toPark.id,
+          updatedAt: timestamp
+        })
+        .where(eq(parkVisits.parkId, fromPark.id));
+
+      await bumpPublicVisitDataVersion(tx, timestamp);
+    });
+  }
+
+  return {
+    dryRun,
+    fromPark: {
+      id: fromPark.id,
+      name: fromPark.name,
+      slug: fromPark.slug
+    },
+    movedImageCount,
+    movedVisitCount,
+    movedVisitIds,
+    toPark: {
+      id: toPark.id,
+      name: toPark.name,
+      slug: toPark.slug
+    }
+  };
 };
 
 export const findVisitRecordById = async (database: Database, visitId: number) => {

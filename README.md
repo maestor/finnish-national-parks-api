@@ -33,6 +33,7 @@ cp .env.example .env
 npm run db:migrate
 npm run import:parks
 npm run import:special-parks
+npm run park:move-visits -- --from <source-slug> --to <target-slug> [--dry-run]
 npm run park:logo -- <park-slug>
 npm run db:backup
 npm run verify
@@ -76,6 +77,7 @@ Production notes:
 - If `/auth/*` is exposed through a frontend proxy or rewrite, set `GOOGLE_REDIRECT_URI=https://your-frontend-domain/auth/google/callback`, register that exact URI in Google Cloud, and start the login flow through that same public domain so the OAuth cookies stay on the right host.
 - `MEMORY_STORAGE=true` is for tests and local-only development, not Vercel.
 - `npm run db:backup` reads the current remote `DATABASE_URL` and `DATABASE_AUTH_TOKEN`, then writes a timestamped SQLite backup under `data/backups/`. You can append an optional label with `npm run db:backup -- before-import`.
+- `npm run park:move-visits -- --from <source-slug> --to <target-slug> [--dry-run]` reassigns all visits for one park slug to another. Visit images stay attached automatically because they belong to the visit rows.
 - `npm run park:logo -- <park-slug>` uploads either `data/logos/<park-slug>.png` or, when multiple parks share one `displayTypeName`, `data/logos/display-types/<normalized-display-type>.png`. Shared display-type logos are stored once under `logos/display-types/` in R2 and linked from every matching park row. Set `R2_PUBLIC_URL` if you want park APIs to return a stable public logo URL for the UI.
 
 The importer's LIPAS source URL and supported type-code list are internal configuration, not a normal `.env` setting.

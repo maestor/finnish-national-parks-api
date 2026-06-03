@@ -14,6 +14,7 @@ import {
   listParkRecordsIncludingRemoved,
   listRemovedParks,
   listVisits,
+  reassignParkVisits,
   reorderVisitImages,
   updateParkLogo,
   updateParkMap,
@@ -427,6 +428,265 @@ describe('repositories', () => {
     await expect(
       reorderVisitImages(testDatabase.database, visit.id, [99999, img1.id])
     ).rejects.toThrow('Invalid image order');
+  });
+
+  it('reassigns visits and keeps visit images attached under the target park', async () => {
+    await importParks({
+      database: testDatabase.database,
+      expectedActiveCount: 3,
+      now: () => '2026-05-01T10:00:00.000Z',
+      sourceUrl: 'https://example.test/lipas',
+      fetchSource: async () => ({
+        items: [
+          createLipasPark(),
+          createLipasPark({
+            'lipas-id': 99999,
+            name: 'Vallisaari',
+            type: { 'type-code': 103 },
+            www: 'https://www.luontoon.fi/vallisaari'
+          }),
+          createLipasPark({
+            'lipas-id': 440499,
+            name: 'Aleksanterin kierros',
+            type: { 'type-code': 103 },
+            www: 'https://www.luontoon.fi/aleksanterin-kierros'
+          })
+        ]
+      })
+    });
+
+    const sourceVisit = await createVisit(testDatabase.database, 'aleksanterin-kierros', {
+      note: 'Route visit note',
+      route: 'Aleksanterin kierros',
+      visitedOn: '2026-04-10'
+    });
+    await createVisit(testDatabase.database, 'vallisaari', {
+      note: 'Destination visit note',
+      visitedOn: '2026-04-11'
+    });
+
+    await createVisitImage(testDatabase.database, {
+      createdAt: '2026-05-01T10:00:00.000Z',
+      displayOrder: 0,
+      fullHeight: 100,
+      fullKey: 'visits/1/full.jpg',
+      fullWidth: 100,
+      mimeType: 'image/jpeg',
+      thumbHeight: 50,
+      thumbKey: 'visits/1/thumb.jpg',
+      thumbWidth: 50,
+      updatedAt: '2026-05-01T10:00:00.000Z',
+      visitId: sourceVisit.id
+    });
+
+    const beforeSummary = await getPublicHomeSummary(testDatabase.database);
+
+    const result = await reassignParkVisits(testDatabase.database, {
+      fromSlug: 'aleksanterin-kierros',
+      toSlug: 'vallisaari'
+    });
+
+    const sourceParkVisits = await getParkVisitsBySlug(
+      testDatabase.database,
+      'aleksanterin-kierros',
+      async () => ''
+    );
+    const targetParkVisits = await getParkVisitsBySlug(
+      testDatabase.database,
+      'vallisaari',
+      async () => ''
+    );
+    const flatVisits = await listVisits(testDatabase.database, async () => '');
+    const movedVisit = flatVisits.find((visit) => visit.id === sourceVisit.id);
+    const afterSummary = await getPublicHomeSummary(testDatabase.database);
+
+    expect(result).toMatchObject({
+      dryRun: false,
+      fromPark: {
+        name: 'Aleksanterin kierros',
+        slug: 'aleksanterin-kierros'
+      },
+      movedImageCount: 1,
+      movedVisitCount: 1,
+      movedVisitIds: [sourceVisit.id],
+      toPark: {
+        name: 'Vallisaari',
+        slug: 'vallisaari'
+      }
+    });
+    expect(sourceParkVisits?.visitedSummary).toEqual({
+      lastVisitedOn: null,
+      visitCount: 0,
+      visited: false
+    });
+    expect(sourceParkVisits?.visits).toEqual([]);
+    expect(targetParkVisits?.visitedSummary).toEqual({
+      lastVisitedOn: '2026-04-11',
+      visitCount: 2,
+      visited: true
+    });
+    expect(targetParkVisits?.visits).toHaveLength(2);
+    const movedParkVisit = targetParkVisits?.visits.find((visit) => visit.id === sourceVisit.id);
+    expect(movedParkVisit).toMatchObject({
+      note: 'Route visit note',
+      route: 'Aleksanterin kierros'
+    });
+    expect(movedParkVisit?.images).toHaveLength(1);
+    expect(movedVisit).toMatchObject({
+      park: {
+        name: 'Vallisaari',
+        slug: 'vallisaari'
+      }
+    });
+    expect(afterSummary.version).toBeGreaterThan(beforeSummary.version);
+  });
+
+  it('supports dry-run previews for visit reassignment without changing stored visits', async () => {
+    await importParks({
+      database: testDatabase.database,
+      expectedActiveCount: 3,
+      now: () => '2026-05-01T10:00:00.000Z',
+      sourceUrl: 'https://example.test/lipas',
+      fetchSource: async () => ({
+        items: [
+          createLipasPark(),
+          createLipasPark({
+            'lipas-id': 99999,
+            name: 'Vallisaari',
+            type: { 'type-code': 103 },
+            www: 'https://www.luontoon.fi/vallisaari'
+          }),
+          createLipasPark({
+            'lipas-id': 440499,
+            name: 'Aleksanterin kierros',
+            type: { 'type-code': 103 },
+            www: 'https://www.luontoon.fi/aleksanterin-kierros'
+          })
+        ]
+      })
+    });
+
+    const sourceVisit = await createVisit(testDatabase.database, 'aleksanterin-kierros', {
+      visitedOn: '2026-04-10'
+    });
+
+    const result = await reassignParkVisits(testDatabase.database, {
+      dryRun: true,
+      fromSlug: 'aleksanterin-kierros',
+      toSlug: 'vallisaari'
+    });
+
+    const sourceParkVisits = await getParkVisitsBySlug(
+      testDatabase.database,
+      'aleksanterin-kierros',
+      async () => ''
+    );
+    const targetParkVisits = await getParkVisitsBySlug(
+      testDatabase.database,
+      'vallisaari',
+      async () => ''
+    );
+
+    expect(result).toMatchObject({
+      dryRun: true,
+      movedImageCount: 0,
+      movedVisitCount: 1,
+      movedVisitIds: [sourceVisit.id]
+    });
+    expect(sourceParkVisits?.visits).toHaveLength(1);
+    expect(targetParkVisits?.visits).toEqual([]);
+  });
+
+  it('returns a zero-move result when the source park has no visits', async () => {
+    await importParks({
+      database: testDatabase.database,
+      expectedActiveCount: 2,
+      now: () => '2026-05-01T10:00:00.000Z',
+      sourceUrl: 'https://example.test/lipas',
+      fetchSource: async () => ({
+        items: [
+          createLipasPark(),
+          createLipasPark({
+            'lipas-id': 99999,
+            name: 'Vallisaari',
+            type: { 'type-code': 103 },
+            www: 'https://www.luontoon.fi/vallisaari'
+          })
+        ]
+      })
+    });
+
+    const result = await reassignParkVisits(testDatabase.database, {
+      fromSlug: 'akasmannyn-kansallispuisto',
+      toSlug: 'vallisaari'
+    });
+
+    expect(result).toMatchObject({
+      dryRun: false,
+      movedImageCount: 0,
+      movedVisitCount: 0,
+      movedVisitIds: []
+    });
+  });
+
+  it('rejects invalid visit reassignment requests', async () => {
+    await importParks({
+      database: testDatabase.database,
+      expectedActiveCount: 2,
+      now: () => '2026-05-01T10:00:00.000Z',
+      sourceUrl: 'https://example.test/lipas',
+      fetchSource: async () => ({
+        items: [
+          createLipasPark(),
+          createLipasPark({
+            'lipas-id': 99999,
+            name: 'Vallisaari',
+            type: { 'type-code': 103 },
+            www: 'https://www.luontoon.fi/vallisaari'
+          })
+        ]
+      })
+    });
+
+    await expect(
+      reassignParkVisits(testDatabase.database, {
+        fromSlug: '   ',
+        toSlug: 'vallisaari'
+      })
+    ).rejects.toThrow('Both fromSlug and toSlug are required.');
+
+    await expect(
+      reassignParkVisits(testDatabase.database, {
+        fromSlug: 'missing-source',
+        toSlug: 'vallisaari'
+      })
+    ).rejects.toThrow('Source park not found');
+
+    await expect(
+      reassignParkVisits(testDatabase.database, {
+        fromSlug: 'akasmannyn-kansallispuisto',
+        toSlug: 'missing-target'
+      })
+    ).rejects.toThrow('Target park not found');
+
+    await expect(
+      reassignParkVisits(testDatabase.database, {
+        fromSlug: 'vallisaari',
+        toSlug: 'vallisaari'
+      })
+    ).rejects.toThrow('Source and target park slugs must be different.');
+
+    await testDatabase.database
+      .update(parks)
+      .set({ removed: true })
+      .where(eq(parks.slug, 'vallisaari'));
+
+    await expect(
+      reassignParkVisits(testDatabase.database, {
+        fromSlug: 'akasmannyn-kansallispuisto',
+        toSlug: 'vallisaari'
+      })
+    ).rejects.toThrow('Target park "vallisaari" is removed and cannot receive visits.');
   });
 
   it('builds public home summary ordering from lightweight public visit data', async () => {

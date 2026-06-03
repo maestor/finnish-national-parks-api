@@ -1,3 +1,6 @@
+import { readFile } from 'node:fs/promises';
+import { fileURLToPath } from 'node:url';
+
 const merenkurkkuSourceUrl =
   'https://geoserver.museovirasto.fi/geoserver/rajapinta_suojellut/wfs?service=WFS&request=GetFeature&version=2.0.0&typeNames=rajapinta_suojellut:maailmanperinto_alue&outputFormat=application/json&srsName=EPSG:4326';
 
@@ -17,7 +20,6 @@ const siikalahtiSourceUrl =
   "https://paikkatiedot.ymparisto.fi/geoserver/inspire_ps/wfs?service=WFS&request=GetFeature&version=2.0.0&typeNames=inspire_ps:PS.ProtectedSitesValtionOmistamaLuonnonsuojelualue&outputFormat=application/json&srsName=EPSG:4326&cql_filter=nimi='Siikalahden luonnonsuojelualue'";
 
 const napapiiriSourceUrl = 'special://napapiirin-retkeilyalue';
-const inariSourceUrl = 'special://inarin-retkeilyalue';
 
 type SykeSourceType = 'private' | 'state';
 
@@ -122,6 +124,13 @@ const createPolygonFeature = (
   properties,
   type: 'Feature'
 });
+
+const readSpecialSourceFile = async (sourceUrl: string) => {
+  const slug = sourceUrl.slice('special://'.length);
+  const fileUrl = new URL(`../../src/importer/data/${slug}.json`, import.meta.url);
+  const content = await readFile(fileURLToPath(fileUrl), 'utf-8');
+  return JSON.parse(content);
+};
 
 export const createSpecialParksSource = () => {
   const responses = new Map<string, unknown>([
@@ -368,23 +377,6 @@ export const createSpecialParksSource = () => {
           ])
         ]
       }
-    ],
-    [
-      inariSourceUrl,
-      {
-        type: 'FeatureCollection',
-        features: [
-          createPolygonFeature([
-            [
-              [27.0, 68.9],
-              [27.0, 69.0],
-              [27.1, 69.0],
-              [27.1, 68.9],
-              [27.0, 68.9]
-            ]
-          ])
-        ]
-      }
     ]
   ]);
 
@@ -447,6 +439,10 @@ export const createSpecialParksSource = () => {
   });
 
   return async (sourceUrl: string) => {
+    if (sourceUrl.startsWith('special://')) {
+      return readSpecialSourceFile(sourceUrl);
+    }
+
     const response = responses.get(sourceUrl);
 
     if (!response) {

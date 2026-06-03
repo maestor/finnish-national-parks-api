@@ -351,6 +351,45 @@ const baseSpecialParkConfigs: SpecialParkConfig[] = [
     slug: 'inarin-retkeilyalue',
     sourceUrl: 'special://inarin-retkeilyalue',
     syntheticLipasId: 606_689
+  },
+  {
+    displayTypeName: 'Historia-alue',
+    locationLabel: 'Seili',
+    luontoonUrl: 'https://www.luontoon.fi/fi/kohteet/seili',
+    name: 'Seili',
+    parkTypeSlug: 'outdoor-recreation-area',
+    postalCode: null,
+    postalOffice: null,
+    responseShapeVersion: 'manual-mml-landwaterboundary-v1',
+    slug: 'seili',
+    sourceUrl: 'special://seili',
+    syntheticLipasId: 9_001_034
+  },
+  {
+    displayTypeName: null,
+    locationLabel: 'Vallisaari',
+    luontoonUrl: 'https://www.luontoon.fi/fi/kohteet/vallisaari',
+    name: 'Vallisaari',
+    parkTypeSlug: 'outdoor-recreation-area',
+    postalCode: null,
+    postalOffice: null,
+    responseShapeVersion: 'manual-mml-landwaterboundary-v1',
+    slug: 'vallisaari',
+    sourceUrl: 'special://vallisaari',
+    syntheticLipasId: 9_001_035
+  },
+  {
+    displayTypeName: null,
+    locationLabel: 'Hailuoto',
+    luontoonUrl: 'https://www.luontoon.fi/fi/kohteet/hailuoto',
+    name: 'Hailuoto',
+    parkTypeSlug: 'outdoor-recreation-area',
+    postalCode: null,
+    postalOffice: null,
+    responseShapeVersion: 'manual-mml-kunta-v1',
+    slug: 'hailuoto',
+    sourceUrl: 'special://hailuoto',
+    syntheticLipasId: 9_001_036
   }
 ];
 
