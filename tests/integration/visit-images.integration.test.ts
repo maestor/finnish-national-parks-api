@@ -423,6 +423,27 @@ describe('Visit image routes', () => {
     expect(response.status).toBe(400);
   });
 
+  it('ignores non-file multipart values when valid files are also provided', async () => {
+    const visitId = await createVisit();
+    const file = new File([await createTestImageBuffer()], 'mixed.jpg', { type: 'image/jpeg' });
+    const app = createApp({ database: testDatabase.database, storage });
+    const formData = new FormData();
+    formData.append('images', 'not-a-file');
+    formData.append('images', file);
+
+    const response = await app.request(`/api/visits/${visitId}/images`, {
+      body: formData,
+      method: 'POST'
+    });
+    const body = (await response.json()) as {
+      images: Array<{ originalName: string | null }>;
+    };
+
+    expect(response.status).toBe(201);
+    expect(body.images).toHaveLength(1);
+    expect(body.images[0]!.originalName).toBe('mixed.jpg');
+  });
+
   it('returns 422 when completing a direct upload before the object exists in storage', async () => {
     const visitId = await createVisit();
     const file = new File([await createTestImageBuffer()], 'pending.jpg', { type: 'image/jpeg' });

@@ -74,9 +74,7 @@ export const createLuontoonUrlResolver = (sitemapXml: string) => {
       byLipasId.set(lipasId, destinationUrl);
     }
 
-    if (slug) {
-      bySlug.set(slug, destinationUrl);
-    }
+    bySlug.set(slug, destinationUrl);
   }
 
   return ({ lipasId, slug }: LuontoonParkRef) => {

@@ -5,6 +5,7 @@ import {
   createVisit,
   createVisitImage,
   deleteVisit,
+  deleteVisitImage,
   getCatalogListEtagSeed,
   getParkBySlug,
   getParkVisitsBySlug,
@@ -165,6 +166,7 @@ describe('repositories', () => {
       visitedOn: '2026-04-12'
     });
     await expect(deleteVisit(testDatabase.database, 99999)).resolves.toBe(false);
+    await expect(deleteVisitImage(testDatabase.database, 99999)).resolves.toBe(false);
   });
 
   it('supports creating visits without optional fields and patching individual fields', async () => {

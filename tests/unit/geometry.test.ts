@@ -93,6 +93,55 @@ describe('geometry helpers', () => {
     expect(isFullyInsideArea(routeInsideHole, area)).toBe(false);
   });
 
+  it('treats routes inside the outer polygon and outside its holes as inside the area', () => {
+    const area: GeoJsonFeatureCollection = {
+      type: 'FeatureCollection',
+      features: [
+        {
+          type: 'Feature',
+          geometry: {
+            type: 'Polygon',
+            coordinates: [
+              [
+                [24, 60],
+                [30, 60],
+                [30, 66],
+                [24, 66],
+                [24, 60]
+              ],
+              [
+                [26, 62],
+                [28, 62],
+                [28, 64],
+                [26, 64],
+                [26, 62]
+              ]
+            ]
+          }
+        }
+      ]
+    };
+
+    const routeOutsideHole: GeoJsonFeatureCollection = {
+      type: 'FeatureCollection',
+      features: [
+        {
+          type: 'Feature',
+          geometry: {
+            type: 'LineString',
+            coordinates: [
+              [24.5, 60.5],
+              [25, 61],
+              [25.5, 61.5]
+            ]
+          }
+        }
+      ]
+    };
+
+    expect(isFullyInsideArea(routeOutsideHole, area)).toBe(true);
+  });
+
   it('treats empty polygons and non-linestring route features as outside the area', () => {
     const emptyArea: GeoJsonFeatureCollection = {
       type: 'FeatureCollection',
