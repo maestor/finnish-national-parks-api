@@ -49,7 +49,7 @@ Use mutation testing for:
 - Import stores the expected catalog fields.
 - Import derives stable slugs, marker points, and bounding boxes.
 - Re-import updates catalog fields without deleting visits.
-- Manual catalog imports can add non-LIPAS-managed parks with a custom `displayTypeName`, and later LIPAS imports do not deactivate those rows.
+- Manual catalog imports can add non-LIPAS-managed parks, including custom top-level types such as `factory-village` and custom `displayTypeName` values, and later LIPAS imports do not deactivate those rows.
 - Import prefers official Luontoon sitemap destination URLs over stale LIPAS `www` links and falls back when no sitemap match exists.
 - `GET /api/parks` returns lightweight list/map data without full boundary geometry.
 - `GET /api/parks/removed` returns a private admin list of removed parks for restore flows.

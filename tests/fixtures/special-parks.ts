@@ -443,6 +443,34 @@ export const createSpecialParksSource = () => {
       return readSpecialSourceFile(sourceUrl);
     }
 
+    if (sourceUrl.includes('typeNames=rajapinta_suojellut:rky_alue')) {
+      return {
+        type: 'FeatureCollection',
+        features: [
+          {
+            type: 'Feature',
+            geometry: {
+              type: 'MultiPolygon',
+              coordinates: [
+                [
+                  [
+                    [24.5, 60.5],
+                    [24.5, 60.52],
+                    [24.52, 60.52],
+                    [24.52, 60.5],
+                    [24.5, 60.5]
+                  ]
+                ]
+              ]
+            },
+            properties: {
+              kohdenimi: 'Testin tehdaskylä'
+            }
+          }
+        ]
+      };
+    }
+
     const response = responses.get(sourceUrl);
 
     if (!response) {
