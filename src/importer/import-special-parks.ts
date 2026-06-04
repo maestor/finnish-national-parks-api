@@ -782,10 +782,12 @@ const sourceReadyHistoryAreaSeeds: SykeSpecialParkSeed[] = [
 const sourceReadyFactoryVillageSeeds: MuseovirastoRkyAreaSeed[] = [
   {
     displayTypeName: null,
-    locationLabel: 'Antskogin ruukki',
+    locationLabel: 'Antskogintie 259',
     luontoonUrl: null,
     name: 'Antskogin ruukki',
     parkTypeSlug: 'factory-village',
+    postalCode: '10410',
+    postalOffice: 'Antskog',
     slug: 'antskogin-ruukki',
     sourceFeatureName: 'Antskogin ruukinalue',
     sourceName: 'Pohjan ruukkiympäristöt',
@@ -793,7 +795,7 @@ const sourceReadyFactoryVillageSeeds: MuseovirastoRkyAreaSeed[] = [
   },
   {
     displayTypeName: null,
-    locationLabel: 'Billnäs',
+    locationLabel: 'Ruukintie 8',
     luontoonUrl: null,
     name: 'Billnäsin ruukki',
     parkTypeSlug: 'factory-village',
@@ -806,7 +808,7 @@ const sourceReadyFactoryVillageSeeds: MuseovirastoRkyAreaSeed[] = [
   },
   {
     displayTypeName: null,
-    locationLabel: 'Fiskars',
+    locationLabel: 'Fiskarsintie 9',
     luontoonUrl: null,
     name: 'Fiskarsin ruukki',
     parkTypeSlug: 'factory-village',
@@ -838,10 +840,12 @@ const sourceReadyFactoryVillageSeeds: MuseovirastoRkyAreaSeed[] = [
   },
   {
     displayTypeName: null,
-    locationLabel: 'Fagervikin ruukki',
+    locationLabel: 'Fagervikintie 21',
     luontoonUrl: null,
     name: 'Fagervikin ruukki',
     parkTypeSlug: 'factory-village',
+    postalCode: '10230',
+    postalOffice: 'Fagervik',
     slug: 'fagervikin-ruukki',
     sourceName: 'Fagervikin ruukinalue',
     syntheticLipasId: 9_002_006
@@ -849,10 +853,12 @@ const sourceReadyFactoryVillageSeeds: MuseovirastoRkyAreaSeed[] = [
   {
     displayTypeName: null,
     excludedSourceNames: ['Kulosuonmäen kaivos'],
-    locationLabel: 'Högforsin ruukki',
+    locationLabel: 'Bremerintie 10',
     luontoonUrl: null,
     name: 'Högforsin ruukki',
     parkTypeSlug: 'factory-village',
+    postalCode: '03600',
+    postalOffice: 'Karkkila',
     slug: 'hogforsin-ruukki',
     sourceName: 'Högforsin ruukinalue',
     syntheticLipasId: 9_002_007
@@ -860,20 +866,24 @@ const sourceReadyFactoryVillageSeeds: MuseovirastoRkyAreaSeed[] = [
   {
     displayTypeName: null,
     excludedSourceNames: ['Lohiluoma'],
-    locationLabel: 'Kauttuan tehdasyhdyskunta',
+    locationLabel: 'Kauttuan Ruukinpuisto, Tehtaantie 1',
     luontoonUrl: null,
-    name: 'Kauttuan tehdasyhdyskunta',
+    name: 'Kauttuan ruukki',
     parkTypeSlug: 'factory-village',
+    postalCode: '27500',
+    postalOffice: 'Kauttua',
     slug: 'kauttuan-tehdasyhdyskunta',
     sourceName: 'Kauttuan ruukki- ja paperitehdasyhdyskunta',
     syntheticLipasId: 9_002_008
   },
   {
     displayTypeName: null,
-    locationLabel: 'Kärkelän ruukki',
+    locationLabel: 'Kärkelänkartanontie 411',
     luontoonUrl: null,
     name: 'Kärkelän ruukki',
     parkTypeSlug: 'factory-village',
+    postalCode: '25470',
+    postalOffice: 'Salo',
     slug: 'karkelan-ruukki',
     sourceName: 'Kärkelän ruukkiyhdyskunta',
     syntheticLipasId: 9_002_009
@@ -900,7 +910,7 @@ const sourceReadyFactoryVillageSeeds: MuseovirastoRkyAreaSeed[] = [
   },
   {
     displayTypeName: null,
-    locationLabel: 'Leineperi',
+    locationLabel: 'Ruukintie 16',
     luontoonUrl: null,
     name: 'Leineperin ruukki',
     parkTypeSlug: 'factory-village',
@@ -912,17 +922,31 @@ const sourceReadyFactoryVillageSeeds: MuseovirastoRkyAreaSeed[] = [
   },
   {
     displayTypeName: null,
-    locationLabel: 'Kellokosken ruukki',
+    locationLabel: 'Kellokoskentie 2',
     luontoonUrl: null,
     name: 'Kellokosken ruukki',
     parkTypeSlug: 'factory-village',
+    postalCode: '04500',
+    postalOffice: 'Kellokoski',
     slug: 'kellokosken-ruukki',
     sourceName: 'Marieforsin ruukki ja Kellokosken sairaala',
     syntheticLipasId: 9_002_013
   },
   {
     displayTypeName: null,
-    locationLabel: 'Mathildedal',
+    locationLabel: 'Pruukinraitti 15',
+    luontoonUrl: null,
+    name: 'Nuutajärven lasikylä',
+    parkTypeSlug: 'factory-village',
+    postalCode: '31160',
+    postalOffice: 'Urjala',
+    slug: 'nuutajarven-lasikyla',
+    sourceName: 'Nuutajärven lasitehtaan alue',
+    syntheticLipasId: 9_002_025
+  },
+  {
+    displayTypeName: null,
+    locationLabel: 'Ruukinrannantie 6',
     luontoonUrl: null,
     name: 'Mathildedalin ruukkikylä',
     parkTypeSlug: 'factory-village',
@@ -944,7 +968,7 @@ const sourceReadyFactoryVillageSeeds: MuseovirastoRkyAreaSeed[] = [
   },
   {
     displayTypeName: null,
-    locationLabel: 'Möhkö',
+    locationLabel: 'Möhköntie 209',
     luontoonUrl: null,
     name: 'Möhkön ruukki',
     parkTypeSlug: 'factory-village',
@@ -956,20 +980,24 @@ const sourceReadyFactoryVillageSeeds: MuseovirastoRkyAreaSeed[] = [
   },
   {
     displayTypeName: null,
-    locationLabel: 'Mustion ruukinalue',
+    locationLabel: 'Hållsnäsintie 89',
     luontoonUrl: null,
-    name: 'Mustion ruukinalue',
+    name: 'Mustion ruukki ja linna',
     parkTypeSlug: 'factory-village',
+    postalCode: '10360',
+    postalOffice: 'Mustio',
     slug: 'mustion-ruukinalue',
     sourceName: 'Mustion ruukinalue',
     syntheticLipasId: 9_002_017
   },
   {
     displayTypeName: null,
-    locationLabel: 'Noormarkun ruukki',
+    locationLabel: 'Ahlströmintie 1',
     luontoonUrl: null,
     name: 'Noormarkun ruukki',
     parkTypeSlug: 'factory-village',
+    postalCode: '29600',
+    postalOffice: 'Noormarkku',
     slug: 'noormarkun-ruukki',
     sourceName: 'Noormarkun ruukin ja Ahlström-yhtiön rakennukset',
     syntheticLipasId: 9_002_018
@@ -986,29 +1014,31 @@ const sourceReadyFactoryVillageSeeds: MuseovirastoRkyAreaSeed[] = [
   },
   {
     displayTypeName: null,
-    locationLabel: 'Strömforsin ruukki',
+    locationLabel: 'Ruukintie 11',
     luontoonUrl: null,
     name: 'Strömforsin ruukki',
     parkTypeSlug: 'factory-village',
+    postalCode: '07970',
+    postalOffice: 'Ruotsinpyhtää',
     slug: 'stromforsin-ruukki',
     sourceName: 'Strömforsin ruukkiyhdyskunta',
     syntheticLipasId: 9_002_020
   },
   {
     displayTypeName: null,
-    locationLabel: 'Teijon ruukki',
+    locationLabel: 'Telakkatie 17',
     luontoonUrl: null,
     name: 'Teijon ruukki',
     parkTypeSlug: 'factory-village',
     postalCode: '25570',
-    postalOffice: 'Teijo',
+    postalOffice: 'Salo',
     slug: 'teijon-ruukki',
     sourceName: 'Teijon ruukinalue',
     syntheticLipasId: 9_002_021
   },
   {
     displayTypeName: null,
-    locationLabel: 'Taalintehdas',
+    locationLabel: 'Tullbacksvägen 2',
     luontoonUrl: null,
     name: 'Taalintehtaan ruukki',
     parkTypeSlug: 'factory-village',
@@ -1020,7 +1050,7 @@ const sourceReadyFactoryVillageSeeds: MuseovirastoRkyAreaSeed[] = [
   },
   {
     displayTypeName: 'Maailmanperintökohde',
-    locationLabel: 'Verla',
+    locationLabel: 'Verlantie 295',
     luontoonUrl: null,
     name: 'Verla',
     parkTypeSlug: 'factory-village',
@@ -1043,11 +1073,39 @@ const sourceReadyFactoryVillageSeeds: MuseovirastoRkyAreaSeed[] = [
   }
 ];
 
+const sourceReadyFactoryVillageProtectedSiteSeeds: SykeSpecialParkSeed[] = [
+  {
+    displayTypeName: null,
+    locationLabel: 'Jyrkänjoentie 217',
+    luontoonUrl: null,
+    name: 'Jyrkkäkosken ruukki',
+    parkTypeSlug: 'factory-village',
+    postalCode: '74360',
+    postalOffice: 'Jyrkkäkoski',
+    slug: 'jyrkkakosken-ruukki',
+    sourceName: 'Jyrkkäkosken ruukki',
+    syntheticLipasId: 9_002_026
+  },
+  {
+    displayTypeName: null,
+    locationLabel: 'Haapakoskentie 506',
+    luontoonUrl: null,
+    name: 'Haapakosken ruukki',
+    parkTypeSlug: 'factory-village',
+    postalCode: '77520',
+    postalOffice: 'Haapakoski',
+    slug: 'haapakosken-ruukki',
+    sourceName: 'Haapakosken ruukki',
+    syntheticLipasId: 9_002_027
+  }
+];
+
 const specialParkConfigs: SpecialParkConfig[] = [
   ...baseSpecialParkConfigs,
   ...sourceReadyReserveParkSeeds.map(createSykeSpecialParkConfig),
   ...sourceReadyDestinationAreaSeeds.map(createSykeSpecialParkConfig),
   ...sourceReadyHistoryAreaSeeds.map(createMuseovirastoSpecialParkConfig),
+  ...sourceReadyFactoryVillageProtectedSiteSeeds.map(createMuseovirastoSpecialParkConfig),
   ...sourceReadyFactoryVillageSeeds.map(createMuseovirastoRkyAreaConfig)
 ];
 

@@ -34,7 +34,7 @@ describe('manual catalog imports', () => {
       now: () => '2026-05-27T08:00:00.000Z'
     });
 
-    expect(result.results).toHaveLength(68);
+    expect(result.results).toHaveLength(71);
 
     const merenkurkku = await getParkBySlug(
       testDatabase.database,
@@ -193,7 +193,7 @@ describe('manual catalog imports', () => {
     const fiskars = await getParkBySlug(testDatabase.database, 'fiskarsin-ruukki');
     expect(fiskars).toMatchObject({
       lipasId: 9002003,
-      location: 'Fiskars, 10470',
+      location: 'Fiskarsintie 9, 10470 Fiskars',
       name: 'Fiskarsin ruukki',
       type: { slug: 'factory-village' }
     });
@@ -202,7 +202,7 @@ describe('manual catalog imports', () => {
     expect(verla).toMatchObject({
       displayTypeName: 'Maailmanperintökohde',
       lipasId: 9002023,
-      location: 'Verla, 47850',
+      location: 'Verlantie 295, 47850 Verla',
       name: 'Verla',
       type: { slug: 'factory-village' }
     });
@@ -211,6 +211,14 @@ describe('manual catalog imports', () => {
     expect(juankoski).toMatchObject({
       lipasId: 9002024,
       name: 'Juankosken ruukki',
+      type: { slug: 'factory-village' }
+    });
+
+    const nuutajarvi = await getParkBySlug(testDatabase.database, 'nuutajarven-lasikyla');
+    expect(nuutajarvi).toMatchObject({
+      lipasId: 9002025,
+      location: 'Pruukinraitti 15, 31160 Urjala',
+      name: 'Nuutajärven lasikylä',
       type: { slug: 'factory-village' }
     });
   });
@@ -243,7 +251,7 @@ describe('manual catalog imports', () => {
     );
     const kevo = await getParkBySlug(testDatabase.database, 'kevon-luonnonpuisto');
 
-    expect(allParks).toHaveLength(68);
+    expect(allParks).toHaveLength(71);
     expect(merenkurkku).toMatchObject({ catalogStatus: 'active' });
     expect(kevo).toMatchObject({ catalogStatus: 'active' });
   });
@@ -294,7 +302,7 @@ describe('manual catalog imports', () => {
       database: testDatabase.database
     });
 
-    expect(result.results).toHaveLength(68);
+    expect(result.results).toHaveLength(71);
 
     const merenkurkku = await getParkBySlug(
       testDatabase.database,
