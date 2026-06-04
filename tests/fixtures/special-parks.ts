@@ -114,7 +114,14 @@ const generatedSykeSources: GeneratedSykeSource[] = [
   { name: 'Olvassuo', sourceName: 'Olvassuon luonnonpuisto' }
 ];
 
-const generatedMuseovirastoSources = ['Harola', 'Kajaanin linna', 'Raaseporin linna', 'Svartholma'];
+const generatedMuseovirastoSources = [
+  'Harola',
+  'Kajaanin linna',
+  'Raaseporin linna',
+  'Svartholma',
+  'Jyrkkäkosken ruukki',
+  'Haapakosken ruukki'
+];
 
 const createPolygonFeature = (
   coordinates: number[][][],
