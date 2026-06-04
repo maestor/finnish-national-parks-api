@@ -115,7 +115,7 @@ Catalog endpoints stay cache-friendly and database-backed:
 
 - `GET /api/parks` returns lightweight list data without boundary GeoJSON.
 - `GET /api/parks/removed` returns an auth-restricted admin list of removed parks so the UI can restore visibility when needed.
-- `GET /api/parks?type=state-hiking-area` filters by normalized type slug.
+- `GET /api/parks?type=hiking-area` filters by normalized type slug.
 - `GET /api/parks/:slug?includeBoundary=true` includes stored boundary geometry.
 - Park list, detail, removed, and public map responses include `logo: { key, updatedAt, url } | null` when a logo has been linked to the park.
 - Park responses now expose `location` instead of `locationLabel`, combining `location_label` and `postal_office` when both exist, but collapsing to a single value when they are identical or only one exists.
@@ -163,13 +163,13 @@ Importer expectations:
 - Allow manually imported catalog rows, such as Merenkurkun maailmanperintöalue, to stay active outside the normal LIPAS cleanup path.
 - Read from the local/libSQL database during normal API requests instead of calling LIPAS live.
 
-One supported manual catalog import currently exists:
+The supported manual catalog import currently covers:
 
 ```sh
 npm run import:special-parks
 ```
 
-It imports Merenkurkun maailmanperintöalue into the existing catalog model as `other-nature-reserve`, keeps its full heritage geometry, sets a park-level display label of `Maailmanperintökohde`, and protects the row from later LIPAS deactivation.
+It imports curated non-LIPAS catalog rows such as Merenkurkun maailmanperintöalue and selected ruukit / tehdaskylät, keeps their source geometry, preserves custom display labels such as `Maailmanperintökohde`, and protects those rows from later LIPAS deactivation.
 
 ## Verification
 

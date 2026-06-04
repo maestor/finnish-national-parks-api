@@ -239,6 +239,30 @@ describe('API routes', () => {
     });
   });
 
+  it('filters manual factory villages by the normalized type slug', async () => {
+    const { createSpecialParksSource } = await import('../fixtures/special-parks.js');
+    await importSpecialParks({
+      database: testDatabase.database,
+      fetchSource: createSpecialParksSource(),
+      now: () => '2026-05-01T10:00:00.000Z'
+    });
+
+    const app = createApp({ database: testDatabase.database });
+    const response = await app.request('/api/parks?type=factory-village');
+    const body = (await response.json()) as {
+      parks: Array<Record<string, unknown>>;
+    };
+
+    expect(response.status).toBe(200);
+    expect(body.parks.some((park) => park.slug === 'fiskarsin-ruukki')).toBe(true);
+    expect(body.parks.some((park) => park.slug === 'verla')).toBe(true);
+    expect(
+      body.parks.every(
+        (park) => park.type && (park.type as { slug: string }).slug === 'factory-village'
+      )
+    ).toBe(true);
+  });
+
   it('returns 304 when the public list ETag matches', async () => {
     const app = createApp({ database: testDatabase.database });
     const firstResponse = await app.request('/api/parks');

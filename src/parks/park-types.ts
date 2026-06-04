@@ -6,6 +6,12 @@ export const supportedParkTypes = [
     slug: 'outdoor-recreation-area'
   },
   {
+    code: 9001,
+    id: 9001,
+    name: 'Tehdaskylä',
+    slug: 'factory-village'
+  },
+  {
     code: 109,
     id: 109,
     name: 'Retkeilyalue',

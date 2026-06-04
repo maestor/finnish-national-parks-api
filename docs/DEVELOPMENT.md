@@ -208,7 +208,7 @@ Key route behavior:
 
 - `GET /api/parks` is optimized for map/list views and omits boundary geometry.
 - `GET /api/parks/removed` returns an auth-restricted admin list of removed parks for restore workflows.
-- `GET /api/parks?type=state-hiking-area` filters by normalized catalog type slug.
+- `GET /api/parks?type=hiking-area` filters by normalized catalog type slug.
 - `GET /api/parks/:slug?includeBoundary=true` returns the stored boundary GeoJSON.
 - Park list, detail, removed, and public map responses expose `logo: { key, updatedAt, url } | null` when one has been linked to the park.
 - Park responses expose `location` instead of `locationLabel`, combining `location_label` and `postal_office` when both exist, but collapsing to one value when they are identical or only one exists.
