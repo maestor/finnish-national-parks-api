@@ -183,6 +183,57 @@ export const createSpecialParksSource = () => {
           createPolygonFeature(
             [
               [
+                [21.77, 61.114],
+                [21.77, 61.117],
+                [21.78, 61.117],
+                [21.78, 61.114],
+                [21.77, 61.114]
+              ]
+            ],
+            {
+              ID: 579,
+              Nimi: 'Sammallahdenmäki',
+              URL: 'https://example.test/sammallahdenmaki',
+              aluetyyppi: 'Kohde'
+            }
+          ),
+          createPolygonFeature(
+            [
+              [
+                [24.963, 60.137],
+                [24.963, 60.153],
+                [24.998, 60.153],
+                [24.998, 60.137],
+                [24.963, 60.137]
+              ]
+            ],
+            {
+              ID: 583,
+              Nimi: 'Suomenlinna',
+              URL: 'https://example.test/suomenlinna',
+              aluetyyppi: 'Kohde'
+            }
+          ),
+          createPolygonFeature(
+            [
+              [
+                [21.505, 61.125],
+                [21.505, 61.13],
+                [21.521, 61.13],
+                [21.521, 61.125],
+                [21.505, 61.125]
+              ]
+            ],
+            {
+              ID: 582,
+              Nimi: 'Vanha Rauma',
+              URL: 'https://example.test/vanha-rauma',
+              aluetyyppi: 'Kohde'
+            }
+          ),
+          createPolygonFeature(
+            [
+              [
                 [20.6, 62.9],
                 [20.6, 63.6],
                 [21.3, 63.6],
