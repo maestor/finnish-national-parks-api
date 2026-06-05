@@ -116,10 +116,12 @@ Catalog endpoints stay cache-friendly and database-backed:
 - `GET /api/parks` returns lightweight list data without boundary GeoJSON.
 - `GET /api/parks/removed` returns an auth-restricted admin list of removed parks so the UI can restore visibility when needed.
 - `GET /api/parks?type=hiking-area` filters by normalized type slug.
+- `GET /api/parks?category=trails-and-routes` filters by a derived API category while park responses still preserve the original imported `type`.
 - `GET /api/parks/:slug?includeBoundary=true` includes stored boundary geometry.
+- Park list, detail, removed, and public map responses include both the source `type` and a derived `category`.
 - Park list, detail, removed, and public map responses include `logo: { key, updatedAt, url } | null` when a logo has been linked to the park.
 - Park responses now expose `location` instead of `locationLabel`, combining `location_label` and `postal_office` when both exist, but collapsing to a single value when they are identical or only one exists.
-- `GET /api/public/home-summary` returns public visit totals, seasonal visit counts, type progress, recent activity, and a public data `version` / `updatedAt` signal without notes, routes, or images.
+- `GET /api/public/home-summary` returns public visit totals, seasonal visit counts, type progress with a `visible` flag, category progress, recent activity, and a public data `version` / `updatedAt` signal without notes, routes, or images.
 - `GET /api/public/map-summary` returns lightweight park map data plus per-park visited summaries and the same public data version signal.
 - `GET /api/parks/:slug/visits` returns visit history plus a visited summary for one park.
 - `GET /api/visits` returns flat visit resources with their parent park reference.
@@ -137,25 +139,29 @@ Catalog endpoints stay cache-friendly and database-backed:
 The catalog importer should use:
 
 ```text
-https://api.lipas.fi/v2/sports-sites?type-codes=103,109,110,111,112,4404&page-size=100&page=1
+https://api.lipas.fi/v2/sports-sites?type-codes=103,109,110,111,112,4403,4404,4405&page-size=100&page=1
 ```
 
 Importer expectations:
 
 - Keep only `status === "active"` records.
-- Expect 1174 active LIPAS records in the current source dataset as of 2026-05-24.
+- Expect 2557 active LIPAS records in the current source dataset.
 - Import these supported LIPAS catalog types:
   - `103` Ulkoilu-/virkistysalue
   - `109` Valtion retkeilyalue
   - `110` Erämaa-alue
   - `111` Kansallispuisto
   - `112` Muu luonnonsuojelualue
+  - `4403` Ulkoilureitti
   - `4404` Luontopolku
+  - `4405` Retkeilyreitti
 - Store normalized type metadata in a dedicated type table and reference it from catalog rows.
 - Store catalog fields needed for a map app.
 - Persist both `postalCode` and `postalOffice` from LIPAS so location matching can use the more stable numeric postal identifier.
-- Skip `4404` nature trails whose full route geometry is contained inside one imported area record, because visits should attach to the parent area instead of the nested route.
-- Skip `4404` nature trails whose normalized `locationLabel`, `postalCode`, and `postalOffice` exactly match one imported area record, because those are also treated as nested visit targets.
+- Skip `4404` nature trails and `4405` hiking trails when their full route geometry is contained inside one imported area record, because visits should attach to the parent area instead of the nested route.
+- Skip `4403` walking trails when any route point overlaps an imported area record, because those routes are treated as nested visit targets even when only part of the route crosses the area.
+- Skip trail imports whose normalized `locationLabel`, `postalCode`, and `postalOffice` exactly match one imported area record, because those are also treated as nested visit targets.
+- Import `4403` walking trails and `4405` hiking trails as removed-by-default catalog rows so the UI can opt into showing them separately from the main public catalog.
 - Exclude LIPAS contact email, phone number, and comment text.
 - Refresh `luontoonUrl` from Luontoon's official Finnish sitemap when a matching destination exists, instead of trusting LIPAS `www` blindly.
 - Preserve personal notes and visit history across imports.

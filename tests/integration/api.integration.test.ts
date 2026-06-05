@@ -120,6 +120,7 @@ describe('API routes', () => {
     expect(body.parks).toHaveLength(4);
     expect(body.parks[0]).not.toHaveProperty('boundaryGeoJson');
     expect(body.parks[0]).not.toHaveProperty('locationLabel');
+    expect(body.parks[0]).toHaveProperty('category');
     expect(body.parks[0]).toHaveProperty('type');
     expect(body.parks[0]).toHaveProperty('location');
   });
@@ -261,6 +262,56 @@ describe('API routes', () => {
         (park) => park.type && (park.type as { slug: string }).slug === 'factory-village'
       )
     ).toBe(true);
+  });
+
+  it('filters the public park list by the derived category slug', async () => {
+    await importParks({
+      database: testDatabase.database,
+      expectedActiveCount: 1,
+      now: () => '2026-05-02T10:00:00.000Z',
+      sourceUrl: 'https://example.test/lipas-trails',
+      fetchSource: async () => ({
+        items: [
+          createLipasTrail({
+            location: {
+              geometries: {
+                type: 'FeatureCollection',
+                features: [
+                  {
+                    type: 'Feature',
+                    geometry: {
+                      type: 'LineString',
+                      coordinates: [
+                        [35.2, 66.2],
+                        [35.4, 66.4],
+                        [35.6, 66.6]
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          })
+        ]
+      })
+    });
+
+    const app = createApp({ database: testDatabase.database });
+    const response = await app.request('/api/parks?category=trails-and-routes');
+    const body = (await response.json()) as {
+      parks: Array<{
+        category: { slug: string };
+        type: { slug: string };
+      }>;
+    };
+
+    expect(response.status).toBe(200);
+    expect(body.parks).toHaveLength(1);
+    expect(body.parks[0]).toMatchObject({
+      category: { slug: 'trails-and-routes' },
+      type: { slug: 'nature-trail' }
+    });
+    expect(response.headers.get('etag')).toContain('category:trails-and-routes');
   });
 
   it('returns 304 when the public list ETag matches', async () => {
@@ -578,10 +629,17 @@ describe('API routes', () => {
         park: { slug: string };
         visitCount: number;
       }>;
+      progressByCategory: Array<{
+        category: { slug: string };
+        totalParks: number;
+        totalVisits: number;
+        visitedParks: number;
+      }>;
       progressByType: Array<{
         totalParks: number;
         totalVisits: number;
         type: { slug: string };
+        visible: boolean;
         visitedParks: number;
       }>;
       recentVisits: Array<{
@@ -620,6 +678,19 @@ describe('API routes', () => {
           type: expect.objectContaining({
             slug: parkTypeFixtures.nationalPark.slug
           }),
+          visible: true,
+          visitedParks: 2
+        })
+      ])
+    );
+    expect(body.progressByCategory).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          category: expect.objectContaining({
+            slug: parkTypeFixtures.nationalPark.slug
+          }),
+          totalParks: 2,
+          totalVisits: 3,
           visitedParks: 2
         })
       ])
@@ -682,6 +753,76 @@ describe('API routes', () => {
       '2026-04-10',
       '2026-04-22'
     ]);
+  });
+
+  it('marks trail progress types hidden while exposing combined trail category progress', async () => {
+    await importParks({
+      database: testDatabase.database,
+      expectedActiveCount: 1,
+      now: () => '2026-05-02T11:00:00.000Z',
+      sourceUrl: 'https://example.test/lipas-nature-trail',
+      fetchSource: async () => ({
+        items: [
+          createLipasTrail({
+            location: {
+              geometries: {
+                type: 'FeatureCollection',
+                features: [
+                  {
+                    type: 'Feature',
+                    geometry: {
+                      type: 'LineString',
+                      coordinates: [
+                        [35.2, 66.2],
+                        [35.4, 66.4],
+                        [35.6, 66.6]
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          })
+        ]
+      })
+    });
+
+    const app = createApp({ database: testDatabase.database });
+    await createVisit(app, 'testin-luontopolku', {
+      visitedOn: '2026-05-01'
+    });
+
+    const response = await app.request('/api/public/home-summary');
+    const body = (await response.json()) as {
+      progressByCategory: Array<{
+        category: { slug: string };
+        totalParks: number;
+        totalVisits: number;
+        visitedParks: number;
+      }>;
+      progressByType: Array<{
+        type: { slug: string };
+        totalParks: number;
+        totalVisits: number;
+        visible: boolean;
+        visitedParks: number;
+      }>;
+    };
+
+    expect(response.status).toBe(200);
+    expect(body.progressByType[0]).toMatchObject({
+      type: { slug: 'nature-trail' },
+      totalParks: 1,
+      totalVisits: 1,
+      visible: false,
+      visitedParks: 1
+    });
+    expect(body.progressByCategory[0]).toMatchObject({
+      category: { slug: 'trails-and-routes' },
+      totalParks: 1,
+      totalVisits: 1,
+      visitedParks: 1
+    });
   });
 
   it('serves lightweight public map summary data with per-park visited summaries', async () => {

@@ -12,9 +12,10 @@ import {
   hikingAreaDisplayTypeName,
   hikingAreaTypeCode,
   isHikingTrailTypeCode,
-  isTrailTypeCode
+  isTrailTypeCode,
+  isWalkingTrailTypeCode
 } from '../parks/park-types.js';
-import { isFullyInsideArea } from './geometry.js';
+import { hasAnyPointInsideArea, isFullyInsideArea } from './geometry.js';
 import { createLuontoonUrlResolver } from './luontoon-sitemap.js';
 import type { MappedPark } from './map-lipas-park.js';
 import { mapLipasPark } from './map-lipas-park.js';
@@ -43,7 +44,7 @@ type ImportParksOptions = {
 
 const RESPONSE_SHAPE_VERSION = 'catalog-v2';
 const LUONTOON_SITEMAP_URL = 'https://www.luontoon.fi/resources/sitemap/fi.xml';
-const SUPPORTED_LIPAS_TYPE_CODES = [103, 109, 110, 111, 112, 4404, 4405] as const;
+const SUPPORTED_LIPAS_TYPE_CODES = [103, 109, 110, 111, 112, 4403, 4404, 4405] as const;
 
 export const defaultLipasCatalogSourceUrl = `https://api.lipas.fi/v2/sports-sites?type-codes=${SUPPORTED_LIPAS_TYPE_CODES.join(',')}&page-size=100&page=1`;
 
@@ -133,17 +134,23 @@ const hasMatchingAreaLocationMetadata = (park: MappedPark, areas: MappedPark[]) 
   );
 };
 
-const isContainedTrail = (park: MappedPark, areas: MappedPark[]) => {
-  return (
-    isTrailTypeCode(park.type.code) &&
-    (areas.some((area) => isFullyInsideArea(park.boundaryGeoJson, area.boundaryGeoJson)) ||
-      hasMatchingAreaLocationMetadata(park, areas))
+const shouldSkipTrailImport = (park: MappedPark, areas: MappedPark[]) => {
+  if (!isTrailTypeCode(park.type.code)) {
+    return false;
+  }
+
+  const overlapsArea = areas.some((area) =>
+    isWalkingTrailTypeCode(park.type.code)
+      ? hasAnyPointInsideArea(park.boundaryGeoJson, area.boundaryGeoJson)
+      : isFullyInsideArea(park.boundaryGeoJson, area.boundaryGeoJson)
   );
+
+  return overlapsArea || hasMatchingAreaLocationMetadata(park, areas);
 };
 
 export const importParks = async ({
   database,
-  expectedActiveCount = 2035,
+  expectedActiveCount = 2557,
   beforeEachUpsert,
   fetchSource = defaultFetchSource,
   fetchLuontoonSitemap,
@@ -169,7 +176,9 @@ export const importParks = async ({
   }
   const mappedActiveParks = activeItems.map((item) => mapLipasPark(item));
   const importedAreas = mappedActiveParks.filter((park) => !isTrailTypeCode(park.type.code));
-  const importedParks = mappedActiveParks.filter((park) => !isContainedTrail(park, importedAreas));
+  const importedParks = mappedActiveParks.filter(
+    (park) => !shouldSkipTrailImport(park, importedAreas)
+  );
   const importedLipasIds = importedParks.map((park) => park.lipasId);
   const existingParks = await listExistingParksByLipasIds(database, importedLipasIds);
   const existingSlugByLipasId = new Map(existingParks.map((park) => [park.lipasId, park.slug]));
@@ -223,7 +232,8 @@ export const importParks = async ({
         luontoonUrl: resolvedLuontoonUrl,
         managedByLipasImport: true,
         markerLat: mapped.markerPoint.lat,
-        removed: isHikingTrailTypeCode(mapped.type.code),
+        removed:
+          isHikingTrailTypeCode(mapped.type.code) || isWalkingTrailTypeCode(mapped.type.code),
         markerLon: mapped.markerPoint.lon,
         municipalityCode: mapped.municipalityCode,
         name: mapped.name,
@@ -241,7 +251,7 @@ export const importParks = async ({
 
   return {
     activeCount: importedParks.length,
-    skippedContainedTrailCount: activeItems.length - importedParks.length,
+    skippedTrailCount: activeItems.length - importedParks.length,
     sourceActiveCount: activeItems.length,
     importRunId: importRunId!,
     importedAt

@@ -21,9 +21,9 @@ describe('contracts and cache helpers', () => {
   it('builds deterministic cache helpers for empty and populated states', () => {
     const emptyListEtag = createCatalogListEtag({
       activeCount: 0,
+      filterKey: null,
       latestImportRunId: null,
-      latestUpdatedAt: null,
-      typeSlug: null
+      latestUpdatedAt: null
     });
     const detailEtag = createCatalogDetailEtag({
       includeBoundary: false,

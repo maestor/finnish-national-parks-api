@@ -44,7 +44,7 @@ Use mutation testing for:
 
 - Import keeps only active supported LIPAS catalog records.
 - Import persists normalized catalog type metadata and park-to-type references.
-- Import accepts route-based `4404` nature trails and skips trails fully contained inside an imported area or matching an imported area's `locationLabel + postalCode + postalOffice`.
+- Import accepts route-based `4403` walking trails, `4404` nature trails, and `4405` hiking trails; it skips walking trails when any route point overlaps an imported area and skips other trail imports when they are fully contained inside an imported area or match an imported area's `locationLabel + postalCode + postalOffice`.
 - Import excludes contact email, phone number, and comment text.
 - Import stores the expected catalog fields.
 - Import derives stable slugs, marker points, and bounding boxes.
@@ -54,10 +54,12 @@ Use mutation testing for:
 - `GET /api/parks` returns lightweight list/map data without full boundary geometry.
 - `GET /api/parks/removed` returns a private admin list of removed parks for restore flows.
 - `GET /api/parks?type=...` filters the public catalog list by normalized type slug.
+- `GET /api/parks?category=...` filters the public catalog list by derived API category, such as `trails-and-routes`.
 - `GET /api/parks/:slug` returns catalog detail without visit state.
+- Park catalog responses expose both the source `type` and a derived `category`.
 - Park catalog responses expose linked logo metadata and stable logo URLs when a park logo has been configured.
 - Park responses expose `location` instead of `locationLabel`, combining address and postal office when both exist, but collapsing to one value when they are identical or only one exists.
-- `GET /api/public/home-summary` returns cache-friendly public summary data including seasonal visit counts, without notes, routes, or images.
+- `GET /api/public/home-summary` returns cache-friendly public summary data including seasonal visit counts, `progressByType` visibility flags, and aggregated `progressByCategory`, without notes, routes, or images.
 - `GET /api/public/map-summary` returns lightweight map data plus per-park visited summaries.
 - `GET /api/parks/:slug/visits` returns park-scoped visit history and visited summary.
 - `GET /api/visits` and `GET /api/visits/:id` expose visit resources with parent park references.

@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
 import type { GeoJsonFeatureCollection } from '../../src/importer/geometry.js';
-import { deriveBoundingBox, isFullyInsideArea } from '../../src/importer/geometry.js';
+import {
+  deriveBoundingBox,
+  hasAnyPointInsideArea,
+  isFullyInsideArea
+} from '../../src/importer/geometry.js';
 
 describe('geometry helpers', () => {
   it('derives bounds from a mixed polygon and linestring feature collection', () => {
@@ -140,6 +144,50 @@ describe('geometry helpers', () => {
     };
 
     expect(isFullyInsideArea(routeOutsideHole, area)).toBe(true);
+    expect(hasAnyPointInsideArea(routeOutsideHole, area)).toBe(true);
+  });
+
+  it('detects partial route overlap when any linestring point is inside the area', () => {
+    const area: GeoJsonFeatureCollection = {
+      type: 'FeatureCollection',
+      features: [
+        {
+          type: 'Feature',
+          geometry: {
+            type: 'Polygon',
+            coordinates: [
+              [
+                [24, 60],
+                [30, 60],
+                [30, 66],
+                [24, 66],
+                [24, 60]
+              ]
+            ]
+          }
+        }
+      ]
+    };
+
+    const partiallyOverlappingRoute: GeoJsonFeatureCollection = {
+      type: 'FeatureCollection',
+      features: [
+        {
+          type: 'Feature',
+          geometry: {
+            type: 'LineString',
+            coordinates: [
+              [23.5, 59.5],
+              [24.5, 60.5],
+              [31, 67]
+            ]
+          }
+        }
+      ]
+    };
+
+    expect(hasAnyPointInsideArea(partiallyOverlappingRoute, area)).toBe(true);
+    expect(isFullyInsideArea(partiallyOverlappingRoute, area)).toBe(false);
   });
 
   it('treats empty polygons and non-linestring route features as outside the area', () => {
@@ -195,5 +243,7 @@ describe('geometry helpers', () => {
 
     expect(isFullyInsideArea(lineRouteAgainstEmptyArea, emptyArea)).toBe(false);
     expect(isFullyInsideArea(polygonOnlyRoute, emptyArea)).toBe(false);
+    expect(hasAnyPointInsideArea(lineRouteAgainstEmptyArea, emptyArea)).toBe(false);
+    expect(hasAnyPointInsideArea(polygonOnlyRoute, emptyArea)).toBe(false);
   });
 });

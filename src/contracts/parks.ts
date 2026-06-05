@@ -1,12 +1,17 @@
 import { z } from '@hono/zod-openapi';
 
-import { supportedParkTypeSlugs } from '../parks/park-types.js';
+import { supportedParkCategorySlugs, supportedParkTypeSlugs } from '../parks/park-types.js';
 
 export const parkTypeSchema = z.object({
   code: z.number().int(),
   id: z.number().int(),
   name: z.string(),
   slug: z.enum(supportedParkTypeSlugs)
+});
+
+export const parkCategorySchema = z.object({
+  name: z.string(),
+  slug: z.enum(supportedParkCategorySlugs)
 });
 
 export const pointSchema = z.object({
@@ -58,6 +63,7 @@ export const geoJsonFeatureCollectionSchema = z.object({
 export const parkListItemSchema = z.object({
   areaKm2: z.number().nullable(),
   boundingBox: boundingBoxSchema,
+  category: parkCategorySchema,
   displayTypeName: z.string().nullable().optional(),
   establishmentYear: z.number().int().nullable(),
   location: z.string(),
@@ -169,6 +175,14 @@ export const publicTypeProgressSchema = z.object({
   totalParks: z.number().int(),
   totalVisits: z.number().int(),
   type: parkTypeSchema,
+  visible: z.boolean(),
+  visitedParks: z.number().int()
+});
+
+export const publicCategoryProgressSchema = z.object({
+  category: parkCategorySchema,
+  totalParks: z.number().int(),
+  totalVisits: z.number().int(),
   visitedParks: z.number().int()
 });
 
@@ -202,6 +216,7 @@ export const seasonalVisitCountsSchema = z.object({
 });
 
 export const publicHomeSummaryResponseSchema = publicVisitVersionSchema.extend({
+  progressByCategory: z.array(publicCategoryProgressSchema),
   latestVisitEntries: z.array(publicVisitEntrySchema),
   mostVisitedParks: z.array(publicMostVisitedParkSchema),
   progressByType: z.array(publicTypeProgressSchema),

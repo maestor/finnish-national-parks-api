@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  getParkCategoryByTypeSlug,
+  getSupportedParkCategoryBySlug,
   getSupportedParkTypeByCode,
   getSupportedParkTypeBySlug,
+  supportedParkCategorySlugs,
   supportedParkTypeSlugs
 } from '../../src/parks/park-types.js';
 
@@ -20,6 +23,10 @@ describe('park type helpers', () => {
       code: 111,
       slug: 'national-park'
     });
+    expect(getSupportedParkTypeByCode(4403)).toMatchObject({
+      code: 4403,
+      slug: 'walking-trail'
+    });
     expect(getSupportedParkTypeByCode(4404)).toMatchObject({
       code: 4404,
       slug: 'nature-trail'
@@ -36,6 +43,10 @@ describe('park type helpers', () => {
       code: 9001,
       name: 'Tehdaskylä'
     });
+    expect(getSupportedParkTypeBySlug('walking-trail')).toMatchObject({
+      code: 4403,
+      name: 'Ulkoilureitti'
+    });
     expect(getSupportedParkTypeBySlug('nature-trail')).toMatchObject({
       code: 4404,
       name: 'Luontopolku'
@@ -51,8 +62,30 @@ describe('park type helpers', () => {
       'wilderness-area',
       'national-park',
       'nature-reserve-area',
+      'walking-trail',
       'nature-trail',
       'hiking-trail'
+    ]);
+    expect(getSupportedParkCategoryBySlug('trails-and-routes')).toEqual({
+      name: 'Trails and routes',
+      slug: 'trails-and-routes'
+    });
+    expect(getParkCategoryByTypeSlug('walking-trail')).toEqual({
+      name: 'Trails and routes',
+      slug: 'trails-and-routes'
+    });
+    expect(getParkCategoryByTypeSlug('national-park')).toEqual({
+      name: 'Kansallispuisto',
+      slug: 'national-park'
+    });
+    expect(supportedParkCategorySlugs).toEqual([
+      'outdoor-recreation-area',
+      'factory-village',
+      'hiking-area',
+      'wilderness-area',
+      'national-park',
+      'nature-reserve-area',
+      'trails-and-routes'
     ]);
   });
 
@@ -62,6 +95,9 @@ describe('park type helpers', () => {
     );
     expect(() => getSupportedParkTypeBySlug('unknown-type')).toThrow(
       'Unsupported protected-area type slug "unknown-type".'
+    );
+    expect(() => getSupportedParkCategoryBySlug('unknown-category')).toThrow(
+      'Unsupported protected-area category slug "unknown-category".'
     );
   });
 });

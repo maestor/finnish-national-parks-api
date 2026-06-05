@@ -367,8 +367,10 @@ export const createApp = ({
 
     app.openapi(listParksRoute, async (context) => {
       const query = context.req.valid('query');
-      const typeSlug = query.type;
-      const filter = typeSlug ? { typeSlug } : {};
+      const filter = {
+        ...(query.category ? { categorySlug: query.category } : {}),
+        ...(query.type ? { typeSlug: query.type } : {})
+      };
       const etag = createCatalogListEtag(await getCatalogListEtagSeed(database, filter));
       context.header('Cache-Control', CATALOG_CACHE_CONTROL);
       context.header('ETag', etag);

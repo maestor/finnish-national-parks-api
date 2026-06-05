@@ -98,13 +98,26 @@ const pointInArea = (point: GeoJsonCoordinate, area: GeoJsonFeatureCollection) =
   );
 };
 
+const getRoutePoints = (route: GeoJsonFeatureCollection) => {
+  return route.features.flatMap((feature) =>
+    feature.geometry.type === 'LineString' ? feature.geometry.coordinates : []
+  );
+};
+
+export const hasAnyPointInsideArea = (
+  route: GeoJsonFeatureCollection,
+  area: GeoJsonFeatureCollection
+) => {
+  const routePoints = getRoutePoints(route);
+
+  return routePoints.length > 0 && routePoints.some((point) => pointInArea(point, area));
+};
+
 export const isFullyInsideArea = (
   route: GeoJsonFeatureCollection,
   area: GeoJsonFeatureCollection
 ) => {
-  const routePoints = route.features.flatMap((feature) =>
-    feature.geometry.type === 'LineString' ? feature.geometry.coordinates : []
-  );
+  const routePoints = getRoutePoints(route);
 
   return routePoints.length > 0 && routePoints.every((point) => pointInArea(point, area));
 };
