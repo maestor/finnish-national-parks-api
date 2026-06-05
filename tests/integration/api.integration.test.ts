@@ -314,6 +314,60 @@ describe('API routes', () => {
     expect(response.headers.get('etag')).toContain('category:trails-and-routes');
   });
 
+  it('filters hiking and wilderness parks through the combined derived category slug', async () => {
+    await importParks({
+      database: testDatabase.database,
+      expectedActiveCount: 2,
+      now: () => '2026-05-02T10:30:00.000Z',
+      sourceUrl: 'https://example.test/lipas-combined-areas',
+      fetchSource: async () => ({
+        items: [
+          createLipasPark({
+            'lipas-id': 80001,
+            name: 'Pisavaaran retkeilyalue',
+            type: {
+              'type-code': parkTypeFixtures.stateHikingArea.typeCode
+            },
+            www: 'https://www.luontoon.fi/pisavaara'
+          }),
+          createLipasPark({
+            'lipas-id': 80002,
+            name: 'Muotkatunturin erämaa-alue',
+            type: {
+              'type-code': parkTypeFixtures.wildernessArea.typeCode
+            },
+            www: 'https://www.luontoon.fi/muotkatunturi'
+          })
+        ]
+      })
+    });
+
+    const app = createApp({ database: testDatabase.database });
+    const response = await app.request('/api/parks?category=hiking-and-wilderness-areas');
+    const body = (await response.json()) as {
+      parks: Array<{
+        category: { slug: string };
+        slug: string;
+        type: { slug: string };
+      }>;
+    };
+
+    expect(response.status).toBe(200);
+    expect(body.parks).toHaveLength(2);
+    expect(body.parks.every((park) => park.category.slug === 'hiking-and-wilderness-areas')).toBe(
+      true
+    );
+    expect(body.parks.map((park) => park.type.slug).sort()).toEqual([
+      'hiking-area',
+      'wilderness-area'
+    ]);
+    expect(body.parks.map((park) => park.slug).sort()).toEqual([
+      'muotkatunturin-eramaa-alue',
+      'pisavaaran-retkeilyalue'
+    ]);
+    expect(response.headers.get('etag')).toContain('category:hiking-and-wilderness-areas');
+  });
+
   it('returns 304 when the public list ETag matches', async () => {
     const app = createApp({ database: testDatabase.database });
     const firstResponse = await app.request('/api/parks');
@@ -823,6 +877,88 @@ describe('API routes', () => {
       totalVisits: 1,
       visitedParks: 1
     });
+  });
+
+  it('aggregates hiking and wilderness parks under one public category while keeping separate types', async () => {
+    await importParks({
+      database: testDatabase.database,
+      expectedActiveCount: 2,
+      now: () => '2026-05-02T11:30:00.000Z',
+      sourceUrl: 'https://example.test/lipas-combined-areas-summary',
+      fetchSource: async () => ({
+        items: [
+          createLipasPark({
+            'lipas-id': 81001,
+            name: 'Pisavaaran retkeilyalue',
+            type: {
+              'type-code': parkTypeFixtures.stateHikingArea.typeCode
+            },
+            www: 'https://www.luontoon.fi/pisavaara'
+          }),
+          createLipasPark({
+            'lipas-id': 81002,
+            name: 'Muotkatunturin erämaa-alue',
+            type: {
+              'type-code': parkTypeFixtures.wildernessArea.typeCode
+            },
+            www: 'https://www.luontoon.fi/muotkatunturi'
+          })
+        ]
+      })
+    });
+
+    const app = createApp({ database: testDatabase.database });
+    await createVisit(app, 'pisavaaran-retkeilyalue', {
+      visitedOn: '2026-05-01'
+    });
+    await createVisit(app, 'muotkatunturin-eramaa-alue', {
+      visitedOn: '2026-05-02'
+    });
+
+    const response = await app.request('/api/public/home-summary');
+    const body = (await response.json()) as {
+      progressByCategory: Array<{
+        category: { slug: string };
+        totalParks: number;
+        totalVisits: number;
+        visitedParks: number;
+      }>;
+      progressByType: Array<{
+        type: { slug: string };
+        totalParks: number;
+        totalVisits: number;
+        visible: boolean;
+        visitedParks: number;
+      }>;
+    };
+
+    expect(response.status).toBe(200);
+    expect(body.progressByType).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          type: expect.objectContaining({ slug: 'hiking-area' }),
+          totalParks: 1,
+          totalVisits: 1,
+          visible: false,
+          visitedParks: 1
+        }),
+        expect.objectContaining({
+          type: expect.objectContaining({ slug: 'wilderness-area' }),
+          totalParks: 1,
+          totalVisits: 1,
+          visible: false,
+          visitedParks: 1
+        })
+      ])
+    );
+    expect(body.progressByCategory).toEqual([
+      expect.objectContaining({
+        category: expect.objectContaining({ slug: 'hiking-and-wilderness-areas' }),
+        totalParks: 2,
+        totalVisits: 2,
+        visitedParks: 2
+      })
+    ]);
   });
 
   it('serves lightweight public map summary data with per-park visited summaries', async () => {

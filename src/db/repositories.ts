@@ -3,10 +3,10 @@ import { and, asc, desc, eq, inArray, notInArray, sql } from 'drizzle-orm';
 import type { SupportedParkCategorySlug, SupportedParkTypeSlug } from '../parks/park-types.js';
 import {
   getParkCategoryByTypeSlug,
+  getSupportedParkTypeSlugsByCategorySlug,
+  isHikingAndWildernessAreaTypeSlug,
   isTrailTypeSlug,
-  supportedParkTypes,
-  trailParkTypeSlugs,
-  trailsAndRoutesCategorySlug
+  supportedParkTypes
 } from '../parks/park-types.js';
 import type { Database, DbClient } from './database.js';
 import {
@@ -188,9 +188,13 @@ const visibleParkBySlugWhere = (slug: string) =>
   and(eq(parks.slug, slug), eq(parks.removed, false));
 
 const categoryWhere = (categorySlug: SupportedParkCategorySlug) => {
-  return categorySlug === trailsAndRoutesCategorySlug
-    ? inArray(parkTypes.slug, trailParkTypeSlugs)
-    : eq(parkTypes.slug, categorySlug);
+  const typeSlugs = getSupportedParkTypeSlugsByCategorySlug(categorySlug);
+
+  if (typeSlugs.length !== 1) {
+    return inArray(parkTypes.slug, typeSlugs);
+  }
+
+  return eq(parkTypes.slug, typeSlugs[0]!);
 };
 
 const visibleCatalogWhere = (
@@ -805,7 +809,8 @@ export const getPublicHomeSummary = async (database: Database) => {
         totalParks: 0,
         totalVisits: 0,
         type: park.type,
-        visible: !isTrailTypeSlug(park.type.slug),
+        visible:
+          !isTrailTypeSlug(park.type.slug) && !isHikingAndWildernessAreaTypeSlug(park.type.slug),
         visitedParks: 0
       };
       const parkVisits = visitsByParkId.get(parkRows[index]!.parkId) ?? [];

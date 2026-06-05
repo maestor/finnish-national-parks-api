@@ -242,6 +242,43 @@ describe('repositories', () => {
     });
   });
 
+  it('builds a catalog etag seed for the combined hiking and wilderness category filter', async () => {
+    await importParks({
+      database: testDatabase.database,
+      expectedActiveCount: 2,
+      now: () => '2026-05-02T10:15:00.000Z',
+      sourceUrl: 'https://example.test/lipas-combined-areas',
+      fetchSource: async () => ({
+        items: [
+          createLipasPark({
+            'lipas-id': 70001,
+            name: 'Evon retkeilyalue',
+            type: {
+              'type-code': 109
+            }
+          }),
+          createLipasPark({
+            'lipas-id': 70002,
+            name: 'Käsivarren erämaa-alue',
+            type: {
+              'type-code': 110
+            }
+          })
+        ]
+      })
+    });
+
+    await expect(
+      getCatalogListEtagSeed(testDatabase.database, {
+        categorySlug: 'hiking-and-wilderness-areas'
+      })
+    ).resolves.toMatchObject({
+      activeCount: 2,
+      filterKey: 'category:hiking-and-wilderness-areas',
+      typeSlug: null
+    });
+  });
+
   it('returns empty visit list when no active parks remain', async () => {
     await importParks({
       database: testDatabase.database,

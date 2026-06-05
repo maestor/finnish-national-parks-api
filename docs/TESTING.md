@@ -54,6 +54,7 @@ Use mutation testing for:
 - `GET /api/parks` returns lightweight list/map data without full boundary geometry.
 - `GET /api/parks/removed` returns a private admin list of removed parks for restore flows.
 - `GET /api/parks?type=...` filters the public catalog list by normalized type slug.
+- `GET /api/parks?category=...` can collapse multiple source types into one public category, including `hiking-and-wilderness-areas`.
 - `GET /api/parks?category=...` filters the public catalog list by derived API category, such as `trails-and-routes`.
 - `GET /api/parks/:slug` returns catalog detail without visit state.
 - Park catalog responses expose both the source `type` and a derived `category`.

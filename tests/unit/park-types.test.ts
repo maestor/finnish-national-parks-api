@@ -5,6 +5,7 @@ import {
   getSupportedParkCategoryBySlug,
   getSupportedParkTypeByCode,
   getSupportedParkTypeBySlug,
+  getSupportedParkTypeSlugsByCategorySlug,
   supportedParkCategorySlugs,
   supportedParkTypeSlugs
 } from '../../src/parks/park-types.js';
@@ -66,9 +67,21 @@ describe('park type helpers', () => {
       'nature-trail',
       'hiking-trail'
     ]);
+    expect(getSupportedParkCategoryBySlug('hiking-and-wilderness-areas')).toEqual({
+      name: 'Erämaa-/retkeilyalue',
+      slug: 'hiking-and-wilderness-areas'
+    });
     expect(getSupportedParkCategoryBySlug('trails-and-routes')).toEqual({
       name: 'Polut/Reitit',
       slug: 'trails-and-routes'
+    });
+    expect(getParkCategoryByTypeSlug('hiking-area')).toEqual({
+      name: 'Erämaa-/retkeilyalue',
+      slug: 'hiking-and-wilderness-areas'
+    });
+    expect(getParkCategoryByTypeSlug('wilderness-area')).toEqual({
+      name: 'Erämaa-/retkeilyalue',
+      slug: 'hiking-and-wilderness-areas'
     });
     expect(getParkCategoryByTypeSlug('walking-trail')).toEqual({
       name: 'Polut/Reitit',
@@ -78,11 +91,14 @@ describe('park type helpers', () => {
       name: 'Kansallispuisto',
       slug: 'national-park'
     });
+    expect(getSupportedParkTypeSlugsByCategorySlug('hiking-and-wilderness-areas')).toEqual([
+      'hiking-area',
+      'wilderness-area'
+    ]);
     expect(supportedParkCategorySlugs).toEqual([
       'outdoor-recreation-area',
       'factory-village',
-      'hiking-area',
-      'wilderness-area',
+      'hiking-and-wilderness-areas',
       'national-park',
       'nature-reserve-area',
       'trails-and-routes'
