@@ -84,7 +84,7 @@ export const supportedParkCategories = [
     slug: 'nature-reserve-area'
   },
   {
-    name: 'Trails and routes',
+    name: 'Polut/Reitit',
     slug: 'trails-and-routes'
   }
 ] as const;
