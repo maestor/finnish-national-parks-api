@@ -939,14 +939,14 @@ describe('API routes', () => {
           type: expect.objectContaining({ slug: 'hiking-area' }),
           totalParks: 1,
           totalVisits: 1,
-          visible: true,
+          visible: false,
           visitedParks: 1
         }),
         expect.objectContaining({
           type: expect.objectContaining({ slug: 'wilderness-area' }),
           totalParks: 1,
           totalVisits: 1,
-          visible: true,
+          visible: false,
           visitedParks: 1
         })
       ])

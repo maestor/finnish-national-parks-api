@@ -4,6 +4,7 @@ import type { SupportedParkCategorySlug, SupportedParkTypeSlug } from '../parks/
 import {
   getParkCategoryByTypeSlug,
   getSupportedParkTypeSlugsByCategorySlug,
+  isHikingAndWildernessAreaTypeSlug,
   isTrailTypeSlug,
   supportedParkTypes
 } from '../parks/park-types.js';
@@ -808,7 +809,8 @@ export const getPublicHomeSummary = async (database: Database) => {
         totalParks: 0,
         totalVisits: 0,
         type: park.type,
-        visible: !isTrailTypeSlug(park.type.slug),
+        visible:
+          !isTrailTypeSlug(park.type.slug) && !isHikingAndWildernessAreaTypeSlug(park.type.slug),
         visitedParks: 0
       };
       const parkVisits = visitsByParkId.get(parkRows[index]!.parkId) ?? [];
