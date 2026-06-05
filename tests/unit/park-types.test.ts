@@ -67,11 +67,11 @@ describe('park type helpers', () => {
       'hiking-trail'
     ]);
     expect(getSupportedParkCategoryBySlug('trails-and-routes')).toEqual({
-      name: 'Trails and routes',
+      name: 'Polut/Reitit',
       slug: 'trails-and-routes'
     });
     expect(getParkCategoryByTypeSlug('walking-trail')).toEqual({
-      name: 'Trails and routes',
+      name: 'Polut/Reitit',
       slug: 'trails-and-routes'
     });
     expect(getParkCategoryByTypeSlug('national-park')).toEqual({
