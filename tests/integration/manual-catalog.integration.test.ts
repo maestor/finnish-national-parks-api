@@ -34,7 +34,7 @@ describe('manual catalog imports', () => {
       now: () => '2026-05-27T08:00:00.000Z'
     });
 
-    expect(result.results).toHaveLength(71);
+    expect(result.results).toHaveLength(74);
 
     const merenkurkku = await getParkBySlug(
       testDatabase.database,
@@ -53,6 +53,33 @@ describe('manual catalog imports', () => {
       managedByLipasImport: false,
       postalCode: '65800',
       postalOffice: 'Raippaluoto'
+    });
+
+    const sammallahdenmaki = await getParkBySlug(testDatabase.database, 'sammallahdenmaki');
+    expect(sammallahdenmaki).toMatchObject({
+      displayTypeName: 'Maailmanperintökohde',
+      lipasId: 9000899,
+      location: 'Sammallahdentie, 27230 Rauma',
+      name: 'Sammallahdenmäki',
+      type: { slug: 'outdoor-recreation-area' }
+    });
+
+    const suomenlinna = await getParkBySlug(testDatabase.database, 'suomenlinna');
+    expect(suomenlinna).toMatchObject({
+      displayTypeName: 'Maailmanperintökohde',
+      lipasId: 9000900,
+      location: 'Suomenlinna, 00190 Helsinki',
+      name: 'Suomenlinna',
+      type: { slug: 'outdoor-recreation-area' }
+    });
+
+    const vanhaRauma = await getParkBySlug(testDatabase.database, 'vanha-rauma');
+    expect(vanhaRauma).toMatchObject({
+      displayTypeName: 'Maailmanperintökohde',
+      lipasId: 9000901,
+      location: 'Vanha Rauma, 26100 Rauma',
+      name: 'Vanha Rauma',
+      type: { slug: 'outdoor-recreation-area' }
     });
 
     const kevo = await getParkBySlug(testDatabase.database, 'kevon-luonnonpuisto');
@@ -251,7 +278,7 @@ describe('manual catalog imports', () => {
     );
     const kevo = await getParkBySlug(testDatabase.database, 'kevon-luonnonpuisto');
 
-    expect(allParks).toHaveLength(71);
+    expect(allParks).toHaveLength(74);
     expect(merenkurkku).toMatchObject({ catalogStatus: 'active' });
     expect(kevo).toMatchObject({ catalogStatus: 'active' });
   });
@@ -302,7 +329,7 @@ describe('manual catalog imports', () => {
       database: testDatabase.database
     });
 
-    expect(result.results).toHaveLength(71);
+    expect(result.results).toHaveLength(74);
 
     const merenkurkku = await getParkBySlug(
       testDatabase.database,
@@ -397,6 +424,48 @@ describe('manual catalog imports', () => {
         }
       })
     ).rejects.toThrow('No Merenkurkku world heritage area features were found in the source.');
+  });
+
+  it('fails when a non-Merenkurkku world heritage source has no matching kohde feature', async () => {
+    await expect(
+      importSpecialParks({
+        database: testDatabase.database,
+        fetchSource: async (sourceUrl) => {
+          if (sourceUrl === merenkurkkuSourceUrl) {
+            return {
+              type: 'FeatureCollection',
+              features: [
+                {
+                  type: 'Feature',
+                  geometry: {
+                    type: 'Polygon',
+                    coordinates: [
+                      [
+                        [21.0, 63.0],
+                        [21.0, 63.1],
+                        [21.1, 63.1],
+                        [21.1, 63.0],
+                        [21.0, 63.0]
+                      ]
+                    ]
+                  },
+                  properties: {
+                    ID: 898,
+                    Nimi: 'Merenkurkun saaristo A',
+                    URL: 'https://example.test/merenkurkku',
+                    aluetyyppi: 'Kohde'
+                  }
+                }
+              ]
+            };
+          }
+
+          return createSpecialParksSource()(sourceUrl);
+        }
+      })
+    ).rejects.toThrow(
+      'No world heritage area features were found for Sammallahdenmäki in the source.'
+    );
   });
 
   it('handles MultiPolygon geometries from SYKE', async () => {

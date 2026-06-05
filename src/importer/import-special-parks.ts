@@ -88,7 +88,8 @@ type SpecialParkConfig = {
   postalOffice: string | null;
   responseShapeVersion: string;
   slug: string;
-  sourceParser?: 'geojson' | 'merenkurkku' | 'syke';
+  sourceFeatureId?: number;
+  sourceParser?: 'geojson' | 'syke' | 'world-heritage-area';
   sourceUrl: string;
   syntheticLipasId: number;
 };
@@ -323,11 +324,61 @@ const baseSpecialParkConfigs: SpecialParkConfig[] = [
     parkTypeSlug: 'nature-reserve-area',
     postalCode: '65800',
     postalOffice: 'Raippaluoto',
-    responseShapeVersion: 'manual-merenkurkku-v1',
+    responseShapeVersion: 'museovirasto-world-heritage-areas-v1',
     slug: 'merenkurkun-maailmanperintoalue',
+    sourceFeatureId: 898,
+    sourceParser: 'world-heritage-area',
     sourceUrl:
       'https://geoserver.museovirasto.fi/geoserver/rajapinta_suojellut/wfs?service=WFS&request=GetFeature&version=2.0.0&typeNames=rajapinta_suojellut:maailmanperinto_alue&outputFormat=application/json&srsName=EPSG:4326',
     syntheticLipasId: 9_000_898
+  },
+  {
+    displayTypeName: 'Maailmanperintökohde',
+    locationLabel: 'Sammallahdentie',
+    luontoonUrl: null,
+    name: 'Sammallahdenmäki',
+    parkTypeSlug: 'outdoor-recreation-area',
+    postalCode: '27230',
+    postalOffice: 'Rauma',
+    responseShapeVersion: 'museovirasto-world-heritage-areas-v1',
+    slug: 'sammallahdenmaki',
+    sourceFeatureId: 579,
+    sourceParser: 'world-heritage-area',
+    sourceUrl:
+      'https://geoserver.museovirasto.fi/geoserver/rajapinta_suojellut/wfs?service=WFS&request=GetFeature&version=2.0.0&typeNames=rajapinta_suojellut:maailmanperinto_alue&outputFormat=application/json&srsName=EPSG:4326',
+    syntheticLipasId: 9_000_899
+  },
+  {
+    displayTypeName: 'Maailmanperintökohde',
+    locationLabel: 'Suomenlinna',
+    luontoonUrl: null,
+    name: 'Suomenlinna',
+    parkTypeSlug: 'outdoor-recreation-area',
+    postalCode: '00190',
+    postalOffice: 'Helsinki',
+    responseShapeVersion: 'museovirasto-world-heritage-areas-v1',
+    slug: 'suomenlinna',
+    sourceFeatureId: 583,
+    sourceParser: 'world-heritage-area',
+    sourceUrl:
+      'https://geoserver.museovirasto.fi/geoserver/rajapinta_suojellut/wfs?service=WFS&request=GetFeature&version=2.0.0&typeNames=rajapinta_suojellut:maailmanperinto_alue&outputFormat=application/json&srsName=EPSG:4326',
+    syntheticLipasId: 9_000_900
+  },
+  {
+    displayTypeName: 'Maailmanperintökohde',
+    locationLabel: 'Vanha Rauma',
+    luontoonUrl: null,
+    name: 'Vanha Rauma',
+    parkTypeSlug: 'outdoor-recreation-area',
+    postalCode: '26100',
+    postalOffice: 'Rauma',
+    responseShapeVersion: 'museovirasto-world-heritage-areas-v1',
+    slug: 'vanha-rauma',
+    sourceFeatureId: 582,
+    sourceParser: 'world-heritage-area',
+    sourceUrl:
+      'https://geoserver.museovirasto.fi/geoserver/rajapinta_suojellut/wfs?service=WFS&request=GetFeature&version=2.0.0&typeNames=rajapinta_suojellut:maailmanperinto_alue&outputFormat=application/json&srsName=EPSG:4326',
+    syntheticLipasId: 9_000_901
   },
   {
     displayTypeName: 'Luonnonpuisto',
@@ -1120,10 +1171,12 @@ const parseSykeFeatures = (payload: unknown) => {
   return parsed.features;
 };
 
-const parseMerenkurkkuFeatures = (payload: unknown) => {
+const parseWorldHeritageAreaFeatures = (payload: unknown, sourceFeatureId?: number) => {
   const parsed = worldHeritageAreaResponseSchema.parse(payload);
   return parsed.features.filter(
-    (feature) => feature.properties.ID === 898 && feature.properties.aluetyyppi === 'Kohde'
+    (feature) =>
+      feature.properties.aluetyyppi === 'Kohde' &&
+      (sourceFeatureId === undefined || feature.properties.ID === sourceFeatureId)
   );
 };
 
@@ -1169,13 +1222,16 @@ export const importSpecialParks = async ({
     }>;
     let metadata: { areaKm2: number | null; establishmentYear: number | null };
 
-    if (
-      config.sourceParser === 'merenkurkku' ||
-      config.slug === 'merenkurkun-maailmanperintoalue'
-    ) {
-      const features = parseMerenkurkkuFeatures(payload);
+    if (config.sourceParser === 'world-heritage-area') {
+      const features = parseWorldHeritageAreaFeatures(payload, config.sourceFeatureId);
       if (features.length === 0) {
-        throw new Error('No Merenkurkku world heritage area features were found in the source.');
+        if (config.slug === 'merenkurkun-maailmanperintoalue') {
+          throw new Error('No Merenkurkku world heritage area features were found in the source.');
+        }
+
+        throw new Error(
+          `No world heritage area features were found for ${config.name} in the source.`
+        );
       }
       sourceFeatures = features;
       metadata = { areaKm2: null, establishmentYear: null };

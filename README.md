@@ -169,7 +169,7 @@ The supported manual catalog import currently covers:
 npm run import:special-parks
 ```
 
-It imports curated non-LIPAS catalog rows such as Merenkurkun maailmanperintöalue and selected ruukit / tehdaskylät, keeps their source geometry, preserves custom display labels such as `Maailmanperintökohde`, and protects those rows from later LIPAS deactivation.
+It imports curated non-LIPAS catalog rows such as Merenkurkun maailmanperintöalue, Sammallahdenmäki, Suomenlinna, Vanha Rauma, and selected ruukit / tehdaskylät, keeps their source geometry, preserves custom display labels such as `Maailmanperintökohde`, and protects those rows from later LIPAS deactivation.
 
 ## Verification
 

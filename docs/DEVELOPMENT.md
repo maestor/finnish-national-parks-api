@@ -117,7 +117,7 @@ If a destination cannot be matched from the official Luontoon sitemap, the impor
 
 ### Manual Catalog Imports
 
-This repo also supports a one-off manual catalog import for Merenkurkun maailmanperintöalue:
+This repo also supports a one-off manual catalog import for curated non-LIPAS parks, including Merenkurkun maailmanperintöalue, Sammallahdenmäki, Suomenlinna, and Vanha Rauma:
 
 ```sh
 npm run import:special-parks
@@ -125,11 +125,11 @@ npm run import:special-parks
 
 That command:
 
-- imports the official world-heritage geometry into the existing `parks` table
-- stores the row under the normalized `other-nature-reserve` type
-- sets a park-level `displayTypeName` of `Maailmanperintökohde` for UI use
-- uses `Raippaluodontie 2, 65800 Raippaluoto` as the generated location source
-- marks the row as not managed by the LIPAS cleanup step, so later `npm run import:parks` executions do not deactivate it
+- imports curated official geometry into the existing `parks` table
+- includes selected world-heritage sites as `outdoor-recreation-area` rows with `displayTypeName: Maailmanperintökohde`
+- stores Merenkurkun maailmanperintöalue under the normalized `nature-reserve-area` type
+- uses curated location details such as `Raippaluodontie 2, 65800 Raippaluoto` and `Suomenlinna, 00190 Helsinki`
+- marks the rows as not managed by the LIPAS cleanup step, so later `npm run import:parks` executions do not deactivate them
 
 ### Park Logos
 
