@@ -116,6 +116,7 @@ Catalog endpoints stay cache-friendly and database-backed:
 - `GET /api/parks` returns lightweight list data without boundary GeoJSON.
 - `GET /api/parks/removed` returns an auth-restricted admin list of removed parks so the UI can restore visibility when needed.
 - `GET /api/parks?type=hiking-area` filters by normalized type slug.
+- `GET /api/parks?category=hiking-and-wilderness-areas` combines `hiking-area` and `wilderness-area` under the public category `Erämaa-/retkeilyalue` while preserving each park's source `type`.
 - `GET /api/parks?category=trails-and-routes` filters by a derived API category while park responses still preserve the original imported `type`.
 - `GET /api/parks/:slug?includeBoundary=true` includes stored boundary geometry.
 - Park list, detail, removed, and public map responses include both the source `type` and a derived `category`.

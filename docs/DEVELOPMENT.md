@@ -211,6 +211,7 @@ Key route behavior:
 - `GET /api/parks` is optimized for map/list views and omits boundary geometry.
 - `GET /api/parks/removed` returns an auth-restricted admin list of removed parks for restore workflows.
 - `GET /api/parks?type=hiking-area` filters by normalized catalog type slug.
+- `GET /api/parks?category=hiking-and-wilderness-areas` filters by the derived `Erämaa-/retkeilyalue` category while preserving each park's imported `type`.
 - `GET /api/parks?category=trails-and-routes` filters by a derived API category while preserving the original imported `type` in responses.
 - `GET /api/parks/:slug?includeBoundary=true` returns the stored boundary GeoJSON.
 - Park list, detail, removed, and public map responses expose both the source `type` and a derived `category`.

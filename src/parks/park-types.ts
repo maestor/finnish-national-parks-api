@@ -68,12 +68,8 @@ export const supportedParkCategories = [
     slug: 'factory-village'
   },
   {
-    name: 'Retkeilyalue',
-    slug: 'hiking-area'
-  },
-  {
-    name: 'Erämaa-alue',
-    slug: 'wilderness-area'
+    name: 'Erämaa-/retkeilyalue',
+    slug: 'hiking-and-wilderness-areas'
   },
   {
     name: 'Kansallispuisto',
@@ -97,6 +93,7 @@ export const hikingAreaDisplayTypeName = 'Valtion retkeilyalue';
 export const walkingTrailTypeCode = 4403;
 export const natureTrailTypeCode = 4404;
 export const hikingTrailTypeCode = 4405;
+export const hikingAndWildernessAreasCategorySlug = 'hiking-and-wilderness-areas';
 export const trailsAndRoutesCategorySlug = 'trails-and-routes';
 
 export const supportedParkTypeSlugs = supportedParkTypes.map((parkType) => parkType.slug) as [
@@ -106,6 +103,7 @@ export const supportedParkTypeSlugs = supportedParkTypes.map((parkType) => parkT
 export const supportedParkCategorySlugs = supportedParkCategories.map(
   (category) => category.slug
 ) as [SupportedParkCategorySlug, ...SupportedParkCategorySlug[]];
+export const hikingAndWildernessAreaTypeSlugs = ['hiking-area', 'wilderness-area'] as const;
 export const trailParkTypeSlugs = ['walking-trail', 'nature-trail', 'hiking-trail'] as const;
 export type TrailParkTypeSlug = (typeof trailParkTypeSlugs)[number];
 
@@ -118,6 +116,7 @@ const parkTypeBySlug = new Map<string, SupportedParkType>(
 const parkCategoryBySlug = new Map<string, SupportedParkCategory>(
   supportedParkCategories.map((category) => [category.slug, category])
 );
+const hikingAndWildernessAreaTypeSlugSet = new Set<string>(hikingAndWildernessAreaTypeSlugs);
 const trailParkTypeSlugSet = new Set<string>(trailParkTypeSlugs);
 
 export const getSupportedParkTypeByCode = (code: number) => {
@@ -155,10 +154,32 @@ export const isNatureTrailTypeCode = (code: number) => code === natureTrailTypeC
 export const isHikingTrailTypeCode = (code: number) => code === hikingTrailTypeCode;
 export const isTrailTypeCode = (code: number) =>
   isWalkingTrailTypeCode(code) || isNatureTrailTypeCode(code) || isHikingTrailTypeCode(code);
+export const isHikingAndWildernessAreaTypeSlug = (
+  slug: string
+): slug is (typeof hikingAndWildernessAreaTypeSlugs)[number] =>
+  hikingAndWildernessAreaTypeSlugSet.has(slug);
 export const isTrailTypeSlug = (slug: string): slug is TrailParkTypeSlug =>
   trailParkTypeSlugSet.has(slug);
 
+export const getSupportedParkTypeSlugsByCategorySlug = (
+  categorySlug: SupportedParkCategorySlug
+): readonly SupportedParkTypeSlug[] => {
+  if (categorySlug === hikingAndWildernessAreasCategorySlug) {
+    return hikingAndWildernessAreaTypeSlugs;
+  }
+
+  if (categorySlug === trailsAndRoutesCategorySlug) {
+    return trailParkTypeSlugs;
+  }
+
+  return [categorySlug];
+};
+
 export const getParkCategoryByTypeSlug = (typeSlug: SupportedParkTypeSlug) => {
+  if (isHikingAndWildernessAreaTypeSlug(typeSlug)) {
+    return getSupportedParkCategoryBySlug(hikingAndWildernessAreasCategorySlug);
+  }
+
   if (isTrailTypeSlug(typeSlug)) {
     return getSupportedParkCategoryBySlug(trailsAndRoutesCategorySlug);
   }
