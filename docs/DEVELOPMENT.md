@@ -95,14 +95,16 @@ The local SQLite/libSQL file and `.env` itself should not be committed.
 
 The importer should:
 
-- Fetch LIPAS sports sites with type codes `103,109,110,111,112,4404`.
+- Fetch LIPAS sports sites with type codes `103,109,110,111,112,4403,4404,4405`.
 - Keep only records where `status` is `active`.
-- Expect 1174 active LIPAS records from the current source dataset as of 2026-05-24.
+- Expect 2557 active LIPAS records from the current source dataset.
 - Upsert catalog rows by `lipasId`.
 - Upsert normalized catalog types in a dedicated `park_types` table.
 - Persist both `postal_code` and `postal_office` from LIPAS for stronger location matching.
-- Skip `4404` nature trails whose full route geometry is contained inside one imported area record.
-- Skip `4404` nature trails whose normalized `location_label`, `postal_code`, and `postal_office` exactly match one imported area record.
+- Skip `4404` nature trails and `4405` hiking trails whose full route geometry is contained inside one imported area record.
+- Skip `4403` walking trails when any route point overlaps one imported area record.
+- Skip trail imports whose normalized `location_label`, `postal_code`, and `postal_office` exactly match one imported area record.
+- Import `4403` walking trails and `4405` hiking trails as removed-by-default catalog rows.
 - Preserve personal visit history during catalog re-imports.
 - Preserve any manually set `parks.removed` flags during catalog re-imports.
 - Refresh destination `luontoonUrl` values from `https://www.luontoon.fi/resources/sitemap/fi.xml` when the official sitemap contains a matching base destination URL.
@@ -112,7 +114,7 @@ The importer should:
 - Update import metadata so catalog ETags change when imported catalog data changes.
 - Keep non-LIPAS-managed catalog rows outside the normal LIPAS deactivation pass.
 
-The current implementation fails the import if the active LIPAS record count does not match `1174`, so upstream drift is visible immediately.
+The current implementation fails the import if the active LIPAS record count does not match `2557`, so upstream drift is visible immediately.
 If a destination cannot be matched from the official Luontoon sitemap, the importer falls back to the normalized LIPAS `www` value for that row.
 
 ### Manual Catalog Imports
@@ -209,10 +211,12 @@ Key route behavior:
 - `GET /api/parks` is optimized for map/list views and omits boundary geometry.
 - `GET /api/parks/removed` returns an auth-restricted admin list of removed parks for restore workflows.
 - `GET /api/parks?type=hiking-area` filters by normalized catalog type slug.
+- `GET /api/parks?category=trails-and-routes` filters by a derived API category while preserving the original imported `type` in responses.
 - `GET /api/parks/:slug?includeBoundary=true` returns the stored boundary GeoJSON.
+- Park list, detail, removed, and public map responses expose both the source `type` and a derived `category`.
 - Park list, detail, removed, and public map responses expose `logo: { key, updatedAt, url } | null` when one has been linked to the park.
 - Park responses expose `location` instead of `locationLabel`, combining `location_label` and `postal_office` when both exist, but collapsing to one value when they are identical or only one exists.
-- `GET /api/public/home-summary` returns public home-page summary data including seasonal visit counts, without visit notes, routes, or images.
+- `GET /api/public/home-summary` returns public home-page summary data including seasonal visit counts, `progressByType` with a `visible` flag, and `progressByCategory`, without visit notes, routes, or images.
 - `GET /api/public/map-summary` returns lightweight park map data plus per-park visited summaries.
 - `GET /api/parks/:slug/visits` returns visit history plus a visited summary for one visible park.
 - `GET /api/visits` returns flat visit resources with their parent park reference.

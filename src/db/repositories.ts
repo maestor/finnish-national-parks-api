@@ -1,7 +1,13 @@
 import { and, asc, desc, eq, inArray, notInArray, sql } from 'drizzle-orm';
 
-import type { SupportedParkTypeSlug } from '../parks/park-types.js';
-import { supportedParkTypes } from '../parks/park-types.js';
+import type { SupportedParkCategorySlug, SupportedParkTypeSlug } from '../parks/park-types.js';
+import {
+  getParkCategoryByTypeSlug,
+  isTrailTypeSlug,
+  supportedParkTypes,
+  trailParkTypeSlugs,
+  trailsAndRoutesCategorySlug
+} from '../parks/park-types.js';
 import type { Database, DbClient } from './database.js';
 import {
   admins,
@@ -144,6 +150,8 @@ const toParkType = (row: typeof parkTypes.$inferSelect) => {
   };
 };
 
+const toParkCategory = (typeSlug: SupportedParkTypeSlug) => getParkCategoryByTypeSlug(typeSlug);
+
 const toLogo = async (
   logoKey: string | null,
   logoUpdatedAt: string | null,
@@ -179,10 +187,26 @@ const toMap = async (
 const visibleParkBySlugWhere = (slug: string) =>
   and(eq(parks.slug, slug), eq(parks.removed, false));
 
-const visibleCatalogWhere = (typeSlug?: SupportedParkTypeSlug) => {
-  return typeSlug
-    ? and(eq(parks.catalogStatus, 'active'), eq(parks.removed, false), eq(parkTypes.slug, typeSlug))
-    : and(eq(parks.catalogStatus, 'active'), eq(parks.removed, false));
+const categoryWhere = (categorySlug: SupportedParkCategorySlug) => {
+  return categorySlug === trailsAndRoutesCategorySlug
+    ? inArray(parkTypes.slug, trailParkTypeSlugs)
+    : eq(parkTypes.slug, categorySlug);
+};
+
+const visibleCatalogWhere = (
+  options: { categorySlug?: SupportedParkCategorySlug; typeSlug?: SupportedParkTypeSlug } = {}
+) => {
+  const conditions = [eq(parks.catalogStatus, 'active'), eq(parks.removed, false)];
+
+  if (options.typeSlug) {
+    conditions.push(eq(parkTypes.slug, options.typeSlug));
+  }
+
+  if (options.categorySlug) {
+    conditions.push(categoryWhere(options.categorySlug));
+  }
+
+  return and(...conditions);
 };
 
 const removedCatalogWhere = () => eq(parks.removed, true);
@@ -238,6 +262,7 @@ const toPark = async (
     areaKm2: row.park.areaKm2,
     boundingBox: toBoundingBox(row.park),
     boundaryGeoJson: JSON.parse(row.park.boundaryGeojson) as Record<string, unknown>,
+    category: toParkCategory(row.parkType.slug as SupportedParkTypeSlug),
     catalogStatus: row.park.catalogStatus as 'active' | 'inactive',
     establishmentYear: row.park.establishmentYear,
     lipasId: row.park.lipasId,
@@ -269,6 +294,7 @@ const toPublicPark = async (
       minLat: row.bboxMinLat,
       minLon: row.bboxMinLon
     },
+    category: toParkCategory(row.typeSlug as SupportedParkTypeSlug),
     establishmentYear: row.establishmentYear,
     location: toLocation(row.locationLabel, row.postalCode, row.postalOffice),
     logo: await toLogo(row.logoKey, row.logoUpdatedAt, getLogoPublicUrl),
@@ -370,7 +396,7 @@ const getTypedParkBySlug = async (database: Database, slug: string) => {
 
 const listTypedParks = async (
   database: Database,
-  options: { typeSlug?: SupportedParkTypeSlug } = {}
+  options: { categorySlug?: SupportedParkCategorySlug; typeSlug?: SupportedParkTypeSlug } = {}
 ) => {
   return database
     .select({
@@ -379,7 +405,7 @@ const listTypedParks = async (
     })
     .from(parks)
     .innerJoin(parkTypes, eq(parks.typeId, parkTypes.id))
-    .where(visibleCatalogWhere(options.typeSlug))
+    .where(visibleCatalogWhere(options))
     .orderBy(parks.name);
 };
 
@@ -660,7 +686,7 @@ export const listExistingParksByLipasIds = async (database: Database, lipasIds: 
 
 export const listParks = async (
   database: Database,
-  options: { typeSlug?: SupportedParkTypeSlug } = {},
+  options: { categorySlug?: SupportedParkCategorySlug; typeSlug?: SupportedParkTypeSlug } = {},
   getLogoPublicUrl?: GetLogoPublicUrl,
   getMapPublicUrl?: GetMapPublicUrl
 ) => {
@@ -701,6 +727,7 @@ export const listRemovedParks = async (
         name: row.park.name,
         removed: true as const,
         slug: row.park.slug,
+        category: toParkCategory(row.parkType.slug as SupportedParkTypeSlug),
         type: toParkType(row.parkType),
         updatedAt: row.park.updatedAt
       })
@@ -769,6 +796,7 @@ export const getPublicHomeSummary = async (database: Database) => {
           totalParks: number;
           totalVisits: number;
           type: (typeof publicParks)[number]['type'];
+          visible: boolean;
           visitedParks: number;
         }
       >
@@ -777,6 +805,7 @@ export const getPublicHomeSummary = async (database: Database) => {
         totalParks: 0,
         totalVisits: 0,
         type: park.type,
+        visible: !isTrailTypeSlug(park.type.slug),
         visitedParks: 0
       };
       const parkVisits = visitsByParkId.get(parkRows[index]!.parkId) ?? [];
@@ -793,6 +822,39 @@ export const getPublicHomeSummary = async (database: Database) => {
   )
     .map(([, value]) => value)
     .sort((a, b) => a.type.name.localeCompare(b.type.name));
+
+  const progressByCategory = Array.from(
+    publicParks.reduce<
+      Map<
+        SupportedParkCategorySlug,
+        {
+          category: (typeof publicParks)[number]['category'];
+          totalParks: number;
+          totalVisits: number;
+          visitedParks: number;
+        }
+      >
+    >((accumulator, park, index) => {
+      const existing = accumulator.get(park.category.slug) ?? {
+        category: park.category,
+        totalParks: 0,
+        totalVisits: 0,
+        visitedParks: 0
+      };
+      const parkVisits = visitsByParkId.get(parkRows[index]!.parkId) ?? [];
+
+      existing.totalParks += 1;
+      existing.totalVisits += parkVisits.length;
+      if (parkVisits.length > 0) {
+        existing.visitedParks += 1;
+      }
+
+      accumulator.set(park.category.slug, existing);
+      return accumulator;
+    }, new Map())
+  )
+    .map(([, value]) => value)
+    .sort((a, b) => a.category.name.localeCompare(b.category.name));
 
   const parkVisitSummaries = Array.from(visitsByParkId.entries()).map(([parkId, visits]) => {
     const park = parksById.get(parkId)!;
@@ -847,6 +909,7 @@ export const getPublicHomeSummary = async (database: Database) => {
       visitedOn: visit.visitedOn
     })),
     mostVisitedParks,
+    progressByCategory,
     progressByType,
     recentVisits,
     seasonalVisitCounts: countVisitsBySeason(visitRows),
@@ -1257,7 +1320,7 @@ export const markMissingParksInactive = async (
 
 export const getCatalogListEtagSeed = async (
   database: Database,
-  options: { typeSlug?: SupportedParkTypeSlug } = {}
+  options: { categorySlug?: SupportedParkCategorySlug; typeSlug?: SupportedParkTypeSlug } = {}
 ) => {
   const summary = (
     await database
@@ -1268,11 +1331,20 @@ export const getCatalogListEtagSeed = async (
       })
       .from(parks)
       .innerJoin(parkTypes, eq(parks.typeId, parkTypes.id))
-      .where(visibleCatalogWhere(options.typeSlug))
+      .where(visibleCatalogWhere(options))
   )[0]!;
+
+  const filterKey =
+    [
+      options.typeSlug ? `type:${options.typeSlug}` : null,
+      options.categorySlug ? `category:${options.categorySlug}` : null
+    ]
+      .filter(Boolean)
+      .join('|') || null;
 
   return {
     activeCount: summary.activeCount,
+    filterKey,
     latestImportRunId: summary.latestImportRunId,
     latestUpdatedAt: summary.latestUpdatedAt,
     typeSlug: options.typeSlug ?? null

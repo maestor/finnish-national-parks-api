@@ -223,8 +223,21 @@ describe('repositories', () => {
 
     await expect(getCatalogListEtagSeed(testDatabase.database)).resolves.toEqual({
       activeCount: 0,
+      filterKey: null,
       latestImportRunId: null,
       latestUpdatedAt: null,
+      typeSlug: null
+    });
+  });
+
+  it('builds a catalog etag seed for a non-trail category filter', async () => {
+    await expect(
+      getCatalogListEtagSeed(testDatabase.database, {
+        categorySlug: 'national-park'
+      })
+    ).resolves.toMatchObject({
+      activeCount: 1,
+      filterKey: 'category:national-park',
       typeSlug: null
     });
   });

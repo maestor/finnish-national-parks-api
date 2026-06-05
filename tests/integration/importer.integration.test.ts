@@ -12,6 +12,7 @@ import {
   createLipasHikingTrail,
   createLipasPark,
   createLipasTrail,
+  createLipasWalkingTrail,
   parkTypeFixtures
 } from '../fixtures/lipas.js';
 import { createTestDatabase } from '../helpers/test-db.js';
@@ -245,6 +246,51 @@ describe('importParks', () => {
     });
   });
 
+  it('imports walking trails as removed catalog entries', async () => {
+    await importParks({
+      database: testDatabase.database,
+      expectedActiveCount: 2,
+      now: () => '2026-05-01T08:00:00.000Z',
+      sourceUrl: 'https://example.test/lipas',
+      fetchSource: async () => ({
+        items: [
+          createLipasPark(),
+          createLipasWalkingTrail({
+            location: {
+              geometries: {
+                type: 'FeatureCollection',
+                features: [
+                  {
+                    type: 'Feature',
+                    geometry: {
+                      type: 'LineString',
+                      coordinates: [
+                        [35.2, 66.2],
+                        [35.4, 66.4],
+                        [35.6, 66.6]
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          })
+        ]
+      })
+    });
+
+    const rawPark = await testDatabase.database.query.parks.findFirst({
+      where: eq(parks.slug, 'testin-ulkoilureitti')
+    });
+
+    expect(rawPark).toMatchObject({
+      name: 'Testin ulkoilureitti',
+      removed: true,
+      catalogStatus: 'active'
+    });
+    await expect(getParkBySlug(testDatabase.database, 'testin-ulkoilureitti')).resolves.toBeNull();
+  });
+
   it('skips hiking trails that are fully inside an imported area', async () => {
     await importParks({
       database: testDatabase.database,
@@ -257,6 +303,43 @@ describe('importParks', () => {
     });
 
     await expect(getParkBySlug(testDatabase.database, 'testin-retkeilyreitti')).resolves.toBeNull();
+    await expect(listParks(testDatabase.database)).resolves.toHaveLength(1);
+  });
+
+  it('skips walking trails when any route point overlaps an imported area', async () => {
+    await importParks({
+      database: testDatabase.database,
+      expectedActiveCount: 2,
+      now: () => '2026-05-01T08:00:00.000Z',
+      sourceUrl: 'https://example.test/lipas',
+      fetchSource: async () => ({
+        items: [
+          createLipasPark(),
+          createLipasWalkingTrail({
+            location: {
+              geometries: {
+                type: 'FeatureCollection',
+                features: [
+                  {
+                    type: 'Feature',
+                    geometry: {
+                      type: 'LineString',
+                      coordinates: [
+                        [23.5, 59.5],
+                        [24.5, 60.5],
+                        [35.6, 66.6]
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          })
+        ]
+      })
+    });
+
+    await expect(getParkBySlug(testDatabase.database, 'testin-ulkoilureitti')).resolves.toBeNull();
     await expect(listParks(testDatabase.database)).resolves.toHaveLength(1);
   });
 

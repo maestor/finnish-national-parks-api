@@ -46,7 +46,8 @@ describe('migrateDatabase', () => {
       '0008_manual_catalog_parks.sql',
       '0009_park_logos.sql',
       '0010_park_maps.sql',
-      '0011_refresh_park_type_slugs.sql'
+      '0011_refresh_park_type_slugs.sql',
+      '0012_supported_catalog_types.sql'
     ]);
     expect(parkTypes.rows.map((row) => String(row.slug))).toEqual([
       'outdoor-recreation-area',
@@ -54,7 +55,10 @@ describe('migrateDatabase', () => {
       'wilderness-area',
       'national-park',
       'nature-reserve-area',
-      'nature-trail'
+      'walking-trail',
+      'nature-trail',
+      'hiking-trail',
+      'factory-village'
     ]);
     expect(parkColumns.rows.some((row) => String(row.name) === 'removed')).toBe(true);
     expect(parkColumns.rows.some((row) => String(row.name) === 'postal_code')).toBe(true);

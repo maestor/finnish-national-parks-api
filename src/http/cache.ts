@@ -8,11 +8,11 @@ export const PUBLIC_SUMMARY_CACHE_CONTROL = 'public, max-age=0, s-maxage=600';
 
 export const createCatalogListEtag = (seed: {
   activeCount: number;
+  filterKey?: string | null;
   latestImportRunId: number | null;
   latestUpdatedAt: string | null;
-  typeSlug?: string | null;
 }) => {
-  return `"parks-list:${CATALOG_RESPONSE_VERSION}:${seed.typeSlug ?? 'all'}:${seed.latestImportRunId ?? 'none'}:${seed.latestUpdatedAt ?? 'none'}:${seed.activeCount}"`;
+  return `"parks-list:${CATALOG_RESPONSE_VERSION}:${seed.filterKey ?? 'all'}:${seed.latestImportRunId ?? 'none'}:${seed.latestUpdatedAt ?? 'none'}:${seed.activeCount}"`;
 };
 
 export const createCatalogDetailEtag = (input: {

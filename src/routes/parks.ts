@@ -21,7 +21,7 @@ import {
   visitSchema,
   visitWithParkSchema
 } from '../contracts/parks.js';
-import { supportedParkTypeSlugs } from '../parks/park-types.js';
+import { supportedParkCategorySlugs, supportedParkTypeSlugs } from '../parks/park-types.js';
 
 export const listParksRoute = createRoute({
   method: 'get',
@@ -30,6 +30,7 @@ export const listParksRoute = createRoute({
   security: [{ bearerAuth: [] }],
   request: {
     query: z.object({
+      category: z.enum(supportedParkCategorySlugs).optional(),
       type: z.enum(supportedParkTypeSlugs).optional()
     })
   },

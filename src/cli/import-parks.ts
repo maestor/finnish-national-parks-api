@@ -15,5 +15,5 @@ const result = await importParks({
 await client.close();
 
 console.log(
-  `Imported ${result.activeCount} catalog places from ${result.sourceActiveCount} active LIPAS records in run ${result.importRunId}. Skipped ${result.skippedContainedTrailCount} fully contained nature trails.`
+  `Imported ${result.activeCount} catalog places from ${result.sourceActiveCount} active LIPAS records in run ${result.importRunId}. Skipped ${result.skippedTrailCount} overlapping or nested trail records.`
 );
