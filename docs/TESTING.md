@@ -52,7 +52,9 @@ Use mutation testing for:
 - Manual catalog imports can add non-LIPAS-managed parks, including custom top-level types such as `factory-village` and custom `displayTypeName` values, and later LIPAS imports do not deactivate those rows.
 - Import prefers official Luontoon sitemap destination URLs over stale LIPAS `www` links and falls back when no sitemap match exists.
 - `GET /api/parks` returns lightweight list/map data without full boundary geometry.
+- `GET /api/parks/search` returns a smaller visible-park payload for search/autocomplete consumers.
 - `GET /api/parks/removed` returns a private admin list of removed parks for restore flows.
+- `GET /api/admin/parks/visibility` returns lightweight visible and removed park arrays in one private response for admin tooling.
 - `GET /api/parks?type=...` filters the public catalog list by normalized type slug.
 - `GET /api/parks?category=...` can collapse multiple source types into one public category, including `hiking-and-wilderness-areas`.
 - `GET /api/parks?category=...` filters the public catalog list by derived API category, such as `trails-and-routes`.

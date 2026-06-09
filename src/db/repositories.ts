@@ -108,6 +108,25 @@ type PublicParkRow = {
   typeSlug: string;
 };
 
+type LightweightParkRow = {
+  bboxMaxLat: number;
+  bboxMaxLon: number;
+  bboxMinLat: number;
+  bboxMinLon: number;
+  displayTypeName: string | null;
+  locationLabel: string;
+  markerLat: number;
+  markerLon: number;
+  name: string;
+  postalCode: string | null;
+  postalOffice: string | null;
+  slug: string;
+  typeCode: number;
+  typeId: number;
+  typeName: string;
+  typeSlug: string;
+};
+
 type PublicVisitRow = {
   createdAt: string;
   id: number;
@@ -319,6 +338,36 @@ const toPublicPark = async (
   });
 };
 
+const toSearchPark = (row: LightweightParkRow) => {
+  return withOptionalDisplayTypeName(row, {
+    location: toLocation(row.locationLabel, row.postalCode, row.postalOffice),
+    name: row.name,
+    slug: row.slug,
+    type: {
+      code: row.typeCode,
+      id: row.typeId,
+      name: row.typeName,
+      slug: row.typeSlug as SupportedParkTypeSlug
+    }
+  });
+};
+
+const toAdminVisibilityPark = (row: LightweightParkRow) => {
+  return {
+    ...toSearchPark(row),
+    boundingBox: {
+      maxLat: row.bboxMaxLat,
+      maxLon: row.bboxMaxLon,
+      minLat: row.bboxMinLat,
+      minLon: row.bboxMinLon
+    },
+    markerPoint: {
+      lat: row.markerLat,
+      lon: row.markerLon
+    }
+  };
+};
+
 export type VisitImage = {
   id: number;
   fullUrl: string;
@@ -444,6 +493,35 @@ const listPublicParkRows = async (database: Database) => {
     .from(parks)
     .innerJoin(parkTypes, eq(parks.typeId, parkTypes.id))
     .where(visibleCatalogWhere())
+    .orderBy(parks.name);
+};
+
+const listLightweightParkRows = async (
+  database: Database,
+  where: ReturnType<typeof visibleCatalogWhere> | ReturnType<typeof removedCatalogWhere>
+) => {
+  return database
+    .select({
+      bboxMaxLat: parks.bboxMaxLat,
+      bboxMaxLon: parks.bboxMaxLon,
+      bboxMinLat: parks.bboxMinLat,
+      bboxMinLon: parks.bboxMinLon,
+      displayTypeName: parks.displayTypeName,
+      locationLabel: parks.locationLabel,
+      markerLat: parks.markerLat,
+      markerLon: parks.markerLon,
+      name: parks.name,
+      postalCode: parks.postalCode,
+      postalOffice: parks.postalOffice,
+      slug: parks.slug,
+      typeCode: parkTypes.code,
+      typeId: parkTypes.id,
+      typeName: parkTypes.name,
+      typeSlug: parkTypes.slug
+    })
+    .from(parks)
+    .innerJoin(parkTypes, eq(parks.typeId, parkTypes.id))
+    .where(where)
     .orderBy(parks.name);
 };
 
@@ -737,6 +815,27 @@ export const listRemovedParks = async (
       })
     )
   );
+};
+
+export const listParkSearchEntries = async (
+  database: Database,
+  options: { categorySlug?: SupportedParkCategorySlug; typeSlug?: SupportedParkTypeSlug } = {}
+) => {
+  const rows = await listLightweightParkRows(database, visibleCatalogWhere(options));
+
+  return rows.map((row) => toSearchPark(row));
+};
+
+export const listAdminParkVisibility = async (database: Database) => {
+  const [visibleRows, removedRows] = await Promise.all([
+    listLightweightParkRows(database, visibleCatalogWhere()),
+    listLightweightParkRows(database, removedCatalogWhere())
+  ]);
+
+  return {
+    removedParks: removedRows.map((row) => toAdminVisibilityPark(row)),
+    visibleParks: visibleRows.map((row) => toAdminVisibilityPark(row))
+  };
 };
 
 export const getParkBySlug = async (

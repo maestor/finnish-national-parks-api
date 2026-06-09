@@ -87,7 +87,9 @@ The importer's LIPAS source URL and supported type-code list are internal config
 - `GET /health`
 - `GET /openapi.json`
 - `GET /api/parks`
+- `GET /api/parks/search`
 - `GET /api/parks/removed`
+- `GET /api/admin/parks/visibility`
 - `GET /api/parks/:slug`
 - `GET /api/public/home-summary`
 - `GET /api/public/map-summary`
@@ -114,7 +116,9 @@ Auth endpoints for control-panel login:
 Catalog endpoints stay cache-friendly and database-backed:
 
 - `GET /api/parks` returns lightweight list data without boundary GeoJSON.
+- `GET /api/parks/search` returns an even smaller visible-park payload for autocomplete and other text-search UIs.
 - `GET /api/parks/removed` returns an auth-restricted admin list of removed parks so the UI can restore visibility when needed.
+- `GET /api/admin/parks/visibility` returns lightweight visible and removed park arrays in one private response for admin visibility management.
 - `GET /api/parks?type=hiking-area` filters by normalized type slug.
 - `GET /api/parks?category=hiking-and-wilderness-areas` combines `hiking-area` and `wilderness-area` under the public category `Erämaa-/retkeilyalue` while preserving each park's source `type`.
 - `GET /api/parks?category=trails-and-routes` filters by a derived API category while park responses still preserve the original imported `type`.

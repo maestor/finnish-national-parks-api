@@ -18,6 +18,8 @@ import {
   getPublicHomeSummary,
   getPublicMapSummary,
   getVisitById,
+  listAdminParkVisibility,
+  listParkSearchEntries,
   listParks,
   listRemovedParks,
   listVisits,
@@ -75,6 +77,8 @@ import {
   getPublicHomeSummaryRoute,
   getPublicMapSummaryRoute,
   getVisitRoute,
+  listAdminParkVisibilityRoute,
+  listParkSearchRoute,
   listParksRoute,
   listRemovedParksRoute,
   listVisitsRoute,
@@ -403,6 +407,38 @@ export const createApp = ({
       );
     });
 
+    app.openapi(listParkSearchRoute, async (context) => {
+      const query = context.req.valid('query');
+      const filter = {
+        ...(query.category ? { categorySlug: query.category } : {}),
+        ...(query.type ? { typeSlug: query.type } : {})
+      };
+      const seed = await getCatalogListEtagSeed(database, filter);
+      const filterKey = [seed.filterKey, 'view:search'].filter(Boolean).join('|');
+      const etag = createCatalogListEtag({
+        ...seed,
+        filterKey
+      });
+      context.header('Cache-Control', CATALOG_CACHE_CONTROL);
+      context.header('ETag', etag);
+
+      if (hasMatchingEtag(context.req.header('if-none-match'), etag)) {
+        return new Response(null, {
+          headers: context.res.headers,
+          status: 304
+        });
+      }
+
+      const parks = await listParkSearchEntries(database, filter);
+
+      return context.json(
+        {
+          parks
+        },
+        200
+      );
+    });
+
     app.openapi(listRemovedParksRoute, async (context) => {
       context.header('Cache-Control', PRIVATE_CACHE_CONTROL);
 
@@ -414,6 +450,14 @@ export const createApp = ({
         },
         200
       );
+    });
+
+    app.openapi(listAdminParkVisibilityRoute, async (context) => {
+      context.header('Cache-Control', PRIVATE_CACHE_CONTROL);
+
+      const visibility = await listAdminParkVisibility(database);
+
+      return context.json(visibility, 200);
     });
 
     app.openapi(getParkRoute, async (context) => {

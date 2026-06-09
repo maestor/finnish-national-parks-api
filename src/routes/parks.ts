@@ -2,6 +2,7 @@ import { createRoute, z } from '@hono/zod-openapi';
 
 import { errorSchema } from '../contracts/common.js';
 import {
+  adminParkVisibilityResponseSchema,
   completeDirectVisitImageUploadRequestSchema,
   completeDirectVisitImageUploadResponseSchema,
   createVisitRequestSchema,
@@ -9,6 +10,7 @@ import {
   directVisitImageUploadRequestSchema,
   parkDetailSchema,
   parkListResponseSchema,
+  parkSearchResponseSchema,
   parkVisitsResponseSchema,
   publicHomeSummaryResponseSchema,
   publicMapSummaryResponseSchema,
@@ -85,6 +87,32 @@ export const getParkRoute = createRoute({
   }
 });
 
+export const listParkSearchRoute = createRoute({
+  method: 'get',
+  path: '/api/parks/search',
+  tags: ['Catalog'],
+  security: [{ bearerAuth: [] }],
+  request: {
+    query: z.object({
+      category: z.enum(supportedParkCategorySlugs).optional(),
+      type: z.enum(supportedParkTypeSlugs).optional()
+    })
+  },
+  responses: {
+    200: {
+      description: 'Lightweight catalog park search list',
+      content: {
+        'application/json': {
+          schema: parkSearchResponseSchema
+        }
+      }
+    },
+    304: {
+      description: 'Catalog park search list not modified'
+    }
+  }
+});
+
 export const listRemovedParksRoute = createRoute({
   method: 'get',
   path: '/api/parks/removed',
@@ -96,6 +124,23 @@ export const listRemovedParksRoute = createRoute({
       content: {
         'application/json': {
           schema: removedParkListResponseSchema
+        }
+      }
+    }
+  }
+});
+
+export const listAdminParkVisibilityRoute = createRoute({
+  method: 'get',
+  path: '/api/admin/parks/visibility',
+  tags: ['Parks'],
+  security: [{ bearerAuth: [] }],
+  responses: {
+    200: {
+      description: 'Lightweight visible and removed parks for admin visibility management',
+      content: {
+        'application/json': {
+          schema: adminParkVisibilityResponseSchema
         }
       }
     }

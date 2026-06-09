@@ -102,6 +102,25 @@ describe('auth middleware', () => {
     expect(authorizedResponse.status).toBe(200);
   });
 
+  it('keeps admin park visibility listing protected', async () => {
+    const app = createApp({ apiKey, database: testDatabase.database });
+
+    const unauthorizedResponse = await app.request('/api/admin/parks/visibility', {
+      headers: {
+        'x-forwarded-for': '203.0.113.1'
+      }
+    });
+    const authorizedResponse = await app.request('/api/admin/parks/visibility', {
+      headers: {
+        authorization: `Bearer ${apiKey}`,
+        'x-forwarded-for': '203.0.113.1'
+      }
+    });
+
+    expect(unauthorizedResponse.status).toBe(401);
+    expect(authorizedResponse.status).toBe(200);
+  });
+
   it('leaves health and openapi.json unprotected', async () => {
     const app = createApp({ apiKey, database: testDatabase.database });
 
