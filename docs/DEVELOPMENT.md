@@ -209,7 +209,9 @@ The API uses Zod schemas as the contract source of truth with OpenAPI exposed at
 Key route behavior:
 
 - `GET /api/parks` is optimized for map/list views and omits boundary geometry.
+- `GET /api/parks/search` returns a minimal visible-park payload for search and autocomplete flows.
 - `GET /api/parks/removed` returns an auth-restricted admin list of removed parks for restore workflows.
+- `GET /api/admin/parks/visibility` returns lightweight visible and removed park arrays in one private response for admin visibility tooling.
 - `GET /api/parks?type=hiking-area` filters by normalized catalog type slug.
 - `GET /api/parks?category=hiking-and-wilderness-areas` filters by the derived `Erämaa-/retkeilyalue` category while preserving each park's imported `type`.
 - `GET /api/parks?category=trails-and-routes` filters by a derived API category while preserving the original imported `type` in responses.

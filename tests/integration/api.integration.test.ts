@@ -125,6 +125,59 @@ describe('API routes', () => {
     expect(body.parks[0]).toHaveProperty('location');
   });
 
+  it('serves lightweight park search results with cache validators', async () => {
+    const app = createApp({ database: testDatabase.database });
+    const firstResponse = await app.request('/api/parks/search');
+    const firstBody = (await firstResponse.json()) as {
+      parks: Array<Record<string, unknown>>;
+    };
+    const etag = firstResponse.headers.get('etag');
+
+    expect(firstResponse.status).toBe(200);
+    expect(firstResponse.headers.get('cache-control')).toContain('public');
+    expect(etag).toBeTruthy();
+    expect(firstBody.parks).toHaveLength(4);
+    expect(firstBody.parks[0]).toHaveProperty('slug');
+    expect(firstBody.parks[0]).toHaveProperty('name');
+    expect(firstBody.parks[0]).toHaveProperty('location');
+    expect(firstBody.parks[0]).toHaveProperty('type');
+    expect(firstBody.parks[0]).not.toHaveProperty('areaKm2');
+    expect(firstBody.parks[0]).not.toHaveProperty('boundingBox');
+    expect(firstBody.parks[0]).not.toHaveProperty('category');
+    expect(firstBody.parks[0]).not.toHaveProperty('logo');
+    expect(firstBody.parks[0]).not.toHaveProperty('luontoonUrl');
+    expect(firstBody.parks[0]).not.toHaveProperty('map');
+    expect(firstBody.parks[0]).not.toHaveProperty('markerPoint');
+
+    const secondResponse = await app.request('/api/parks/search', {
+      headers: {
+        'if-none-match': etag!
+      }
+    });
+
+    expect(secondResponse.status).toBe(304);
+  });
+
+  it('filters lightweight park search results by type and category', async () => {
+    const app = createApp({ database: testDatabase.database });
+
+    const typeResponse = await app.request('/api/parks/search?type=outdoor-recreation-area');
+    const typeBody = (await typeResponse.json()) as {
+      parks: Array<{ slug: string }>;
+    };
+    const categoryResponse = await app.request(
+      '/api/parks/search?category=hiking-and-wilderness-areas'
+    );
+    const categoryBody = (await categoryResponse.json()) as {
+      parks: Array<{ slug: string }>;
+    };
+
+    expect(typeResponse.status).toBe(200);
+    expect(typeBody.parks.map((park) => park.slug)).toEqual(['kaupunkilaakson-ulkoilualue']);
+    expect(categoryResponse.status).toBe(200);
+    expect(categoryBody.parks.map((park) => park.slug)).toEqual(['evon-retkeilyalue']);
+  });
+
   it('exposes logo details in park list and park detail responses when a logo is set', async () => {
     await testDatabase.database
       .update(parks)
@@ -1386,6 +1439,53 @@ describe('API routes', () => {
       })
     ]);
     expect(body.parks[0]).not.toHaveProperty('locationLabel');
+  });
+
+  it('serves lightweight admin park visibility data for visible and removed parks', async () => {
+    const app = createApp({ database: testDatabase.database });
+
+    await app.request('/api/parks/akasmannyn-kansallispuisto/removed', {
+      method: 'PATCH',
+      body: JSON.stringify({
+        removed: true
+      }),
+      headers: {
+        'content-type': 'application/json'
+      }
+    });
+
+    const response = await app.request('/api/admin/parks/visibility');
+    const body = (await response.json()) as {
+      removedParks: Array<Record<string, unknown>>;
+      visibleParks: Array<Record<string, unknown>>;
+    };
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('cache-control')).toBe('private, no-store');
+    expect(body.visibleParks).toHaveLength(3);
+    expect(body.removedParks).toEqual([
+      expect.objectContaining({
+        boundingBox: {
+          maxLat: 65,
+          maxLon: 31,
+          minLat: 60,
+          minLon: 24
+        },
+        location: 'Puistotie 1, 00999 Testikylä',
+        markerPoint: {
+          lat: 62.5,
+          lon: 27.5
+        },
+        name: 'Äkäsmännyn kansallispuisto',
+        slug: 'akasmannyn-kansallispuisto'
+      })
+    ]);
+    expect(body.visibleParks.map((park) => park.slug)).not.toContain('akasmannyn-kansallispuisto');
+    expect(body.visibleParks[0]).toHaveProperty('type');
+    expect(body.visibleParks[0]).not.toHaveProperty('areaKm2');
+    expect(body.visibleParks[0]).not.toHaveProperty('logo');
+    expect(body.visibleParks[0]).not.toHaveProperty('luontoonUrl');
+    expect(body.visibleParks[0]).not.toHaveProperty('map');
   });
 
   it('returns CORS headers for preflight requests on API routes', async () => {

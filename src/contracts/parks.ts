@@ -76,6 +76,19 @@ export const parkListItemSchema = z.object({
   type: parkTypeSchema
 });
 
+export const parkSearchItemSchema = z.object({
+  displayTypeName: z.string().nullable().optional(),
+  location: z.string(),
+  name: z.string(),
+  slug: z.string(),
+  type: parkTypeSchema
+});
+
+export const adminParkVisibilityItemSchema = parkSearchItemSchema.extend({
+  boundingBox: boundingBoxSchema,
+  markerPoint: pointSchema
+});
+
 export const parkDetailSchema = parkListItemSchema.extend({
   boundaryGeoJson: geoJsonFeatureCollectionSchema.optional(),
   catalogStatus: z.enum(['active', 'inactive']),
@@ -238,8 +251,17 @@ export const parkListResponseSchema = z.object({
   parks: z.array(parkListItemSchema)
 });
 
+export const parkSearchResponseSchema = z.object({
+  parks: z.array(parkSearchItemSchema)
+});
+
 export const removedParkListResponseSchema = z.object({
   parks: z.array(adminRemovedParkListItemSchema)
+});
+
+export const adminParkVisibilityResponseSchema = z.object({
+  removedParks: z.array(adminParkVisibilityItemSchema),
+  visibleParks: z.array(adminParkVisibilityItemSchema)
 });
 
 export const visitListResponseSchema = z.object({
