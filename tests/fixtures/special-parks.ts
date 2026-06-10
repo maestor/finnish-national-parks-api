@@ -107,11 +107,17 @@ const generatedSykeSources: GeneratedSykeSource[] = [
     sourceName: 'Liimanninkosken lehtojensuojelualue'
   },
   {
+    name: 'Lapakisto',
+    sourceName: 'Lapakiston luonnonsuojelualue',
+    sourceType: 'private'
+  },
+  {
     name: 'Dagmarin puisto',
     sourceName: 'Dagmarin puisto',
     sourceType: 'private'
   },
-  { name: 'Olvassuo', sourceName: 'Olvassuon luonnonpuisto' }
+  { name: 'Olvassuo', sourceName: 'Olvassuon luonnonpuisto' },
+  { name: 'Korouoma', sourceName: 'Korouoman lehtojensuojelualue' }
 ];
 
 const generatedMuseovirastoSources = [
@@ -119,6 +125,7 @@ const generatedMuseovirastoSources = [
   'Kajaanin linna',
   'Raaseporin linna',
   'Svartholma',
+  'Kuusiston piispanlinna',
   'Jyrkkäkosken ruukki',
   'Haapakosken ruukki'
 ];

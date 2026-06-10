@@ -771,6 +771,16 @@ const sourceReadyDestinationAreaSeeds: SykeSpecialParkSeed[] = [
     syntheticLipasId: 9_001_027
   },
   {
+    displayTypeName: null,
+    luontoonUrl: null,
+    name: 'Lapakisto',
+    parkTypeSlug: 'nature-reserve-area',
+    slug: 'lapakisto',
+    sourceName: 'Lapakiston luonnonsuojelualue',
+    sourceType: 'private',
+    syntheticLipasId: 9_001_038
+  },
+  {
     displayTypeName: 'Historia-alue',
     luontoonUrl: 'https://www.luontoon.fi/fi/kohteet/dagmarin-puisto',
     name: 'Dagmarin puisto',
@@ -788,6 +798,15 @@ const sourceReadyDestinationAreaSeeds: SykeSpecialParkSeed[] = [
     slug: 'olvassuo',
     sourceName: 'Olvassuon luonnonpuisto',
     syntheticLipasId: 9_001_029
+  },
+  {
+    displayTypeName: null,
+    luontoonUrl: 'https://www.luontoon.fi/fi/kohteet/korouoma',
+    name: 'Korouoma',
+    parkTypeSlug: 'nature-reserve-area',
+    slug: 'korouoma',
+    sourceName: 'Korouoman lehtojensuojelualue',
+    syntheticLipasId: 9_001_037
   }
 ];
 
@@ -827,6 +846,15 @@ const sourceReadyHistoryAreaSeeds: SykeSpecialParkSeed[] = [
     slug: 'svartholma',
     sourceName: 'Svartholma',
     syntheticLipasId: 9_001_033
+  },
+  {
+    displayTypeName: 'Historia-alue',
+    luontoonUrl: 'https://www.luontoon.fi/fi/kohteet/kuusiston-linna',
+    name: 'Kuusiston linna',
+    parkTypeSlug: 'outdoor-recreation-area',
+    slug: 'kuusiston-linna',
+    sourceName: 'Kuusiston piispanlinna',
+    syntheticLipasId: 9_001_039
   }
 ];
 
