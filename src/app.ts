@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 
 import { OpenAPIHono } from '@hono/zod-openapi';
+import type { Context } from 'hono';
 import { cors } from 'hono/cors';
 
 import type { Database } from './db/database.js';
@@ -10,10 +11,12 @@ import {
   deleteVisit,
   deleteVisitImage,
   findAdminByEmail,
+  findParkRecordBySlugIncludingRemoved,
   findVisitImageById,
   findVisitRecordById,
   getCatalogListEtagSeed,
   getParkBySlug,
+  getParkBySlugIncludingRemoved,
   getParkVisitsBySlug,
   getPublicHomeSummary,
   getPublicMapSummary,
@@ -24,6 +27,7 @@ import {
   listRemovedParks,
   listVisits,
   reorderVisitImages,
+  updateParkDetails,
   updateParkRemoved,
   updateVisit
 } from './db/repositories.js';
@@ -84,6 +88,7 @@ import {
   listVisitsRoute,
   reorderVisitImagesRoute,
   updateParkRemovedRoute,
+  updateParkRoute,
   updateVisitRoute,
   uploadVisitImagesRoute
 } from './routes/parks.js';
@@ -135,6 +140,24 @@ const getVisitImageFileExtension = (contentType: string) => {
 
 const normalizeOptionalOriginalName = (originalName?: string | null) => {
   return originalName?.trim() || null;
+};
+
+const getAuthenticatedSession = async (context: Context, auth?: AuthConfig) => {
+  if (!auth) {
+    return null;
+  }
+
+  const token = getSessionCookie(context, auth.cookieName);
+
+  if (!token) {
+    return null;
+  }
+
+  try {
+    return await verifySessionToken(token, new TextEncoder().encode(auth.jwtSecret));
+  } catch {
+    return null;
+  }
 };
 
 const toVisitImageResponse = async (
@@ -465,10 +488,29 @@ export const createApp = ({
       const query = context.req.valid('query');
       const includeBoundary = query.includeBoundary === 'true';
       const omitBoundary = query.includeBoundary === 'false' || !query.includeBoundary;
-      const park = await getParkBySlug(database, slug, logoPublicUrl, mapPublicUrl);
+      const adminSession = await getAuthenticatedSession(context, auth);
+      const removedPark = adminSession
+        ? await findParkRecordBySlugIncludingRemoved(database, slug)
+        : null;
+      const canViewRemovedPark = Boolean(adminSession && removedPark?.removed);
+      const park = canViewRemovedPark
+        ? await getParkBySlugIncludingRemoved(database, slug, logoPublicUrl, mapPublicUrl)
+        : await getParkBySlug(database, slug, logoPublicUrl, mapPublicUrl);
 
       if (!park) {
         return context.json(jsonNotFound('Park not found.'), 404);
+      }
+
+      if (canViewRemovedPark) {
+        context.header('Cache-Control', PRIVATE_CACHE_CONTROL);
+
+        return context.json(
+          {
+            ...park,
+            ...(omitBoundary ? { boundaryGeoJson: undefined } : {})
+          },
+          200
+        );
       }
 
       const etag = createCatalogDetailEtag({
@@ -493,6 +535,35 @@ export const createApp = ({
         },
         200
       );
+    });
+
+    app.openapi(updateParkRoute, async (context) => {
+      context.header('Cache-Control', PRIVATE_CACHE_CONTROL);
+
+      if (auth && !(await getAuthenticatedSession(context, auth))) {
+        return context.json({ error: 'Unauthorized' }, 401);
+      }
+
+      const { slug } = context.req.valid('param');
+      const body = context.req.valid('json');
+
+      try {
+        const park = await updateParkDetails(database, slug, body, logoPublicUrl, mapPublicUrl);
+
+        if (!park) {
+          return context.json(jsonNotFound('Park not found.'), 404);
+        }
+
+        return context.json(park, 200);
+      } catch (error) {
+        const message = (error as Error).message;
+
+        if (message.includes('already in use')) {
+          return context.json({ error: message }, 409);
+        }
+
+        return context.json({ error: message }, 422);
+      }
     });
 
     app.openapi(getParkVisitsRoute, async (context) => {

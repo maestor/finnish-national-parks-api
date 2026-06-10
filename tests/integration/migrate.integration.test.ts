@@ -47,7 +47,8 @@ describe('migrateDatabase', () => {
       '0009_park_logos.sql',
       '0010_park_maps.sql',
       '0011_refresh_park_type_slugs.sql',
-      '0012_supported_catalog_types.sql'
+      '0012_supported_catalog_types.sql',
+      '0013_park_imported_editable_fields.sql'
     ]);
     expect(parkTypes.rows.map((row) => String(row.slug))).toEqual([
       'outdoor-recreation-area',
@@ -70,6 +71,14 @@ describe('migrateDatabase', () => {
     expect(parkColumns.rows.some((row) => String(row.name) === 'logo_updated_at')).toBe(true);
     expect(parkColumns.rows.some((row) => String(row.name) === 'map_key')).toBe(true);
     expect(parkColumns.rows.some((row) => String(row.name) === 'map_updated_at')).toBe(true);
+    expect(parkColumns.rows.some((row) => String(row.name) === 'imported_name')).toBe(true);
+    expect(parkColumns.rows.some((row) => String(row.name) === 'imported_slug')).toBe(true);
+    expect(parkColumns.rows.some((row) => String(row.name) === 'imported_location_label')).toBe(
+      true
+    );
+    expect(parkColumns.rows.some((row) => String(row.name) === 'imported_display_type_name')).toBe(
+      true
+    );
     expect(publicDataVersionColumns.rows.some((row) => String(row.name) === 'version')).toBe(true);
   });
 });

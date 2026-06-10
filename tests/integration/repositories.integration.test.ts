@@ -8,6 +8,7 @@ import {
   deleteVisitImage,
   getCatalogListEtagSeed,
   getParkBySlug,
+  getParkBySlugIncludingRemoved,
   getParkVisitsBySlug,
   getPublicHomeSummary,
   getVisitById,
@@ -16,6 +17,7 @@ import {
   listVisits,
   reassignParkVisits,
   reorderVisitImages,
+  updateParkDetails,
   updateParkLogo,
   updateParkMap,
   updateVisit
@@ -49,6 +51,9 @@ describe('repositories', () => {
   it('returns null for missing parks', async () => {
     await expect(getParkBySlug(testDatabase.database, 'missing-park')).resolves.toBeNull();
     await expect(
+      getParkBySlugIncludingRemoved(testDatabase.database, 'missing-park')
+    ).resolves.toBeNull();
+    await expect(
       getParkVisitsBySlug(testDatabase.database, 'missing-park', async () => '')
     ).resolves.toBeNull();
     await expect(getVisitById(testDatabase.database, 99999, async () => '')).resolves.toBeNull();
@@ -77,6 +82,108 @@ describe('repositories', () => {
     });
 
     expect(result).toBeNull();
+  });
+
+  it('returns null when updating details for a missing park', async () => {
+    await expect(
+      updateParkDetails(testDatabase.database, 'missing-park', {
+        name: 'Missing park'
+      })
+    ).resolves.toBeNull();
+  });
+
+  it('updates editable park details and resolves removed parks when requested explicitly', async () => {
+    await testDatabase.database
+      .update(parks)
+      .set({ removed: true })
+      .where(eq(parks.slug, 'akasmannyn-kansallispuisto'));
+
+    const updated = await updateParkDetails(testDatabase.database, 'akasmannyn-kansallispuisto', {
+      areaKm2: null,
+      displayTypeName: null,
+      establishmentYear: 1999,
+      locationLabel: 'Oma osoite 4',
+      luontoonUrl: 'www.luontoon.fi/oma-kohde',
+      name: 'Oma kohde',
+      postalCode: null,
+      postalOffice: 'Muonio'
+    });
+
+    expect(updated).toMatchObject({
+      areaKm2: null,
+      establishmentYear: 1999,
+      location: 'Oma osoite 4, Muonio',
+      luontoonUrl: 'https://www.luontoon.fi/oma-kohde',
+      name: 'Oma kohde',
+      postalOffice: 'Muonio',
+      slug: 'oma-kohde'
+    });
+    expect(updated).not.toHaveProperty('displayTypeName');
+    await expect(getParkBySlug(testDatabase.database, 'oma-kohde')).resolves.toBeNull();
+    await expect(
+      getParkBySlugIncludingRemoved(testDatabase.database, 'oma-kohde')
+    ).resolves.toMatchObject({
+      name: 'Oma kohde',
+      slug: 'oma-kohde'
+    });
+  });
+
+  it('rejects invalid luontoon urls and conflicting park slugs', async () => {
+    await importParks({
+      database: testDatabase.database,
+      expectedActiveCount: 2,
+      now: () => '2026-05-02T10:00:00.000Z',
+      sourceUrl: 'https://example.test/lipas-second-park',
+      fetchSource: async () => ({
+        items: [
+          createLipasPark(),
+          createLipasPark({
+            'lipas-id': 67890,
+            name: 'Seitsemisen kansallispuisto',
+            location: {
+              address: 'Seitsemisentie 1',
+              'postal-office': 'Ylöjärvi'
+            },
+            www: 'https://www.luontoon.fi/seitseminen'
+          })
+        ]
+      })
+    });
+
+    await expect(
+      updateParkDetails(testDatabase.database, 'akasmannyn-kansallispuisto', {
+        luontoonUrl: 'not a real url'
+      })
+    ).rejects.toThrow('Invalid Luontoon URL.');
+
+    await expect(
+      updateParkDetails(testDatabase.database, 'akasmannyn-kansallispuisto', {
+        slug: 'seitsemisen-kansallispuisto'
+      })
+    ).rejects.toThrow('Park slug "seitsemisen-kansallispuisto" is already in use.');
+
+    await expect(
+      updateParkDetails(testDatabase.database, 'akasmannyn-kansallispuisto', {
+        name: '   '
+      })
+    ).rejects.toThrow('Name is required.');
+  });
+
+  it('can clear luontoon url while leaving other editable fields unchanged', async () => {
+    const updated = await updateParkDetails(testDatabase.database, 'akasmannyn-kansallispuisto', {
+      luontoonUrl: null,
+      name: 'Päivitetty puisto'
+    });
+
+    expect(updated).toMatchObject({
+      areaKm2: 12.5,
+      establishmentYear: 1982,
+      location: 'Puistotie 1, 00999 Testikylä',
+      luontoonUrl: null,
+      name: 'Päivitetty puisto',
+      slug: 'paivitetty-puisto'
+    });
+    expect(updated).not.toHaveProperty('displayTypeName');
   });
 
   it('lists park records including removed rows with display type names', async () => {

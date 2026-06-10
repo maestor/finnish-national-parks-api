@@ -122,6 +122,103 @@ describe('importParks', () => {
     expect(parks).toHaveLength(1);
   });
 
+  it('preserves manually edited park details across re-imports', async () => {
+    await importParks({
+      database: testDatabase.database,
+      expectedActiveCount: 1,
+      now: () => '2026-05-01T08:00:00.000Z',
+      sourceUrl: 'https://example.test/lipas',
+      fetchSource: async () => ({
+        items: [createLipasPark()]
+      })
+    });
+
+    await testDatabase.database
+      .update(parks)
+      .set({
+        areaKm2: 99.9,
+        displayTypeName: 'Oma kohdelaji',
+        establishmentYear: 2001,
+        locationLabel: 'Oma osoite 7',
+        luontoonUrl: null,
+        name: 'Oma puistonimi',
+        postalCode: '99870',
+        postalOffice: 'Inari',
+        slug: 'oma-puistonimi'
+      })
+      .where(eq(parks.slug, 'akasmannyn-kansallispuisto'));
+
+    await importParks({
+      database: testDatabase.database,
+      expectedActiveCount: 1,
+      now: () => '2026-05-02T08:00:00.000Z',
+      sourceUrl: 'https://example.test/lipas',
+      fetchSource: async () => ({
+        items: [
+          createLipasPark({
+            location: {
+              address: 'Tuotu tie 2',
+              'postal-code': '00100',
+              'postal-office': 'Helsinki'
+            },
+            name: 'Tuotu puistonimi',
+            properties: {
+              'area-km2': 13.75
+            },
+            www: 'https://www.luontoon.fi/tuotu-puisto',
+            'construction-year': 1988
+          })
+        ]
+      })
+    });
+
+    await expect(getParkBySlug(testDatabase.database, 'oma-puistonimi')).resolves.toMatchObject({
+      areaKm2: 99.9,
+      displayTypeName: 'Oma kohdelaji',
+      establishmentYear: 2001,
+      location: 'Oma osoite 7, 99870 Inari',
+      luontoonUrl: null,
+      name: 'Oma puistonimi',
+      slug: 'oma-puistonimi'
+    });
+  });
+
+  it('falls back to the current slug when importedSlug is missing on an existing row', async () => {
+    await importParks({
+      database: testDatabase.database,
+      expectedActiveCount: 1,
+      now: () => '2026-05-01T08:00:00.000Z',
+      sourceUrl: 'https://example.test/lipas',
+      fetchSource: async () => ({
+        items: [createLipasPark()]
+      })
+    });
+
+    await testDatabase.database
+      .update(parks)
+      .set({
+        importedSlug: null,
+        slug: 'legacy-custom-slug'
+      })
+      .where(eq(parks.lipasId, 12345));
+
+    await importParks({
+      database: testDatabase.database,
+      expectedActiveCount: 1,
+      now: () => '2026-05-02T08:00:00.000Z',
+      sourceUrl: 'https://example.test/lipas',
+      fetchSource: async () => ({
+        items: [createLipasPark()]
+      })
+    });
+
+    await expect(getParkBySlug(testDatabase.database, 'legacy-custom-slug')).resolves.toMatchObject(
+      {
+        slug: 'legacy-custom-slug'
+      }
+    );
+  });
+
   it('imports hiking trails as removed catalog entries', async () => {
     await importParks({
       database: testDatabase.database,

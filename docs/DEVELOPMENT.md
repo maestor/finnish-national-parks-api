@@ -107,6 +107,7 @@ The importer should:
 - Import `4403` walking trails and `4405` hiking trails as removed-by-default catalog rows.
 - Preserve personal visit history during catalog re-imports.
 - Preserve any manually set `parks.removed` flags during catalog re-imports.
+- Preserve admin-managed edits to `name`, `slug`, `location_label`, `postal_office`, `postal_code`, `area_km2`, `establishment_year`, `luontoon_url`, and `display_type_name` during catalog re-imports while still refreshing the imported baseline for those fields.
 - Refresh destination `luontoonUrl` values from `https://www.luontoon.fi/resources/sitemap/fi.xml` when the official sitemap contains a matching base destination URL.
 - Derive slug, marker point, and bounding box from imported data.
 - Store boundary GeoJSON for detail/map-boundary usage.
@@ -216,6 +217,7 @@ Key route behavior:
 - `GET /api/parks?category=hiking-and-wilderness-areas` filters by the derived `Erämaa-/retkeilyalue` category while preserving each park's imported `type`.
 - `GET /api/parks?category=trails-and-routes` filters by a derived API category while preserving the original imported `type` in responses.
 - `GET /api/parks/:slug?includeBoundary=true` returns the stored boundary GeoJSON.
+- `GET /api/parks/:slug` still hides removed parks publicly, but returns removed-park detail to a request carrying a valid admin session cookie when OAuth is enabled.
 - Park list, detail, removed, and public map responses expose both the source `type` and a derived `category`.
 - Park list, detail, removed, and public map responses expose `logo: { key, updatedAt, url } | null` when one has been linked to the park.
 - Park responses expose `location` instead of `locationLabel`, combining `location_label` and `postal_office` when both exist, but collapsing to one value when they are identical or only one exists.
@@ -227,6 +229,7 @@ Key route behavior:
 - Catalog and public summary routes emit deterministic `ETag` headers and support `304 Not Modified`.
 - Public summary routes use shared-cache headers and expose a public visit-data `version` / `updatedAt` signal that changes on visit create/update/delete and visit image upload/delete/reorder.
 - Visit and management routes use `private, no-store`.
+- `PATCH /api/parks/:slug` updates the admin-editable park fields and auto-generates a slug from `name` when no explicit `slug` is provided.
 - `PATCH /api/parks/:slug/removed` toggles whether a park is hidden from catalog and visit responses.
 - Auth routes (`/auth/*`) bypass API key authentication so the OAuth flow can complete without a bearer token.
 - Public summary routes (`/api/public/*`) also bypass API key authentication so public UI pages can use them remotely.

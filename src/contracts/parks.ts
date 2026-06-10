@@ -279,6 +279,34 @@ export const updateParkRemovedRequestSchema = z.object({
   removed: z.boolean()
 });
 
+export const updateParkRequestSchema = z
+  .object({
+    areaKm2: z.number().nonnegative().nullable().optional(),
+    displayTypeName: z.string().max(120).nullable().optional(),
+    establishmentYear: z.number().int().nullable().optional(),
+    locationLabel: z.string().trim().min(1).max(255).optional(),
+    luontoonUrl: z.string().trim().min(1).max(500).nullable().optional(),
+    name: z.string().trim().min(1).max(255).optional(),
+    postalCode: z.string().trim().max(20).nullable().optional(),
+    postalOffice: z.string().trim().max(120).nullable().optional(),
+    slug: z.string().trim().min(1).max(255).optional()
+  })
+  .refine(
+    (input) =>
+      input.areaKm2 !== undefined ||
+      input.displayTypeName !== undefined ||
+      input.establishmentYear !== undefined ||
+      input.locationLabel !== undefined ||
+      input.luontoonUrl !== undefined ||
+      input.name !== undefined ||
+      input.postalCode !== undefined ||
+      input.postalOffice !== undefined ||
+      input.slug !== undefined,
+    {
+      message: 'Provide at least one field to update.'
+    }
+  );
+
 export const updateVisitRequestSchema = createVisitRequestSchema
   .partial()
   .refine(

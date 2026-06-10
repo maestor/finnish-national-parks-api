@@ -1,5 +1,7 @@
 import { and, asc, desc, eq, inArray, notInArray, sql } from 'drizzle-orm';
 
+import type { GeoJsonFeatureCollection } from '../importer/geometry.js';
+import { createParkSlug, normalizeLuontoonUrl } from '../parks/park-normalization.js';
 import type { SupportedParkCategorySlug, SupportedParkTypeSlug } from '../parks/park-types.js';
 import {
   getParkCategoryByTypeSlug,
@@ -31,6 +33,18 @@ type UpdateVisitInput = {
   note?: string | null | undefined;
   route?: string | null | undefined;
   visitedOn?: string | undefined;
+};
+
+type UpdateParkDetailsInput = {
+  areaKm2?: number | null | undefined;
+  displayTypeName?: string | null | undefined;
+  establishmentYear?: number | null | undefined;
+  locationLabel?: string | undefined;
+  luontoonUrl?: string | null | undefined;
+  name?: string | undefined;
+  postalCode?: string | null | undefined;
+  postalOffice?: string | null | undefined;
+  slug?: string | undefined;
 };
 
 type ReassignParkVisitsInput = {
@@ -142,7 +156,33 @@ type PublicVisitVersion = {
   version: number;
 };
 
+type UpsertCatalogParkInput = Omit<
+  typeof parks.$inferInsert,
+  | 'id'
+  | 'importedAreaKm2'
+  | 'importedDisplayTypeName'
+  | 'importedEstablishmentYear'
+  | 'importedLocationLabel'
+  | 'importedLuontoonUrl'
+  | 'importedName'
+  | 'importedPostalCode'
+  | 'importedPostalOffice'
+  | 'importedSlug'
+>;
+
 const PUBLIC_VISIT_DATA_VERSION_KEY = 'public-visits';
+
+const normalizeOptionalText = (value?: string | null) => value?.trim() || null;
+
+const normalizeRequiredText = (value: string, fieldName: string) => {
+  const normalized = value.trim();
+
+  if (!normalized) {
+    throw new Error(`${fieldName} is required.`);
+  }
+
+  return normalized;
+};
 
 const toBoundingBox = (row: typeof parks.$inferSelect): BoundingBox => {
   return {
@@ -284,7 +324,7 @@ const toPark = async (
   return withOptionalDisplayTypeName(row.park, {
     areaKm2: row.park.areaKm2,
     boundingBox: toBoundingBox(row.park),
-    boundaryGeoJson: JSON.parse(row.park.boundaryGeojson) as Record<string, unknown>,
+    boundaryGeoJson: JSON.parse(row.park.boundaryGeojson) as GeoJsonFeatureCollection,
     category: toParkCategory(row.parkType.slug as SupportedParkTypeSlug),
     catalogStatus: row.park.catalogStatus as 'active' | 'inactive',
     establishmentYear: row.park.establishmentYear,
@@ -443,6 +483,21 @@ const getTypedParkBySlug = async (database: Database, slug: string) => {
         .from(parks)
         .innerJoin(parkTypes, eq(parks.typeId, parkTypes.id))
         .where(visibleParkBySlugWhere(slug))
+    )[0] ?? null
+  );
+};
+
+const getTypedParkBySlugIncludingRemoved = async (database: Database, slug: string) => {
+  return (
+    (
+      await database
+        .select({
+          park: parks,
+          parkType: parkTypes
+        })
+        .from(parks)
+        .innerJoin(parkTypes, eq(parks.typeId, parkTypes.id))
+        .where(eq(parks.slug, slug))
     )[0] ?? null
   );
 };
@@ -848,6 +903,16 @@ export const getParkBySlug = async (
   return row ? await toPark(row, getLogoPublicUrl, getMapPublicUrl) : null;
 };
 
+export const getParkBySlugIncludingRemoved = async (
+  database: Database,
+  slug: string,
+  getLogoPublicUrl?: GetLogoPublicUrl,
+  getMapPublicUrl?: GetMapPublicUrl
+) => {
+  const row = await getTypedParkBySlugIncludingRemoved(database, slug);
+  return row ? await toPark(row, getLogoPublicUrl, getMapPublicUrl) : null;
+};
+
 export const listVisits = async (
   database: Database,
   getImagePublicUrl: (key: string) => Promise<string>
@@ -1191,6 +1256,78 @@ export const updateParkRemoved = async (database: Database, slug: string, remove
   return true;
 };
 
+export const updateParkDetails = async (
+  database: Database,
+  slug: string,
+  input: UpdateParkDetailsInput,
+  getLogoPublicUrl?: GetLogoPublicUrl,
+  getMapPublicUrl?: GetMapPublicUrl
+) => {
+  const park = await findParkRecordBySlugIncludingRemoved(database, slug);
+
+  if (!park) {
+    return null;
+  }
+
+  const nextName = input.name === undefined ? park.name : normalizeRequiredText(input.name, 'Name');
+  const nextSlug =
+    input.slug !== undefined
+      ? createParkSlug(normalizeRequiredText(input.slug, 'Slug'))
+      : input.name !== undefined
+        ? createParkSlug(nextName)
+        : park.slug;
+  const nextLocationLabel =
+    input.locationLabel === undefined
+      ? park.locationLabel
+      : normalizeRequiredText(input.locationLabel, 'Location label');
+  const nextLuontoonUrl =
+    input.luontoonUrl === undefined
+      ? park.luontoonUrl
+      : input.luontoonUrl === null
+        ? null
+        : normalizeLuontoonUrl(input.luontoonUrl);
+
+  if (input.luontoonUrl !== undefined && input.luontoonUrl !== null && !nextLuontoonUrl) {
+    throw new Error('Invalid Luontoon URL.');
+  }
+
+  const conflictingPark = await database.query.parks.findFirst({
+    where: eq(parks.slug, nextSlug)
+  });
+
+  if (conflictingPark && conflictingPark.id !== park.id) {
+    throw new Error(`Park slug "${nextSlug}" is already in use.`);
+  }
+
+  const timestamp = new Date().toISOString();
+
+  await database
+    .update(parks)
+    .set({
+      areaKm2: input.areaKm2 === undefined ? park.areaKm2 : input.areaKm2,
+      displayTypeName:
+        input.displayTypeName === undefined
+          ? park.displayTypeName
+          : normalizeOptionalText(input.displayTypeName),
+      establishmentYear:
+        input.establishmentYear === undefined ? park.establishmentYear : input.establishmentYear,
+      locationLabel: nextLocationLabel,
+      luontoonUrl: nextLuontoonUrl,
+      name: nextName,
+      postalCode:
+        input.postalCode === undefined ? park.postalCode : normalizeOptionalText(input.postalCode),
+      postalOffice:
+        input.postalOffice === undefined
+          ? park.postalOffice
+          : normalizeOptionalText(input.postalOffice),
+      slug: nextSlug,
+      updatedAt: timestamp
+    })
+    .where(eq(parks.id, park.id));
+
+  return getParkBySlugIncludingRemoved(database, nextSlug, getLogoPublicUrl, getMapPublicUrl);
+};
+
 export const updateParkLogo = async (
   database: Database,
   slug: string,
@@ -1346,35 +1483,90 @@ export const reorderVisitImages = async (
   await bumpPublicVisitDataVersion(database, timestamp);
 };
 
-export const upsertCatalogPark = async (
-  database: DbClient,
-  values: Omit<typeof parks.$inferInsert, 'id'>
-) => {
+export const upsertCatalogPark = async (database: DbClient, values: UpsertCatalogParkInput) => {
+  const valuesWithImportedFields = {
+    ...values,
+    importedAreaKm2: values.areaKm2,
+    importedDisplayTypeName: values.displayTypeName,
+    importedEstablishmentYear: values.establishmentYear,
+    importedLocationLabel: values.locationLabel,
+    importedLuontoonUrl: values.luontoonUrl,
+    importedName: values.name,
+    importedPostalCode: values.postalCode,
+    importedPostalOffice: values.postalOffice,
+    importedSlug: values.slug
+  };
+
   await database
     .insert(parks)
-    .values(values)
+    .values(valuesWithImportedFields)
     .onConflictDoUpdate({
       set: {
-        areaKm2: values.areaKm2,
+        areaKm2: sql`CASE
+          WHEN ${parks.areaKm2} IS ${parks.importedAreaKm2}
+            THEN excluded.imported_area_km2
+          ELSE ${parks.areaKm2}
+        END`,
         bboxMaxLat: values.bboxMaxLat,
         bboxMaxLon: values.bboxMaxLon,
         bboxMinLat: values.bboxMinLat,
         bboxMinLon: values.bboxMinLon,
         boundaryGeojson: values.boundaryGeojson,
         catalogStatus: values.catalogStatus,
-        displayTypeName: values.displayTypeName,
-        establishmentYear: values.establishmentYear,
+        displayTypeName: sql`CASE
+          WHEN ${parks.displayTypeName} IS ${parks.importedDisplayTypeName}
+            THEN excluded.imported_display_type_name
+          ELSE ${parks.displayTypeName}
+        END`,
+        establishmentYear: sql`CASE
+          WHEN ${parks.establishmentYear} IS ${parks.importedEstablishmentYear}
+            THEN excluded.imported_establishment_year
+          ELSE ${parks.establishmentYear}
+        END`,
+        importedAreaKm2: valuesWithImportedFields.importedAreaKm2,
+        importedDisplayTypeName: valuesWithImportedFields.importedDisplayTypeName,
+        importedEstablishmentYear: valuesWithImportedFields.importedEstablishmentYear,
+        importedLocationLabel: valuesWithImportedFields.importedLocationLabel,
+        importedLuontoonUrl: valuesWithImportedFields.importedLuontoonUrl,
+        importedName: valuesWithImportedFields.importedName,
+        importedPostalCode: valuesWithImportedFields.importedPostalCode,
+        importedPostalOffice: valuesWithImportedFields.importedPostalOffice,
+        importedSlug: valuesWithImportedFields.importedSlug,
         lastImportRunId: values.lastImportRunId,
-        locationLabel: values.locationLabel,
-        luontoonUrl: values.luontoonUrl,
+        locationLabel: sql`CASE
+          WHEN ${parks.locationLabel} IS ${parks.importedLocationLabel}
+            THEN excluded.imported_location_label
+          ELSE ${parks.locationLabel}
+        END`,
+        luontoonUrl: sql`CASE
+          WHEN ${parks.luontoonUrl} IS ${parks.importedLuontoonUrl}
+            THEN excluded.imported_luontoon_url
+          ELSE ${parks.luontoonUrl}
+        END`,
         managedByLipasImport: values.managedByLipasImport,
         markerLat: values.markerLat,
         markerLon: values.markerLon,
         municipalityCode: values.municipalityCode,
-        name: values.name,
-        postalCode: values.postalCode,
-        postalOffice: values.postalOffice,
-        slug: values.slug,
+        name: sql`CASE
+          WHEN ${parks.name} IS ${parks.importedName}
+            THEN excluded.imported_name
+          ELSE ${parks.name}
+        END`,
+        postalCode: sql`CASE
+          WHEN ${parks.postalCode} IS ${parks.importedPostalCode}
+            THEN excluded.imported_postal_code
+          ELSE ${parks.postalCode}
+        END`,
+        postalOffice: sql`CASE
+          WHEN ${parks.postalOffice} IS ${parks.importedPostalOffice}
+            THEN excluded.imported_postal_office
+          ELSE ${parks.postalOffice}
+        END`,
+        slug: sql`CASE
+          WHEN ${parks.slug} IS ${parks.importedSlug}
+            THEN excluded.imported_slug
+          ELSE ${parks.slug}
+        END`,
         sourceEventDate: values.sourceEventDate,
         typeId: values.typeId,
         updatedAt: values.updatedAt
@@ -1383,10 +1575,8 @@ export const upsertCatalogPark = async (
     });
 };
 
-export const upsertImportedPark = async (
-  database: DbClient,
-  values: Omit<typeof parks.$inferInsert, 'id'>
-) => upsertCatalogPark(database, values);
+export const upsertImportedPark = async (database: DbClient, values: UpsertCatalogParkInput) =>
+  upsertCatalogPark(database, values);
 
 export const markMissingParksInactive = async (
   database: DbClient,
