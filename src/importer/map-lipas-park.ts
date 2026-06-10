@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { createParkSlug, normalizeLuontoonUrl } from '../parks/park-normalization.js';
 import { getSupportedParkTypeByCode, getSupportedParkTypeBySlug } from '../parks/park-types.js';
 import type { BoundingBox, GeoJsonFeatureCollection } from './geometry.js';
 import { deriveBoundingBox } from './geometry.js';
@@ -86,39 +87,6 @@ export type MappedPark = {
   };
 };
 
-const normalizeLuontoonUrl = (value?: string) => {
-  if (!value) {
-    return null;
-  }
-
-  const normalizedInput =
-    value.startsWith('http://') || value.startsWith('https://')
-      ? value
-      : value.startsWith('/')
-        ? `https://www.luontoon.fi${value}`
-        : `https://${value}`;
-
-  try {
-    const url = new URL(normalizedInput);
-    const pathname = url.pathname.replace(/\/+$/, '');
-
-    return `https://www.luontoon.fi${pathname}`;
-  } catch {
-    return null;
-  }
-};
-
-const createSlug = (name: string) => {
-  const slug = name
-    .normalize('NFKD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '');
-
-  return slug || 'park';
-};
-
 const shouldPromoteToHikingArea = (park: LipasPark) => {
   const normalizedName = park.name.trim().toLowerCase();
   const typeCode = park.type['type-code'];
@@ -152,7 +120,7 @@ export const mapLipasPark = (source: unknown, existingSlug?: string): MappedPark
     postalCode: park.location['postal-code'] ?? null,
     postalOffice: park.location['postal-office'] ?? null,
     sourceTypeCode,
-    slug: existingSlug ?? createSlug(park.name),
+    slug: existingSlug ?? createParkSlug(park.name),
     sourceEventDate: park['event-date'] ?? null,
     type: parkType
   };

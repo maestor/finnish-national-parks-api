@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { updateVisitRequestSchema } from '../../src/contracts/parks.js';
+import { updateParkRequestSchema, updateVisitRequestSchema } from '../../src/contracts/parks.js';
 import {
   createCatalogDetailEtag,
   createCatalogListEtag,
@@ -15,6 +15,15 @@ describe('contracts and cache helpers', () => {
     );
     expect(updateVisitRequestSchema.parse({ note: 'Updated note' })).toEqual({
       note: 'Updated note'
+    });
+  });
+
+  it('requires at least one field when patching a park', () => {
+    expect(() => updateParkRequestSchema.parse({})).toThrow(
+      'Provide at least one field to update.'
+    );
+    expect(updateParkRequestSchema.parse({ name: 'Updated park' })).toEqual({
+      name: 'Updated park'
     });
   });
 

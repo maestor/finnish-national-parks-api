@@ -12,11 +12,26 @@ const authConfig = {
 import { createApp } from '../../src/app.js';
 import { getParkBySlug } from '../../src/db/repositories.js';
 import { parks } from '../../src/db/schema.js';
+import { createSessionToken } from '../../src/http/session.js';
 import { importParks } from '../../src/importer/import-parks.js';
 import { importSpecialParks } from '../../src/importer/import-special-parks.js';
 import { createMemoryStorage } from '../../src/storage/memory-storage.js';
 import { createLipasPark, createLipasTrail, parkTypeFixtures } from '../fixtures/lipas.js';
 import { createTestDatabase } from '../helpers/test-db.js';
+
+const createAdminSessionCookie = async () => {
+  const token = await createSessionToken(
+    {
+      email: 'admin@example.com',
+      name: 'Admin User',
+      picture: 'https://example.com/photo.jpg',
+      sub: 'google-user-id'
+    },
+    new TextEncoder().encode(authConfig.jwtSecret)
+  );
+
+  return `${authConfig.cookieName}=${token}`;
+};
 
 describe('API routes', () => {
   let testDatabase: Awaited<ReturnType<typeof createTestDatabase>>;
@@ -537,6 +552,163 @@ describe('API routes', () => {
       }
     });
     expect(cachedResponse.status).toBe(304);
+  });
+
+  it('allows admin park edits and auto-generates a slug when the name changes', async () => {
+    const app = createApp({ auth: authConfig, database: testDatabase.database });
+    const sessionCookie = await createAdminSessionCookie();
+
+    const response = await app.request('/api/parks/akasmannyn-kansallispuisto', {
+      method: 'PATCH',
+      body: JSON.stringify({
+        areaKm2: 14.75,
+        displayTypeName: 'Ystävyyden puisto',
+        establishmentYear: 1990,
+        locationLabel: 'Korjattu puistotie 9',
+        luontoonUrl: '/fi/kohteet/korjattu-puisto',
+        name: 'Korjattu puisto',
+        postalCode: '99130',
+        postalOffice: 'Kittilä'
+      }),
+      headers: {
+        cookie: sessionCookie,
+        'content-type': 'application/json'
+      }
+    });
+    const body = (await response.json()) as Record<string, unknown>;
+    const updatedPark = await getParkBySlug(testDatabase.database, 'korjattu-puisto');
+    const oldSlugResponse = await app.request('/api/parks/akasmannyn-kansallispuisto');
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('cache-control')).toBe('private, no-store');
+    expect(body).toMatchObject({
+      areaKm2: 14.75,
+      displayTypeName: 'Ystävyyden puisto',
+      establishmentYear: 1990,
+      location: 'Korjattu puistotie 9, 99130 Kittilä',
+      luontoonUrl: 'https://www.luontoon.fi/fi/kohteet/korjattu-puisto',
+      name: 'Korjattu puisto',
+      postalOffice: 'Kittilä',
+      slug: 'korjattu-puisto'
+    });
+    expect(updatedPark).toMatchObject({
+      areaKm2: 14.75,
+      displayTypeName: 'Ystävyyden puisto',
+      establishmentYear: 1990,
+      location: 'Korjattu puistotie 9, 99130 Kittilä',
+      luontoonUrl: 'https://www.luontoon.fi/fi/kohteet/korjattu-puisto',
+      name: 'Korjattu puisto',
+      postalOffice: 'Kittilä',
+      slug: 'korjattu-puisto'
+    });
+    expect(oldSlugResponse.status).toBe(404);
+  });
+
+  it('requires an admin session for park edits and reports missing, invalid, and conflicting updates', async () => {
+    await importParks({
+      database: testDatabase.database,
+      expectedActiveCount: 5,
+      now: () => '2026-05-02T09:00:00.000Z',
+      sourceUrl: 'https://example.test/lipas-expanded',
+      fetchSource: async () => ({
+        items: [
+          createLipasPark(),
+          createLipasPark({
+            'lipas-id': 67889,
+            name: 'Kaupunkilaakson ulkoilualue',
+            type: {
+              'type-code': parkTypeFixtures.outdoorRecreationArea.typeCode
+            },
+            location: {
+              address: 'Laaksopolku 1',
+              'postal-office': 'Espoo'
+            },
+            properties: {
+              'area-km2': 22.4
+            },
+            www: 'https://www.luontoon.fi/kaupunkilaakso'
+          }),
+          createLipasPark({
+            'lipas-id': 67890,
+            name: 'Seitsemisen kansallispuisto',
+            location: {
+              address: 'Seitsemisentie 1',
+              'postal-office': 'Ylöjärvi'
+            },
+            properties: {
+              'area-km2': 45.2
+            },
+            www: 'https://www.luontoon.fi/seitseminen'
+          }),
+          createLipasPark({
+            'lipas-id': 67891,
+            name: 'Evon retkeilyalue',
+            type: {
+              'type-code': parkTypeFixtures.stateHikingArea.typeCode
+            },
+            location: {
+              address: 'Evontie 1',
+              'postal-office': 'Evo'
+            },
+            properties: {
+              'area-km2': 47.0
+            },
+            www: 'https://www.luontoon.fi/evo'
+          }),
+          createLipasPark({
+            'lipas-id': 70001,
+            name: 'Vallisaari',
+            www: 'https://www.luontoon.fi/vallisaari'
+          })
+        ]
+      })
+    });
+
+    const app = createApp({ auth: authConfig, database: testDatabase.database });
+    const unauthorizedResponse = await app.request('/api/parks/akasmannyn-kansallispuisto', {
+      method: 'PATCH',
+      body: JSON.stringify({
+        name: 'Unauthorized change'
+      }),
+      headers: {
+        'content-type': 'application/json'
+      }
+    });
+    const missingResponse = await app.request('/api/parks/missing-park', {
+      method: 'PATCH',
+      body: JSON.stringify({
+        name: 'Missing park'
+      }),
+      headers: {
+        cookie: await createAdminSessionCookie(),
+        'content-type': 'application/json'
+      }
+    });
+    const invalidUrlResponse = await app.request('/api/parks/akasmannyn-kansallispuisto', {
+      method: 'PATCH',
+      body: JSON.stringify({
+        luontoonUrl: 'bad url'
+      }),
+      headers: {
+        cookie: await createAdminSessionCookie(),
+        'content-type': 'application/json'
+      }
+    });
+    const conflictingSlugResponse = await app.request('/api/parks/akasmannyn-kansallispuisto', {
+      method: 'PATCH',
+      body: JSON.stringify({
+        slug: 'vallisaari'
+      }),
+      headers: {
+        cookie: await createAdminSessionCookie(),
+        'content-type': 'application/json'
+      }
+    });
+
+    expect(unauthorizedResponse.status).toBe(401);
+    expect(missingResponse.status).toBe(404);
+    expect(invalidUrlResponse.status).toBe(422);
+    expect(conflictingSlugResponse.status).toBe(409);
   });
 
   it('serves standalone nature trails through the HTTP contract', async () => {
@@ -1354,6 +1526,50 @@ describe('API routes', () => {
     expect(visitsBody.visits).toEqual([]);
     expect(visitDetailResponse.status).toBe(404);
     expect(createRemovedVisitResponse.status).toBe(404);
+  });
+
+  it('shows removed park detail only to an authenticated admin session', async () => {
+    await testDatabase.database
+      .update(parks)
+      .set({ removed: true })
+      .where(eq(parks.slug, 'akasmannyn-kansallispuisto'));
+
+    const app = createApp({ auth: authConfig, database: testDatabase.database });
+    const unauthorizedResponse = await app.request('/api/parks/akasmannyn-kansallispuisto');
+    const invalidCookieResponse = await app.request('/api/parks/akasmannyn-kansallispuisto', {
+      headers: {
+        cookie: `${authConfig.cookieName}=invalid-token`
+      }
+    });
+    const authorizedResponse = await app.request('/api/parks/akasmannyn-kansallispuisto', {
+      headers: {
+        cookie: await createAdminSessionCookie()
+      }
+    });
+    const authorizedBoundaryResponse = await app.request(
+      '/api/parks/akasmannyn-kansallispuisto?includeBoundary=true',
+      {
+        headers: {
+          cookie: await createAdminSessionCookie()
+        }
+      }
+    );
+    const authorizedBody = (await authorizedResponse.json()) as Record<string, unknown>;
+    const authorizedBoundaryBody = (await authorizedBoundaryResponse.json()) as Record<
+      string,
+      unknown
+    >;
+
+    expect(unauthorizedResponse.status).toBe(404);
+    expect(invalidCookieResponse.status).toBe(404);
+    expect(authorizedResponse.status).toBe(200);
+    expect(authorizedBoundaryResponse.status).toBe(200);
+    expect(authorizedResponse.headers.get('cache-control')).toBe('private, no-store');
+    expect(authorizedBody).toMatchObject({
+      name: 'Äkäsmännyn kansallispuisto',
+      slug: 'akasmannyn-kansallispuisto'
+    });
+    expect(authorizedBoundaryBody).toHaveProperty('boundaryGeoJson');
   });
 
   it('allows authenticated UI to disable and restore a park by slug', async () => {

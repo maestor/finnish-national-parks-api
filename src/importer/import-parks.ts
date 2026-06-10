@@ -4,6 +4,7 @@ import type { Database } from '../db/database.js';
 import {
   createImportRun,
   listExistingParksByLipasIds,
+  listParkRecordsIncludingRemoved,
   markMissingParksInactive,
   syncParkTypes,
   upsertImportedPark
@@ -181,8 +182,12 @@ export const importParks = async ({
   );
   const importedLipasIds = importedParks.map((park) => park.lipasId);
   const existingParks = await listExistingParksByLipasIds(database, importedLipasIds);
-  const existingSlugByLipasId = new Map(existingParks.map((park) => [park.lipasId, park.slug]));
-  const takenSlugs = new Set(existingParks.map((park) => park.slug));
+  const existingImportedSlugByLipasId = new Map(
+    existingParks.map((park) => [park.lipasId, park.importedSlug ?? park.slug])
+  );
+  const takenSlugs = new Set(
+    (await listParkRecordsIncludingRemoved(database)).map((park) => park.slug)
+  );
   const importedAt = now();
   const parksByLipasId = new Map(importedParks.map((park) => [park.lipasId, park]));
   const importableItems = activeItems.filter((item) =>
@@ -209,10 +214,11 @@ export const importParks = async ({
         await beforeEachUpsert(index, lipasId);
       }
 
-      const mapped = mapLipasPark(item, existingSlugByLipasId.get(lipasId));
+      const mapped = mapLipasPark(item, existingImportedSlugByLipasId.get(lipasId));
       const resolvedLuontoonUrl = resolveLuontoonUrl(mapped) ?? mapped.luontoonUrl;
       const slug =
-        existingSlugByLipasId.get(lipasId) ?? ensureUniqueSlug(mapped.slug, lipasId, takenSlugs);
+        existingImportedSlugByLipasId.get(lipasId) ??
+        ensureUniqueSlug(mapped.slug, lipasId, takenSlugs);
 
       await upsertImportedPark(tx, {
         areaKm2: mapped.areaKm2,

@@ -17,6 +17,7 @@ import {
   removedParkListResponseSchema,
   reorderVisitImagesRequestSchema,
   updateParkRemovedRequestSchema,
+  updateParkRequestSchema,
   updateVisitRequestSchema,
   visitImageSchema,
   visitListResponseSchema,
@@ -78,6 +79,67 @@ export const getParkRoute = createRoute({
     },
     404: {
       description: 'Park was not found',
+      content: {
+        'application/json': {
+          schema: errorSchema
+        }
+      }
+    }
+  }
+});
+
+export const updateParkRoute = createRoute({
+  method: 'patch',
+  path: '/api/parks/{slug}',
+  tags: ['Parks'],
+  security: [{ bearerAuth: [] }],
+  request: {
+    params: z.object({
+      slug: z.string()
+    }),
+    body: {
+      content: {
+        'application/json': {
+          schema: updateParkRequestSchema
+        }
+      }
+    }
+  },
+  responses: {
+    200: {
+      description: 'Updated park detail',
+      content: {
+        'application/json': {
+          schema: parkDetailSchema
+        }
+      }
+    },
+    401: {
+      description: 'Admin session required',
+      content: {
+        'application/json': {
+          schema: errorSchema
+        }
+      }
+    },
+    404: {
+      description: 'Park was not found',
+      content: {
+        'application/json': {
+          schema: errorSchema
+        }
+      }
+    },
+    409: {
+      description: 'Requested park slug is already in use',
+      content: {
+        'application/json': {
+          schema: errorSchema
+        }
+      }
+    },
+    422: {
+      description: 'Invalid park update payload',
       content: {
         'application/json': {
           schema: errorSchema
