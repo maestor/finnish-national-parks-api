@@ -1,7 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
 import { OpenAPIHono } from '@hono/zod-openapi';
-import type { Context } from 'hono';
 import { cors } from 'hono/cors';
 
 import type { Database } from './db/database.js';
@@ -114,6 +113,10 @@ type AppDependencies = {
   storage?: StorageClient | undefined;
 };
 
+// Keep direct `hono` imports out of this module. Vercel may otherwise mis-detect
+// `src/app.ts` as the deployment entrypoint instead of the dedicated `src/index.ts`.
+type SessionContext = Parameters<typeof getSessionCookie>[0];
+
 const MAX_VISIT_IMAGE_FILE_SIZE = 15 * 1024 * 1024;
 const ACCEPTED_VISIT_IMAGE_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 const DIRECT_VISIT_UPLOAD_URL_TTL_SECONDS = 15 * 60;
@@ -142,7 +145,7 @@ const normalizeOptionalOriginalName = (originalName?: string | null) => {
   return originalName?.trim() || null;
 };
 
-const getAuthenticatedSession = async (context: Context, auth?: AuthConfig) => {
+const getAuthenticatedSession = async (context: SessionContext, auth?: AuthConfig) => {
   if (!auth) {
     return null;
   }
