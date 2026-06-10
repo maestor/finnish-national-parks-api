@@ -91,6 +91,7 @@ The importer's LIPAS source URL and supported type-code list are internal config
 - `GET /api/parks/removed`
 - `GET /api/admin/parks/visibility`
 - `GET /api/parks/:slug`
+- `PATCH /api/parks/:slug`
 - `GET /api/public/home-summary`
 - `GET /api/public/map-summary`
 - `GET /api/parks/:slug/visits`
@@ -123,6 +124,7 @@ Catalog endpoints stay cache-friendly and database-backed:
 - `GET /api/parks?category=hiking-and-wilderness-areas` combines `hiking-area` and `wilderness-area` under the public category `Erämaa-/retkeilyalue` while preserving each park's source `type`.
 - `GET /api/parks?category=trails-and-routes` filters by a derived API category while park responses still preserve the original imported `type`.
 - `GET /api/parks/:slug?includeBoundary=true` includes stored boundary geometry.
+- `GET /api/parks/:slug` still returns `404` for removed parks publicly, but when a valid admin session cookie is present it also serves removed-park detail for control-panel workflows.
 - Park list, detail, removed, and public map responses include both the source `type` and a derived `category`.
 - Park list, detail, removed, and public map responses include `logo: { key, updatedAt, url } | null` when a logo has been linked to the park.
 - Park responses now expose `location` instead of `locationLabel`, combining `location_label` and `postal_office` when both exist, but collapsing to a single value when they are identical or only one exists.
@@ -135,6 +137,7 @@ Catalog endpoints stay cache-friendly and database-backed:
 - Public summary endpoints use `Cache-Control: public, max-age=0, s-maxage=3600, stale-while-revalidate=86400`.
 - Public summary versions bump when public visit data changes, including visit create/update/delete and visit image upload/delete/reorder.
 - Visit and management endpoints use `Cache-Control: private, no-store`.
+- `PATCH /api/parks/:slug` updates the admin-editable park fields (`name`, `slug`, `locationLabel`, `postalOffice`, `postalCode`, `areaKm2`, `establishmentYear`, `luontoonUrl`, `displayTypeName`) and auto-generates a slug from `name` when `slug` is omitted.
 - `PATCH /api/parks/:slug/removed` lets the UI hide or restore a park by toggling its persisted `removed` flag.
 - Deployed clients should use the two-step direct upload flow: `POST /api/visits/:id/images/upload-url`, upload the file to R2 with the returned `PUT` URL, then call `POST /api/visits/:id/images/complete`.
 - `POST /api/visits/:id/images` remains available for localhost-style server uploads, but Vercel runtime disables that Sharp-based path so uploads do not pass through the function body limit.
@@ -171,6 +174,7 @@ Importer expectations:
 - Refresh `luontoonUrl` from Luontoon's official Finnish sitemap when a matching destination exists, instead of trusting LIPAS `www` blindly.
 - Preserve personal notes and visit history across imports.
 - Preserve manual park removals across imports and exclude removed rows from API responses.
+- Preserve manual edits to the editable park fields across imports by storing the latest imported baseline separately from the current admin-managed values.
 - Allow manually imported catalog rows, such as Merenkurkun maailmanperintöalue, to stay active outside the normal LIPAS cleanup path.
 - Read from the local/libSQL database during normal API requests instead of calling LIPAS live.
 
