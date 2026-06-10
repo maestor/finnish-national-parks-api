@@ -22,6 +22,7 @@ Use API integration tests for:
 - persistence behavior
 - visit workflows
 - importer plus database behavior when realistic enough
+- deployment-entry contracts that cannot be reproduced reliably through localhost alone, such as Vercel's Hono auto-detection behavior
 
 Use focused unit tests for:
 
@@ -62,6 +63,7 @@ Use mutation testing for:
 - `GET /api/parks/:slug` returns catalog detail without visit state.
 - `GET /api/parks/:slug` also returns removed-park detail when the request carries a valid admin session cookie.
 - `PATCH /api/parks/:slug` updates the editable admin-managed park fields and auto-generates a slug when only `name` changes.
+- `tests/integration/vercel-entry.integration.test.ts` protects the Vercel entrypoint contract by ensuring `src/index.ts` remains the recognized Hono entry file and `src/app.ts` does not import directly from `hono`.
 - Park catalog responses expose both the source `type` and a derived `category`.
 - Park catalog responses expose linked logo metadata and stable logo URLs when a park logo has been configured.
 - Park responses expose `location` instead of `locationLabel`, combining address and postal office when both exist, but collapsing to one value when they are identical or only one exists.
@@ -112,6 +114,7 @@ For implementation tasks, start with the cheapest check that can fail for the ri
 5. Scoped mutation run for meaningful backend logic.
 
 Do not claim behavior is verified unless the check actually exercised it.
+When a production platform behavior cannot be reproduced locally, add the smallest regression test that proves the repo-side contract the platform depends on, and document that contract near the affected runtime files.
 
 ## CI
 

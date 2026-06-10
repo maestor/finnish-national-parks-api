@@ -12,6 +12,12 @@ describe('Vercel entrypoint', () => {
     expect(source).toMatch(/from ['"]hono['"]/);
   });
 
+  it('keeps the app factory free of direct hono imports so Vercel does not mis-detect it', async () => {
+    const source = await readFile(resolve(process.cwd(), 'src/app.ts'), 'utf8');
+
+    expect(source).not.toMatch(/from ['"]hono['"]/);
+  });
+
   it('exports a Hono app that can serve requests directly', async () => {
     const response = await app.request('/health');
 

@@ -23,6 +23,7 @@ The API imports selected park and outdoor-area data from the open LIPAS API into
 - Production database target: Turso.
 - Deployment target: Vercel Functions.
 - Vercel entrypoint: `src/index.ts` with a direct `hono` import for Vercel auto-detection.
+- Keep direct `hono` imports out of non-entry modules such as `src/app.ts`, because Vercel can mis-detect those files as the deployment entrypoint and crash boot with an invalid default export.
 - Local long-running server entrypoint: `src/local-server.ts`.
 
 ## Setup
