@@ -34,7 +34,7 @@ describe('manual catalog imports', () => {
       now: () => '2026-05-27T08:00:00.000Z'
     });
 
-    expect(result.results).toHaveLength(74);
+    expect(result.results).toHaveLength(77);
 
     const merenkurkku = await getParkBySlug(
       testDatabase.database,
@@ -202,6 +202,20 @@ describe('manual catalog imports', () => {
       type: { slug: 'outdoor-recreation-area' }
     });
 
+    const korouoma = await getParkBySlug(testDatabase.database, 'korouoma');
+    expect(korouoma).toMatchObject({
+      lipasId: 9001037,
+      name: 'Korouoma',
+      type: { slug: 'nature-reserve-area' }
+    });
+
+    const lapakisto = await getParkBySlug(testDatabase.database, 'lapakisto');
+    expect(lapakisto).toMatchObject({
+      lipasId: 9001038,
+      name: 'Lapakisto',
+      type: { slug: 'nature-reserve-area' }
+    });
+
     const harola = await getParkBySlug(testDatabase.database, 'harola');
     expect(harola).toMatchObject({
       lipasId: 9001030,
@@ -214,6 +228,14 @@ describe('manual catalog imports', () => {
       displayTypeName: 'Historia-alue',
       lipasId: 9001031,
       name: 'Kajaanin linna',
+      type: { slug: 'outdoor-recreation-area' }
+    });
+
+    const kuusistonLinna = await getParkBySlug(testDatabase.database, 'kuusiston-linna');
+    expect(kuusistonLinna).toMatchObject({
+      displayTypeName: 'Historia-alue',
+      lipasId: 9001039,
+      name: 'Kuusiston linna',
       type: { slug: 'outdoor-recreation-area' }
     });
 
@@ -278,7 +300,7 @@ describe('manual catalog imports', () => {
     );
     const kevo = await getParkBySlug(testDatabase.database, 'kevon-luonnonpuisto');
 
-    expect(allParks).toHaveLength(74);
+    expect(allParks).toHaveLength(77);
     expect(merenkurkku).toMatchObject({ catalogStatus: 'active' });
     expect(kevo).toMatchObject({ catalogStatus: 'active' });
   });
@@ -329,7 +351,7 @@ describe('manual catalog imports', () => {
       database: testDatabase.database
     });
 
-    expect(result.results).toHaveLength(74);
+    expect(result.results).toHaveLength(77);
 
     const merenkurkku = await getParkBySlug(
       testDatabase.database,
