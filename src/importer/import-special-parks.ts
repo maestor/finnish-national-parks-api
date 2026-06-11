@@ -791,13 +791,22 @@ const sourceReadyDestinationAreaSeeds: SykeSpecialParkSeed[] = [
     syntheticLipasId: 9_001_028
   },
   {
-    displayTypeName: null,
+    displayTypeName: 'Luonnonpuisto',
     luontoonUrl: 'https://www.luontoon.fi/fi/kohteet/olvassuo',
-    name: 'Olvassuo',
-    parkTypeSlug: 'outdoor-recreation-area',
-    slug: 'olvassuo',
+    name: 'Olvassuon luonnonpuisto',
+    parkTypeSlug: 'nature-reserve-area',
+    slug: 'olvassuon-luonnonpuisto',
     sourceName: 'Olvassuon luonnonpuisto',
     syntheticLipasId: 9_001_029
+  },
+  {
+    displayTypeName: 'Luonnonpuisto',
+    luontoonUrl: 'https://www.luontoon.fi/fi/reitit/tapion-taival-reitti-ilomantsi-47985',
+    name: 'Koivusuon luonnonpuisto',
+    parkTypeSlug: 'nature-reserve-area',
+    slug: 'koivusuon-luonnonpuisto',
+    sourceName: 'Koivusuon luonnonpuisto',
+    syntheticLipasId: 9_001_040
   },
   {
     displayTypeName: null,
