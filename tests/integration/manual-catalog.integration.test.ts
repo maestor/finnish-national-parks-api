@@ -34,7 +34,7 @@ describe('manual catalog imports', () => {
       now: () => '2026-05-27T08:00:00.000Z'
     });
 
-    expect(result.results).toHaveLength(77);
+    expect(result.results).toHaveLength(78);
 
     const merenkurkku = await getParkBySlug(
       testDatabase.database,
@@ -204,11 +204,12 @@ describe('manual catalog imports', () => {
       type: { slug: 'nature-reserve-area' }
     });
 
-    const olvassuo = await getParkBySlug(testDatabase.database, 'olvassuo');
+    const olvassuo = await getParkBySlug(testDatabase.database, 'olvassuon-luonnonpuisto');
     expect(olvassuo).toMatchObject({
+      displayTypeName: 'Luonnonpuisto',
       lipasId: 9001029,
-      name: 'Olvassuo',
-      type: { slug: 'outdoor-recreation-area' }
+      name: 'Olvassuon luonnonpuisto',
+      type: { slug: 'nature-reserve-area' }
     });
 
     const korouoma = await getParkBySlug(testDatabase.database, 'korouoma');
@@ -222,6 +223,15 @@ describe('manual catalog imports', () => {
     expect(lapakisto).toMatchObject({
       lipasId: 9001038,
       name: 'Lapakisto',
+      type: { slug: 'nature-reserve-area' }
+    });
+
+    const koivusuo = await getParkBySlug(testDatabase.database, 'koivusuon-luonnonpuisto');
+    expect(koivusuo).toMatchObject({
+      displayTypeName: 'Luonnonpuisto',
+      lipasId: 9001040,
+      luontoonUrl: 'https://www.luontoon.fi/fi/reitit/tapion-taival-reitti-ilomantsi-47985',
+      name: 'Koivusuon luonnonpuisto',
       type: { slug: 'nature-reserve-area' }
     });
 
@@ -318,7 +328,7 @@ describe('manual catalog imports', () => {
     );
     const kevo = await getParkBySlug(testDatabase.database, 'kevon-luonnonpuisto');
 
-    expect(allParks).toHaveLength(77);
+    expect(allParks).toHaveLength(78);
     expect(merenkurkku).toMatchObject({ catalogStatus: 'active' });
     expect(kevo).toMatchObject({ catalogStatus: 'active' });
   });
@@ -369,7 +379,7 @@ describe('manual catalog imports', () => {
       database: testDatabase.database
     });
 
-    expect(result.results).toHaveLength(77);
+    expect(result.results).toHaveLength(78);
 
     const merenkurkku = await getParkBySlug(
       testDatabase.database,

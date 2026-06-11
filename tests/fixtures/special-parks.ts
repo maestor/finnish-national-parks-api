@@ -116,7 +116,8 @@ const generatedSykeSources: GeneratedSykeSource[] = [
     sourceName: 'Dagmarin puisto',
     sourceType: 'private'
   },
-  { name: 'Olvassuo', sourceName: 'Olvassuon luonnonpuisto' },
+  { name: 'Olvassuon luonnonpuisto', sourceName: 'Olvassuon luonnonpuisto' },
+  { name: 'Koivusuon luonnonpuisto', sourceName: 'Koivusuon luonnonpuisto' },
   { name: 'Korouoma', sourceName: 'Korouoman lehtojensuojelualue' }
 ];
 
