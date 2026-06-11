@@ -222,7 +222,7 @@ Key route behavior:
 - `GET /api/parks/:slug` still hides removed parks publicly, but returns removed-park detail to a request carrying a valid admin session cookie when OAuth is enabled.
 - Park list, detail, removed, and public map responses expose both the source `type` and a derived `category`.
 - Park list, detail, removed, and public map responses expose `logo: { key, updatedAt, url } | null` when one has been linked to the park.
-- Park responses expose `location` instead of `locationLabel`, combining `location_label` and `postal_office` when both exist, but collapsing to one value when they are identical or only one exists.
+- Park responses expose raw `locationLabel`, `postalCode`, and `postalOffice` fields from the database, plus a derived `address` string for display use.
 - `GET /api/public/home-summary` returns public home-page summary data including seasonal visit counts, `progressByType` with a `visible` flag, and `progressByCategory`, without visit notes, routes, or images.
 - `GET /api/public/map-summary` returns lightweight park map data plus per-park visited summaries.
 - `GET /api/parks/:slug/visits` returns visit history plus a visited summary for one visible park.

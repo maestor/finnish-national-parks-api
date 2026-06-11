@@ -128,7 +128,7 @@ Catalog endpoints stay cache-friendly and database-backed:
 - `GET /api/parks/:slug` still returns `404` for removed parks publicly, but when a valid admin session cookie is present it also serves removed-park detail for control-panel workflows.
 - Park list, detail, removed, and public map responses include both the source `type` and a derived `category`.
 - Park list, detail, removed, and public map responses include `logo: { key, updatedAt, url } | null` when a logo has been linked to the park.
-- Park responses now expose `location` instead of `locationLabel`, combining `location_label` and `postal_office` when both exist, but collapsing to a single value when they are identical or only one exists.
+- Park responses expose raw `locationLabel`, `postalCode`, and `postalOffice` fields from the database, plus a derived `address` string for display use.
 - `GET /api/public/home-summary` returns public visit totals, seasonal visit counts, type progress with a `visible` flag, category progress, recent activity, and a public data `version` / `updatedAt` signal without notes, routes, or images.
 - `GET /api/public/map-summary` returns lightweight park map data plus per-park visited summaries and the same public data version signal.
 - `GET /api/parks/:slug/visits` returns visit history plus a visited summary for one park.

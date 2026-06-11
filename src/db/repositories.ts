@@ -288,7 +288,7 @@ const withOptionalDisplayTypeName = <T extends object>(
   };
 };
 
-const toLocation = (
+const toAddress = (
   locationLabel: string,
   postalCode: string | null,
   postalOffice: string | null
@@ -316,12 +316,23 @@ const toLocation = (
   return `${normalizedLocationLabel}, ${postalLocation}`;
 };
 
+const toRawLocationFields = (
+  locationLabel: string,
+  postalCode: string | null,
+  postalOffice: string | null
+) => ({
+  locationLabel,
+  postalCode,
+  postalOffice
+});
+
 const toPark = async (
   row: TypedParkRow,
   getLogoPublicUrl?: GetLogoPublicUrl,
   getMapPublicUrl?: GetMapPublicUrl
 ) => {
   return withOptionalDisplayTypeName(row.park, {
+    address: toAddress(row.park.locationLabel, row.park.postalCode, row.park.postalOffice),
     areaKm2: row.park.areaKm2,
     boundingBox: toBoundingBox(row.park),
     boundaryGeoJson: JSON.parse(row.park.boundaryGeojson) as GeoJsonFeatureCollection,
@@ -329,14 +340,13 @@ const toPark = async (
     catalogStatus: row.park.catalogStatus as 'active' | 'inactive',
     establishmentYear: row.park.establishmentYear,
     lipasId: row.park.lipasId,
-    location: toLocation(row.park.locationLabel, row.park.postalCode, row.park.postalOffice),
     logo: await toLogo(row.park.logoKey, row.park.logoUpdatedAt, getLogoPublicUrl),
     luontoonUrl: row.park.luontoonUrl,
     map: await toMap(row.park.mapKey, row.park.mapUpdatedAt, getMapPublicUrl),
     markerPoint: toMarkerPoint(row.park),
     municipalityCode: row.park.municipalityCode,
     name: row.park.name,
-    postalOffice: row.park.postalOffice,
+    ...toRawLocationFields(row.park.locationLabel, row.park.postalCode, row.park.postalOffice),
     slug: row.park.slug,
     sourceEventDate: row.park.sourceEventDate,
     type: toParkType(row.parkType),
@@ -350,6 +360,7 @@ const toPublicPark = async (
   getMapPublicUrl?: GetMapPublicUrl
 ) => {
   return withOptionalDisplayTypeName(row, {
+    address: toAddress(row.locationLabel, row.postalCode, row.postalOffice),
     areaKm2: row.areaKm2,
     boundingBox: {
       maxLat: row.bboxMaxLat,
@@ -359,7 +370,6 @@ const toPublicPark = async (
     },
     category: toParkCategory(row.typeSlug as SupportedParkTypeSlug),
     establishmentYear: row.establishmentYear,
-    location: toLocation(row.locationLabel, row.postalCode, row.postalOffice),
     logo: await toLogo(row.logoKey, row.logoUpdatedAt, getLogoPublicUrl),
     luontoonUrl: row.luontoonUrl,
     map: await toMap(row.mapKey, row.mapUpdatedAt, getMapPublicUrl),
@@ -368,6 +378,7 @@ const toPublicPark = async (
       lon: row.markerLon
     },
     name: row.name,
+    ...toRawLocationFields(row.locationLabel, row.postalCode, row.postalOffice),
     slug: row.slug,
     type: {
       code: row.typeCode,
@@ -380,7 +391,8 @@ const toPublicPark = async (
 
 const toSearchPark = (row: LightweightParkRow) => {
   return withOptionalDisplayTypeName(row, {
-    location: toLocation(row.locationLabel, row.postalCode, row.postalOffice),
+    address: toAddress(row.locationLabel, row.postalCode, row.postalOffice),
+    ...toRawLocationFields(row.locationLabel, row.postalCode, row.postalOffice),
     name: row.name,
     slug: row.slug,
     type: {
@@ -852,16 +864,17 @@ export const listRemovedParks = async (
   return Promise.all(
     rows.map(async (row) =>
       withOptionalDisplayTypeName(row.park, {
+        address: toAddress(row.park.locationLabel, row.park.postalCode, row.park.postalOffice),
         areaKm2: row.park.areaKm2,
         boundingBox: toBoundingBox(row.park),
         catalogStatus: row.park.catalogStatus as 'active' | 'inactive',
         establishmentYear: row.park.establishmentYear,
-        location: toLocation(row.park.locationLabel, row.park.postalCode, row.park.postalOffice),
         logo: await toLogo(row.park.logoKey, row.park.logoUpdatedAt, getLogoPublicUrl),
         luontoonUrl: row.park.luontoonUrl,
         map: await toMap(row.park.mapKey, row.park.mapUpdatedAt, getMapPublicUrl),
         markerPoint: toMarkerPoint(row.park),
         name: row.park.name,
+        ...toRawLocationFields(row.park.locationLabel, row.park.postalCode, row.park.postalOffice),
         removed: true as const,
         slug: row.park.slug,
         category: toParkCategory(row.parkType.slug as SupportedParkTypeSlug),

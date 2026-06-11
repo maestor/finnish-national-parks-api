@@ -66,7 +66,7 @@ Use mutation testing for:
 - `tests/integration/vercel-entry.integration.test.ts` protects the Vercel entrypoint contract by ensuring `src/index.ts` remains the recognized Hono entry file and `src/app.ts` does not import directly from `hono`.
 - Park catalog responses expose both the source `type` and a derived `category`.
 - Park catalog responses expose linked logo metadata and stable logo URLs when a park logo has been configured.
-- Park responses expose `location` instead of `locationLabel`, combining address and postal office when both exist, but collapsing to one value when they are identical or only one exists.
+- Park responses expose raw `locationLabel`, `postalCode`, and `postalOffice` fields from the database, plus a derived `address` string for display use.
 - `GET /api/public/home-summary` returns cache-friendly public summary data including seasonal visit counts, `progressByType` visibility flags, and aggregated `progressByCategory`, without notes, routes, or images.
 - `GET /api/public/map-summary` returns lightweight map data plus per-park visited summaries.
 - `GET /api/parks/:slug/visits` returns park-scoped visit history and visited summary.
