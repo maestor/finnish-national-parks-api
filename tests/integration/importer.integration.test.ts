@@ -173,12 +173,15 @@ describe('importParks', () => {
     });
 
     await expect(getParkBySlug(testDatabase.database, 'oma-puistonimi')).resolves.toMatchObject({
+      address: 'Oma osoite 7, 99870 Inari',
       areaKm2: 99.9,
       displayTypeName: 'Oma kohdelaji',
       establishmentYear: 2001,
-      location: 'Oma osoite 7, 99870 Inari',
+      locationLabel: 'Oma osoite 7',
       luontoonUrl: null,
       name: 'Oma puistonimi',
+      postalCode: '99870',
+      postalOffice: 'Inari',
       slug: 'oma-puistonimi'
     });
   });

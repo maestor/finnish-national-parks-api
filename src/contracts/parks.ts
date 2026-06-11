@@ -61,25 +61,31 @@ export const geoJsonFeatureCollectionSchema = z.object({
 });
 
 export const parkListItemSchema = z.object({
+  address: z.string(),
   areaKm2: z.number().nullable(),
   boundingBox: boundingBoxSchema,
   category: parkCategorySchema,
   displayTypeName: z.string().nullable().optional(),
   establishmentYear: z.number().int().nullable(),
-  location: z.string(),
+  locationLabel: z.string(),
   logo: parkLogoSchema.nullable(),
   luontoonUrl: z.string().nullable(),
   map: parkMapSchema.nullable(),
   markerPoint: pointSchema,
   name: z.string(),
+  postalCode: z.string().nullable(),
+  postalOffice: z.string().nullable(),
   slug: z.string(),
   type: parkTypeSchema
 });
 
 export const parkSearchItemSchema = z.object({
+  address: z.string(),
   displayTypeName: z.string().nullable().optional(),
-  location: z.string(),
+  locationLabel: z.string(),
   name: z.string(),
+  postalCode: z.string().nullable(),
+  postalOffice: z.string().nullable(),
   slug: z.string(),
   type: parkTypeSchema
 });
@@ -94,7 +100,6 @@ export const parkDetailSchema = parkListItemSchema.extend({
   catalogStatus: z.enum(['active', 'inactive']),
   lipasId: z.number().int(),
   municipalityCode: z.number().int().nullable(),
-  postalOffice: z.string().nullable(),
   sourceEventDate: z.string().datetime().nullable(),
   updatedAt: z.string()
 });

@@ -57,28 +57,37 @@ describe('manual catalog imports', () => {
 
     const sammallahdenmaki = await getParkBySlug(testDatabase.database, 'sammallahdenmaki');
     expect(sammallahdenmaki).toMatchObject({
+      address: 'Sammallahdentie, 27230 Rauma',
       displayTypeName: 'Maailmanperintökohde',
       lipasId: 9000899,
-      location: 'Sammallahdentie, 27230 Rauma',
+      locationLabel: 'Sammallahdentie',
       name: 'Sammallahdenmäki',
+      postalCode: '27230',
+      postalOffice: 'Rauma',
       type: { slug: 'outdoor-recreation-area' }
     });
 
     const suomenlinna = await getParkBySlug(testDatabase.database, 'suomenlinna');
     expect(suomenlinna).toMatchObject({
+      address: 'Suomenlinna, 00190 Helsinki',
       displayTypeName: 'Maailmanperintökohde',
       lipasId: 9000900,
-      location: 'Suomenlinna, 00190 Helsinki',
+      locationLabel: 'Suomenlinna',
       name: 'Suomenlinna',
+      postalCode: '00190',
+      postalOffice: 'Helsinki',
       type: { slug: 'outdoor-recreation-area' }
     });
 
     const vanhaRauma = await getParkBySlug(testDatabase.database, 'vanha-rauma');
     expect(vanhaRauma).toMatchObject({
+      address: 'Vanha Rauma, 26100 Rauma',
       displayTypeName: 'Maailmanperintökohde',
       lipasId: 9000901,
-      location: 'Vanha Rauma, 26100 Rauma',
+      locationLabel: 'Vanha Rauma',
       name: 'Vanha Rauma',
+      postalCode: '26100',
+      postalOffice: 'Rauma',
       type: { slug: 'outdoor-recreation-area' }
     });
 
@@ -241,18 +250,24 @@ describe('manual catalog imports', () => {
 
     const fiskars = await getParkBySlug(testDatabase.database, 'fiskarsin-ruukki');
     expect(fiskars).toMatchObject({
+      address: 'Fiskarsintie 9, 10470 Fiskars',
       lipasId: 9002003,
-      location: 'Fiskarsintie 9, 10470 Fiskars',
+      locationLabel: 'Fiskarsintie 9',
       name: 'Fiskarsin ruukki',
+      postalCode: '10470',
+      postalOffice: 'Fiskars',
       type: { slug: 'factory-village' }
     });
 
     const verla = await getParkBySlug(testDatabase.database, 'verla');
     expect(verla).toMatchObject({
+      address: 'Verlantie 295, 47850 Verla',
       displayTypeName: 'Maailmanperintökohde',
       lipasId: 9002023,
-      location: 'Verlantie 295, 47850 Verla',
+      locationLabel: 'Verlantie 295',
       name: 'Verla',
+      postalCode: '47850',
+      postalOffice: 'Verla',
       type: { slug: 'factory-village' }
     });
 
@@ -265,9 +280,12 @@ describe('manual catalog imports', () => {
 
     const nuutajarvi = await getParkBySlug(testDatabase.database, 'nuutajarven-lasikyla');
     expect(nuutajarvi).toMatchObject({
+      address: 'Pruukinraitti 15, 31160 Urjala',
       lipasId: 9002025,
-      location: 'Pruukinraitti 15, 31160 Urjala',
+      locationLabel: 'Pruukinraitti 15',
       name: 'Nuutajärven lasikylä',
+      postalCode: '31160',
+      postalOffice: 'Urjala',
       type: { slug: 'factory-village' }
     });
   });

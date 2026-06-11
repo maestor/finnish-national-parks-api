@@ -422,7 +422,6 @@ export const createApp = ({
               catalogStatus: _catalogStatus,
               lipasId: _lipasId,
               municipalityCode: _municipalityCode,
-              postalOffice: _postalOffice,
               sourceEventDate: _sourceEventDate,
               updatedAt: _updatedAt,
               ...park

@@ -134,10 +134,13 @@ describe('API routes', () => {
     expect(response.headers.get('etag')).toBeTruthy();
     expect(body.parks).toHaveLength(4);
     expect(body.parks[0]).not.toHaveProperty('boundaryGeoJson');
-    expect(body.parks[0]).not.toHaveProperty('locationLabel');
+    expect(body.parks[0]).not.toHaveProperty('location');
     expect(body.parks[0]).toHaveProperty('category');
     expect(body.parks[0]).toHaveProperty('type');
-    expect(body.parks[0]).toHaveProperty('location');
+    expect(body.parks[0]).toHaveProperty('address');
+    expect(body.parks[0]).toHaveProperty('locationLabel');
+    expect(body.parks[0]).toHaveProperty('postalCode');
+    expect(body.parks[0]).toHaveProperty('postalOffice');
   });
 
   it('serves lightweight park search results with cache validators', async () => {
@@ -154,7 +157,10 @@ describe('API routes', () => {
     expect(firstBody.parks).toHaveLength(4);
     expect(firstBody.parks[0]).toHaveProperty('slug');
     expect(firstBody.parks[0]).toHaveProperty('name');
-    expect(firstBody.parks[0]).toHaveProperty('location');
+    expect(firstBody.parks[0]).toHaveProperty('address');
+    expect(firstBody.parks[0]).toHaveProperty('locationLabel');
+    expect(firstBody.parks[0]).toHaveProperty('postalCode');
+    expect(firstBody.parks[0]).toHaveProperty('postalOffice');
     expect(firstBody.parks[0]).toHaveProperty('type');
     expect(firstBody.parks[0]).not.toHaveProperty('areaKm2');
     expect(firstBody.parks[0]).not.toHaveProperty('boundingBox');
@@ -295,8 +301,11 @@ describe('API routes', () => {
     expect(listResponse.status).toBe(200);
     expect(detailResponse.status).toBe(200);
     expect(merenkurkku).toMatchObject({
+      address: 'Raippaluodontie 2, 65800 Raippaluoto',
       displayTypeName: 'Maailmanperintökohde',
-      location: 'Raippaluodontie 2, 65800 Raippaluoto',
+      locationLabel: 'Raippaluodontie 2',
+      postalCode: '65800',
+      postalOffice: 'Raippaluoto',
       slug: 'merenkurkun-maailmanperintoalue',
       type: {
         slug: 'nature-reserve-area'
@@ -539,8 +548,11 @@ describe('API routes', () => {
 
     expect(summaryResponse.status).toBe(200);
     expect(summaryBody).not.toHaveProperty('boundaryGeoJson');
-    expect(summaryBody).not.toHaveProperty('locationLabel');
-    expect(summaryBody).toHaveProperty('location', 'Puistotie 1, 00999 Testikylä');
+    expect(summaryBody).not.toHaveProperty('location');
+    expect(summaryBody).toHaveProperty('address', 'Puistotie 1, 00999 Testikylä');
+    expect(summaryBody).toHaveProperty('locationLabel', 'Puistotie 1');
+    expect(summaryBody).toHaveProperty('postalCode', '00999');
+    expect(summaryBody).toHaveProperty('postalOffice', 'Testikylä');
     expect(response.status).toBe(200);
     expect(body).toHaveProperty('boundaryGeoJson');
     expect(body).not.toHaveProperty('note');
@@ -552,6 +564,35 @@ describe('API routes', () => {
       }
     });
     expect(cachedResponse.status).toBe(304);
+  });
+
+  it('returns raw and derived location fields consistently in park detail', async () => {
+    const app = createApp({ auth: authConfig, database: testDatabase.database });
+    const publicResponse = await app.request('/api/parks/akasmannyn-kansallispuisto');
+    const publicBody = (await publicResponse.json()) as Record<string, unknown>;
+    const adminResponse = await app.request('/api/parks/akasmannyn-kansallispuisto', {
+      headers: {
+        cookie: await createAdminSessionCookie()
+      }
+    });
+    const adminBody = (await adminResponse.json()) as Record<string, unknown>;
+
+    expect(publicResponse.status).toBe(200);
+    expect(publicBody).not.toHaveProperty('location');
+    expect(adminResponse.status).toBe(200);
+    expect(adminResponse.headers.get('cache-control')).toContain('public');
+    expect(publicBody).toMatchObject({
+      address: 'Puistotie 1, 00999 Testikylä',
+      locationLabel: 'Puistotie 1',
+      postalCode: '00999',
+      postalOffice: 'Testikylä'
+    });
+    expect(adminBody).toMatchObject({
+      address: 'Puistotie 1, 00999 Testikylä',
+      locationLabel: 'Puistotie 1',
+      postalCode: '00999',
+      postalOffice: 'Testikylä'
+    });
   });
 
   it('allows admin park edits and auto-generates a slug when the name changes', async () => {
@@ -576,28 +617,46 @@ describe('API routes', () => {
       }
     });
     const body = (await response.json()) as Record<string, unknown>;
+    const adminDetailResponse = await app.request('/api/parks/korjattu-puisto', {
+      headers: {
+        cookie: sessionCookie
+      }
+    });
+    const adminDetailBody = (await adminDetailResponse.json()) as Record<string, unknown>;
     const updatedPark = await getParkBySlug(testDatabase.database, 'korjattu-puisto');
     const oldSlugResponse = await app.request('/api/parks/akasmannyn-kansallispuisto');
 
     expect(response.status).toBe(200);
     expect(response.headers.get('cache-control')).toBe('private, no-store');
     expect(body).toMatchObject({
+      address: 'Korjattu puistotie 9, 99130 Kittilä',
       areaKm2: 14.75,
       displayTypeName: 'Ystävyyden puisto',
       establishmentYear: 1990,
-      location: 'Korjattu puistotie 9, 99130 Kittilä',
+      locationLabel: 'Korjattu puistotie 9',
       luontoonUrl: 'https://www.luontoon.fi/fi/kohteet/korjattu-puisto',
       name: 'Korjattu puisto',
+      postalCode: '99130',
       postalOffice: 'Kittilä',
       slug: 'korjattu-puisto'
     });
+    expect(adminDetailResponse.status).toBe(200);
+    expect(adminDetailResponse.headers.get('cache-control')).toContain('public');
+    expect(adminDetailBody).toMatchObject({
+      address: 'Korjattu puistotie 9, 99130 Kittilä',
+      locationLabel: 'Korjattu puistotie 9',
+      postalCode: '99130',
+      postalOffice: 'Kittilä'
+    });
     expect(updatedPark).toMatchObject({
+      address: 'Korjattu puistotie 9, 99130 Kittilä',
       areaKm2: 14.75,
       displayTypeName: 'Ystävyyden puisto',
       establishmentYear: 1990,
-      location: 'Korjattu puistotie 9, 99130 Kittilä',
+      locationLabel: 'Korjattu puistotie 9',
       luontoonUrl: 'https://www.luontoon.fi/fi/kohteet/korjattu-puisto',
       name: 'Korjattu puisto',
+      postalCode: '99130',
       postalOffice: 'Kittilä',
       slug: 'korjattu-puisto'
     });
@@ -818,7 +877,7 @@ describe('API routes', () => {
     expect(detailBody.boundaryGeoJson.features[0]?.geometry.type).toBe('LineString');
   });
 
-  it('normalizes API location values when postal fields duplicate or replace the address', async () => {
+  it('normalizes API address values when postal fields duplicate or replace the address', async () => {
     const app = createApp({ database: testDatabase.database });
 
     await testDatabase.database
@@ -829,7 +888,7 @@ describe('API routes', () => {
     const duplicatedResponse = await app.request('/api/parks/akasmannyn-kansallispuisto');
     const duplicatedBody = (await duplicatedResponse.json()) as Record<string, unknown>;
 
-    expect(duplicatedBody).toHaveProperty('location', 'Puistotie 1, 00999');
+    expect(duplicatedBody).toHaveProperty('address', 'Puistotie 1, 00999');
 
     await testDatabase.database
       .update(parks)
@@ -839,7 +898,7 @@ describe('API routes', () => {
     const postalOnlyResponse = await app.request('/api/parks/akasmannyn-kansallispuisto');
     const postalOnlyBody = (await postalOnlyResponse.json()) as Record<string, unknown>;
 
-    expect(postalOnlyBody).toHaveProperty('location', '00999 Testikylä');
+    expect(postalOnlyBody).toHaveProperty('address', '00999 Testikylä');
   });
 
   it('explicitly omits boundary geometry when includeBoundary=false', async () => {
@@ -1220,8 +1279,11 @@ describe('API routes', () => {
       visitCount: 1,
       visited: true
     });
-    expect(akasmanty).toHaveProperty('location', 'Puistotie 1, 00999 Testikylä');
-    expect(akasmanty).not.toHaveProperty('locationLabel');
+    expect(akasmanty).toHaveProperty('address', 'Puistotie 1, 00999 Testikylä');
+    expect(akasmanty).toHaveProperty('locationLabel', 'Puistotie 1');
+    expect(akasmanty).toHaveProperty('postalCode', '00999');
+    expect(akasmanty).toHaveProperty('postalOffice', 'Testikylä');
+    expect(akasmanty).not.toHaveProperty('location');
     expect(akasmanty).not.toHaveProperty('boundaryGeoJson');
     expect(akasmanty).not.toHaveProperty('visits');
     expect(akasmanty).not.toHaveProperty('note');
@@ -1647,14 +1709,17 @@ describe('API routes', () => {
     expect(response.headers.get('cache-control')).toBe('private, no-store');
     expect(body.parks).toEqual([
       expect.objectContaining({
+        address: 'Puistotie 1, 00999 Testikylä',
         catalogStatus: 'active',
-        location: 'Puistotie 1, 00999 Testikylä',
+        locationLabel: 'Puistotie 1',
         name: 'Äkäsmännyn kansallispuisto',
+        postalCode: '00999',
+        postalOffice: 'Testikylä',
         removed: true,
         slug: 'akasmannyn-kansallispuisto'
       })
     ]);
-    expect(body.parks[0]).not.toHaveProperty('locationLabel');
+    expect(body.parks[0]).not.toHaveProperty('location');
   });
 
   it('serves lightweight admin park visibility data for visible and removed parks', async () => {
@@ -1681,18 +1746,21 @@ describe('API routes', () => {
     expect(body.visibleParks).toHaveLength(3);
     expect(body.removedParks).toEqual([
       expect.objectContaining({
+        address: 'Puistotie 1, 00999 Testikylä',
         boundingBox: {
           maxLat: 65,
           maxLon: 31,
           minLat: 60,
           minLon: 24
         },
-        location: 'Puistotie 1, 00999 Testikylä',
+        locationLabel: 'Puistotie 1',
         markerPoint: {
           lat: 62.5,
           lon: 27.5
         },
         name: 'Äkäsmännyn kansallispuisto',
+        postalCode: '00999',
+        postalOffice: 'Testikylä',
         slug: 'akasmannyn-kansallispuisto'
       })
     ]);

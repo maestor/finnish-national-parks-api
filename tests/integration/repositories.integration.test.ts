@@ -110,11 +110,13 @@ describe('repositories', () => {
     });
 
     expect(updated).toMatchObject({
+      address: 'Oma osoite 4, Muonio',
       areaKm2: null,
       establishmentYear: 1999,
-      location: 'Oma osoite 4, Muonio',
+      locationLabel: 'Oma osoite 4',
       luontoonUrl: 'https://www.luontoon.fi/oma-kohde',
       name: 'Oma kohde',
+      postalCode: null,
       postalOffice: 'Muonio',
       slug: 'oma-kohde'
     });
@@ -176,11 +178,14 @@ describe('repositories', () => {
     });
 
     expect(updated).toMatchObject({
+      address: 'Puistotie 1, 00999 Testikylä',
       areaKm2: 12.5,
       establishmentYear: 1982,
-      location: 'Puistotie 1, 00999 Testikylä',
+      locationLabel: 'Puistotie 1',
       luontoonUrl: null,
       name: 'Päivitetty puisto',
+      postalCode: '00999',
+      postalOffice: 'Testikylä',
       slug: 'paivitetty-puisto'
     });
     expect(updated).not.toHaveProperty('displayTypeName');
@@ -207,7 +212,7 @@ describe('repositories', () => {
     await expect(
       getParkBySlug(testDatabase.database, 'akasmannyn-kansallispuisto')
     ).resolves.toMatchObject({
-      location: 'Puistotie 1, 00999 Testikylä'
+      address: 'Puistotie 1, 00999 Testikylä'
     });
 
     await testDatabase.database
@@ -218,7 +223,7 @@ describe('repositories', () => {
     await expect(
       getParkBySlug(testDatabase.database, 'akasmannyn-kansallispuisto')
     ).resolves.toMatchObject({
-      location: 'Puistotie 1, 00999'
+      address: 'Puistotie 1, 00999'
     });
 
     await testDatabase.database
@@ -229,7 +234,7 @@ describe('repositories', () => {
     await expect(
       getParkBySlug(testDatabase.database, 'akasmannyn-kansallispuisto')
     ).resolves.toMatchObject({
-      location: 'Puistotie 1'
+      address: 'Puistotie 1'
     });
 
     await testDatabase.database
@@ -240,7 +245,7 @@ describe('repositories', () => {
     await expect(
       getParkBySlug(testDatabase.database, 'akasmannyn-kansallispuisto')
     ).resolves.toMatchObject({
-      location: '00999 Testikylä'
+      address: '00999 Testikylä'
     });
 
     await testDatabase.database
@@ -251,7 +256,7 @@ describe('repositories', () => {
     await expect(
       getParkBySlug(testDatabase.database, 'akasmannyn-kansallispuisto')
     ).resolves.toMatchObject({
-      location: 'Puistotie 1'
+      address: 'Puistotie 1'
     });
   });
 
@@ -917,9 +922,12 @@ describe('repositories', () => {
 
     expect(removedParks).toEqual([
       expect.objectContaining({
+        address: 'Puistotie 1, 00999 Testikylä',
         catalogStatus: 'active',
-        location: 'Puistotie 1, 00999 Testikylä',
+        locationLabel: 'Puistotie 1',
         name: 'Äkäsmännyn kansallispuisto',
+        postalCode: '00999',
+        postalOffice: 'Testikylä',
         removed: true,
         slug: 'akasmannyn-kansallispuisto'
       })
