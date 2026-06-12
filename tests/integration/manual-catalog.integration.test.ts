@@ -34,7 +34,7 @@ describe('manual catalog imports', () => {
       now: () => '2026-05-27T08:00:00.000Z'
     });
 
-    expect(result.results).toHaveLength(78);
+    expect(result.results).toHaveLength(81);
 
     const merenkurkku = await getParkBySlug(
       testDatabase.database,
@@ -226,6 +226,21 @@ describe('manual catalog imports', () => {
       type: { slug: 'nature-reserve-area' }
     });
 
+    const sanginjoki = await getParkBySlug(testDatabase.database, 'sanginjoki');
+    expect(sanginjoki).toMatchObject({
+      lipasId: 9001041,
+      locationLabel: 'Loppula',
+      luontoonUrl: 'https://www.luontoon.fi/fi/kohteet/sanginjoki',
+      name: 'Sanginjoki',
+      type: { slug: 'nature-reserve-area' }
+    });
+    if (!sanginjoki) {
+      throw new Error('Sanginjoki should have been imported.');
+    }
+    expect(sanginjoki.boundingBox.minLon).toBeLessThan(25.75);
+    expect(sanginjoki.boundingBox.maxLon).toBeGreaterThan(25.9);
+    expect(sanginjoki.boundingBox.maxLat).toBeGreaterThan(65.03);
+
     const koivusuo = await getParkBySlug(testDatabase.database, 'koivusuon-luonnonpuisto');
     expect(koivusuo).toMatchObject({
       displayTypeName: 'Luonnonpuisto',
@@ -255,6 +270,27 @@ describe('manual catalog imports', () => {
       displayTypeName: 'Historia-alue',
       lipasId: 9001039,
       name: 'Kuusiston linna',
+      type: { slug: 'outdoor-recreation-area' }
+    });
+
+    const latokartanonkoski = await getParkBySlug(testDatabase.database, 'latokartanonkoski');
+    expect(latokartanonkoski).toMatchObject({
+      displayTypeName: 'Historia-alue',
+      lipasId: 9001042,
+      luontoonUrl: 'https://www.luontoon.fi/fi/kohteet/latokartanonkoski',
+      name: 'Latokartanonkoski',
+      type: { slug: 'outdoor-recreation-area' }
+    });
+
+    const karnakoskenLinnoitus = await getParkBySlug(
+      testDatabase.database,
+      'karnakosken-linnoitus'
+    );
+    expect(karnakoskenLinnoitus).toMatchObject({
+      displayTypeName: 'Historia-alue',
+      lipasId: 9001043,
+      luontoonUrl: 'https://www.luontoon.fi/fi/kohteet/karnakosken-linnoitus',
+      name: 'Kärnäkosken linnoitus',
       type: { slug: 'outdoor-recreation-area' }
     });
 
@@ -328,7 +364,7 @@ describe('manual catalog imports', () => {
     );
     const kevo = await getParkBySlug(testDatabase.database, 'kevon-luonnonpuisto');
 
-    expect(allParks).toHaveLength(78);
+    expect(allParks).toHaveLength(81);
     expect(merenkurkku).toMatchObject({ catalogStatus: 'active' });
     expect(kevo).toMatchObject({ catalogStatus: 'active' });
   });
@@ -379,7 +415,7 @@ describe('manual catalog imports', () => {
       database: testDatabase.database
     });
 
-    expect(result.results).toHaveLength(78);
+    expect(result.results).toHaveLength(81);
 
     const merenkurkku = await getParkBySlug(
       testDatabase.database,

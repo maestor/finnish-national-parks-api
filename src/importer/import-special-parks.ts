@@ -205,6 +205,14 @@ const buildSykeProtectedSitesSourceUrl = (
   return `https://paikkatiedot.ymparisto.fi/geoserver/inspire_ps/wfs?service=WFS&request=GetFeature&version=2.0.0&typeNames=${typeName}&outputFormat=application/json&srsName=EPSG:4326&cql_filter=nimi='${sourceName}'`;
 };
 
+const buildSykePrivateProtectedSitesCompositeSourceUrl = (sourceNames: string[]) => {
+  const cqlFilter = encodeURIComponent(
+    sourceNames.map((sourceName) => `nimi='${sourceName}'`).join(' OR ')
+  );
+
+  return `https://paikkatiedot.ymparisto.fi/geoserver/inspire_ps/wfs?service=WFS&request=GetFeature&version=2.0.0&typeNames=inspire_ps:PS.ProtectedSitesYksityistenMaillaOlevaLuonnonsuojelualue&outputFormat=application/json&srsName=EPSG:4326&cql_filter=${cqlFilter}`;
+};
+
 const createSykeSpecialParkConfig = ({
   displayTypeName,
   locationLabel,
@@ -516,6 +524,22 @@ const baseSpecialParkConfigs: SpecialParkConfig[] = [
     slug: 'hailuoto',
     sourceUrl: 'special://hailuoto',
     syntheticLipasId: 9_001_036
+  },
+  {
+    displayTypeName: null,
+    locationLabel: 'Loppula',
+    luontoonUrl: 'https://www.luontoon.fi/fi/kohteet/sanginjoki',
+    name: 'Sanginjoki',
+    parkTypeSlug: 'nature-reserve-area',
+    postalCode: null,
+    postalOffice: null,
+    responseShapeVersion: 'syke-protected-sites-composite-v1',
+    slug: 'sanginjoki',
+    sourceUrl: buildSykePrivateProtectedSitesCompositeSourceUrl([
+      'Asmonkorven luonnonsuojelualue',
+      'Isokankaan luonnonsuojelualue'
+    ]),
+    syntheticLipasId: 9_001_041
   }
 ];
 
@@ -864,6 +888,24 @@ const sourceReadyHistoryAreaSeeds: SykeSpecialParkSeed[] = [
     slug: 'kuusiston-linna',
     sourceName: 'Kuusiston piispanlinna',
     syntheticLipasId: 9_001_039
+  },
+  {
+    displayTypeName: 'Historia-alue',
+    luontoonUrl: 'https://www.luontoon.fi/fi/kohteet/latokartanonkoski',
+    name: 'Latokartanonkoski',
+    parkTypeSlug: 'outdoor-recreation-area',
+    slug: 'latokartanonkoski',
+    sourceName: 'Latokartanonkoski',
+    syntheticLipasId: 9_001_042
+  },
+  {
+    displayTypeName: 'Historia-alue',
+    luontoonUrl: 'https://www.luontoon.fi/fi/kohteet/karnakosken-linnoitus',
+    name: 'Kärnäkosken linnoitus',
+    parkTypeSlug: 'outdoor-recreation-area',
+    slug: 'karnakosken-linnoitus',
+    sourceName: 'Kärnäkosken linnoitus',
+    syntheticLipasId: 9_001_043
   }
 ];
 

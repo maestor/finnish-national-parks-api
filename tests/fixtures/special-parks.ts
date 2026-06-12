@@ -41,6 +41,19 @@ const buildSykeProtectedSitesSourceUrl = (
   return `https://paikkatiedot.ymparisto.fi/geoserver/inspire_ps/wfs?service=WFS&request=GetFeature&version=2.0.0&typeNames=${typeName}&outputFormat=application/json&srsName=EPSG:4326&cql_filter=nimi='${sourceName}'`;
 };
 
+const buildSykePrivateProtectedSitesCompositeSourceUrl = (sourceNames: string[]) => {
+  const cqlFilter = encodeURIComponent(
+    sourceNames.map((sourceName) => `nimi='${sourceName}'`).join(' OR ')
+  );
+
+  return `https://paikkatiedot.ymparisto.fi/geoserver/inspire_ps/wfs?service=WFS&request=GetFeature&version=2.0.0&typeNames=inspire_ps:PS.ProtectedSitesYksityistenMaillaOlevaLuonnonsuojelualue&outputFormat=application/json&srsName=EPSG:4326&cql_filter=${cqlFilter}`;
+};
+
+const sanginjokiSourceUrl = buildSykePrivateProtectedSitesCompositeSourceUrl([
+  'Asmonkorven luonnonsuojelualue',
+  'Isokankaan luonnonsuojelualue'
+]);
+
 const buildMuseovirastoProtectedSitesSourceUrl = (sourceName: string) => {
   return `https://geoserver.museovirasto.fi/geoserver/rajapinta_suojellut/wfs?service=WFS&request=GetFeature&version=2.0.0&typeNames=rajapinta_suojellut:muinaisjaannos_alue&outputFormat=application/json&srsName=EPSG:4326&cql_filter=kohdenimi='${sourceName}'`;
 };
@@ -127,6 +140,8 @@ const generatedMuseovirastoSources = [
   'Raaseporin linna',
   'Svartholma',
   'Kuusiston piispanlinna',
+  'Latokartanonkoski',
+  'Kärnäkosken linnoitus',
   'Jyrkkäkosken ruukki',
   'Haapakosken ruukki'
 ];
@@ -408,6 +423,44 @@ export const createSpecialParksSource = () => {
               nimi: 'Siikalahden luonnonsuojelualue',
               paatpvm: '2019-11-14T00:00:00Z',
               shape_area: 4_469_391
+            }
+          )
+        ]
+      }
+    ],
+    [
+      sanginjokiSourceUrl,
+      {
+        type: 'FeatureCollection',
+        features: [
+          createPolygonFeature(
+            [
+              [
+                [25.838515, 65.008774],
+                [25.838515, 65.010346],
+                [25.842058, 65.010346],
+                [25.842058, 65.008774],
+                [25.838515, 65.008774]
+              ]
+            ],
+            {
+              nimi: 'Asmonkorven luonnonsuojelualue',
+              shape_area: 22_825.728
+            }
+          ),
+          createPolygonFeature(
+            [
+              [
+                [25.748372, 64.993762],
+                [25.748372, 65.03478],
+                [25.913272, 65.03478],
+                [25.913272, 64.993762],
+                [25.748372, 64.993762]
+              ]
+            ],
+            {
+              nimi: 'Isokankaan luonnonsuojelualue',
+              shape_area: 11_242_826.38
             }
           )
         ]
