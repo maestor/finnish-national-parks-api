@@ -7,7 +7,7 @@ import type { Database } from '../db/database.js';
 import { createImportRun, syncParkTypes, upsertCatalogPark } from '../db/repositories.js';
 import type { SupportedParkTypeSlug } from '../parks/park-types.js';
 import { getSupportedParkTypeBySlug } from '../parks/park-types.js';
-import type { GeoJsonFeatureCollection, PolygonGeometry } from './geometry.js';
+import type { GeoJsonFeatureCollection, LineStringGeometry, PolygonGeometry } from './geometry.js';
 import { deriveBoundingBox } from './geometry.js';
 
 const coordinateSchema = z.tuple([z.number(), z.number()]).rest(z.number());
@@ -15,6 +15,16 @@ const coordinateSchema = z.tuple([z.number(), z.number()]).rest(z.number());
 const polygonGeometrySchema = z.object({
   coordinates: z.array(z.array(coordinateSchema)),
   type: z.literal('Polygon')
+});
+
+const multiPolygonGeometrySchema = z.object({
+  coordinates: z.array(z.array(z.array(coordinateSchema))),
+  type: z.literal('MultiPolygon')
+});
+
+const lineStringGeometrySchema = z.object({
+  coordinates: z.array(coordinateSchema),
+  type: z.literal('LineString')
 });
 
 const worldHeritageAreaFeatureSchema = z.object({
@@ -142,23 +152,31 @@ const defaultFetchSource = async (sourceUrl: string) => {
   return response.json();
 };
 
-const flattenGeometry = (geometry: {
+const normalizeGeometry = (geometry: {
   coordinates: unknown;
   type: string;
-}): Array<{ coordinates: number[][][]; type: 'Polygon' }> => {
+}): Array<PolygonGeometry | LineStringGeometry> => {
   if (geometry.type === 'MultiPolygon') {
-    return (geometry.coordinates as number[][][][]).map((coords) => ({
+    return multiPolygonGeometrySchema.parse(geometry).coordinates.map((coords) => ({
       coordinates: coords,
       type: 'Polygon' as const
     }));
   }
 
-  return [{ coordinates: geometry.coordinates as number[][][], type: 'Polygon' }];
+  if (geometry.type === 'Polygon') {
+    return [polygonGeometrySchema.parse(geometry)];
+  }
+
+  if (geometry.type === 'LineString') {
+    return [lineStringGeometrySchema.parse(geometry)];
+  }
+
+  throw new Error(`Unsupported geometry type "${geometry.type}" in special parks source.`);
 };
 
 const toBoundaryGeoJson = (
   features: Array<{
-    geometry: PolygonGeometry;
+    geometry: PolygonGeometry | LineStringGeometry;
     sortKey?: string | null;
   }>
 ): GeoJsonFeatureCollection => ({
@@ -241,6 +259,32 @@ const createSykeSpecialParkConfig = ({
 
 const buildMuseovirastoProtectedSitesSourceUrl = (sourceName: string) => {
   return `https://geoserver.museovirasto.fi/geoserver/rajapinta_suojellut/wfs?service=WFS&request=GetFeature&version=2.0.0&typeNames=rajapinta_suojellut:muinaisjaannos_alue&outputFormat=application/json&srsName=EPSG:4326&cql_filter=kohdenimi='${sourceName}'`;
+};
+
+const buildArcGisGeoJsonQuerySourceUrl = ({
+  geometry,
+  outFields,
+  serviceUrl
+}: {
+  geometry?: [number, number, number, number];
+  outFields: string[];
+  serviceUrl: string;
+}) => {
+  const params = new URLSearchParams({
+    f: 'geojson',
+    outFields: outFields.join(','),
+    returnGeometry: 'true',
+    where: '1=1'
+  });
+
+  if (geometry) {
+    params.set('geometry', geometry.join(','));
+    params.set('geometryType', 'esriGeometryEnvelope');
+    params.set('inSR', '4326');
+    params.set('spatialRel', 'esriSpatialRelIntersects');
+  }
+
+  return `${serviceUrl}/query?${params.toString()}`;
 };
 
 const buildMuseovirastoRkyAreaSourceUrl = ({
@@ -485,6 +529,43 @@ const baseSpecialParkConfigs: SpecialParkConfig[] = [
     slug: 'inarin-retkeilyalue',
     sourceUrl: 'special://inarin-retkeilyalue',
     syntheticLipasId: 606_689
+  },
+  {
+    displayTypeName: null,
+    locationLabel: 'Pietiläntie 23',
+    luontoonUrl: null,
+    name: 'Paavolan luontopolku',
+    parkTypeSlug: 'nature-trail',
+    postalCode: '08800',
+    postalOffice: 'Lohja',
+    responseShapeVersion: 'lohja-paavolan-arcgis-route-v1',
+    slug: 'paavolan-luontopolku',
+    sourceParser: 'geojson',
+    sourceUrl: buildArcGisGeoJsonQuerySourceUrl({
+      geometry: [23.882, 60.225, 23.891, 60.228],
+      outFields: ['FID', 'REITTI', 'LISATIETO'],
+      serviceUrl:
+        'https://services2.arcgis.com/RrgTAfcgVcTLi0XF/arcgis/rest/services/Paavolan_reitti/FeatureServer/0'
+    }),
+    syntheticLipasId: 9_004_404
+  },
+  {
+    displayTypeName: null,
+    locationLabel: 'Kipparitie 4',
+    luontoonUrl: null,
+    name: 'Santalahden luontopolku',
+    parkTypeSlug: 'nature-trail',
+    postalCode: '48310',
+    postalOffice: 'Kotka',
+    responseShapeVersion: 'kotka-santalahden-arcgis-route-v1',
+    slug: 'santalahden-luontopolku',
+    sourceParser: 'geojson',
+    sourceUrl: buildArcGisGeoJsonQuerySourceUrl({
+      outFields: ['FID', 'Layer', 'Nimi', 'Linkki'],
+      serviceUrl:
+        'https://services-eu1.arcgis.com/zIF5LKWARhpLFEt3/arcgis/rest/services/Santalahden_reitti/FeatureServer/0'
+    }),
+    syntheticLipasId: 9_004_405
   },
   {
     displayTypeName: 'Historia-alue',
@@ -1335,13 +1416,11 @@ export const importSpecialParks = async ({
       metadata = extractSykeMetadata(filteredFeatures);
     }
 
-    const polygonGeometries = sourceFeatures.flatMap((feature) =>
-      flattenGeometry(feature.geometry)
-    );
+    const geometries = sourceFeatures.flatMap((feature) => normalizeGeometry(feature.geometry));
 
     const boundaryGeoJson = toBoundaryGeoJson(
-      polygonGeometries.map((geom) => ({
-        geometry: geom as PolygonGeometry,
+      geometries.map((geom) => ({
+        geometry: geom,
         sortKey: config.slug === 'merenkurkun-maailmanperintoalue' ? null : config.name
       }))
     );
