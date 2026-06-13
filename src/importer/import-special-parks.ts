@@ -27,6 +27,11 @@ const lineStringGeometrySchema = z.object({
   type: z.literal('LineString')
 });
 
+const multiLineStringGeometrySchema = z.object({
+  coordinates: z.array(z.array(coordinateSchema)),
+  type: z.literal('MultiLineString')
+});
+
 const worldHeritageAreaFeatureSchema = z.object({
   geometry: polygonGeometrySchema,
   properties: z.object({
@@ -171,6 +176,13 @@ const normalizeGeometry = (geometry: {
     return [lineStringGeometrySchema.parse(geometry)];
   }
 
+  if (geometry.type === 'MultiLineString') {
+    return multiLineStringGeometrySchema.parse(geometry).coordinates.map((coordinates) => ({
+      coordinates,
+      type: 'LineString' as const
+    }));
+  }
+
   throw new Error(`Unsupported geometry type "${geometry.type}" in special parks source.`);
 };
 
@@ -285,6 +297,24 @@ const buildArcGisGeoJsonQuerySourceUrl = ({
   }
 
   return `${serviceUrl}/query?${params.toString()}`;
+};
+
+const buildLuontoonGeoJsonCollectionSourceUrl = ({
+  collectionId,
+  filter,
+  limit = 1000
+}: {
+  collectionId: string;
+  filter: string;
+  limit?: number;
+}) => {
+  const params = new URLSearchParams({
+    filter,
+    'filter-lang': 'cql-text',
+    limit: String(limit)
+  });
+
+  return `https://www.luontoon.fi/geo/features/collections/${collectionId}/items?${params.toString()}`;
 };
 
 const buildMuseovirastoRkyAreaSourceUrl = ({
@@ -566,6 +596,23 @@ const baseSpecialParkConfigs: SpecialParkConfig[] = [
         'https://services-eu1.arcgis.com/zIF5LKWARhpLFEt3/arcgis/rest/services/Santalahden_reitti/FeatureServer/0'
     }),
     syntheticLipasId: 9_004_405
+  },
+  {
+    displayTypeName: null,
+    locationLabel: 'Torholan luola',
+    luontoonUrl: 'https://www.luontoon.fi/fi/reitit/torholan-luolan-polku-lohja-194240',
+    name: 'Torholan luola',
+    parkTypeSlug: 'nature-trail',
+    postalCode: null,
+    postalOffice: 'Lohja',
+    responseShapeVersion: 'luontoon-torholan-route-v1',
+    slug: 'torholan-luola',
+    sourceParser: 'geojson',
+    sourceUrl: buildLuontoonGeoJsonCollectionSourceUrl({
+      collectionId: 'public.all_lines_details_view',
+      filter: "slug='torholan-luolan-polku-lohja-194240'"
+    }),
+    syntheticLipasId: 9_004_406
   },
   {
     displayTypeName: 'Historia-alue',
