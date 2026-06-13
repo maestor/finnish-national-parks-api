@@ -34,7 +34,7 @@ describe('manual catalog imports', () => {
       now: () => '2026-05-27T08:00:00.000Z'
     });
 
-    expect(result.results).toHaveLength(83);
+    expect(result.results).toHaveLength(84);
 
     const merenkurkku = await getParkBySlug(
       testDatabase.database,
@@ -205,6 +205,26 @@ describe('manual catalog imports', () => {
     expect(santalahti?.boundingBox.maxLon).toBeCloseTo(26.8592556232422);
     expect(santalahti?.boundingBox.minLat).toBeCloseTo(60.4309110325505);
     expect(santalahti?.boundingBox.maxLat).toBeCloseTo(60.4433449987787);
+
+    const torholan = await getParkBySlug(testDatabase.database, 'torholan-luola');
+    expect(torholan).toMatchObject({
+      address: 'Torholan luola, Lohja',
+      lipasId: 9004406,
+      locationLabel: 'Torholan luola',
+      luontoonUrl: 'https://www.luontoon.fi/fi/reitit/torholan-luolan-polku-lohja-194240',
+      name: 'Torholan luola',
+      postalCode: null,
+      postalOffice: 'Lohja',
+      type: { slug: 'nature-trail' }
+    });
+    expect(torholan?.boundaryGeoJson?.features).toHaveLength(1);
+    expect(
+      torholan?.boundaryGeoJson?.features.every((feature) => feature.geometry.type === 'LineString')
+    ).toBe(true);
+    expect(torholan?.boundingBox.minLon).toBeCloseTo(23.85665818);
+    expect(torholan?.boundingBox.maxLon).toBeCloseTo(23.8572344);
+    expect(torholan?.boundingBox.minLat).toBeCloseTo(60.252980562);
+    expect(torholan?.boundingBox.maxLat).toBeCloseTo(60.254699132);
 
     const seili = await getParkBySlug(testDatabase.database, 'seili');
     expect(seili).toMatchObject({
@@ -406,7 +426,7 @@ describe('manual catalog imports', () => {
     );
     const kevo = await getParkBySlug(testDatabase.database, 'kevon-luonnonpuisto');
 
-    expect(allParks).toHaveLength(83);
+    expect(allParks).toHaveLength(84);
     expect(merenkurkku).toMatchObject({ catalogStatus: 'active' });
     expect(kevo).toMatchObject({ catalogStatus: 'active' });
   });
@@ -483,7 +503,7 @@ describe('manual catalog imports', () => {
       database: testDatabase.database
     });
 
-    expect(result.results).toHaveLength(83);
+    expect(result.results).toHaveLength(84);
 
     const merenkurkku = await getParkBySlug(
       testDatabase.database,

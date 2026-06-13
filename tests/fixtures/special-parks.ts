@@ -24,6 +24,8 @@ const paavolanLuontopolkuSourceUrl =
   'https://services2.arcgis.com/RrgTAfcgVcTLi0XF/arcgis/rest/services/Paavolan_reitti/FeatureServer/0/query?f=geojson&outFields=FID%2CREITTI%2CLISATIETO&returnGeometry=true&where=1%3D1&geometry=23.882%2C60.225%2C23.891%2C60.228&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects';
 const santalahdenLuontopolkuSourceUrl =
   'https://services-eu1.arcgis.com/zIF5LKWARhpLFEt3/arcgis/rest/services/Santalahden_reitti/FeatureServer/0/query?f=geojson&outFields=FID%2CLayer%2CNimi%2CLinkki&returnGeometry=true&where=1%3D1';
+const torholanLuolaSourceUrl =
+  'https://www.luontoon.fi/geo/features/collections/public.all_lines_details_view/items?filter=slug%3D%27torholan-luolan-polku-lohja-194240%27&filter-lang=cql-text&limit=1000';
 
 type SykeSourceType = 'private' | 'state';
 
@@ -164,6 +166,15 @@ const createLineStringFeature = (
   properties: Record<string, unknown> = {}
 ) => ({
   geometry: { coordinates, type: 'LineString' },
+  properties,
+  type: 'Feature'
+});
+
+const createMultiLineStringFeature = (
+  coordinates: number[][][],
+  properties: Record<string, unknown> = {}
+) => ({
+  geometry: { coordinates, type: 'MultiLineString' },
   properties,
   type: 'Feature'
 });
@@ -660,6 +671,44 @@ export const createSpecialParksSource = () => {
               Layer: 'Merireitti',
               Linkki: 'https://www.santalahti.fi/fi/Aktiviteetit/Luontopolut%20ja%20puistot/',
               Nimi: 'Santalahden luontopolku'
+            }
+          )
+        ]
+      }
+    ],
+    [
+      torholanLuolaSourceUrl,
+      {
+        type: 'FeatureCollection',
+        features: [
+          createMultiLineStringFeature(
+            [
+              [
+                [23.85665818, 60.254699132],
+                [23.85677561, 60.25465329],
+                [23.85683879, 60.25462112],
+                [23.85691244, 60.25457352],
+                [23.85696419, 60.25452477],
+                [23.85703298, 60.25444461],
+                [23.8570978, 60.25434195],
+                [23.85713838, 60.25424698],
+                [23.85716473, 60.2541769],
+                [23.85719157, 60.25407706],
+                [23.85722013, 60.25393289],
+                [23.8572344, 60.25377733],
+                [23.85723179, 60.25360682],
+                [23.85721931, 60.25346439],
+                [23.85720459, 60.25327244],
+                [23.85719673, 60.25310538],
+                [23.857183867, 60.252980562]
+              ]
+            ],
+            {
+              city: 'Lohja',
+              length_km: 0.2,
+              name_fi: 'Torholan luolan polku',
+              slug: 'torholan-luolan-polku-lohja-194240',
+              source: 'uljas'
             }
           )
         ]
