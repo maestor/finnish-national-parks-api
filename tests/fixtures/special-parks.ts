@@ -20,6 +20,10 @@ const siikalahtiSourceUrl =
   "https://paikkatiedot.ymparisto.fi/geoserver/inspire_ps/wfs?service=WFS&request=GetFeature&version=2.0.0&typeNames=inspire_ps:PS.ProtectedSitesValtionOmistamaLuonnonsuojelualue&outputFormat=application/json&srsName=EPSG:4326&cql_filter=nimi='Siikalahden luonnonsuojelualue'";
 
 const napapiiriSourceUrl = 'special://napapiirin-retkeilyalue';
+const paavolanLuontopolkuSourceUrl =
+  'https://services2.arcgis.com/RrgTAfcgVcTLi0XF/arcgis/rest/services/Paavolan_reitti/FeatureServer/0/query?f=geojson&outFields=FID%2CREITTI%2CLISATIETO&returnGeometry=true&where=1%3D1&geometry=23.882%2C60.225%2C23.891%2C60.228&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects';
+const santalahdenLuontopolkuSourceUrl =
+  'https://services-eu1.arcgis.com/zIF5LKWARhpLFEt3/arcgis/rest/services/Santalahden_reitti/FeatureServer/0/query?f=geojson&outFields=FID%2CLayer%2CNimi%2CLinkki&returnGeometry=true&where=1%3D1';
 
 type SykeSourceType = 'private' | 'state';
 
@@ -151,6 +155,15 @@ const createPolygonFeature = (
   properties: Record<string, unknown> = {}
 ) => ({
   geometry: { coordinates, type: 'Polygon' },
+  properties,
+  type: 'Feature'
+});
+
+const createLineStringFeature = (
+  coordinates: number[][],
+  properties: Record<string, unknown> = {}
+) => ({
+  geometry: { coordinates, type: 'LineString' },
   properties,
   type: 'Feature'
 });
@@ -494,6 +507,161 @@ export const createSpecialParksSource = () => {
               [25.85, 66.5]
             ]
           ])
+        ]
+      }
+    ],
+    [
+      paavolanLuontopolkuSourceUrl,
+      {
+        type: 'FeatureCollection',
+        features: [
+          createLineStringFeature(
+            [
+              [23.8852161875505, 60.2275115553159],
+              [23.8860956065322, 60.2273302072513],
+              [23.8869633792335, 60.2270960207198]
+            ],
+            {
+              FID: 1,
+              LISATIETO: ' ',
+              REITTI: 'Luontopolun reitti'
+            }
+          ),
+          createLineStringFeature(
+            [
+              [23.8874876852271, 60.2267570516225],
+              [23.8882452933221, 60.2267991729627],
+              [23.8884464972605, 60.2266798339451]
+            ],
+            {
+              FID: 6,
+              LISATIETO: 'Pitkospuut',
+              REITTI: 'Pitkospuut'
+            }
+          ),
+          createLineStringFeature(
+            [
+              [23.8883446898101, 60.2267793546796],
+              [23.8898029538791, 60.2263894373494],
+              [23.890603352384, 60.2265361970361]
+            ],
+            {
+              FID: 8,
+              LISATIETO: 'Pistopolku  Tammelle',
+              REITTI: 'Vaihtoehtoinen reitti'
+            }
+          ),
+          createLineStringFeature(
+            [
+              [23.8883800218139, 60.2258545825143],
+              [23.888288394225, 60.2254776367656],
+              [23.8836126343924, 60.2277589357966]
+            ],
+            {
+              FID: 20,
+              LISATIETO: 'Viimeinen pätkä kokonaisuudessaan',
+              REITTI: 'Luontopolun reitti'
+            }
+          )
+        ]
+      }
+    ],
+    [
+      santalahdenLuontopolkuSourceUrl,
+      {
+        type: 'FeatureCollection',
+        features: [
+          createLineStringFeature(
+            [
+              [26.8585271902272, 60.435033100798],
+              [26.8550460859602, 60.4319330201228],
+              [26.8507921028238, 60.4309112117761]
+            ],
+            {
+              FID: 1,
+              Layer: 'Merireitti',
+              Linkki: 'https://www.santalahti.fi/fi/Aktiviteetit/Luontopolut%20ja%20puistot/',
+              Nimi: 'Santalahden luontopolku'
+            }
+          ),
+          createLineStringFeature(
+            [
+              [26.8507931513519, 60.4309110325505],
+              [26.8527882312624, 60.4348711068796],
+              [26.8587087783301, 60.4352943052316]
+            ],
+            {
+              FID: 2,
+              Layer: 'Merireitti',
+              Linkki: 'https://www.santalahti.fi/fi/Aktiviteetit/Luontopolut%20ja%20puistot/',
+              Nimi: 'Santalahden luontopolku'
+            }
+          ),
+          createLineStringFeature(
+            [
+              [26.8539776946415, 60.4349348747832],
+              [26.8527586436998, 60.4360687221766],
+              [26.853065650428, 60.4382434551032]
+            ],
+            {
+              FID: 3,
+              Layer: 'Metsäreitti',
+              Linkki: 'https://www.santalahti.fi/fi/Aktiviteetit/Luontopolut%20ja%20puistot/',
+              Nimi: 'Santalahden luontopolku'
+            }
+          ),
+          createLineStringFeature(
+            [
+              [26.8530563199517, 60.4382512540421],
+              [26.8523228980215, 60.4406051257843],
+              [26.8510114932418, 60.4418992585836]
+            ],
+            {
+              FID: 4,
+              Layer: 'Metsäreitti',
+              Linkki: 'https://www.santalahti.fi/fi/Aktiviteetit/Luontopolut%20ja%20puistot/',
+              Nimi: 'Santalahden luontopolku'
+            }
+          ),
+          createLineStringFeature(
+            [
+              [26.8510111439327, 60.4418993811518],
+              [26.8538538765541, 60.4433449987787],
+              [26.8592556232422, 60.4427473250297],
+              [26.8586885087252, 60.4397735250218]
+            ],
+            {
+              FID: 5,
+              Layer: 'Metsäreitti',
+              Linkki: 'https://www.santalahti.fi/fi/Aktiviteetit/Luontopolut%20ja%20puistot/',
+              Nimi: 'Santalahden luontopolku'
+            }
+          ),
+          createLineStringFeature(
+            [
+              [26.8586922409682, 60.4397689705326],
+              [26.8563967106475, 60.4364264544899],
+              [26.8537303477567, 60.4352682068634]
+            ],
+            {
+              FID: 6,
+              Layer: 'Metsäreitti',
+              Linkki: 'https://www.santalahti.fi/fi/Aktiviteetit/Luontopolut%20ja%20puistot/',
+              Nimi: 'Santalahden luontopolku'
+            }
+          ),
+          createLineStringFeature(
+            [
+              [26.8585756971808, 60.4352949224869],
+              [26.858445949731, 60.4350108173457]
+            ],
+            {
+              FID: 7,
+              Layer: 'Merireitti',
+              Linkki: 'https://www.santalahti.fi/fi/Aktiviteetit/Luontopolut%20ja%20puistot/',
+              Nimi: 'Santalahden luontopolku'
+            }
+          )
         ]
       }
     ]

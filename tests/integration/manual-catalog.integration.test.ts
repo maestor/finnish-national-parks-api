@@ -34,7 +34,7 @@ describe('manual catalog imports', () => {
       now: () => '2026-05-27T08:00:00.000Z'
     });
 
-    expect(result.results).toHaveLength(81);
+    expect(result.results).toHaveLength(83);
 
     const merenkurkku = await getParkBySlug(
       testDatabase.database,
@@ -163,6 +163,48 @@ describe('manual catalog imports', () => {
       postalCode: '99870',
       postalOffice: 'Inari'
     });
+
+    const paavola = await getParkBySlug(testDatabase.database, 'paavolan-luontopolku');
+    expect(paavola).toMatchObject({
+      address: 'Pietiläntie 23, 08800 Lohja',
+      lipasId: 9004404,
+      locationLabel: 'Pietiläntie 23',
+      luontoonUrl: null,
+      name: 'Paavolan luontopolku',
+      postalCode: '08800',
+      postalOffice: 'Lohja',
+      type: { slug: 'nature-trail' }
+    });
+    expect(paavola?.boundaryGeoJson?.features).toHaveLength(4);
+    expect(
+      paavola?.boundaryGeoJson?.features.every((feature) => feature.geometry.type === 'LineString')
+    ).toBe(true);
+    expect(paavola?.boundingBox.minLon).toBeCloseTo(23.8836126343924);
+    expect(paavola?.boundingBox.maxLon).toBeCloseTo(23.890603352384);
+    expect(paavola?.boundingBox.minLat).toBeCloseTo(60.2254776367656);
+    expect(paavola?.boundingBox.maxLat).toBeCloseTo(60.2277589357966);
+
+    const santalahti = await getParkBySlug(testDatabase.database, 'santalahden-luontopolku');
+    expect(santalahti).toMatchObject({
+      address: 'Kipparitie 4, 48310 Kotka',
+      lipasId: 9004405,
+      locationLabel: 'Kipparitie 4',
+      luontoonUrl: null,
+      name: 'Santalahden luontopolku',
+      postalCode: '48310',
+      postalOffice: 'Kotka',
+      type: { slug: 'nature-trail' }
+    });
+    expect(santalahti?.boundaryGeoJson?.features).toHaveLength(7);
+    expect(
+      santalahti?.boundaryGeoJson?.features.every(
+        (feature) => feature.geometry.type === 'LineString'
+      )
+    ).toBe(true);
+    expect(santalahti?.boundingBox.minLon).toBeCloseTo(26.8507921028238);
+    expect(santalahti?.boundingBox.maxLon).toBeCloseTo(26.8592556232422);
+    expect(santalahti?.boundingBox.minLat).toBeCloseTo(60.4309110325505);
+    expect(santalahti?.boundingBox.maxLat).toBeCloseTo(60.4433449987787);
 
     const seili = await getParkBySlug(testDatabase.database, 'seili');
     expect(seili).toMatchObject({
@@ -364,7 +406,7 @@ describe('manual catalog imports', () => {
     );
     const kevo = await getParkBySlug(testDatabase.database, 'kevon-luonnonpuisto');
 
-    expect(allParks).toHaveLength(81);
+    expect(allParks).toHaveLength(83);
     expect(merenkurkku).toMatchObject({ catalogStatus: 'active' });
     expect(kevo).toMatchObject({ catalogStatus: 'active' });
   });
@@ -400,6 +442,32 @@ describe('manual catalog imports', () => {
     ).rejects.toThrow('No features found for Kevon luonnonpuisto in the SYKE source.');
   });
 
+  it('fails when a geojson source contains an unsupported geometry type', async () => {
+    await expect(
+      importSpecialParks({
+        database: testDatabase.database,
+        fetchSource: async (sourceUrl) => {
+          if (sourceUrl === 'special://seili') {
+            return {
+              type: 'FeatureCollection',
+              features: [
+                {
+                  type: 'Feature',
+                  geometry: {
+                    type: 'Point',
+                    coordinates: [22.0, 60.0]
+                  }
+                }
+              ]
+            };
+          }
+
+          return createSpecialParksSource()(sourceUrl);
+        }
+      })
+    ).rejects.toThrow('Unsupported geometry type "Point" in special parks source.');
+  });
+
   it('supports the default fetch path used by the CLI importer', async () => {
     const fetchSource = createSpecialParksSource();
 
@@ -415,7 +483,7 @@ describe('manual catalog imports', () => {
       database: testDatabase.database
     });
 
-    expect(result.results).toHaveLength(81);
+    expect(result.results).toHaveLength(83);
 
     const merenkurkku = await getParkBySlug(
       testDatabase.database,
