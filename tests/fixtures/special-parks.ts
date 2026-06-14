@@ -37,6 +37,12 @@ type GeneratedSykeSource = {
   sourceType?: SykeSourceType;
 };
 
+type GeneratedLuontoonDestinationSource = {
+  name: string;
+  slug: string;
+  surfaceArea?: number;
+};
+
 const buildSykeProtectedSitesSourceUrl = (
   sourceName: string,
   sourceType: SykeSourceType = 'state'
@@ -55,6 +61,24 @@ const buildSykePrivateProtectedSitesCompositeSourceUrl = (sourceNames: string[])
   );
 
   return `https://paikkatiedot.ymparisto.fi/geoserver/inspire_ps/wfs?service=WFS&request=GetFeature&version=2.0.0&typeNames=inspire_ps:PS.ProtectedSitesYksityistenMaillaOlevaLuonnonsuojelualue&outputFormat=application/json&srsName=EPSG:4326&cql_filter=${cqlFilter}`;
+};
+
+const buildLuontoonGeoJsonCollectionSourceUrl = ({
+  collectionId,
+  filter,
+  limit = 1000
+}: {
+  collectionId: string;
+  filter: string;
+  limit?: number;
+}) => {
+  const params = new URLSearchParams({
+    filter,
+    'filter-lang': 'cql-text',
+    limit: String(limit)
+  });
+
+  return `https://www.luontoon.fi/geo/features/collections/${collectionId}/items?${params.toString()}`;
 };
 
 const sanginjokiSourceUrl = buildSykePrivateProtectedSitesCompositeSourceUrl([
@@ -152,6 +176,25 @@ const generatedMuseovirastoSources = [
   'Kärnäkosken linnoitus',
   'Jyrkkäkosken ruukki',
   'Haapakosken ruukki'
+];
+
+const generatedLuontoonDestinationSources: GeneratedLuontoonDestinationSource[] = [
+  { name: 'Litokairan soidensuojelualue', slug: 'litokairan-soidensuojelualue' },
+  { name: 'Martimoaavan soidensuojelualue', slug: 'martimoaavan-soidensuojelualue' },
+  { name: 'Paukanevan soidensuojelualue', slug: 'paukanevan-soidensuojelualue' },
+  {
+    name: 'Neitvuori ja Luonterin luonnonsuojelualue',
+    slug: 'neitvuori-ja-luonterin-luonnonsuojelualue'
+  },
+  { name: 'Koskeljärvi', slug: 'koskeljarvi' },
+  { name: 'Kurimonkoski', slug: 'kurimonkoski' },
+  { name: 'Pukala', slug: 'pukala' },
+  { name: 'Peurajärvi', slug: 'peurajarvi' },
+  { name: 'Hepoköngäs', slug: 'hepokongas' },
+  { name: 'Auttiköngäs', slug: 'auttikongas' },
+  { name: 'Pinkjärvi', slug: 'pinkjarvi' },
+  { name: 'Soiperoinen', slug: 'soiperoinen' },
+  { name: 'Unarinköngäs', slug: 'unarinkongas' }
 ];
 
 const createPolygonFeature = (
@@ -804,6 +847,45 @@ export const createSpecialParksSource = () => {
         }
       ]
     });
+  });
+
+  generatedLuontoonDestinationSources.forEach((entry, index) => {
+    const lon = 27 + index * 0.1;
+    const lat = 62 + index * 0.1;
+
+    responses.set(
+      buildLuontoonGeoJsonCollectionSourceUrl({
+        collectionId: 'public.destinations_details_view',
+        filter: `slug='${entry.slug}'`
+      }),
+      {
+        type: 'FeatureCollection',
+        features: [
+          {
+            type: 'Feature',
+            geometry: {
+              type: 'MultiPolygon',
+              coordinates: [
+                [
+                  [
+                    [lon, lat],
+                    [lon, lat + 0.03],
+                    [lon + 0.03, lat + 0.03],
+                    [lon + 0.03, lat],
+                    [lon, lat]
+                  ]
+                ]
+              ]
+            },
+            properties: {
+              name: entry.name,
+              slug: entry.slug,
+              surfaceArea: entry.surfaceArea ?? 2_000_000 + index * 25_000
+            }
+          }
+        ]
+      }
+    );
   });
 
   return async (sourceUrl: string) => {

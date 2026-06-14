@@ -125,6 +125,18 @@ type SykeSpecialParkSeed = {
   syntheticLipasId: number;
 };
 
+type LuontoonDestinationAreaSeed = {
+  displayTypeName: string | null;
+  locationLabel?: string;
+  luontoonUrl: string | null;
+  name: string;
+  parkTypeSlug: SupportedParkTypeSlug;
+  postalCode?: string | null;
+  postalOffice?: string | null;
+  slug: string;
+  syntheticLipasId: number;
+};
+
 type MuseovirastoRkyAreaSeed = {
   displayTypeName: string | null;
   excludedSourceNames?: string[];
@@ -272,7 +284,7 @@ const createSykeSpecialParkConfig = ({
   sourceType,
   syntheticLipasId
 }: SykeSpecialParkSeed): SpecialParkConfig => ({
-  displayTypeName,
+  displayTypeName: normalizeSpecialParkDisplayTypeName(name, displayTypeName),
   locationLabel: locationLabel ?? name,
   luontoonUrl,
   name,
@@ -284,6 +296,14 @@ const createSykeSpecialParkConfig = ({
   sourceUrl: buildSykeProtectedSitesSourceUrl(sourceName, sourceType),
   syntheticLipasId
 });
+
+const normalizeSpecialParkDisplayTypeName = (name: string, displayTypeName: string | null) => {
+  if (name.toLocaleLowerCase('fi-FI').endsWith('soidensuojelualue')) {
+    return 'Soidensuojelualue';
+  }
+
+  return displayTypeName;
+};
 
 const buildMuseovirastoProtectedSitesSourceUrl = (sourceName: string) => {
   return `https://geoserver.museovirasto.fi/geoserver/rajapinta_suojellut/wfs?service=WFS&request=GetFeature&version=2.0.0&typeNames=rajapinta_suojellut:muinaisjaannos_alue&outputFormat=application/json&srsName=EPSG:4326&cql_filter=kohdenimi='${sourceName}'`;
@@ -367,7 +387,7 @@ const createMuseovirastoSpecialParkConfig = ({
   sourceName,
   syntheticLipasId
 }: SykeSpecialParkSeed): SpecialParkConfig => ({
-  displayTypeName,
+  displayTypeName: normalizeSpecialParkDisplayTypeName(name, displayTypeName),
   locationLabel: locationLabel ?? name,
   luontoonUrl,
   name,
@@ -378,6 +398,35 @@ const createMuseovirastoSpecialParkConfig = ({
   slug,
   sourceParser: 'geojson',
   sourceUrl: buildMuseovirastoProtectedSitesSourceUrl(sourceName),
+  syntheticLipasId
+});
+
+const createLuontoonDestinationAreaConfig = ({
+  displayTypeName,
+  locationLabel,
+  luontoonUrl,
+  name,
+  parkTypeSlug,
+  postalCode,
+  postalOffice,
+  slug,
+  syntheticLipasId
+}: LuontoonDestinationAreaSeed): SpecialParkConfig => ({
+  displayTypeName: normalizeSpecialParkDisplayTypeName(name, displayTypeName),
+  extractMetadata: extractLuontoonDestinationMetadata,
+  locationLabel: locationLabel ?? name,
+  luontoonUrl,
+  name,
+  parkTypeSlug,
+  postalCode: postalCode ?? null,
+  postalOffice: postalOffice ?? null,
+  responseShapeVersion: 'luontoon-destination-area-v1',
+  slug,
+  sourceParser: 'geojson',
+  sourceUrl: buildLuontoonGeoJsonCollectionSourceUrl({
+    collectionId: 'public.destinations_details_view',
+    filter: `slug='${slug}'`
+  }),
   syntheticLipasId
 });
 
@@ -395,7 +444,7 @@ const createMuseovirastoRkyAreaConfig = ({
   sourceName,
   syntheticLipasId
 }: MuseovirastoRkyAreaSeed): SpecialParkConfig => ({
-  displayTypeName,
+  displayTypeName: normalizeSpecialParkDisplayTypeName(name, displayTypeName),
   locationLabel: locationLabel ?? name,
   luontoonUrl,
   name,
@@ -682,9 +731,12 @@ const baseSpecialParkConfigs: SpecialParkConfig[] = [
     parkTypeSlug: 'outdoor-recreation-area',
     postalCode: null,
     postalOffice: null,
-    responseShapeVersion: 'manual-mml-kunta-v1',
+    responseShapeVersion: 'museovirasto-rky-areas-v1',
     slug: 'hailuoto',
-    sourceUrl: 'special://hailuoto',
+    sourceParser: 'geojson',
+    sourceUrl: buildMuseovirastoRkyAreaSourceUrl({
+      sourceName: 'Hailuoto'
+    }),
     syntheticLipasId: 9_001_036
   },
   {
@@ -1005,6 +1057,113 @@ const sourceReadyDestinationAreaSeeds: SykeSpecialParkSeed[] = [
   }
 ];
 
+const sourceReadyLuontoonDestinationAreaSeeds: LuontoonDestinationAreaSeed[] = [
+  {
+    displayTypeName: null,
+    luontoonUrl: 'https://www.luontoon.fi/fi/kohteet/litokairan-soidensuojelualue',
+    name: 'Litokairan soidensuojelualue',
+    parkTypeSlug: 'nature-reserve-area',
+    slug: 'litokairan-soidensuojelualue',
+    syntheticLipasId: 9_001_045
+  },
+  {
+    displayTypeName: null,
+    luontoonUrl: 'https://www.luontoon.fi/fi/kohteet/martimoaavan-soidensuojelualue',
+    name: 'Martimoaavan soidensuojelualue',
+    parkTypeSlug: 'nature-reserve-area',
+    slug: 'martimoaavan-soidensuojelualue',
+    syntheticLipasId: 9_001_046
+  },
+  {
+    displayTypeName: null,
+    luontoonUrl: 'https://www.luontoon.fi/fi/kohteet/paukanevan-soidensuojelualue',
+    name: 'Paukanevan soidensuojelualue',
+    parkTypeSlug: 'nature-reserve-area',
+    slug: 'paukanevan-soidensuojelualue',
+    syntheticLipasId: 9_001_047
+  },
+  {
+    displayTypeName: null,
+    luontoonUrl: 'https://www.luontoon.fi/fi/kohteet/neitvuori-ja-luonterin-luonnonsuojelualue',
+    name: 'Neitvuori ja Luonterin luonnonsuojelualue',
+    parkTypeSlug: 'nature-reserve-area',
+    slug: 'neitvuori-ja-luonterin-luonnonsuojelualue',
+    syntheticLipasId: 9_001_048
+  },
+  {
+    displayTypeName: null,
+    luontoonUrl: 'https://www.luontoon.fi/fi/kohteet/koskeljarvi',
+    name: 'Koskeljärvi',
+    parkTypeSlug: 'outdoor-recreation-area',
+    slug: 'koskeljarvi',
+    syntheticLipasId: 9_001_049
+  },
+  {
+    displayTypeName: null,
+    luontoonUrl: 'https://www.luontoon.fi/fi/kohteet/kurimonkoski',
+    name: 'Kurimonkoski',
+    parkTypeSlug: 'outdoor-recreation-area',
+    slug: 'kurimonkoski',
+    syntheticLipasId: 9_001_050
+  },
+  {
+    displayTypeName: null,
+    luontoonUrl: 'https://www.luontoon.fi/fi/kohteet/pukala',
+    name: 'Pukala',
+    parkTypeSlug: 'outdoor-recreation-area',
+    slug: 'pukala',
+    syntheticLipasId: 9_001_051
+  },
+  {
+    displayTypeName: null,
+    luontoonUrl: 'https://www.luontoon.fi/fi/kohteet/peurajarvi',
+    name: 'Peurajärvi',
+    parkTypeSlug: 'outdoor-recreation-area',
+    slug: 'peurajarvi',
+    syntheticLipasId: 9_001_052
+  },
+  {
+    displayTypeName: null,
+    luontoonUrl: 'https://www.luontoon.fi/fi/kohteet/hepokongas',
+    name: 'Hepoköngäs',
+    parkTypeSlug: 'outdoor-recreation-area',
+    slug: 'hepokongas',
+    syntheticLipasId: 9_001_053
+  },
+  {
+    displayTypeName: null,
+    luontoonUrl: 'https://www.luontoon.fi/fi/kohteet/auttikongas',
+    name: 'Auttiköngäs',
+    parkTypeSlug: 'outdoor-recreation-area',
+    slug: 'auttikongas',
+    syntheticLipasId: 9_001_054
+  },
+  {
+    displayTypeName: null,
+    luontoonUrl: 'https://www.luontoon.fi/fi/kohteet/pinkjarvi',
+    name: 'Pinkjärvi',
+    parkTypeSlug: 'outdoor-recreation-area',
+    slug: 'pinkjarvi',
+    syntheticLipasId: 9_001_055
+  },
+  {
+    displayTypeName: null,
+    luontoonUrl: 'https://www.luontoon.fi/fi/kohteet/soiperoinen',
+    name: 'Soiperoinen',
+    parkTypeSlug: 'outdoor-recreation-area',
+    slug: 'soiperoinen',
+    syntheticLipasId: 9_001_056
+  },
+  {
+    displayTypeName: null,
+    luontoonUrl: 'https://www.luontoon.fi/fi/kohteet/unarinkongas',
+    name: 'Unarinköngäs',
+    parkTypeSlug: 'outdoor-recreation-area',
+    slug: 'unarinkongas',
+    syntheticLipasId: 9_001_057
+  }
+];
+
 const sourceReadyHistoryAreaSeeds: SykeSpecialParkSeed[] = [
   {
     displayTypeName: null,
@@ -1068,6 +1227,117 @@ const sourceReadyHistoryAreaSeeds: SykeSpecialParkSeed[] = [
     slug: 'karnakosken-linnoitus',
     sourceName: 'Kärnäkosken linnoitus',
     syntheticLipasId: 9_001_043
+  }
+];
+
+const sourceReadyHistoryRkyAreaSeeds: MuseovirastoRkyAreaSeed[] = [
+  {
+    displayTypeName: 'Historia-alue',
+    luontoonUrl: null,
+    name: 'Bengtskärin majakka',
+    parkTypeSlug: 'outdoor-recreation-area',
+    slug: 'bengtskarin-majakka',
+    sourceName: 'Bengtskärin majakka',
+    syntheticLipasId: 9_001_058
+  },
+  {
+    displayTypeName: 'Historia-alue',
+    luontoonUrl: null,
+    name: 'Haapasaaren saaristokylä',
+    parkTypeSlug: 'outdoor-recreation-area',
+    slug: 'haapasaaren-saaristokyla',
+    sourceName: 'Haapasaaren saaristokylä',
+    syntheticLipasId: 9_001_059
+  },
+  {
+    displayTypeName: 'Historia-alue',
+    luontoonUrl: null,
+    name: 'Kaunissaaren saaristokylä',
+    parkTypeSlug: 'outdoor-recreation-area',
+    slug: 'kaunissaaren-saaristokyla',
+    sourceName: 'Kaunissaaren saaristokylä',
+    syntheticLipasId: 9_001_060
+  },
+  {
+    displayTypeName: 'Historia-alue',
+    luontoonUrl: null,
+    name: 'Vanajanlinna',
+    parkTypeSlug: 'outdoor-recreation-area',
+    slug: 'vanajanlinna',
+    sourceName: 'Vanajanlinna',
+    syntheticLipasId: 9_001_061
+  },
+  {
+    displayTypeName: 'Historia-alue',
+    luontoonUrl: null,
+    name: 'Kissakosken kanava',
+    parkTypeSlug: 'outdoor-recreation-area',
+    slug: 'kissakosken-kanava',
+    sourceName: 'Kissakosken kanava ja tehdasalue',
+    syntheticLipasId: 9_001_062
+  },
+  {
+    displayTypeName: 'Historia-alue',
+    luontoonUrl: null,
+    name: 'Jyväskylän harju',
+    parkTypeSlug: 'outdoor-recreation-area',
+    slug: 'harju',
+    sourceName: 'Jyväskylän Harju ja Vesilinna',
+    syntheticLipasId: 9_001_063
+  },
+  {
+    displayTypeName: 'Maailmanperintökohde',
+    luontoonUrl: null,
+    name: 'Petäjäveden vanha kirkko',
+    parkTypeSlug: 'outdoor-recreation-area',
+    slug: 'petajaveden-vanha-kirkko',
+    sourceName: 'Petäjäveden vanha ja uusi kirkko ympäristöineen',
+    syntheticLipasId: 9_001_064
+  },
+  {
+    displayTypeName: 'Historia-alue',
+    luontoonUrl: null,
+    name: 'Ylivieskan savisilta',
+    parkTypeSlug: 'outdoor-recreation-area',
+    slug: 'savisilta',
+    sourceName: 'Kalajokivarsi Ylivieskan keskustassa ja Savisilta',
+    syntheticLipasId: 9_001_065
+  },
+  {
+    displayTypeName: 'Historia-alue',
+    luontoonUrl: null,
+    name: 'Vääksyn kanava',
+    parkTypeSlug: 'outdoor-recreation-area',
+    slug: 'vaaksyn-kanava',
+    sourceName: 'Vääksyn kanava',
+    syntheticLipasId: 9_001_066
+  },
+  {
+    displayTypeName: 'Historia-alue',
+    luontoonUrl: null,
+    name: 'Reposaari',
+    parkTypeSlug: 'outdoor-recreation-area',
+    slug: 'reposaari',
+    sourceName: 'Reposaaren yhdyskunta',
+    syntheticLipasId: 9_001_067
+  },
+  {
+    displayTypeName: 'Historia-alue',
+    luontoonUrl: null,
+    name: 'Träskändan kartano',
+    parkTypeSlug: 'outdoor-recreation-area',
+    slug: 'traskandan-kartano',
+    sourceName: 'Träskändan kartano',
+    syntheticLipasId: 9_001_068
+  },
+  {
+    displayTypeName: 'Historia-alue',
+    luontoonUrl: null,
+    name: 'Helsingin Vanhakaupunki',
+    parkTypeSlug: 'outdoor-recreation-area',
+    slug: 'helsingin-vanhakaupunki',
+    sourceName: 'Helsingin Vanhakaupunki',
+    syntheticLipasId: 9_001_069
   }
 ];
 
@@ -1362,6 +1632,42 @@ const sourceReadyFactoryVillageSeeds: MuseovirastoRkyAreaSeed[] = [
     slug: 'juankosken-ruukki',
     sourceName: 'Juantehdas',
     syntheticLipasId: 9_002_024
+  },
+  {
+    displayTypeName: null,
+    luontoonUrl: null,
+    name: 'Lapuan patruunatehdas',
+    parkTypeSlug: 'factory-village',
+    slug: 'lapuan-patruunatehdas',
+    sourceName: 'Lapuan Patruunatehdas',
+    syntheticLipasId: 9_002_028
+  },
+  {
+    displayTypeName: null,
+    luontoonUrl: null,
+    name: 'Vääräkosken kartonkitehdas',
+    parkTypeSlug: 'factory-village',
+    slug: 'vaarakosken-kartonkitehdas',
+    sourceName: 'Vääräkosken kartonkitehdas',
+    syntheticLipasId: 9_002_029
+  },
+  {
+    displayTypeName: null,
+    luontoonUrl: null,
+    name: 'Riihimäen lasitehdas',
+    parkTypeSlug: 'factory-village',
+    slug: 'riihimaen-lasitehdas',
+    sourceName: 'Riihimäen Lasin tehdasalue',
+    syntheticLipasId: 9_002_030
+  },
+  {
+    displayTypeName: null,
+    luontoonUrl: null,
+    name: 'Koskenkylän ruukinalue',
+    parkTypeSlug: 'factory-village',
+    slug: 'koskenkylan-ruukinalue',
+    sourceName: 'Koskenkylän ruukinalue',
+    syntheticLipasId: 9_002_031
   }
 ];
 
@@ -1396,7 +1702,9 @@ const specialParkConfigs: SpecialParkConfig[] = [
   ...baseSpecialParkConfigs,
   ...sourceReadyReserveParkSeeds.map(createSykeSpecialParkConfig),
   ...sourceReadyDestinationAreaSeeds.map(createSykeSpecialParkConfig),
+  ...sourceReadyLuontoonDestinationAreaSeeds.map(createLuontoonDestinationAreaConfig),
   ...sourceReadyHistoryAreaSeeds.map(createMuseovirastoSpecialParkConfig),
+  ...sourceReadyHistoryRkyAreaSeeds.map(createMuseovirastoRkyAreaConfig),
   ...sourceReadyFactoryVillageProtectedSiteSeeds.map(createMuseovirastoSpecialParkConfig),
   ...sourceReadyFactoryVillageSeeds.map(createMuseovirastoRkyAreaConfig)
 ];
