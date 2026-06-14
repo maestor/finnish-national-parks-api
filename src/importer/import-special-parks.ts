@@ -223,6 +223,22 @@ export const extractHikingAreaMetadata = (
   };
 };
 
+const extractLuontoonDestinationMetadata = (
+  features: Array<{
+    properties?: Record<string, unknown> | undefined;
+  }>
+) => {
+  const totalAreaM2 = features.reduce(
+    (sum, f) => sum + ((f.properties?.surfaceArea as number | undefined) ?? 0),
+    0
+  );
+
+  return {
+    areaKm2: totalAreaM2 > 0 ? Math.round((totalAreaM2 / 1_000_000) * 100) / 100 : null,
+    establishmentYear: null
+  };
+};
+
 const buildSykeProtectedSitesSourceUrl = (
   sourceName: string,
   sourceType: SykeProtectedSitesSourceType = 'state'
@@ -613,6 +629,24 @@ const baseSpecialParkConfigs: SpecialParkConfig[] = [
       filter: "slug='torholan-luolan-polku-lohja-194240'"
     }),
     syntheticLipasId: 9_004_406
+  },
+  {
+    displayTypeName: null,
+    extractMetadata: extractLuontoonDestinationMetadata,
+    locationLabel: 'Sonnasentie 948',
+    luontoonUrl: 'https://www.luontoon.fi/fi/kohteet/paistjarvi',
+    name: 'Paistjärvi',
+    parkTypeSlug: 'outdoor-recreation-area',
+    postalCode: '18300',
+    postalOffice: 'Heinola',
+    responseShapeVersion: 'luontoon-destination-area-v1',
+    slug: 'paistjarvi',
+    sourceParser: 'geojson',
+    sourceUrl: buildLuontoonGeoJsonCollectionSourceUrl({
+      collectionId: 'public.destinations_details_view',
+      filter: "slug='paistjarvi'"
+    }),
+    syntheticLipasId: 9_001_044
   },
   {
     displayTypeName: 'Historia-alue',

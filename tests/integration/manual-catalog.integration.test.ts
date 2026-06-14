@@ -14,6 +14,8 @@ const merenkurkkuSourceUrl =
 
 const kevoSourceUrl =
   "https://paikkatiedot.ymparisto.fi/geoserver/inspire_ps/wfs?service=WFS&request=GetFeature&version=2.0.0&typeNames=inspire_ps:PS.ProtectedSitesValtionOmistamaLuonnonsuojelualue&outputFormat=application/json&srsName=EPSG:4326&cql_filter=nimi='Kevon luonnonpuisto'";
+const paistjarviSourceUrl =
+  'https://www.luontoon.fi/geo/features/collections/public.destinations_details_view/items?filter=slug%3D%27paistjarvi%27&filter-lang=cql-text&limit=1000';
 
 describe('manual catalog imports', () => {
   let testDatabase: Awaited<ReturnType<typeof createTestDatabase>>;
@@ -34,7 +36,7 @@ describe('manual catalog imports', () => {
       now: () => '2026-05-27T08:00:00.000Z'
     });
 
-    expect(result.results).toHaveLength(84);
+    expect(result.results).toHaveLength(85);
 
     const merenkurkku = await getParkBySlug(
       testDatabase.database,
@@ -256,6 +258,20 @@ describe('manual catalog imports', () => {
       type: { slug: 'outdoor-recreation-area' }
     });
 
+    const paistjarvi = await getParkBySlug(testDatabase.database, 'paistjarvi');
+    expect(paistjarvi).toMatchObject({
+      address: 'Sonnasentie 948, 18300 Heinola',
+      lipasId: 9001044,
+      locationLabel: 'Sonnasentie 948',
+      luontoonUrl: 'https://www.luontoon.fi/fi/kohteet/paistjarvi',
+      name: 'Paistjärvi',
+      postalCode: '18300',
+      postalOffice: 'Heinola',
+      type: { slug: 'outdoor-recreation-area' }
+    });
+    expect(paistjarvi?.boundaryGeoJson?.features).toHaveLength(1);
+    expect(paistjarvi?.boundaryGeoJson?.features[0]?.geometry.type).toBe('Polygon');
+
     const liimanninkoski = await getParkBySlug(
       testDatabase.database,
       'liimanninkosken-lehtojensuojelualue'
@@ -426,7 +442,7 @@ describe('manual catalog imports', () => {
     );
     const kevo = await getParkBySlug(testDatabase.database, 'kevon-luonnonpuisto');
 
-    expect(allParks).toHaveLength(84);
+    expect(allParks).toHaveLength(85);
     expect(merenkurkku).toMatchObject({ catalogStatus: 'active' });
     expect(kevo).toMatchObject({ catalogStatus: 'active' });
   });
@@ -503,7 +519,7 @@ describe('manual catalog imports', () => {
       database: testDatabase.database
     });
 
-    expect(result.results).toHaveLength(84);
+    expect(result.results).toHaveLength(85);
 
     const merenkurkku = await getParkBySlug(
       testDatabase.database,
@@ -568,6 +584,49 @@ describe('manual catalog imports', () => {
 
     expect(liminganlahti?.areaKm2).toBe(3.7);
     expect(liminganlahti?.establishmentYear).toBe(1998);
+  });
+
+  it('keeps luontoon destination area null when surface area metadata is missing', async () => {
+    await importSpecialParks({
+      database: testDatabase.database,
+      fetchSource: async (sourceUrl) => {
+        if (sourceUrl === paistjarviSourceUrl) {
+          return {
+            type: 'FeatureCollection',
+            features: [
+              {
+                type: 'Feature',
+                geometry: {
+                  type: 'Polygon',
+                  coordinates: [
+                    [
+                      [26.3364, 61.2622],
+                      [26.3364, 61.3146],
+                      [26.4688, 61.3146],
+                      [26.4688, 61.2622],
+                      [26.3364, 61.2622]
+                    ]
+                  ]
+                },
+                properties: {
+                  name_fi: 'Paistjärvi',
+                  slug: 'paistjarvi'
+                }
+              }
+            ]
+          };
+        }
+
+        return createSpecialParksSource()(sourceUrl);
+      },
+      now: () => '2026-05-27T08:00:00.000Z'
+    });
+
+    const paistjarvi = await testDatabase.database.query.parks.findFirst({
+      where: eq(parks.slug, 'paistjarvi')
+    });
+
+    expect(paistjarvi?.areaKm2).toBeNull();
   });
 
   it('filters Laajalahti by ELY to pick the Espoo feature', async () => {
