@@ -131,7 +131,8 @@ npm run import:special-parks
 That command:
 
 - imports curated official geometry into the existing `parks` table
-- includes selected world-heritage sites as `outdoor-recreation-area` rows with `displayTypeName: Maailmanperintökohde`
+- stores curated cultural-history imports under the normalized `cultural-history-area` type, with `displayTypeName: Tehdaskylä` for former factory-village rows
+- includes selected cultural world-heritage sites under `cultural-history-area` with `displayTypeName: Maailmanperintökohde`
 - stores Merenkurkun maailmanperintöalue under the normalized `nature-reserve-area` type
 - uses curated location details such as `Raippaluodontie 2, 65800 Raippaluoto`, `Suomenlinna, 00190 Helsinki`, and `Sonnasentie 948, 18300 Heinola`
 - marks the rows as not managed by the LIPAS cleanup step, so later `npm run import:parks` executions do not deactivate them

@@ -18,7 +18,7 @@ describe('park type helpers', () => {
     });
     expect(getSupportedParkTypeByCode(9001)).toMatchObject({
       code: 9001,
-      slug: 'factory-village'
+      slug: 'cultural-history-area'
     });
     expect(getSupportedParkTypeByCode(111)).toMatchObject({
       code: 111,
@@ -40,9 +40,9 @@ describe('park type helpers', () => {
       code: 109,
       name: 'Retkeilyalue'
     });
-    expect(getSupportedParkTypeBySlug('factory-village')).toMatchObject({
+    expect(getSupportedParkTypeBySlug('cultural-history-area')).toMatchObject({
       code: 9001,
-      name: 'Tehdaskylä'
+      name: 'Historia-alue'
     });
     expect(getSupportedParkTypeBySlug('walking-trail')).toMatchObject({
       code: 4403,
@@ -58,7 +58,7 @@ describe('park type helpers', () => {
     });
     expect(supportedParkTypeSlugs).toEqual([
       'outdoor-recreation-area',
-      'factory-village',
+      'cultural-history-area',
       'hiking-area',
       'wilderness-area',
       'national-park',
@@ -97,7 +97,7 @@ describe('park type helpers', () => {
     ]);
     expect(supportedParkCategorySlugs).toEqual([
       'outdoor-recreation-area',
-      'factory-village',
+      'cultural-history-area',
       'hiking-and-wilderness-areas',
       'national-park',
       'nature-reserve-area',
