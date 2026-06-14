@@ -1126,7 +1126,7 @@ const sourceReadyLuontoonDestinationAreaSeeds: LuontoonDestinationAreaSeed[] = [
     displayTypeName: null,
     luontoonUrl: 'https://www.luontoon.fi/fi/kohteet/hepokongas',
     name: 'Hepoköngäs',
-    parkTypeSlug: 'outdoor-recreation-area',
+    parkTypeSlug: 'nature-reserve-area',
     slug: 'hepokongas',
     syntheticLipasId: 9_001_053
   },

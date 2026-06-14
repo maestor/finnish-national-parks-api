@@ -334,7 +334,7 @@ describe('manual catalog imports', () => {
         lipasId: 9001053,
         name: 'Hepoköngäs',
         slug: 'hepokongas',
-        typeSlug: 'outdoor-recreation-area'
+        typeSlug: 'nature-reserve-area'
       },
       {
         lipasId: 9001054,
