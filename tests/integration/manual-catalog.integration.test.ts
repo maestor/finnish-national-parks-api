@@ -74,7 +74,7 @@ describe('manual catalog imports', () => {
       name: 'Sammallahdenmäki',
       postalCode: '27230',
       postalOffice: 'Rauma',
-      type: { slug: 'outdoor-recreation-area' }
+      type: { slug: 'cultural-history-area' }
     });
 
     const suomenlinna = await getParkBySlug(testDatabase.database, 'suomenlinna');
@@ -86,7 +86,7 @@ describe('manual catalog imports', () => {
       name: 'Suomenlinna',
       postalCode: '00190',
       postalOffice: 'Helsinki',
-      type: { slug: 'outdoor-recreation-area' }
+      type: { slug: 'cultural-history-area' }
     });
 
     const vanhaRauma = await getParkBySlug(testDatabase.database, 'vanha-rauma');
@@ -98,7 +98,7 @@ describe('manual catalog imports', () => {
       name: 'Vanha Rauma',
       postalCode: '26100',
       postalOffice: 'Rauma',
-      type: { slug: 'outdoor-recreation-area' }
+      type: { slug: 'cultural-history-area' }
     });
 
     const kevo = await getParkBySlug(testDatabase.database, 'kevon-luonnonpuisto');
@@ -238,10 +238,9 @@ describe('manual catalog imports', () => {
 
     const seili = await getParkBySlug(testDatabase.database, 'seili');
     expect(seili).toMatchObject({
-      displayTypeName: 'Historia-alue',
       lipasId: 9001034,
       name: 'Seili',
-      type: { slug: 'outdoor-recreation-area' }
+      type: { slug: 'cultural-history-area' }
     });
 
     const vallisaari = await getParkBySlug(testDatabase.database, 'vallisaari');
@@ -260,10 +259,9 @@ describe('manual catalog imports', () => {
 
     const dagmarinPuisto = await getParkBySlug(testDatabase.database, 'dagmarin-puisto');
     expect(dagmarinPuisto).toMatchObject({
-      displayTypeName: 'Historia-alue',
       lipasId: 9001028,
       name: 'Dagmarin puisto',
-      type: { slug: 'outdoor-recreation-area' }
+      type: { slug: 'cultural-history-area' }
     });
 
     const paistjarvi = await getParkBySlug(testDatabase.database, 'paistjarvi');
@@ -457,27 +455,24 @@ describe('manual catalog imports', () => {
 
     const kajaaninLinna = await getParkBySlug(testDatabase.database, 'kajaanin-linna');
     expect(kajaaninLinna).toMatchObject({
-      displayTypeName: 'Historia-alue',
       lipasId: 9001031,
       name: 'Kajaanin linna',
-      type: { slug: 'outdoor-recreation-area' }
+      type: { slug: 'cultural-history-area' }
     });
 
     const kuusistonLinna = await getParkBySlug(testDatabase.database, 'kuusiston-linna');
     expect(kuusistonLinna).toMatchObject({
-      displayTypeName: 'Historia-alue',
       lipasId: 9001039,
       name: 'Kuusiston linna',
-      type: { slug: 'outdoor-recreation-area' }
+      type: { slug: 'cultural-history-area' }
     });
 
     const latokartanonkoski = await getParkBySlug(testDatabase.database, 'latokartanonkoski');
     expect(latokartanonkoski).toMatchObject({
-      displayTypeName: 'Historia-alue',
       lipasId: 9001042,
       luontoonUrl: 'https://www.luontoon.fi/fi/kohteet/latokartanonkoski',
       name: 'Latokartanonkoski',
-      type: { slug: 'outdoor-recreation-area' }
+      type: { slug: 'cultural-history-area' }
     });
 
     const karnakoskenLinnoitus = await getParkBySlug(
@@ -485,46 +480,39 @@ describe('manual catalog imports', () => {
       'karnakosken-linnoitus'
     );
     expect(karnakoskenLinnoitus).toMatchObject({
-      displayTypeName: 'Historia-alue',
       lipasId: 9001043,
       luontoonUrl: 'https://www.luontoon.fi/fi/kohteet/karnakosken-linnoitus',
       name: 'Kärnäkosken linnoitus',
-      type: { slug: 'outdoor-recreation-area' }
+      type: { slug: 'cultural-history-area' }
     });
 
     const expectedMuseovirastoHistoryImports = [
       {
-        displayTypeName: 'Historia-alue',
         lipasId: 9001058,
         name: 'Bengtskärin majakka',
         slug: 'bengtskarin-majakka'
       },
       {
-        displayTypeName: 'Historia-alue',
         lipasId: 9001059,
         name: 'Haapasaaren saaristokylä',
         slug: 'haapasaaren-saaristokyla'
       },
       {
-        displayTypeName: 'Historia-alue',
         lipasId: 9001060,
         name: 'Kaunissaaren saaristokylä',
         slug: 'kaunissaaren-saaristokyla'
       },
       {
-        displayTypeName: 'Historia-alue',
         lipasId: 9001061,
         name: 'Vanajanlinna',
         slug: 'vanajanlinna'
       },
       {
-        displayTypeName: 'Historia-alue',
         lipasId: 9001062,
         name: 'Kissakosken kanava',
         slug: 'kissakosken-kanava'
       },
       {
-        displayTypeName: 'Historia-alue',
         lipasId: 9001063,
         name: 'Jyväskylän harju',
         slug: 'harju'
@@ -536,31 +524,26 @@ describe('manual catalog imports', () => {
         slug: 'petajaveden-vanha-kirkko'
       },
       {
-        displayTypeName: 'Historia-alue',
         lipasId: 9001065,
         name: 'Ylivieskan savisilta',
         slug: 'savisilta'
       },
       {
-        displayTypeName: 'Historia-alue',
         lipasId: 9001066,
         name: 'Vääksyn kanava',
         slug: 'vaaksyn-kanava'
       },
       {
-        displayTypeName: 'Historia-alue',
         lipasId: 9001067,
         name: 'Reposaari',
         slug: 'reposaari'
       },
       {
-        displayTypeName: 'Historia-alue',
         lipasId: 9001068,
         name: 'Träskändan kartano',
         slug: 'traskandan-kartano'
       },
       {
-        displayTypeName: 'Historia-alue',
         lipasId: 9001069,
         name: 'Helsingin Vanhakaupunki',
         slug: 'helsingin-vanhakaupunki'
@@ -571,23 +554,23 @@ describe('manual catalog imports', () => {
       const park = await getParkBySlug(testDatabase.database, expectedPark.slug);
 
       expect(park).toMatchObject({
-        displayTypeName: expectedPark.displayTypeName,
         lipasId: expectedPark.lipasId,
         luontoonUrl: null,
         name: expectedPark.name,
-        type: { slug: 'outdoor-recreation-area' }
+        type: { slug: 'cultural-history-area' }
       });
     }
 
     const fiskars = await getParkBySlug(testDatabase.database, 'fiskarsin-ruukki');
     expect(fiskars).toMatchObject({
       address: 'Fiskarsintie 9, 10470 Fiskars',
+      displayTypeName: 'Tehdaskylä',
       lipasId: 9002003,
       locationLabel: 'Fiskarsintie 9',
       name: 'Fiskarsin ruukki',
       postalCode: '10470',
       postalOffice: 'Fiskars',
-      type: { slug: 'factory-village' }
+      type: { slug: 'cultural-history-area' }
     });
 
     const verla = await getParkBySlug(testDatabase.database, 'verla');
@@ -599,25 +582,27 @@ describe('manual catalog imports', () => {
       name: 'Verla',
       postalCode: '47850',
       postalOffice: 'Verla',
-      type: { slug: 'factory-village' }
+      type: { slug: 'cultural-history-area' }
     });
 
     const juankoski = await getParkBySlug(testDatabase.database, 'juankosken-ruukki');
     expect(juankoski).toMatchObject({
+      displayTypeName: 'Tehdaskylä',
       lipasId: 9002024,
       name: 'Juankosken ruukki',
-      type: { slug: 'factory-village' }
+      type: { slug: 'cultural-history-area' }
     });
 
     const nuutajarvi = await getParkBySlug(testDatabase.database, 'nuutajarven-lasikyla');
     expect(nuutajarvi).toMatchObject({
       address: 'Pruukinraitti 15, 31160 Urjala',
+      displayTypeName: 'Tehdaskylä',
       lipasId: 9002025,
       locationLabel: 'Pruukinraitti 15',
       name: 'Nuutajärven lasikylä',
       postalCode: '31160',
       postalOffice: 'Urjala',
-      type: { slug: 'factory-village' }
+      type: { slug: 'cultural-history-area' }
     });
 
     const expectedFactoryVillageImports = [
@@ -647,10 +632,11 @@ describe('manual catalog imports', () => {
       const park = await getParkBySlug(testDatabase.database, expectedPark.slug);
 
       expect(park).toMatchObject({
+        displayTypeName: 'Tehdaskylä',
         lipasId: expectedPark.lipasId,
         luontoonUrl: null,
         name: expectedPark.name,
-        type: { slug: 'factory-village' }
+        type: { slug: 'cultural-history-area' }
       });
     }
   });
@@ -787,9 +773,8 @@ describe('manual catalog imports', () => {
 
     const seili = await getParkBySlug(testDatabase.database, 'seili');
     expect(seili).toMatchObject({
-      displayTypeName: 'Historia-alue',
       name: 'Seili',
-      type: { slug: 'outdoor-recreation-area' }
+      type: { slug: 'cultural-history-area' }
     });
 
     const vallisaari = await getParkBySlug(testDatabase.database, 'vallisaari');

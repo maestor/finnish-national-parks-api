@@ -317,7 +317,7 @@ describe('API routes', () => {
     });
   });
 
-  it('filters manual factory villages by the normalized type slug', async () => {
+  it('filters manual cultural history areas by the normalized type slug', async () => {
     const { createSpecialParksSource } = await import('../fixtures/special-parks.js');
     await importSpecialParks({
       database: testDatabase.database,
@@ -326,7 +326,7 @@ describe('API routes', () => {
     });
 
     const app = createApp({ database: testDatabase.database });
-    const response = await app.request('/api/parks?type=factory-village');
+    const response = await app.request('/api/parks?type=cultural-history-area');
     const body = (await response.json()) as {
       parks: Array<Record<string, unknown>>;
     };
@@ -334,9 +334,10 @@ describe('API routes', () => {
     expect(response.status).toBe(200);
     expect(body.parks.some((park) => park.slug === 'fiskarsin-ruukki')).toBe(true);
     expect(body.parks.some((park) => park.slug === 'verla')).toBe(true);
+    expect(body.parks.some((park) => park.slug === 'kajaanin-linna')).toBe(true);
     expect(
       body.parks.every(
-        (park) => park.type && (park.type as { slug: string }).slug === 'factory-village'
+        (park) => park.type && (park.type as { slug: string }).slug === 'cultural-history-area'
       )
     ).toBe(true);
   });

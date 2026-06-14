@@ -484,7 +484,7 @@ const baseSpecialParkConfigs: SpecialParkConfig[] = [
     locationLabel: 'Sammallahdentie',
     luontoonUrl: null,
     name: 'Sammallahdenmäki',
-    parkTypeSlug: 'outdoor-recreation-area',
+    parkTypeSlug: 'cultural-history-area',
     postalCode: '27230',
     postalOffice: 'Rauma',
     responseShapeVersion: 'museovirasto-world-heritage-areas-v1',
@@ -500,7 +500,7 @@ const baseSpecialParkConfigs: SpecialParkConfig[] = [
     locationLabel: 'Suomenlinna',
     luontoonUrl: null,
     name: 'Suomenlinna',
-    parkTypeSlug: 'outdoor-recreation-area',
+    parkTypeSlug: 'cultural-history-area',
     postalCode: '00190',
     postalOffice: 'Helsinki',
     responseShapeVersion: 'museovirasto-world-heritage-areas-v1',
@@ -516,7 +516,7 @@ const baseSpecialParkConfigs: SpecialParkConfig[] = [
     locationLabel: 'Vanha Rauma',
     luontoonUrl: null,
     name: 'Vanha Rauma',
-    parkTypeSlug: 'outdoor-recreation-area',
+    parkTypeSlug: 'cultural-history-area',
     postalCode: '26100',
     postalOffice: 'Rauma',
     responseShapeVersion: 'museovirasto-world-heritage-areas-v1',
@@ -698,11 +698,11 @@ const baseSpecialParkConfigs: SpecialParkConfig[] = [
     syntheticLipasId: 9_001_044
   },
   {
-    displayTypeName: 'Historia-alue',
+    displayTypeName: null,
     locationLabel: 'Seili',
     luontoonUrl: 'https://www.luontoon.fi/fi/kohteet/seili',
     name: 'Seili',
-    parkTypeSlug: 'outdoor-recreation-area',
+    parkTypeSlug: 'cultural-history-area',
     postalCode: null,
     postalOffice: null,
     responseShapeVersion: 'manual-mml-landwaterboundary-v1',
@@ -1019,10 +1019,10 @@ const sourceReadyDestinationAreaSeeds: SykeSpecialParkSeed[] = [
     syntheticLipasId: 9_001_038
   },
   {
-    displayTypeName: 'Historia-alue',
+    displayTypeName: null,
     luontoonUrl: 'https://www.luontoon.fi/fi/kohteet/dagmarin-puisto',
     name: 'Dagmarin puisto',
-    parkTypeSlug: 'outdoor-recreation-area',
+    parkTypeSlug: 'cultural-history-area',
     slug: 'dagmarin-puisto',
     sourceName: 'Dagmarin puisto',
     sourceType: 'private',
@@ -1175,55 +1175,55 @@ const sourceReadyHistoryAreaSeeds: SykeSpecialParkSeed[] = [
     syntheticLipasId: 9_001_030
   },
   {
-    displayTypeName: 'Historia-alue',
+    displayTypeName: null,
     luontoonUrl: 'https://www.luontoon.fi/fi/kohteet/kajaanin-linna',
     name: 'Kajaanin linna',
-    parkTypeSlug: 'outdoor-recreation-area',
+    parkTypeSlug: 'cultural-history-area',
     slug: 'kajaanin-linna',
     sourceName: 'Kajaanin linna',
     syntheticLipasId: 9_001_031
   },
   {
-    displayTypeName: 'Historia-alue',
+    displayTypeName: null,
     luontoonUrl: 'https://www.luontoon.fi/fi/kohteet/raaseporin-linna',
     name: 'Raaseporin linna',
-    parkTypeSlug: 'outdoor-recreation-area',
+    parkTypeSlug: 'cultural-history-area',
     slug: 'raaseporin-linna',
     sourceName: 'Raaseporin linna',
     syntheticLipasId: 9_001_032
   },
   {
-    displayTypeName: 'Historia-alue',
+    displayTypeName: null,
     luontoonUrl: 'https://www.luontoon.fi/fi/kohteet/svartholma',
     name: 'Svartholma',
-    parkTypeSlug: 'outdoor-recreation-area',
+    parkTypeSlug: 'cultural-history-area',
     slug: 'svartholma',
     sourceName: 'Svartholma',
     syntheticLipasId: 9_001_033
   },
   {
-    displayTypeName: 'Historia-alue',
+    displayTypeName: null,
     luontoonUrl: 'https://www.luontoon.fi/fi/kohteet/kuusiston-linna',
     name: 'Kuusiston linna',
-    parkTypeSlug: 'outdoor-recreation-area',
+    parkTypeSlug: 'cultural-history-area',
     slug: 'kuusiston-linna',
     sourceName: 'Kuusiston piispanlinna',
     syntheticLipasId: 9_001_039
   },
   {
-    displayTypeName: 'Historia-alue',
+    displayTypeName: null,
     luontoonUrl: 'https://www.luontoon.fi/fi/kohteet/latokartanonkoski',
     name: 'Latokartanonkoski',
-    parkTypeSlug: 'outdoor-recreation-area',
+    parkTypeSlug: 'cultural-history-area',
     slug: 'latokartanonkoski',
     sourceName: 'Latokartanonkoski',
     syntheticLipasId: 9_001_042
   },
   {
-    displayTypeName: 'Historia-alue',
+    displayTypeName: null,
     luontoonUrl: 'https://www.luontoon.fi/fi/kohteet/karnakosken-linnoitus',
     name: 'Kärnäkosken linnoitus',
-    parkTypeSlug: 'outdoor-recreation-area',
+    parkTypeSlug: 'cultural-history-area',
     slug: 'karnakosken-linnoitus',
     sourceName: 'Kärnäkosken linnoitus',
     syntheticLipasId: 9_001_043
@@ -1232,55 +1232,55 @@ const sourceReadyHistoryAreaSeeds: SykeSpecialParkSeed[] = [
 
 const sourceReadyHistoryRkyAreaSeeds: MuseovirastoRkyAreaSeed[] = [
   {
-    displayTypeName: 'Historia-alue',
+    displayTypeName: null,
     luontoonUrl: null,
     name: 'Bengtskärin majakka',
-    parkTypeSlug: 'outdoor-recreation-area',
+    parkTypeSlug: 'cultural-history-area',
     slug: 'bengtskarin-majakka',
     sourceName: 'Bengtskärin majakka',
     syntheticLipasId: 9_001_058
   },
   {
-    displayTypeName: 'Historia-alue',
+    displayTypeName: null,
     luontoonUrl: null,
     name: 'Haapasaaren saaristokylä',
-    parkTypeSlug: 'outdoor-recreation-area',
+    parkTypeSlug: 'cultural-history-area',
     slug: 'haapasaaren-saaristokyla',
     sourceName: 'Haapasaaren saaristokylä',
     syntheticLipasId: 9_001_059
   },
   {
-    displayTypeName: 'Historia-alue',
+    displayTypeName: null,
     luontoonUrl: null,
     name: 'Kaunissaaren saaristokylä',
-    parkTypeSlug: 'outdoor-recreation-area',
+    parkTypeSlug: 'cultural-history-area',
     slug: 'kaunissaaren-saaristokyla',
     sourceName: 'Kaunissaaren saaristokylä',
     syntheticLipasId: 9_001_060
   },
   {
-    displayTypeName: 'Historia-alue',
+    displayTypeName: null,
     luontoonUrl: null,
     name: 'Vanajanlinna',
-    parkTypeSlug: 'outdoor-recreation-area',
+    parkTypeSlug: 'cultural-history-area',
     slug: 'vanajanlinna',
     sourceName: 'Vanajanlinna',
     syntheticLipasId: 9_001_061
   },
   {
-    displayTypeName: 'Historia-alue',
+    displayTypeName: null,
     luontoonUrl: null,
     name: 'Kissakosken kanava',
-    parkTypeSlug: 'outdoor-recreation-area',
+    parkTypeSlug: 'cultural-history-area',
     slug: 'kissakosken-kanava',
     sourceName: 'Kissakosken kanava ja tehdasalue',
     syntheticLipasId: 9_001_062
   },
   {
-    displayTypeName: 'Historia-alue',
+    displayTypeName: null,
     luontoonUrl: null,
     name: 'Jyväskylän harju',
-    parkTypeSlug: 'outdoor-recreation-area',
+    parkTypeSlug: 'cultural-history-area',
     slug: 'harju',
     sourceName: 'Jyväskylän Harju ja Vesilinna',
     syntheticLipasId: 9_001_063
@@ -1289,52 +1289,52 @@ const sourceReadyHistoryRkyAreaSeeds: MuseovirastoRkyAreaSeed[] = [
     displayTypeName: 'Maailmanperintökohde',
     luontoonUrl: null,
     name: 'Petäjäveden vanha kirkko',
-    parkTypeSlug: 'outdoor-recreation-area',
+    parkTypeSlug: 'cultural-history-area',
     slug: 'petajaveden-vanha-kirkko',
     sourceName: 'Petäjäveden vanha ja uusi kirkko ympäristöineen',
     syntheticLipasId: 9_001_064
   },
   {
-    displayTypeName: 'Historia-alue',
+    displayTypeName: null,
     luontoonUrl: null,
     name: 'Ylivieskan savisilta',
-    parkTypeSlug: 'outdoor-recreation-area',
+    parkTypeSlug: 'cultural-history-area',
     slug: 'savisilta',
     sourceName: 'Kalajokivarsi Ylivieskan keskustassa ja Savisilta',
     syntheticLipasId: 9_001_065
   },
   {
-    displayTypeName: 'Historia-alue',
+    displayTypeName: null,
     luontoonUrl: null,
     name: 'Vääksyn kanava',
-    parkTypeSlug: 'outdoor-recreation-area',
+    parkTypeSlug: 'cultural-history-area',
     slug: 'vaaksyn-kanava',
     sourceName: 'Vääksyn kanava',
     syntheticLipasId: 9_001_066
   },
   {
-    displayTypeName: 'Historia-alue',
+    displayTypeName: null,
     luontoonUrl: null,
     name: 'Reposaari',
-    parkTypeSlug: 'outdoor-recreation-area',
+    parkTypeSlug: 'cultural-history-area',
     slug: 'reposaari',
     sourceName: 'Reposaaren yhdyskunta',
     syntheticLipasId: 9_001_067
   },
   {
-    displayTypeName: 'Historia-alue',
+    displayTypeName: null,
     luontoonUrl: null,
     name: 'Träskändan kartano',
-    parkTypeSlug: 'outdoor-recreation-area',
+    parkTypeSlug: 'cultural-history-area',
     slug: 'traskandan-kartano',
     sourceName: 'Träskändan kartano',
     syntheticLipasId: 9_001_068
   },
   {
-    displayTypeName: 'Historia-alue',
+    displayTypeName: null,
     luontoonUrl: null,
     name: 'Helsingin Vanhakaupunki',
-    parkTypeSlug: 'outdoor-recreation-area',
+    parkTypeSlug: 'cultural-history-area',
     slug: 'helsingin-vanhakaupunki',
     sourceName: 'Helsingin Vanhakaupunki',
     syntheticLipasId: 9_001_069
@@ -1343,11 +1343,11 @@ const sourceReadyHistoryRkyAreaSeeds: MuseovirastoRkyAreaSeed[] = [
 
 const sourceReadyFactoryVillageSeeds: MuseovirastoRkyAreaSeed[] = [
   {
-    displayTypeName: null,
+    displayTypeName: 'Tehdaskylä',
     locationLabel: 'Antskogintie 259',
     luontoonUrl: null,
     name: 'Antskogin ruukki',
-    parkTypeSlug: 'factory-village',
+    parkTypeSlug: 'cultural-history-area',
     postalCode: '10410',
     postalOffice: 'Antskog',
     slug: 'antskogin-ruukki',
@@ -1356,11 +1356,11 @@ const sourceReadyFactoryVillageSeeds: MuseovirastoRkyAreaSeed[] = [
     syntheticLipasId: 9_002_001
   },
   {
-    displayTypeName: null,
+    displayTypeName: 'Tehdaskylä',
     locationLabel: 'Ruukintie 8',
     luontoonUrl: null,
     name: 'Billnäsin ruukki',
-    parkTypeSlug: 'factory-village',
+    parkTypeSlug: 'cultural-history-area',
     postalCode: '10330',
     postalOffice: 'Billnäs',
     slug: 'billnasin-ruukki',
@@ -1369,11 +1369,11 @@ const sourceReadyFactoryVillageSeeds: MuseovirastoRkyAreaSeed[] = [
     syntheticLipasId: 9_002_002
   },
   {
-    displayTypeName: null,
+    displayTypeName: 'Tehdaskylä',
     locationLabel: 'Fiskarsintie 9',
     luontoonUrl: null,
     name: 'Fiskarsin ruukki',
-    parkTypeSlug: 'factory-village',
+    parkTypeSlug: 'cultural-history-area',
     postalCode: '10470',
     postalOffice: 'Fiskars',
     slug: 'fiskarsin-ruukki',
@@ -1382,30 +1382,30 @@ const sourceReadyFactoryVillageSeeds: MuseovirastoRkyAreaSeed[] = [
     syntheticLipasId: 9_002_003
   },
   {
-    displayTypeName: null,
+    displayTypeName: 'Tehdaskylä',
     luontoonUrl: null,
     name: 'Inhan ruukkiyhdyskunta',
-    parkTypeSlug: 'factory-village',
+    parkTypeSlug: 'cultural-history-area',
     slug: 'inhan-ruukkiyhdyskunta',
     sourceName: 'Inhan ruukkiyhdyskunta',
     syntheticLipasId: 9_002_004
   },
   {
-    displayTypeName: null,
+    displayTypeName: 'Tehdaskylä',
     locationLabel: 'Björkbodan ruukinalue',
     luontoonUrl: null,
     name: 'Björkbodan ruukinalue',
-    parkTypeSlug: 'factory-village',
+    parkTypeSlug: 'cultural-history-area',
     slug: 'bjorkbodan-ruukinalue',
     sourceName: 'Björkbodan ruukinalue',
     syntheticLipasId: 9_002_005
   },
   {
-    displayTypeName: null,
+    displayTypeName: 'Tehdaskylä',
     locationLabel: 'Fagervikintie 21',
     luontoonUrl: null,
     name: 'Fagervikin ruukki',
-    parkTypeSlug: 'factory-village',
+    parkTypeSlug: 'cultural-history-area',
     postalCode: '10230',
     postalOffice: 'Fagervik',
     slug: 'fagervikin-ruukki',
@@ -1413,12 +1413,12 @@ const sourceReadyFactoryVillageSeeds: MuseovirastoRkyAreaSeed[] = [
     syntheticLipasId: 9_002_006
   },
   {
-    displayTypeName: null,
+    displayTypeName: 'Tehdaskylä',
     excludedSourceNames: ['Kulosuonmäen kaivos'],
     locationLabel: 'Bremerintie 10',
     luontoonUrl: null,
     name: 'Högforsin ruukki',
-    parkTypeSlug: 'factory-village',
+    parkTypeSlug: 'cultural-history-area',
     postalCode: '03600',
     postalOffice: 'Karkkila',
     slug: 'hogforsin-ruukki',
@@ -1426,12 +1426,12 @@ const sourceReadyFactoryVillageSeeds: MuseovirastoRkyAreaSeed[] = [
     syntheticLipasId: 9_002_007
   },
   {
-    displayTypeName: null,
+    displayTypeName: 'Tehdaskylä',
     excludedSourceNames: ['Lohiluoma'],
     locationLabel: 'Kauttuan Ruukinpuisto, Tehtaantie 1',
     luontoonUrl: null,
     name: 'Kauttuan ruukki',
-    parkTypeSlug: 'factory-village',
+    parkTypeSlug: 'cultural-history-area',
     postalCode: '27500',
     postalOffice: 'Kauttua',
     slug: 'kauttuan-tehdasyhdyskunta',
@@ -1439,11 +1439,11 @@ const sourceReadyFactoryVillageSeeds: MuseovirastoRkyAreaSeed[] = [
     syntheticLipasId: 9_002_008
   },
   {
-    displayTypeName: null,
+    displayTypeName: 'Tehdaskylä',
     locationLabel: 'Kärkelänkartanontie 411',
     luontoonUrl: null,
     name: 'Kärkelän ruukki',
-    parkTypeSlug: 'factory-village',
+    parkTypeSlug: 'cultural-history-area',
     postalCode: '25470',
     postalOffice: 'Salo',
     slug: 'karkelan-ruukki',
@@ -1451,31 +1451,31 @@ const sourceReadyFactoryVillageSeeds: MuseovirastoRkyAreaSeed[] = [
     syntheticLipasId: 9_002_009
   },
   {
-    displayTypeName: null,
+    displayTypeName: 'Tehdaskylä',
     locationLabel: 'Kimon ruukki',
     luontoonUrl: null,
     name: 'Kimon ruukki',
-    parkTypeSlug: 'factory-village',
+    parkTypeSlug: 'cultural-history-area',
     slug: 'kimon-ruukki',
     sourceName: 'Kimon ruukki ja Oravaisten tehdasyhdyskunta',
     syntheticLipasId: 9_002_010
   },
   {
-    displayTypeName: null,
+    displayTypeName: 'Tehdaskylä',
     locationLabel: 'Kosken ruukki',
     luontoonUrl: null,
     name: 'Kosken ruukki',
-    parkTypeSlug: 'factory-village',
+    parkTypeSlug: 'cultural-history-area',
     slug: 'kosken-ruukki',
     sourceName: 'Kosken ruukinalue',
     syntheticLipasId: 9_002_011
   },
   {
-    displayTypeName: null,
+    displayTypeName: 'Tehdaskylä',
     locationLabel: 'Ruukintie 16',
     luontoonUrl: null,
     name: 'Leineperin ruukki',
-    parkTypeSlug: 'factory-village',
+    parkTypeSlug: 'cultural-history-area',
     postalCode: '29320',
     postalOffice: 'Leineperi',
     slug: 'leineperin-ruukki',
@@ -1483,11 +1483,11 @@ const sourceReadyFactoryVillageSeeds: MuseovirastoRkyAreaSeed[] = [
     syntheticLipasId: 9_002_012
   },
   {
-    displayTypeName: null,
+    displayTypeName: 'Tehdaskylä',
     locationLabel: 'Kellokoskentie 2',
     luontoonUrl: null,
     name: 'Kellokosken ruukki',
-    parkTypeSlug: 'factory-village',
+    parkTypeSlug: 'cultural-history-area',
     postalCode: '04500',
     postalOffice: 'Kellokoski',
     slug: 'kellokosken-ruukki',
@@ -1495,11 +1495,11 @@ const sourceReadyFactoryVillageSeeds: MuseovirastoRkyAreaSeed[] = [
     syntheticLipasId: 9_002_013
   },
   {
-    displayTypeName: null,
+    displayTypeName: 'Tehdaskylä',
     locationLabel: 'Pruukinraitti 15',
     luontoonUrl: null,
     name: 'Nuutajärven lasikylä',
-    parkTypeSlug: 'factory-village',
+    parkTypeSlug: 'cultural-history-area',
     postalCode: '31160',
     postalOffice: 'Urjala',
     slug: 'nuutajarven-lasikyla',
@@ -1507,11 +1507,11 @@ const sourceReadyFactoryVillageSeeds: MuseovirastoRkyAreaSeed[] = [
     syntheticLipasId: 9_002_025
   },
   {
-    displayTypeName: null,
+    displayTypeName: 'Tehdaskylä',
     locationLabel: 'Ruukinrannantie 6',
     luontoonUrl: null,
     name: 'Mathildedalin ruukkikylä',
-    parkTypeSlug: 'factory-village',
+    parkTypeSlug: 'cultural-history-area',
     postalCode: '25660',
     postalOffice: 'Mathildedal',
     slug: 'mathildedalin-ruukkikyla',
@@ -1519,21 +1519,21 @@ const sourceReadyFactoryVillageSeeds: MuseovirastoRkyAreaSeed[] = [
     syntheticLipasId: 9_002_014
   },
   {
-    displayTypeName: null,
+    displayTypeName: 'Tehdaskylä',
     locationLabel: 'Männäisten ruukki',
     luontoonUrl: null,
     name: 'Männäisten ruukki',
-    parkTypeSlug: 'factory-village',
+    parkTypeSlug: 'cultural-history-area',
     slug: 'mannaisten-ruukki',
     sourceName: 'Männäisten ruukinalue',
     syntheticLipasId: 9_002_015
   },
   {
-    displayTypeName: null,
+    displayTypeName: 'Tehdaskylä',
     locationLabel: 'Möhköntie 209',
     luontoonUrl: null,
     name: 'Möhkön ruukki',
-    parkTypeSlug: 'factory-village',
+    parkTypeSlug: 'cultural-history-area',
     postalCode: '82980',
     postalOffice: 'Möhkö',
     slug: 'mohkon-ruukki',
@@ -1541,11 +1541,11 @@ const sourceReadyFactoryVillageSeeds: MuseovirastoRkyAreaSeed[] = [
     syntheticLipasId: 9_002_016
   },
   {
-    displayTypeName: null,
+    displayTypeName: 'Tehdaskylä',
     locationLabel: 'Hållsnäsintie 89',
     luontoonUrl: null,
     name: 'Mustion ruukki ja linna',
-    parkTypeSlug: 'factory-village',
+    parkTypeSlug: 'cultural-history-area',
     postalCode: '10360',
     postalOffice: 'Mustio',
     slug: 'mustion-ruukinalue',
@@ -1553,11 +1553,11 @@ const sourceReadyFactoryVillageSeeds: MuseovirastoRkyAreaSeed[] = [
     syntheticLipasId: 9_002_017
   },
   {
-    displayTypeName: null,
+    displayTypeName: 'Tehdaskylä',
     locationLabel: 'Ahlströmintie 1',
     luontoonUrl: null,
     name: 'Noormarkun ruukki',
-    parkTypeSlug: 'factory-village',
+    parkTypeSlug: 'cultural-history-area',
     postalCode: '29600',
     postalOffice: 'Noormarkku',
     slug: 'noormarkun-ruukki',
@@ -1565,21 +1565,21 @@ const sourceReadyFactoryVillageSeeds: MuseovirastoRkyAreaSeed[] = [
     syntheticLipasId: 9_002_018
   },
   {
-    displayTypeName: null,
+    displayTypeName: 'Tehdaskylä',
     locationLabel: 'Orisbergin ruukinalue',
     luontoonUrl: null,
     name: 'Orisbergin ruukinalue',
-    parkTypeSlug: 'factory-village',
+    parkTypeSlug: 'cultural-history-area',
     slug: 'orisbergin-ruukinalue',
     sourceName: 'Orisbergin ruukinalue',
     syntheticLipasId: 9_002_019
   },
   {
-    displayTypeName: null,
+    displayTypeName: 'Tehdaskylä',
     locationLabel: 'Ruukintie 11',
     luontoonUrl: null,
     name: 'Strömforsin ruukki',
-    parkTypeSlug: 'factory-village',
+    parkTypeSlug: 'cultural-history-area',
     postalCode: '07970',
     postalOffice: 'Ruotsinpyhtää',
     slug: 'stromforsin-ruukki',
@@ -1587,11 +1587,11 @@ const sourceReadyFactoryVillageSeeds: MuseovirastoRkyAreaSeed[] = [
     syntheticLipasId: 9_002_020
   },
   {
-    displayTypeName: null,
+    displayTypeName: 'Tehdaskylä',
     locationLabel: 'Telakkatie 17',
     luontoonUrl: null,
     name: 'Teijon ruukki',
-    parkTypeSlug: 'factory-village',
+    parkTypeSlug: 'cultural-history-area',
     postalCode: '25570',
     postalOffice: 'Salo',
     slug: 'teijon-ruukki',
@@ -1599,11 +1599,11 @@ const sourceReadyFactoryVillageSeeds: MuseovirastoRkyAreaSeed[] = [
     syntheticLipasId: 9_002_021
   },
   {
-    displayTypeName: null,
+    displayTypeName: 'Tehdaskylä',
     locationLabel: 'Tullbacksvägen 2',
     luontoonUrl: null,
     name: 'Taalintehtaan ruukki',
-    parkTypeSlug: 'factory-village',
+    parkTypeSlug: 'cultural-history-area',
     postalCode: '25900',
     postalOffice: 'Taalintehdas',
     slug: 'taalintehtaan-ruukki',
@@ -1615,7 +1615,7 @@ const sourceReadyFactoryVillageSeeds: MuseovirastoRkyAreaSeed[] = [
     locationLabel: 'Verlantie 295',
     luontoonUrl: null,
     name: 'Verla',
-    parkTypeSlug: 'factory-village',
+    parkTypeSlug: 'cultural-history-area',
     postalCode: '47850',
     postalOffice: 'Verla',
     slug: 'verla',
@@ -1623,48 +1623,48 @@ const sourceReadyFactoryVillageSeeds: MuseovirastoRkyAreaSeed[] = [
     syntheticLipasId: 9_002_023
   },
   {
-    displayTypeName: null,
+    displayTypeName: 'Tehdaskylä',
     excludedSourceNames: ['hiiliuunit'],
     locationLabel: 'Juankosken ruukki',
     luontoonUrl: null,
     name: 'Juankosken ruukki',
-    parkTypeSlug: 'factory-village',
+    parkTypeSlug: 'cultural-history-area',
     slug: 'juankosken-ruukki',
     sourceName: 'Juantehdas',
     syntheticLipasId: 9_002_024
   },
   {
-    displayTypeName: null,
+    displayTypeName: 'Tehdaskylä',
     luontoonUrl: null,
     name: 'Lapuan patruunatehdas',
-    parkTypeSlug: 'factory-village',
+    parkTypeSlug: 'cultural-history-area',
     slug: 'lapuan-patruunatehdas',
     sourceName: 'Lapuan Patruunatehdas',
     syntheticLipasId: 9_002_028
   },
   {
-    displayTypeName: null,
+    displayTypeName: 'Tehdaskylä',
     luontoonUrl: null,
     name: 'Vääräkosken kartonkitehdas',
-    parkTypeSlug: 'factory-village',
+    parkTypeSlug: 'cultural-history-area',
     slug: 'vaarakosken-kartonkitehdas',
     sourceName: 'Vääräkosken kartonkitehdas',
     syntheticLipasId: 9_002_029
   },
   {
-    displayTypeName: null,
+    displayTypeName: 'Tehdaskylä',
     luontoonUrl: null,
     name: 'Riihimäen lasitehdas',
-    parkTypeSlug: 'factory-village',
+    parkTypeSlug: 'cultural-history-area',
     slug: 'riihimaen-lasitehdas',
     sourceName: 'Riihimäen Lasin tehdasalue',
     syntheticLipasId: 9_002_030
   },
   {
-    displayTypeName: null,
+    displayTypeName: 'Tehdaskylä',
     luontoonUrl: null,
     name: 'Koskenkylän ruukinalue',
-    parkTypeSlug: 'factory-village',
+    parkTypeSlug: 'cultural-history-area',
     slug: 'koskenkylan-ruukinalue',
     sourceName: 'Koskenkylän ruukinalue',
     syntheticLipasId: 9_002_031
@@ -1673,11 +1673,11 @@ const sourceReadyFactoryVillageSeeds: MuseovirastoRkyAreaSeed[] = [
 
 const sourceReadyFactoryVillageProtectedSiteSeeds: SykeSpecialParkSeed[] = [
   {
-    displayTypeName: null,
+    displayTypeName: 'Tehdaskylä',
     locationLabel: 'Jyrkänjoentie 217',
     luontoonUrl: null,
     name: 'Jyrkkäkosken ruukki',
-    parkTypeSlug: 'factory-village',
+    parkTypeSlug: 'cultural-history-area',
     postalCode: '74360',
     postalOffice: 'Jyrkkäkoski',
     slug: 'jyrkkakosken-ruukki',
@@ -1685,11 +1685,11 @@ const sourceReadyFactoryVillageProtectedSiteSeeds: SykeSpecialParkSeed[] = [
     syntheticLipasId: 9_002_026
   },
   {
-    displayTypeName: null,
+    displayTypeName: 'Tehdaskylä',
     locationLabel: 'Haapakoskentie 506',
     luontoonUrl: null,
     name: 'Haapakosken ruukki',
-    parkTypeSlug: 'factory-village',
+    parkTypeSlug: 'cultural-history-area',
     postalCode: '77520',
     postalOffice: 'Haapakoski',
     slug: 'haapakosken-ruukki',

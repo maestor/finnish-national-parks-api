@@ -8,8 +8,8 @@ export const supportedParkTypes = [
   {
     code: 9001,
     id: 9001,
-    name: 'Tehdaskylä',
-    slug: 'factory-village'
+    name: 'Historia-alue',
+    slug: 'cultural-history-area'
   },
   {
     code: 109,
@@ -64,8 +64,8 @@ export const supportedParkCategories = [
     slug: 'outdoor-recreation-area'
   },
   {
-    name: 'Tehdaskylä',
-    slug: 'factory-village'
+    name: 'Historia-alue',
+    slug: 'cultural-history-area'
   },
   {
     name: 'Erämaa-/retkeilyalue',
