@@ -20,6 +20,8 @@ const siikalahtiSourceUrl =
   "https://paikkatiedot.ymparisto.fi/geoserver/inspire_ps/wfs?service=WFS&request=GetFeature&version=2.0.0&typeNames=inspire_ps:PS.ProtectedSitesValtionOmistamaLuonnonsuojelualue&outputFormat=application/json&srsName=EPSG:4326&cql_filter=nimi='Siikalahden luonnonsuojelualue'";
 
 const napapiiriSourceUrl = 'special://napapiirin-retkeilyalue';
+const paistjarviSourceUrl =
+  'https://www.luontoon.fi/geo/features/collections/public.destinations_details_view/items?filter=slug%3D%27paistjarvi%27&filter-lang=cql-text&limit=1000';
 const paavolanLuontopolkuSourceUrl =
   'https://services2.arcgis.com/RrgTAfcgVcTLi0XF/arcgis/rest/services/Paavolan_reitti/FeatureServer/0/query?f=geojson&outFields=FID%2CREITTI%2CLISATIETO&returnGeometry=true&where=1%3D1&geometry=23.882%2C60.225%2C23.891%2C60.228&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects';
 const santalahdenLuontopolkuSourceUrl =
@@ -518,6 +520,36 @@ export const createSpecialParksSource = () => {
               [25.85, 66.5]
             ]
           ])
+        ]
+      }
+    ],
+    [
+      paistjarviSourceUrl,
+      {
+        type: 'FeatureCollection',
+        features: [
+          {
+            type: 'Feature',
+            geometry: {
+              type: 'MultiPolygon',
+              coordinates: [
+                [
+                  [
+                    [26.3364, 61.2622],
+                    [26.3364, 61.3146],
+                    [26.4688, 61.3146],
+                    [26.4688, 61.2622],
+                    [26.3364, 61.2622]
+                  ]
+                ]
+              ]
+            },
+            properties: {
+              name_fi: 'Paistjärvi',
+              slug: 'paistjarvi',
+              surfaceArea: 12_727_533.832729377
+            }
+          }
         ]
       }
     ],
