@@ -9,11 +9,21 @@ import { createLipasPark } from '../fixtures/lipas.js';
 import { createSpecialParksSource } from '../fixtures/special-parks.js';
 import { createTestDatabase } from '../helpers/test-db.js';
 
+type ExpectedLuontoonDestinationImport = {
+  displayTypeName?: string;
+  lipasId: number;
+  name: string;
+  slug: string;
+  typeSlug: string;
+};
+
 const merenkurkkuSourceUrl =
   'https://geoserver.museovirasto.fi/geoserver/rajapinta_suojellut/wfs?service=WFS&request=GetFeature&version=2.0.0&typeNames=rajapinta_suojellut:maailmanperinto_alue&outputFormat=application/json&srsName=EPSG:4326';
 
 const kevoSourceUrl =
   "https://paikkatiedot.ymparisto.fi/geoserver/inspire_ps/wfs?service=WFS&request=GetFeature&version=2.0.0&typeNames=inspire_ps:PS.ProtectedSitesValtionOmistamaLuonnonsuojelualue&outputFormat=application/json&srsName=EPSG:4326&cql_filter=nimi='Kevon luonnonpuisto'";
+const paistjarviSourceUrl =
+  'https://www.luontoon.fi/geo/features/collections/public.destinations_details_view/items?filter=slug%3D%27paistjarvi%27&filter-lang=cql-text&limit=1000';
 
 describe('manual catalog imports', () => {
   let testDatabase: Awaited<ReturnType<typeof createTestDatabase>>;
@@ -34,7 +44,7 @@ describe('manual catalog imports', () => {
       now: () => '2026-05-27T08:00:00.000Z'
     });
 
-    expect(result.results).toHaveLength(81);
+    expect(result.results).toHaveLength(114);
 
     const merenkurkku = await getParkBySlug(
       testDatabase.database,
@@ -64,7 +74,7 @@ describe('manual catalog imports', () => {
       name: 'Sammallahdenmäki',
       postalCode: '27230',
       postalOffice: 'Rauma',
-      type: { slug: 'outdoor-recreation-area' }
+      type: { slug: 'cultural-history-area' }
     });
 
     const suomenlinna = await getParkBySlug(testDatabase.database, 'suomenlinna');
@@ -76,7 +86,7 @@ describe('manual catalog imports', () => {
       name: 'Suomenlinna',
       postalCode: '00190',
       postalOffice: 'Helsinki',
-      type: { slug: 'outdoor-recreation-area' }
+      type: { slug: 'cultural-history-area' }
     });
 
     const vanhaRauma = await getParkBySlug(testDatabase.database, 'vanha-rauma');
@@ -88,7 +98,7 @@ describe('manual catalog imports', () => {
       name: 'Vanha Rauma',
       postalCode: '26100',
       postalOffice: 'Rauma',
-      type: { slug: 'outdoor-recreation-area' }
+      type: { slug: 'cultural-history-area' }
     });
 
     const kevo = await getParkBySlug(testDatabase.database, 'kevon-luonnonpuisto');
@@ -164,12 +174,73 @@ describe('manual catalog imports', () => {
       postalOffice: 'Inari'
     });
 
+    const paavola = await getParkBySlug(testDatabase.database, 'paavolan-luontopolku');
+    expect(paavola).toMatchObject({
+      address: 'Pietiläntie 23, 08800 Lohja',
+      lipasId: 9004404,
+      locationLabel: 'Pietiläntie 23',
+      luontoonUrl: null,
+      name: 'Paavolan luontopolku',
+      postalCode: '08800',
+      postalOffice: 'Lohja',
+      type: { slug: 'nature-trail' }
+    });
+    expect(paavola?.boundaryGeoJson?.features).toHaveLength(4);
+    expect(
+      paavola?.boundaryGeoJson?.features.every((feature) => feature.geometry.type === 'LineString')
+    ).toBe(true);
+    expect(paavola?.boundingBox.minLon).toBeCloseTo(23.8836126343924);
+    expect(paavola?.boundingBox.maxLon).toBeCloseTo(23.890603352384);
+    expect(paavola?.boundingBox.minLat).toBeCloseTo(60.2254776367656);
+    expect(paavola?.boundingBox.maxLat).toBeCloseTo(60.2277589357966);
+
+    const santalahti = await getParkBySlug(testDatabase.database, 'santalahden-luontopolku');
+    expect(santalahti).toMatchObject({
+      address: 'Kipparitie 4, 48310 Kotka',
+      lipasId: 9004405,
+      locationLabel: 'Kipparitie 4',
+      luontoonUrl: null,
+      name: 'Santalahden luontopolku',
+      postalCode: '48310',
+      postalOffice: 'Kotka',
+      type: { slug: 'nature-trail' }
+    });
+    expect(santalahti?.boundaryGeoJson?.features).toHaveLength(7);
+    expect(
+      santalahti?.boundaryGeoJson?.features.every(
+        (feature) => feature.geometry.type === 'LineString'
+      )
+    ).toBe(true);
+    expect(santalahti?.boundingBox.minLon).toBeCloseTo(26.8507921028238);
+    expect(santalahti?.boundingBox.maxLon).toBeCloseTo(26.8592556232422);
+    expect(santalahti?.boundingBox.minLat).toBeCloseTo(60.4309110325505);
+    expect(santalahti?.boundingBox.maxLat).toBeCloseTo(60.4433449987787);
+
+    const torholan = await getParkBySlug(testDatabase.database, 'torholan-luola');
+    expect(torholan).toMatchObject({
+      address: 'Torholan luola, Lohja',
+      lipasId: 9004406,
+      locationLabel: 'Torholan luola',
+      luontoonUrl: 'https://www.luontoon.fi/fi/reitit/torholan-luolan-polku-lohja-194240',
+      name: 'Torholan luola',
+      postalCode: null,
+      postalOffice: 'Lohja',
+      type: { slug: 'nature-trail' }
+    });
+    expect(torholan?.boundaryGeoJson?.features).toHaveLength(1);
+    expect(
+      torholan?.boundaryGeoJson?.features.every((feature) => feature.geometry.type === 'LineString')
+    ).toBe(true);
+    expect(torholan?.boundingBox.minLon).toBeCloseTo(23.85665818);
+    expect(torholan?.boundingBox.maxLon).toBeCloseTo(23.8572344);
+    expect(torholan?.boundingBox.minLat).toBeCloseTo(60.252980562);
+    expect(torholan?.boundingBox.maxLat).toBeCloseTo(60.254699132);
+
     const seili = await getParkBySlug(testDatabase.database, 'seili');
     expect(seili).toMatchObject({
-      displayTypeName: 'Historia-alue',
       lipasId: 9001034,
       name: 'Seili',
-      type: { slug: 'outdoor-recreation-area' }
+      type: { slug: 'cultural-history-area' }
     });
 
     const vallisaari = await getParkBySlug(testDatabase.database, 'vallisaari');
@@ -188,11 +259,136 @@ describe('manual catalog imports', () => {
 
     const dagmarinPuisto = await getParkBySlug(testDatabase.database, 'dagmarin-puisto');
     expect(dagmarinPuisto).toMatchObject({
-      displayTypeName: 'Historia-alue',
       lipasId: 9001028,
       name: 'Dagmarin puisto',
+      type: { slug: 'cultural-history-area' }
+    });
+
+    const paistjarvi = await getParkBySlug(testDatabase.database, 'paistjarvi');
+    expect(paistjarvi).toMatchObject({
+      address: 'Sonnasentie 948, 18300 Heinola',
+      lipasId: 9001044,
+      locationLabel: 'Sonnasentie 948',
+      luontoonUrl: 'https://www.luontoon.fi/fi/kohteet/paistjarvi',
+      name: 'Paistjärvi',
+      postalCode: '18300',
+      postalOffice: 'Heinola',
       type: { slug: 'outdoor-recreation-area' }
     });
+    expect(paistjarvi?.boundaryGeoJson?.features).toHaveLength(1);
+    expect(paistjarvi?.boundaryGeoJson?.features[0]?.geometry.type).toBe('Polygon');
+
+    const expectedLuontoonDestinationImports: ExpectedLuontoonDestinationImport[] = [
+      {
+        displayTypeName: 'Soidensuojelualue',
+        lipasId: 9001045,
+        name: 'Litokairan soidensuojelualue',
+        slug: 'litokairan-soidensuojelualue',
+        typeSlug: 'nature-reserve-area'
+      },
+      {
+        displayTypeName: 'Soidensuojelualue',
+        lipasId: 9001046,
+        name: 'Martimoaavan soidensuojelualue',
+        slug: 'martimoaavan-soidensuojelualue',
+        typeSlug: 'nature-reserve-area'
+      },
+      {
+        displayTypeName: 'Soidensuojelualue',
+        lipasId: 9001047,
+        name: 'Paukanevan soidensuojelualue',
+        slug: 'paukanevan-soidensuojelualue',
+        typeSlug: 'nature-reserve-area'
+      },
+      {
+        lipasId: 9001048,
+        name: 'Neitvuori ja Luonterin luonnonsuojelualue',
+        slug: 'neitvuori-ja-luonterin-luonnonsuojelualue',
+        typeSlug: 'nature-reserve-area'
+      },
+      {
+        lipasId: 9001049,
+        name: 'Koskeljärvi',
+        slug: 'koskeljarvi',
+        typeSlug: 'outdoor-recreation-area'
+      },
+      {
+        lipasId: 9001050,
+        name: 'Kurimonkoski',
+        slug: 'kurimonkoski',
+        typeSlug: 'outdoor-recreation-area'
+      },
+      {
+        lipasId: 9001051,
+        name: 'Pukala',
+        slug: 'pukala',
+        typeSlug: 'outdoor-recreation-area'
+      },
+      {
+        lipasId: 9001052,
+        name: 'Peurajärvi',
+        slug: 'peurajarvi',
+        typeSlug: 'outdoor-recreation-area'
+      },
+      {
+        lipasId: 9001053,
+        name: 'Hepoköngäs',
+        slug: 'hepokongas',
+        typeSlug: 'nature-reserve-area'
+      },
+      {
+        lipasId: 9001054,
+        name: 'Auttiköngäs',
+        slug: 'auttikongas',
+        typeSlug: 'outdoor-recreation-area'
+      },
+      {
+        lipasId: 9001055,
+        name: 'Pinkjärvi',
+        slug: 'pinkjarvi',
+        typeSlug: 'outdoor-recreation-area'
+      },
+      {
+        lipasId: 9001056,
+        name: 'Soiperoinen',
+        slug: 'soiperoinen',
+        typeSlug: 'outdoor-recreation-area'
+      },
+      {
+        lipasId: 9001057,
+        name: 'Unarinköngäs',
+        slug: 'unarinkongas',
+        typeSlug: 'outdoor-recreation-area'
+      }
+    ] as const;
+
+    for (const expectedPark of expectedLuontoonDestinationImports) {
+      const park = await getParkBySlug(testDatabase.database, expectedPark.slug);
+
+      expect(park).toMatchObject({
+        ...(expectedPark.displayTypeName ? { displayTypeName: expectedPark.displayTypeName } : {}),
+        lipasId: expectedPark.lipasId,
+        luontoonUrl: `https://www.luontoon.fi/fi/kohteet/${expectedPark.slug}`,
+        name: expectedPark.name,
+        type: { slug: expectedPark.typeSlug }
+      });
+      expect(park?.boundaryGeoJson?.features.length).toBeGreaterThan(0);
+      expect(
+        park?.boundaryGeoJson?.features.every((feature) => feature.geometry.type === 'Polygon')
+      ).toBe(true);
+    }
+
+    const soidensuojelualueSlugs = [
+      'ilmakkiaavan-soidensuojelualue',
+      'juortanansalon-lapinsuon-soidensuojelualue-ystavyyden-puisto',
+      'siikanevan-soidensuojelualue',
+      'viiankiaavan-soidensuojelualue'
+    ] as const;
+
+    for (const slug of soidensuojelualueSlugs) {
+      const park = await getParkBySlug(testDatabase.database, slug);
+      expect(park).toMatchObject({ displayTypeName: 'Soidensuojelualue' });
+    }
 
     const liimanninkoski = await getParkBySlug(
       testDatabase.database,
@@ -259,27 +455,24 @@ describe('manual catalog imports', () => {
 
     const kajaaninLinna = await getParkBySlug(testDatabase.database, 'kajaanin-linna');
     expect(kajaaninLinna).toMatchObject({
-      displayTypeName: 'Historia-alue',
       lipasId: 9001031,
       name: 'Kajaanin linna',
-      type: { slug: 'outdoor-recreation-area' }
+      type: { slug: 'cultural-history-area' }
     });
 
     const kuusistonLinna = await getParkBySlug(testDatabase.database, 'kuusiston-linna');
     expect(kuusistonLinna).toMatchObject({
-      displayTypeName: 'Historia-alue',
       lipasId: 9001039,
       name: 'Kuusiston linna',
-      type: { slug: 'outdoor-recreation-area' }
+      type: { slug: 'cultural-history-area' }
     });
 
     const latokartanonkoski = await getParkBySlug(testDatabase.database, 'latokartanonkoski');
     expect(latokartanonkoski).toMatchObject({
-      displayTypeName: 'Historia-alue',
       lipasId: 9001042,
       luontoonUrl: 'https://www.luontoon.fi/fi/kohteet/latokartanonkoski',
       name: 'Latokartanonkoski',
-      type: { slug: 'outdoor-recreation-area' }
+      type: { slug: 'cultural-history-area' }
     });
 
     const karnakoskenLinnoitus = await getParkBySlug(
@@ -287,22 +480,97 @@ describe('manual catalog imports', () => {
       'karnakosken-linnoitus'
     );
     expect(karnakoskenLinnoitus).toMatchObject({
-      displayTypeName: 'Historia-alue',
       lipasId: 9001043,
       luontoonUrl: 'https://www.luontoon.fi/fi/kohteet/karnakosken-linnoitus',
       name: 'Kärnäkosken linnoitus',
-      type: { slug: 'outdoor-recreation-area' }
+      type: { slug: 'cultural-history-area' }
     });
+
+    const expectedMuseovirastoHistoryImports = [
+      {
+        lipasId: 9001058,
+        name: 'Bengtskärin majakka',
+        slug: 'bengtskarin-majakka'
+      },
+      {
+        lipasId: 9001059,
+        name: 'Haapasaaren saaristokylä',
+        slug: 'haapasaaren-saaristokyla'
+      },
+      {
+        lipasId: 9001060,
+        name: 'Kaunissaaren saaristokylä',
+        slug: 'kaunissaaren-saaristokyla'
+      },
+      {
+        lipasId: 9001061,
+        name: 'Vanajanlinna',
+        slug: 'vanajanlinna'
+      },
+      {
+        lipasId: 9001062,
+        name: 'Kissakosken kanava',
+        slug: 'kissakosken-kanava'
+      },
+      {
+        lipasId: 9001063,
+        name: 'Jyväskylän harju',
+        slug: 'harju'
+      },
+      {
+        displayTypeName: 'Maailmanperintökohde',
+        lipasId: 9001064,
+        name: 'Petäjäveden vanha kirkko',
+        slug: 'petajaveden-vanha-kirkko'
+      },
+      {
+        lipasId: 9001065,
+        name: 'Ylivieskan savisilta',
+        slug: 'savisilta'
+      },
+      {
+        lipasId: 9001066,
+        name: 'Vääksyn kanava',
+        slug: 'vaaksyn-kanava'
+      },
+      {
+        lipasId: 9001067,
+        name: 'Reposaari',
+        slug: 'reposaari'
+      },
+      {
+        lipasId: 9001068,
+        name: 'Träskändan kartano',
+        slug: 'traskandan-kartano'
+      },
+      {
+        lipasId: 9001069,
+        name: 'Helsingin Vanhakaupunki',
+        slug: 'helsingin-vanhakaupunki'
+      }
+    ] as const;
+
+    for (const expectedPark of expectedMuseovirastoHistoryImports) {
+      const park = await getParkBySlug(testDatabase.database, expectedPark.slug);
+
+      expect(park).toMatchObject({
+        lipasId: expectedPark.lipasId,
+        luontoonUrl: null,
+        name: expectedPark.name,
+        type: { slug: 'cultural-history-area' }
+      });
+    }
 
     const fiskars = await getParkBySlug(testDatabase.database, 'fiskarsin-ruukki');
     expect(fiskars).toMatchObject({
       address: 'Fiskarsintie 9, 10470 Fiskars',
+      displayTypeName: 'Tehdaskylä',
       lipasId: 9002003,
       locationLabel: 'Fiskarsintie 9',
       name: 'Fiskarsin ruukki',
       postalCode: '10470',
       postalOffice: 'Fiskars',
-      type: { slug: 'factory-village' }
+      type: { slug: 'cultural-history-area' }
     });
 
     const verla = await getParkBySlug(testDatabase.database, 'verla');
@@ -314,26 +582,63 @@ describe('manual catalog imports', () => {
       name: 'Verla',
       postalCode: '47850',
       postalOffice: 'Verla',
-      type: { slug: 'factory-village' }
+      type: { slug: 'cultural-history-area' }
     });
 
     const juankoski = await getParkBySlug(testDatabase.database, 'juankosken-ruukki');
     expect(juankoski).toMatchObject({
+      displayTypeName: 'Tehdaskylä',
       lipasId: 9002024,
       name: 'Juankosken ruukki',
-      type: { slug: 'factory-village' }
+      type: { slug: 'cultural-history-area' }
     });
 
     const nuutajarvi = await getParkBySlug(testDatabase.database, 'nuutajarven-lasikyla');
     expect(nuutajarvi).toMatchObject({
       address: 'Pruukinraitti 15, 31160 Urjala',
+      displayTypeName: 'Tehdaskylä',
       lipasId: 9002025,
       locationLabel: 'Pruukinraitti 15',
       name: 'Nuutajärven lasikylä',
       postalCode: '31160',
       postalOffice: 'Urjala',
-      type: { slug: 'factory-village' }
+      type: { slug: 'cultural-history-area' }
     });
+
+    const expectedFactoryVillageImports = [
+      {
+        lipasId: 9002028,
+        name: 'Lapuan patruunatehdas',
+        slug: 'lapuan-patruunatehdas'
+      },
+      {
+        lipasId: 9002029,
+        name: 'Vääräkosken kartonkitehdas',
+        slug: 'vaarakosken-kartonkitehdas'
+      },
+      {
+        lipasId: 9002030,
+        name: 'Riihimäen lasitehdas',
+        slug: 'riihimaen-lasitehdas'
+      },
+      {
+        lipasId: 9002031,
+        name: 'Koskenkylän ruukinalue',
+        slug: 'koskenkylan-ruukinalue'
+      }
+    ] as const;
+
+    for (const expectedPark of expectedFactoryVillageImports) {
+      const park = await getParkBySlug(testDatabase.database, expectedPark.slug);
+
+      expect(park).toMatchObject({
+        displayTypeName: 'Tehdaskylä',
+        lipasId: expectedPark.lipasId,
+        luontoonUrl: null,
+        name: expectedPark.name,
+        type: { slug: 'cultural-history-area' }
+      });
+    }
   });
 
   it('keeps non-LIPAS-managed parks active when a later LIPAS import deactivates managed rows', async () => {
@@ -364,7 +669,7 @@ describe('manual catalog imports', () => {
     );
     const kevo = await getParkBySlug(testDatabase.database, 'kevon-luonnonpuisto');
 
-    expect(allParks).toHaveLength(81);
+    expect(allParks).toHaveLength(114);
     expect(merenkurkku).toMatchObject({ catalogStatus: 'active' });
     expect(kevo).toMatchObject({ catalogStatus: 'active' });
   });
@@ -400,6 +705,32 @@ describe('manual catalog imports', () => {
     ).rejects.toThrow('No features found for Kevon luonnonpuisto in the SYKE source.');
   });
 
+  it('fails when a geojson source contains an unsupported geometry type', async () => {
+    await expect(
+      importSpecialParks({
+        database: testDatabase.database,
+        fetchSource: async (sourceUrl) => {
+          if (sourceUrl === 'special://seili') {
+            return {
+              type: 'FeatureCollection',
+              features: [
+                {
+                  type: 'Feature',
+                  geometry: {
+                    type: 'Point',
+                    coordinates: [22.0, 60.0]
+                  }
+                }
+              ]
+            };
+          }
+
+          return createSpecialParksSource()(sourceUrl);
+        }
+      })
+    ).rejects.toThrow('Unsupported geometry type "Point" in special parks source.');
+  });
+
   it('supports the default fetch path used by the CLI importer', async () => {
     const fetchSource = createSpecialParksSource();
 
@@ -415,7 +746,7 @@ describe('manual catalog imports', () => {
       database: testDatabase.database
     });
 
-    expect(result.results).toHaveLength(81);
+    expect(result.results).toHaveLength(114);
 
     const merenkurkku = await getParkBySlug(
       testDatabase.database,
@@ -442,9 +773,8 @@ describe('manual catalog imports', () => {
 
     const seili = await getParkBySlug(testDatabase.database, 'seili');
     expect(seili).toMatchObject({
-      displayTypeName: 'Historia-alue',
       name: 'Seili',
-      type: { slug: 'outdoor-recreation-area' }
+      type: { slug: 'cultural-history-area' }
     });
 
     const vallisaari = await getParkBySlug(testDatabase.database, 'vallisaari');
@@ -480,6 +810,49 @@ describe('manual catalog imports', () => {
 
     expect(liminganlahti?.areaKm2).toBe(3.7);
     expect(liminganlahti?.establishmentYear).toBe(1998);
+  });
+
+  it('keeps luontoon destination area null when surface area metadata is missing', async () => {
+    await importSpecialParks({
+      database: testDatabase.database,
+      fetchSource: async (sourceUrl) => {
+        if (sourceUrl === paistjarviSourceUrl) {
+          return {
+            type: 'FeatureCollection',
+            features: [
+              {
+                type: 'Feature',
+                geometry: {
+                  type: 'Polygon',
+                  coordinates: [
+                    [
+                      [26.3364, 61.2622],
+                      [26.3364, 61.3146],
+                      [26.4688, 61.3146],
+                      [26.4688, 61.2622],
+                      [26.3364, 61.2622]
+                    ]
+                  ]
+                },
+                properties: {
+                  name_fi: 'Paistjärvi',
+                  slug: 'paistjarvi'
+                }
+              }
+            ]
+          };
+        }
+
+        return createSpecialParksSource()(sourceUrl);
+      },
+      now: () => '2026-05-27T08:00:00.000Z'
+    });
+
+    const paistjarvi = await testDatabase.database.query.parks.findFirst({
+      where: eq(parks.slug, 'paistjarvi')
+    });
+
+    expect(paistjarvi?.areaKm2).toBeNull();
   });
 
   it('filters Laajalahti by ELY to pick the Espoo feature', async () => {

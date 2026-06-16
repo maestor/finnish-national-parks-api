@@ -20,6 +20,14 @@ const siikalahtiSourceUrl =
   "https://paikkatiedot.ymparisto.fi/geoserver/inspire_ps/wfs?service=WFS&request=GetFeature&version=2.0.0&typeNames=inspire_ps:PS.ProtectedSitesValtionOmistamaLuonnonsuojelualue&outputFormat=application/json&srsName=EPSG:4326&cql_filter=nimi='Siikalahden luonnonsuojelualue'";
 
 const napapiiriSourceUrl = 'special://napapiirin-retkeilyalue';
+const paistjarviSourceUrl =
+  'https://www.luontoon.fi/geo/features/collections/public.destinations_details_view/items?filter=slug%3D%27paistjarvi%27&filter-lang=cql-text&limit=1000';
+const paavolanLuontopolkuSourceUrl =
+  'https://services2.arcgis.com/RrgTAfcgVcTLi0XF/arcgis/rest/services/Paavolan_reitti/FeatureServer/0/query?f=geojson&outFields=FID%2CREITTI%2CLISATIETO&returnGeometry=true&where=1%3D1&geometry=23.882%2C60.225%2C23.891%2C60.228&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects';
+const santalahdenLuontopolkuSourceUrl =
+  'https://services-eu1.arcgis.com/zIF5LKWARhpLFEt3/arcgis/rest/services/Santalahden_reitti/FeatureServer/0/query?f=geojson&outFields=FID%2CLayer%2CNimi%2CLinkki&returnGeometry=true&where=1%3D1';
+const torholanLuolaSourceUrl =
+  'https://www.luontoon.fi/geo/features/collections/public.all_lines_details_view/items?filter=slug%3D%27torholan-luolan-polku-lohja-194240%27&filter-lang=cql-text&limit=1000';
 
 type SykeSourceType = 'private' | 'state';
 
@@ -27,6 +35,12 @@ type GeneratedSykeSource = {
   name: string;
   sourceName: string;
   sourceType?: SykeSourceType;
+};
+
+type GeneratedLuontoonDestinationSource = {
+  name: string;
+  slug: string;
+  surfaceArea?: number;
 };
 
 const buildSykeProtectedSitesSourceUrl = (
@@ -47,6 +61,24 @@ const buildSykePrivateProtectedSitesCompositeSourceUrl = (sourceNames: string[])
   );
 
   return `https://paikkatiedot.ymparisto.fi/geoserver/inspire_ps/wfs?service=WFS&request=GetFeature&version=2.0.0&typeNames=inspire_ps:PS.ProtectedSitesYksityistenMaillaOlevaLuonnonsuojelualue&outputFormat=application/json&srsName=EPSG:4326&cql_filter=${cqlFilter}`;
+};
+
+const buildLuontoonGeoJsonCollectionSourceUrl = ({
+  collectionId,
+  filter,
+  limit = 1000
+}: {
+  collectionId: string;
+  filter: string;
+  limit?: number;
+}) => {
+  const params = new URLSearchParams({
+    filter,
+    'filter-lang': 'cql-text',
+    limit: String(limit)
+  });
+
+  return `https://www.luontoon.fi/geo/features/collections/${collectionId}/items?${params.toString()}`;
 };
 
 const sanginjokiSourceUrl = buildSykePrivateProtectedSitesCompositeSourceUrl([
@@ -146,11 +178,48 @@ const generatedMuseovirastoSources = [
   'Haapakosken ruukki'
 ];
 
+const generatedLuontoonDestinationSources: GeneratedLuontoonDestinationSource[] = [
+  { name: 'Litokairan soidensuojelualue', slug: 'litokairan-soidensuojelualue' },
+  { name: 'Martimoaavan soidensuojelualue', slug: 'martimoaavan-soidensuojelualue' },
+  { name: 'Paukanevan soidensuojelualue', slug: 'paukanevan-soidensuojelualue' },
+  {
+    name: 'Neitvuori ja Luonterin luonnonsuojelualue',
+    slug: 'neitvuori-ja-luonterin-luonnonsuojelualue'
+  },
+  { name: 'Koskeljärvi', slug: 'koskeljarvi' },
+  { name: 'Kurimonkoski', slug: 'kurimonkoski' },
+  { name: 'Pukala', slug: 'pukala' },
+  { name: 'Peurajärvi', slug: 'peurajarvi' },
+  { name: 'Hepoköngäs', slug: 'hepokongas' },
+  { name: 'Auttiköngäs', slug: 'auttikongas' },
+  { name: 'Pinkjärvi', slug: 'pinkjarvi' },
+  { name: 'Soiperoinen', slug: 'soiperoinen' },
+  { name: 'Unarinköngäs', slug: 'unarinkongas' }
+];
+
 const createPolygonFeature = (
   coordinates: number[][][],
   properties: Record<string, unknown> = {}
 ) => ({
   geometry: { coordinates, type: 'Polygon' },
+  properties,
+  type: 'Feature'
+});
+
+const createLineStringFeature = (
+  coordinates: number[][],
+  properties: Record<string, unknown> = {}
+) => ({
+  geometry: { coordinates, type: 'LineString' },
+  properties,
+  type: 'Feature'
+});
+
+const createMultiLineStringFeature = (
+  coordinates: number[][][],
+  properties: Record<string, unknown> = {}
+) => ({
+  geometry: { coordinates, type: 'MultiLineString' },
   properties,
   type: 'Feature'
 });
@@ -496,6 +565,229 @@ export const createSpecialParksSource = () => {
           ])
         ]
       }
+    ],
+    [
+      paistjarviSourceUrl,
+      {
+        type: 'FeatureCollection',
+        features: [
+          {
+            type: 'Feature',
+            geometry: {
+              type: 'MultiPolygon',
+              coordinates: [
+                [
+                  [
+                    [26.3364, 61.2622],
+                    [26.3364, 61.3146],
+                    [26.4688, 61.3146],
+                    [26.4688, 61.2622],
+                    [26.3364, 61.2622]
+                  ]
+                ]
+              ]
+            },
+            properties: {
+              name_fi: 'Paistjärvi',
+              slug: 'paistjarvi',
+              surfaceArea: 12_727_533.832729377
+            }
+          }
+        ]
+      }
+    ],
+    [
+      paavolanLuontopolkuSourceUrl,
+      {
+        type: 'FeatureCollection',
+        features: [
+          createLineStringFeature(
+            [
+              [23.8852161875505, 60.2275115553159],
+              [23.8860956065322, 60.2273302072513],
+              [23.8869633792335, 60.2270960207198]
+            ],
+            {
+              FID: 1,
+              LISATIETO: ' ',
+              REITTI: 'Luontopolun reitti'
+            }
+          ),
+          createLineStringFeature(
+            [
+              [23.8874876852271, 60.2267570516225],
+              [23.8882452933221, 60.2267991729627],
+              [23.8884464972605, 60.2266798339451]
+            ],
+            {
+              FID: 6,
+              LISATIETO: 'Pitkospuut',
+              REITTI: 'Pitkospuut'
+            }
+          ),
+          createLineStringFeature(
+            [
+              [23.8883446898101, 60.2267793546796],
+              [23.8898029538791, 60.2263894373494],
+              [23.890603352384, 60.2265361970361]
+            ],
+            {
+              FID: 8,
+              LISATIETO: 'Pistopolku  Tammelle',
+              REITTI: 'Vaihtoehtoinen reitti'
+            }
+          ),
+          createLineStringFeature(
+            [
+              [23.8883800218139, 60.2258545825143],
+              [23.888288394225, 60.2254776367656],
+              [23.8836126343924, 60.2277589357966]
+            ],
+            {
+              FID: 20,
+              LISATIETO: 'Viimeinen pätkä kokonaisuudessaan',
+              REITTI: 'Luontopolun reitti'
+            }
+          )
+        ]
+      }
+    ],
+    [
+      santalahdenLuontopolkuSourceUrl,
+      {
+        type: 'FeatureCollection',
+        features: [
+          createLineStringFeature(
+            [
+              [26.8585271902272, 60.435033100798],
+              [26.8550460859602, 60.4319330201228],
+              [26.8507921028238, 60.4309112117761]
+            ],
+            {
+              FID: 1,
+              Layer: 'Merireitti',
+              Linkki: 'https://www.santalahti.fi/fi/Aktiviteetit/Luontopolut%20ja%20puistot/',
+              Nimi: 'Santalahden luontopolku'
+            }
+          ),
+          createLineStringFeature(
+            [
+              [26.8507931513519, 60.4309110325505],
+              [26.8527882312624, 60.4348711068796],
+              [26.8587087783301, 60.4352943052316]
+            ],
+            {
+              FID: 2,
+              Layer: 'Merireitti',
+              Linkki: 'https://www.santalahti.fi/fi/Aktiviteetit/Luontopolut%20ja%20puistot/',
+              Nimi: 'Santalahden luontopolku'
+            }
+          ),
+          createLineStringFeature(
+            [
+              [26.8539776946415, 60.4349348747832],
+              [26.8527586436998, 60.4360687221766],
+              [26.853065650428, 60.4382434551032]
+            ],
+            {
+              FID: 3,
+              Layer: 'Metsäreitti',
+              Linkki: 'https://www.santalahti.fi/fi/Aktiviteetit/Luontopolut%20ja%20puistot/',
+              Nimi: 'Santalahden luontopolku'
+            }
+          ),
+          createLineStringFeature(
+            [
+              [26.8530563199517, 60.4382512540421],
+              [26.8523228980215, 60.4406051257843],
+              [26.8510114932418, 60.4418992585836]
+            ],
+            {
+              FID: 4,
+              Layer: 'Metsäreitti',
+              Linkki: 'https://www.santalahti.fi/fi/Aktiviteetit/Luontopolut%20ja%20puistot/',
+              Nimi: 'Santalahden luontopolku'
+            }
+          ),
+          createLineStringFeature(
+            [
+              [26.8510111439327, 60.4418993811518],
+              [26.8538538765541, 60.4433449987787],
+              [26.8592556232422, 60.4427473250297],
+              [26.8586885087252, 60.4397735250218]
+            ],
+            {
+              FID: 5,
+              Layer: 'Metsäreitti',
+              Linkki: 'https://www.santalahti.fi/fi/Aktiviteetit/Luontopolut%20ja%20puistot/',
+              Nimi: 'Santalahden luontopolku'
+            }
+          ),
+          createLineStringFeature(
+            [
+              [26.8586922409682, 60.4397689705326],
+              [26.8563967106475, 60.4364264544899],
+              [26.8537303477567, 60.4352682068634]
+            ],
+            {
+              FID: 6,
+              Layer: 'Metsäreitti',
+              Linkki: 'https://www.santalahti.fi/fi/Aktiviteetit/Luontopolut%20ja%20puistot/',
+              Nimi: 'Santalahden luontopolku'
+            }
+          ),
+          createLineStringFeature(
+            [
+              [26.8585756971808, 60.4352949224869],
+              [26.858445949731, 60.4350108173457]
+            ],
+            {
+              FID: 7,
+              Layer: 'Merireitti',
+              Linkki: 'https://www.santalahti.fi/fi/Aktiviteetit/Luontopolut%20ja%20puistot/',
+              Nimi: 'Santalahden luontopolku'
+            }
+          )
+        ]
+      }
+    ],
+    [
+      torholanLuolaSourceUrl,
+      {
+        type: 'FeatureCollection',
+        features: [
+          createMultiLineStringFeature(
+            [
+              [
+                [23.85665818, 60.254699132],
+                [23.85677561, 60.25465329],
+                [23.85683879, 60.25462112],
+                [23.85691244, 60.25457352],
+                [23.85696419, 60.25452477],
+                [23.85703298, 60.25444461],
+                [23.8570978, 60.25434195],
+                [23.85713838, 60.25424698],
+                [23.85716473, 60.2541769],
+                [23.85719157, 60.25407706],
+                [23.85722013, 60.25393289],
+                [23.8572344, 60.25377733],
+                [23.85723179, 60.25360682],
+                [23.85721931, 60.25346439],
+                [23.85720459, 60.25327244],
+                [23.85719673, 60.25310538],
+                [23.857183867, 60.252980562]
+              ]
+            ],
+            {
+              city: 'Lohja',
+              length_km: 0.2,
+              name_fi: 'Torholan luolan polku',
+              slug: 'torholan-luolan-polku-lohja-194240',
+              source: 'uljas'
+            }
+          )
+        ]
+      }
     ]
   ]);
 
@@ -555,6 +847,45 @@ export const createSpecialParksSource = () => {
         }
       ]
     });
+  });
+
+  generatedLuontoonDestinationSources.forEach((entry, index) => {
+    const lon = 27 + index * 0.1;
+    const lat = 62 + index * 0.1;
+
+    responses.set(
+      buildLuontoonGeoJsonCollectionSourceUrl({
+        collectionId: 'public.destinations_details_view',
+        filter: `slug='${entry.slug}'`
+      }),
+      {
+        type: 'FeatureCollection',
+        features: [
+          {
+            type: 'Feature',
+            geometry: {
+              type: 'MultiPolygon',
+              coordinates: [
+                [
+                  [
+                    [lon, lat],
+                    [lon, lat + 0.03],
+                    [lon + 0.03, lat + 0.03],
+                    [lon + 0.03, lat],
+                    [lon, lat]
+                  ]
+                ]
+              ]
+            },
+            properties: {
+              name: entry.name,
+              slug: entry.slug,
+              surfaceArea: entry.surfaceArea ?? 2_000_000 + index * 25_000
+            }
+          }
+        ]
+      }
+    );
   });
 
   return async (sourceUrl: string) => {
