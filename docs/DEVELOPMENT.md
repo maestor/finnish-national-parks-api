@@ -25,6 +25,17 @@ The deployment guardrail test for this lives in `tests/integration/vercel-entry.
 
 - Node.js 24 or newer.
 
+## Security And Sustainability Baseline
+
+- Route naming is not the auth policy. `/api/public/*` names frontend-facing payloads, not anonymous access.
+- Do not expose the shared `API_KEY` in browser-delivered code.
+- All write routes and `GET /api/admin/parks/visibility` should stay admin-session protected.
+- When adding or changing an env var, update `src/env.ts`, `.env.example`, `README.md`, and the relevant docs in the same change.
+- Treat direct uploads as a storage-cost surface: enforce size and content-type limits against the actual stored object, not only the client request.
+- Prefer owned data and cached verification over new live third-party request-path dependencies.
+- Before risky imports, migrations, or large manual catalog updates against Turso, take a fresh `npm run db:backup`.
+- Keep the current hardening priorities in [docs/SECURITY.md](./SECURITY.md).
+
 ## Branch And PR Workflow
 
 - Create a dedicated branch for every change: `feature/<name>`, `bugfix/<name>`, `chore/<name>`, `docs/<name>`, etc.
@@ -61,10 +72,9 @@ AUTH_COOKIE_NAME=__session
 FRONTEND_URL=http://localhost:4300
 
 # Cloudflare R2 (optional — needed for visit image uploads and park logo uploads)
-# Visit images can stay private; set R2_PUBLIC_URL if catalog APIs should expose stable logo URLs.
+# Visit images and park logos use presigned URLs today, so the bucket can stay private.
 R2_BUCKET_NAME=
 R2_ENDPOINT=
-R2_PUBLIC_URL=
 R2_ACCESS_KEY_ID=
 R2_SECRET_ACCESS_KEY=
 MEMORY_STORAGE=false
@@ -85,7 +95,7 @@ DATABASE_AUTH_TOKEN=...
 
 Vercel guardrails in this repo:
 
-- `API_KEY` is required on Vercel so non-public endpoints are not exposed accidentally.
+- `API_KEY` is required on Vercel so API routes are not exposed accidentally.
 - `DATABASE_URL` cannot use the local `file:` default on Vercel.
 - `MEMORY_STORAGE=true` is rejected on Vercel because it is ephemeral.
 - If Google OAuth is enabled on Vercel, `FRONTEND_URL` cannot point at localhost.
@@ -157,7 +167,7 @@ That command:
 - uploads shared display-type files once to `logos/display-types/<normalized-display-type>.png` and then reuses that same key for every matching park
 - stores the logo key plus a logo timestamp on the matching park row so catalog ETags and logo URLs change together
 
-For UI rendering, set `R2_PUBLIC_URL` to the public base URL that serves those logo objects.
+Catalog APIs currently return presigned logo URLs instead of a configurable public base URL.
 
 ## Database
 
@@ -214,8 +224,7 @@ Key route behavior:
 
 - `GET /api/parks` is optimized for map/list views and omits boundary geometry.
 - `GET /api/parks/search` returns a minimal visible-park payload for search and autocomplete flows.
-- `GET /api/parks/removed` returns an auth-restricted admin list of removed parks for restore workflows.
-- `GET /api/admin/parks/visibility` returns lightweight visible and removed park arrays in one private response for admin visibility tooling.
+- `GET /api/admin/parks/visibility` returns lightweight visible and removed park arrays in one private admin response for admin visibility tooling.
 - `GET /api/parks?type=hiking-area` filters by normalized catalog type slug.
 - `GET /api/parks?category=hiking-and-wilderness-areas` filters by the derived `Erämaa-/retkeilyalue` category while preserving each park's imported `type`.
 - `GET /api/parks?category=trails-and-routes` filters by a derived API category while preserving the original imported `type` in responses.
@@ -224,19 +233,21 @@ Key route behavior:
 - Park list, detail, removed, and public map responses expose both the source `type` and a derived `category`.
 - Park list, detail, removed, and public map responses expose `logo: { key, updatedAt, url } | null` when one has been linked to the park.
 - Park responses expose raw `locationLabel`, `postalCode`, and `postalOffice` fields from the database, plus a derived `address` string for display use.
-- `GET /api/public/home-summary` returns public home-page summary data including seasonal visit counts, `progressByType` with a `visible` flag, and `progressByCategory`, without visit notes, routes, or images.
-- `GET /api/public/map-summary` returns lightweight park map data plus per-park visited summaries.
+- `GET /api/public/home-summary` returns frontend-public home-page summary data including seasonal visit counts, `progressByType` with a `visible` flag, and `progressByCategory`, without visit notes, routes, or images.
+- `GET /api/public/map-summary` returns lightweight frontend-public park map data plus per-park visited summaries.
 - `GET /api/parks/:slug/visits` returns visit history plus a visited summary for one visible park.
 - `GET /api/visits` returns flat visit resources with their parent park reference.
 - `GET /api/visits/:id` returns one visit with its parent park reference.
 - Catalog and public summary routes emit deterministic `ETag` headers and support `304 Not Modified`.
 - Public summary routes use shared-cache headers and expose a public visit-data `version` / `updatedAt` signal that changes on visit create/update/delete and visit image upload/delete/reorder.
 - Visit and management routes use `private, no-store`.
+- All write routes and `GET /api/admin/parks/visibility` require a valid admin session cookie.
 - `PATCH /api/parks/:slug` updates the admin-editable park fields and auto-generates a slug from `name` when no explicit `slug` is provided.
 - `PATCH /api/parks/:slug/removed` toggles whether a park is hidden from catalog and visit responses.
 - Auth routes (`/auth/*`) bypass API key authentication so the OAuth flow can complete without a bearer token.
-- Public summary routes (`/api/public/*`) also bypass API key authentication so public UI pages can use them remotely.
-- All other non-public endpoints require API key authentication; localhost requests are exempt.
+- `GET /health` and `GET /openapi.json` are the only anonymous data endpoints.
+- `/auth/*` routes are anonymous control-flow endpoints for login, not anonymous data endpoints.
+- All `/api/*` endpoints, including `/api/public/*`, currently require the API key outside localhost.
 - Image routes are only registered when R2 credentials (or `MEMORY_STORAGE=true`) are configured.
 - Localhost-style server uploads still use `POST /api/visits/:id/images`, which accepts multipart/form-data, resizes images with Sharp, and stores derived JPEGs in R2 or memory storage.
 - Deployed clients should use the Vercel-safe direct flow instead: `POST /api/visits/:id/images/upload-url`, upload the file to the returned presigned `PUT` URL, then call `POST /api/visits/:id/images/complete`.
@@ -267,7 +278,6 @@ This is intentionally a narrow contract: `src/index.ts` is the one place that sh
 6. If you will use visit image uploads or park logo uploads, also set the R2 variables:
    - `R2_BUCKET_NAME`
    - `R2_ENDPOINT`
-   - `R2_PUBLIC_URL` for stable park logo URLs returned by catalog APIs
    - `R2_ACCESS_KEY_ID`
    - `R2_SECRET_ACCESS_KEY`
 7. Frontends deployed against Vercel should call the direct upload endpoints instead of posting image bytes to `POST /api/visits/:id/images`.

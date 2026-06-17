@@ -23,7 +23,6 @@ import {
   listAdminParkVisibility,
   listParkSearchEntries,
   listParks,
-  listRemovedParks,
   listVisits,
   reorderVisitImages,
   updateParkDetails,
@@ -83,7 +82,6 @@ import {
   listAdminParkVisibilityRoute,
   listParkSearchRoute,
   listParksRoute,
-  listRemovedParksRoute,
   listVisitsRoute,
   reorderVisitImagesRoute,
   updateParkRemovedRoute,
@@ -143,6 +141,20 @@ const getVisitImageFileExtension = (contentType: string) => {
 
 const normalizeOptionalOriginalName = (originalName?: string | null) => {
   return originalName?.trim() || null;
+};
+
+const requireAdminSession = async (context: SessionContext, auth?: AuthConfig) => {
+  if (!auth) {
+    return context.json({ error: 'OAuth not configured.' }, 503);
+  }
+
+  const session = await getAuthenticatedSession(context, auth);
+
+  if (!session) {
+    return context.json({ error: 'Unauthorized' }, 401);
+  }
+
+  return null;
 };
 
 const getAuthenticatedSession = async (context: SessionContext, auth?: AuthConfig) => {
@@ -255,6 +267,12 @@ export const createApp = ({
   app.openAPIRegistry.registerComponent('securitySchemes', 'bearerAuth', {
     type: 'http',
     scheme: 'bearer'
+  });
+
+  app.openAPIRegistry.registerComponent('securitySchemes', 'sessionAuth', {
+    in: 'cookie',
+    name: auth?.cookieName ?? '__session',
+    type: 'apiKey'
   });
 
   app.openapi(healthRoute, (context) =>
@@ -464,21 +482,13 @@ export const createApp = ({
       );
     });
 
-    app.openapi(listRemovedParksRoute, async (context) => {
-      context.header('Cache-Control', PRIVATE_CACHE_CONTROL);
-
-      const parks = await listRemovedParks(database, logoPublicUrl, mapPublicUrl);
-
-      return context.json(
-        {
-          parks
-        },
-        200
-      );
-    });
-
     app.openapi(listAdminParkVisibilityRoute, async (context) => {
       context.header('Cache-Control', PRIVATE_CACHE_CONTROL);
+      const authFailure = await requireAdminSession(context, auth);
+
+      if (authFailure) {
+        return authFailure;
+      }
 
       const visibility = await listAdminParkVisibility(database);
 
@@ -541,9 +551,10 @@ export const createApp = ({
 
     app.openapi(updateParkRoute, async (context) => {
       context.header('Cache-Control', PRIVATE_CACHE_CONTROL);
+      const authFailure = await requireAdminSession(context, auth);
 
-      if (auth && !(await getAuthenticatedSession(context, auth))) {
-        return context.json({ error: 'Unauthorized' }, 401);
+      if (authFailure) {
+        return authFailure;
       }
 
       const { slug } = context.req.valid('param');
@@ -660,6 +671,11 @@ export const createApp = ({
 
     app.openapi(createVisitRoute, async (context) => {
       context.header('Cache-Control', PRIVATE_CACHE_CONTROL);
+      const authFailure = await requireAdminSession(context, auth);
+
+      if (authFailure) {
+        return authFailure;
+      }
 
       const { slug } = context.req.valid('param');
       const body = context.req.valid('json');
@@ -674,6 +690,11 @@ export const createApp = ({
 
     app.openapi(updateParkRemovedRoute, async (context) => {
       context.header('Cache-Control', PRIVATE_CACHE_CONTROL);
+      const authFailure = await requireAdminSession(context, auth);
+
+      if (authFailure) {
+        return authFailure;
+      }
 
       const { slug } = context.req.valid('param');
       const { removed } = context.req.valid('json');
@@ -691,6 +712,11 @@ export const createApp = ({
 
     app.openapi(updateVisitRoute, async (context) => {
       context.header('Cache-Control', PRIVATE_CACHE_CONTROL);
+      const authFailure = await requireAdminSession(context, auth);
+
+      if (authFailure) {
+        return authFailure;
+      }
 
       const { id } = context.req.valid('param');
       const body = context.req.valid('json');
@@ -705,6 +731,11 @@ export const createApp = ({
 
     app.openapi(deleteVisitRoute, async (context) => {
       context.header('Cache-Control', PRIVATE_CACHE_CONTROL);
+      const authFailure = await requireAdminSession(context, auth);
+
+      if (authFailure) {
+        return authFailure;
+      }
 
       const { id } = context.req.valid('param');
       const deleted = await deleteVisit(database, id);
@@ -722,6 +753,11 @@ export const createApp = ({
     if (storage) {
       app.openapi(createVisitImageUploadUrlRoute, async (context) => {
         context.header('Cache-Control', PRIVATE_CACHE_CONTROL);
+        const authFailure = await requireAdminSession(context, auth);
+
+        if (authFailure) {
+          return authFailure;
+        }
 
         const { id } = context.req.valid('param');
         const { contentType, fileSizeBytes } = context.req.valid('json');
@@ -761,6 +797,11 @@ export const createApp = ({
 
       app.openapi(completeVisitImageUploadRoute, async (context) => {
         context.header('Cache-Control', PRIVATE_CACHE_CONTROL);
+        const authFailure = await requireAdminSession(context, auth);
+
+        if (authFailure) {
+          return authFailure;
+        }
 
         const { id } = context.req.valid('param');
         const { fullHeight, fullWidth, key, originalName } = context.req.valid('json');
@@ -814,6 +855,11 @@ export const createApp = ({
 
       app.openapi(uploadVisitImagesRoute, async (context) => {
         context.header('Cache-Control', PRIVATE_CACHE_CONTROL);
+        const authFailure = await requireAdminSession(context, auth);
+
+        if (authFailure) {
+          return authFailure;
+        }
 
         if (!allowServerImageUploads) {
           return context.json(
@@ -925,6 +971,11 @@ export const createApp = ({
 
       app.openapi(deleteVisitImageRoute, async (context) => {
         context.header('Cache-Control', PRIVATE_CACHE_CONTROL);
+        const authFailure = await requireAdminSession(context, auth);
+
+        if (authFailure) {
+          return authFailure;
+        }
 
         const { imageId, visitId } = context.req.valid('param');
         const image = await findVisitImageById(database, imageId);
@@ -945,6 +996,11 @@ export const createApp = ({
 
       app.openapi(reorderVisitImagesRoute, async (context) => {
         context.header('Cache-Control', PRIVATE_CACHE_CONTROL);
+        const authFailure = await requireAdminSession(context, auth);
+
+        if (authFailure) {
+          return authFailure;
+        }
 
         const { id } = context.req.valid('param');
         const { imageIds } = context.req.valid('json');

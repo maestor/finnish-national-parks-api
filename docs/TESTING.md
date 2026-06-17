@@ -41,6 +41,20 @@ Use mutation testing for:
 - API validation branches
 - repository persistence logic
 
+## Security And Sustainability Regression Targets
+
+Add or update tests when a change touches:
+
+- route access classification such as anonymous remote, API-key, or admin-session behavior
+- cache headers or `ETag` behavior on catalog and summary routes
+- upload size, content-type, or orphan-cleanup behavior
+- OAuth callback, session cookie, or allowlist trust decisions
+- env guardrails that protect Vercel, Turso, or storage usage
+- new live third-party request-path dependencies or fallback behavior
+
+If docs say a route is public or private, an integration test should prove the same policy.
+If an upload limit exists, at least one test should cover the real stored-object validation path instead of only the client-declared metadata.
+
 ## Covered V1 Scenarios
 
 - Import keeps only active supported LIPAS catalog records.
@@ -55,8 +69,7 @@ Use mutation testing for:
 - Re-import preserves admin-managed edits to the editable park fields while still refreshing the imported baseline values underneath.
 - `GET /api/parks` returns lightweight list/map data without full boundary geometry.
 - `GET /api/parks/search` returns a smaller visible-park payload for search/autocomplete consumers.
-- `GET /api/parks/removed` returns a private admin list of removed parks for restore flows.
-- `GET /api/admin/parks/visibility` returns lightweight visible and removed park arrays in one private response for admin tooling.
+- `GET /api/admin/parks/visibility` returns lightweight visible and removed park arrays in one private admin-session response for admin tooling.
 - `GET /api/parks?type=...` filters the public catalog list by normalized type slug.
 - `GET /api/parks?category=...` can collapse multiple source types into one public category, including `hiking-and-wilderness-areas`.
 - `GET /api/parks?category=...` filters the public catalog list by derived API category, such as `trails-and-routes`.
@@ -67,14 +80,15 @@ Use mutation testing for:
 - Park catalog responses expose both the source `type` and a derived `category`.
 - Park catalog responses expose linked logo metadata and stable logo URLs when a park logo has been configured.
 - Park responses expose raw `locationLabel`, `postalCode`, and `postalOffice` fields from the database, plus a derived `address` string for display use.
-- `GET /api/public/home-summary` returns cache-friendly public summary data including seasonal visit counts, `progressByType` visibility flags, and aggregated `progressByCategory`, without notes, routes, or images.
-- `GET /api/public/map-summary` returns lightweight map data plus per-park visited summaries.
+- `GET /api/public/home-summary` returns cache-friendly frontend-public summary data including seasonal visit counts, `progressByType` visibility flags, and aggregated `progressByCategory`, without notes, routes, or images.
+- `GET /api/public/map-summary` returns lightweight frontend-public map data plus per-park visited summaries.
 - `GET /api/parks/:slug/visits` returns park-scoped visit history and visited summary.
 - `GET /api/visits` and `GET /api/visits/:id` expose visit resources with parent park references.
 - Catalog and public summary `GET` endpoints emit ETags and return `304 Not Modified` for matching `If-None-Match`.
 - Catalog `GET` endpoints are safe for public caching.
 - Public summary endpoints use shared-cache headers and bump their version signal when visit or visit-image public data changes.
 - Visit and management endpoints are private or no-store.
+- All write routes and admin-only visibility reads require an admin session and fail closed when OAuth session auth is unavailable.
 - Park removal toggle can hide and restore a park through the authenticated park-management API.
 - Visit create/edit/delete supports optional route and author fields.
 - Visit create/edit/delete works against a real temporary database.
@@ -84,6 +98,8 @@ Use mutation testing for:
 - `GET /auth/me` returns the current user from a valid session or `401` otherwise.
 - `POST /auth/logout` clears the session cookie.
 - Runtime API handlers are implemented against the same Zod/OpenAPI contract definitions.
+- Auth, cache, and documentation claims stay aligned for `/health`, `/openapi.json`, `/auth/*`, and `/api/*` route families.
+- Direct-upload tests should protect the real object-size and content-type checks whenever that flow changes.
 
 ## Required Scripts
 
@@ -109,7 +125,7 @@ For implementation tasks, start with the cheapest check that can fail for the ri
 
 1. Focused test for the changed behavior.
 2. Typecheck or lint when configured.
-3. API integration tests for touched routes/importer behavior.
+3. API integration tests for touched routes/importer behavior, especially auth and cache boundaries.
 4. Full verification command (`npm run verify`).
 5. Scoped mutation run for meaningful backend logic.
 

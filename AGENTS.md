@@ -18,8 +18,10 @@ This repository is a local-first TypeScript API that imports Finnish park, prote
 ## Documentation Rules
 - Update `README.md` when project purpose, setup, or common commands change.
 - Update `docs/DEVELOPMENT.md` when local development, importer, database, or deployment workflow changes.
+- Update `docs/SECURITY.md` when auth policy, secrets handling, storage upload behavior, cache exposure, external request-path dependencies, or operational hardening priorities change.
 - Update `docs/TESTING.md` when test strategy, commands, or quality gates change.
 - When adding, removing, or changing API endpoints, request or response fields, or database schema, update the relevant README endpoint lists and docs references in the same session.
+- If docs mention a contributor-facing env var, it must also exist in `src/env.ts` and `.env.example` in the same change.
 - Prefer linking to source documents instead of duplicating long explanations.
 
 ## Data Rules
@@ -37,6 +39,19 @@ This repository is a local-first TypeScript API that imports Finnish park, prote
 - Lightweight list endpoints should not include full boundary geometry by default.
 - Keep public catalog endpoints separate from personal note and visit endpoints so catalog responses can be cached aggressively.
 - Catalog `GET` endpoints should support deterministic ETags and `304 Not Modified`.
+- Every route must have an explicit access classification: anonymous remote, API-key protected, admin-session protected, or local-only maintenance.
+- Do not describe a route as public in docs unless middleware and tests prove anonymous remote access.
+- New anonymously accessible endpoints must define cache policy, abuse-control expectations, and the reason they are safe to expose without API-key or session auth.
+
+## Security And Sustainability Rules
+- Prefer owned data and local verification over new live third-party request-path dependencies. If a live dependency is necessary, document its timeout, caching, and failure behavior.
+- Never expose the shared `API_KEY` in browser-delivered code.
+- Browser-facing admin or mutation routes must use session-based admin authorization.
+- `GET /api/admin/parks/visibility` is an admin-only read route and must stay session-protected.
+- Treat direct uploads as a cost and abuse surface: enforce limits against the actual stored object, not only client-declared metadata.
+- Keep storage private by default and prefer presigned URLs over permanently public buckets.
+- Before high-risk imports, schema changes, or large manual data operations against Turso, take a fresh backup or document why it is unnecessary.
+- When changing auth, cacheability, uploads, or external integrations, update the relevant tests and `docs/SECURITY.md` in the same session.
 
 ## Testing Rules
 - Follow behavior-first TDD for application code.
@@ -47,6 +62,8 @@ This repository is a local-first TypeScript API that imports Finnish park, prote
 - `npm run verify` is the main local quality gate.
 - Keep coverage thresholds high from the start for first-party application code, with explicit exclusions for generated or non-application files.
 - Use scoped mutation testing for meaningful backend logic after normal tests pass.
+- When route exposure changes, add integration coverage for the exact auth boundary, cache headers, and failure path.
+- When upload behavior changes, cover both client-declared limits and actual stored-object validation.
 
 ## Mandatory Git Workflow
 

@@ -14,7 +14,6 @@ import {
   parkVisitsResponseSchema,
   publicHomeSummaryResponseSchema,
   publicMapSummaryResponseSchema,
-  removedParkListResponseSchema,
   reorderVisitImagesRequestSchema,
   updateParkRemovedRequestSchema,
   updateParkRequestSchema,
@@ -92,7 +91,7 @@ export const updateParkRoute = createRoute({
   method: 'patch',
   path: '/api/parks/{slug}',
   tags: ['Parks'],
-  security: [{ bearerAuth: [] }],
+  security: [{ bearerAuth: [], sessionAuth: [] }],
   request: {
     params: z.object({
       slug: z.string()
@@ -116,6 +115,14 @@ export const updateParkRoute = createRoute({
     },
     401: {
       description: 'Admin session required',
+      content: {
+        'application/json': {
+          schema: errorSchema
+        }
+      }
+    },
+    503: {
+      description: 'OAuth not configured',
       content: {
         'application/json': {
           schema: errorSchema
@@ -175,34 +182,33 @@ export const listParkSearchRoute = createRoute({
   }
 });
 
-export const listRemovedParksRoute = createRoute({
-  method: 'get',
-  path: '/api/parks/removed',
-  tags: ['Parks'],
-  security: [{ bearerAuth: [] }],
-  responses: {
-    200: {
-      description: 'Removed parks for admin visibility management',
-      content: {
-        'application/json': {
-          schema: removedParkListResponseSchema
-        }
-      }
-    }
-  }
-});
-
 export const listAdminParkVisibilityRoute = createRoute({
   method: 'get',
   path: '/api/admin/parks/visibility',
   tags: ['Parks'],
-  security: [{ bearerAuth: [] }],
+  security: [{ bearerAuth: [], sessionAuth: [] }],
   responses: {
     200: {
       description: 'Lightweight visible and removed parks for admin visibility management',
       content: {
         'application/json': {
           schema: adminParkVisibilityResponseSchema
+        }
+      }
+    },
+    401: {
+      description: 'Admin session required',
+      content: {
+        'application/json': {
+          schema: errorSchema
+        }
+      }
+    },
+    503: {
+      description: 'OAuth not configured',
+      content: {
+        'application/json': {
+          schema: errorSchema
         }
       }
     }
@@ -330,7 +336,7 @@ export const createVisitRoute = createRoute({
   method: 'post',
   path: '/api/parks/{slug}/visits',
   tags: ['Visits'],
-  security: [{ bearerAuth: [] }],
+  security: [{ bearerAuth: [], sessionAuth: [] }],
   request: {
     params: z.object({
       slug: z.string()
@@ -352,8 +358,24 @@ export const createVisitRoute = createRoute({
         }
       }
     },
+    401: {
+      description: 'Admin session required',
+      content: {
+        'application/json': {
+          schema: errorSchema
+        }
+      }
+    },
     404: {
       description: 'Park was not found',
+      content: {
+        'application/json': {
+          schema: errorSchema
+        }
+      }
+    },
+    503: {
+      description: 'OAuth not configured',
       content: {
         'application/json': {
           schema: errorSchema
@@ -367,7 +389,7 @@ export const updateParkRemovedRoute = createRoute({
   method: 'patch',
   path: '/api/parks/{slug}/removed',
   tags: ['Parks'],
-  security: [{ bearerAuth: [] }],
+  security: [{ bearerAuth: [], sessionAuth: [] }],
   request: {
     params: z.object({
       slug: z.string()
@@ -384,8 +406,24 @@ export const updateParkRemovedRoute = createRoute({
     204: {
       description: 'Updated park removed state'
     },
+    401: {
+      description: 'Admin session required',
+      content: {
+        'application/json': {
+          schema: errorSchema
+        }
+      }
+    },
     404: {
       description: 'Park was not found',
+      content: {
+        'application/json': {
+          schema: errorSchema
+        }
+      }
+    },
+    503: {
+      description: 'OAuth not configured',
       content: {
         'application/json': {
           schema: errorSchema
@@ -399,7 +437,7 @@ export const updateVisitRoute = createRoute({
   method: 'patch',
   path: '/api/visits/{id}',
   tags: ['Visits'],
-  security: [{ bearerAuth: [] }],
+  security: [{ bearerAuth: [], sessionAuth: [] }],
   request: {
     params: z.object({
       id: z.coerce.number().int()
@@ -421,8 +459,24 @@ export const updateVisitRoute = createRoute({
         }
       }
     },
+    401: {
+      description: 'Admin session required',
+      content: {
+        'application/json': {
+          schema: errorSchema
+        }
+      }
+    },
     404: {
       description: 'Visit was not found',
+      content: {
+        'application/json': {
+          schema: errorSchema
+        }
+      }
+    },
+    503: {
+      description: 'OAuth not configured',
       content: {
         'application/json': {
           schema: errorSchema
@@ -436,7 +490,7 @@ export const deleteVisitRoute = createRoute({
   method: 'delete',
   path: '/api/visits/{id}',
   tags: ['Visits'],
-  security: [{ bearerAuth: [] }],
+  security: [{ bearerAuth: [], sessionAuth: [] }],
   request: {
     params: z.object({
       id: z.coerce.number().int()
@@ -446,8 +500,24 @@ export const deleteVisitRoute = createRoute({
     204: {
       description: 'Deleted park visit'
     },
+    401: {
+      description: 'Admin session required',
+      content: {
+        'application/json': {
+          schema: errorSchema
+        }
+      }
+    },
     404: {
       description: 'Visit was not found',
+      content: {
+        'application/json': {
+          schema: errorSchema
+        }
+      }
+    },
+    503: {
+      description: 'OAuth not configured',
       content: {
         'application/json': {
           schema: errorSchema
@@ -461,7 +531,7 @@ export const createVisitImageUploadUrlRoute = createRoute({
   method: 'post',
   path: '/api/visits/{id}/images/upload-url',
   tags: ['Visits'],
-  security: [{ bearerAuth: [] }],
+  security: [{ bearerAuth: [], sessionAuth: [] }],
   request: {
     params: z.object({
       id: z.coerce.number().int()
@@ -480,6 +550,14 @@ export const createVisitImageUploadUrlRoute = createRoute({
       content: {
         'application/json': {
           schema: directVisitImageUploadPlanSchema
+        }
+      }
+    },
+    401: {
+      description: 'Admin session required',
+      content: {
+        'application/json': {
+          schema: errorSchema
         }
       }
     },
@@ -506,6 +584,14 @@ export const createVisitImageUploadUrlRoute = createRoute({
           schema: errorSchema
         }
       }
+    },
+    503: {
+      description: 'OAuth not configured',
+      content: {
+        'application/json': {
+          schema: errorSchema
+        }
+      }
     }
   }
 });
@@ -514,7 +600,7 @@ export const completeVisitImageUploadRoute = createRoute({
   method: 'post',
   path: '/api/visits/{id}/images/complete',
   tags: ['Visits'],
-  security: [{ bearerAuth: [] }],
+  security: [{ bearerAuth: [], sessionAuth: [] }],
   request: {
     params: z.object({
       id: z.coerce.number().int()
@@ -536,6 +622,14 @@ export const completeVisitImageUploadRoute = createRoute({
         }
       }
     },
+    401: {
+      description: 'Admin session required',
+      content: {
+        'application/json': {
+          schema: errorSchema
+        }
+      }
+    },
     404: {
       description: 'Visit was not found',
       content: {
@@ -551,6 +645,14 @@ export const completeVisitImageUploadRoute = createRoute({
           schema: errorSchema
         }
       }
+    },
+    503: {
+      description: 'OAuth not configured',
+      content: {
+        'application/json': {
+          schema: errorSchema
+        }
+      }
     }
   }
 });
@@ -559,7 +661,7 @@ export const uploadVisitImagesRoute = createRoute({
   method: 'post',
   path: '/api/visits/{id}/images',
   tags: ['Visits'],
-  security: [{ bearerAuth: [] }],
+  security: [{ bearerAuth: [], sessionAuth: [] }],
   request: {
     params: z.object({
       id: z.coerce.number().int()
@@ -588,6 +690,14 @@ export const uploadVisitImagesRoute = createRoute({
             ),
             images: z.array(visitImageSchema)
           })
+        }
+      }
+    },
+    401: {
+      description: 'Admin session required',
+      content: {
+        'application/json': {
+          schema: errorSchema
         }
       }
     },
@@ -630,6 +740,14 @@ export const uploadVisitImagesRoute = createRoute({
           schema: errorSchema
         }
       }
+    },
+    503: {
+      description: 'OAuth not configured',
+      content: {
+        'application/json': {
+          schema: errorSchema
+        }
+      }
     }
   }
 });
@@ -638,7 +756,7 @@ export const deleteVisitImageRoute = createRoute({
   method: 'delete',
   path: '/api/visits/{visitId}/images/{imageId}',
   tags: ['Visits'],
-  security: [{ bearerAuth: [] }],
+  security: [{ bearerAuth: [], sessionAuth: [] }],
   request: {
     params: z.object({
       imageId: z.coerce.number().int(),
@@ -649,8 +767,24 @@ export const deleteVisitImageRoute = createRoute({
     204: {
       description: 'Deleted visit image'
     },
+    401: {
+      description: 'Admin session required',
+      content: {
+        'application/json': {
+          schema: errorSchema
+        }
+      }
+    },
     404: {
       description: 'Image or visit was not found',
+      content: {
+        'application/json': {
+          schema: errorSchema
+        }
+      }
+    },
+    503: {
+      description: 'OAuth not configured',
       content: {
         'application/json': {
           schema: errorSchema
@@ -664,7 +798,7 @@ export const reorderVisitImagesRoute = createRoute({
   method: 'patch',
   path: '/api/visits/{id}/images/reorder',
   tags: ['Visits'],
-  security: [{ bearerAuth: [] }],
+  security: [{ bearerAuth: [], sessionAuth: [] }],
   request: {
     params: z.object({
       id: z.coerce.number().int()
@@ -681,6 +815,14 @@ export const reorderVisitImagesRoute = createRoute({
     204: {
       description: 'Reordered visit images'
     },
+    401: {
+      description: 'Admin session required',
+      content: {
+        'application/json': {
+          schema: errorSchema
+        }
+      }
+    },
     404: {
       description: 'Visit was not found',
       content: {
@@ -691,6 +833,14 @@ export const reorderVisitImagesRoute = createRoute({
     },
     422: {
       description: 'Invalid image order',
+      content: {
+        'application/json': {
+          schema: errorSchema
+        }
+      }
+    },
+    503: {
+      description: 'OAuth not configured',
       content: {
         'application/json': {
           schema: errorSchema

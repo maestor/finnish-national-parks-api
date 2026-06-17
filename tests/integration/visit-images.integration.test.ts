@@ -2,18 +2,37 @@ import sharp from 'sharp';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { createApp } from '../../src/app.js';
+import { createSessionToken } from '../../src/http/session.js';
 import { importParks } from '../../src/importer/import-parks.js';
 import { createMemoryStorage } from '../../src/storage/memory-storage.js';
 import { createLipasPark } from '../fixtures/lipas.js';
 import { createTestDatabase } from '../helpers/test-db.js';
 
+const authConfig = {
+  cookieName: '__session',
+  frontendUrl: 'http://localhost:4300',
+  googleClientId: 'test-google-client-id',
+  googleClientSecret: 'test-google-client-secret',
+  jwtSecret: 'test-jwt-secret-at-least-32-characters-long'
+};
+
 describe('Visit image routes', () => {
   let testDatabase: Awaited<ReturnType<typeof createTestDatabase>>;
   let storage: ReturnType<typeof createMemoryStorage>;
+  let adminSessionCookie: string;
 
   beforeEach(async () => {
     testDatabase = await createTestDatabase();
     storage = createMemoryStorage();
+    adminSessionCookie = await createSessionToken(
+      {
+        email: 'admin@example.com',
+        name: 'Admin User',
+        picture: 'https://example.com/photo.jpg',
+        sub: 'google-user-id'
+      },
+      new TextEncoder().encode(authConfig.jwtSecret)
+    ).then((token) => `${authConfig.cookieName}=${token}`);
 
     await importParks({
       database: testDatabase.database,
@@ -30,6 +49,28 @@ describe('Visit image routes', () => {
     await testDatabase.dispose();
   });
 
+  const createAuthedApp = (overrides: Parameters<typeof createApp>[0] = {}) => {
+    return createApp({
+      auth: authConfig,
+      database: testDatabase.database,
+      ...overrides
+    });
+  };
+
+  const requestAsAdmin = (
+    app: ReturnType<typeof createApp>,
+    input: Parameters<typeof app.request>[0],
+    init?: Parameters<typeof app.request>[1]
+  ) => {
+    const headers = new Headers(init?.headers);
+    headers.set('cookie', adminSessionCookie);
+
+    return app.request(input, {
+      ...init,
+      headers
+    });
+  };
+
   const createTestImageBuffer = async (width = 800, height = 600) => {
     return sharp({
       create: {
@@ -44,8 +85,8 @@ describe('Visit image routes', () => {
   };
 
   const createVisit = async () => {
-    const app = createApp({ database: testDatabase.database, storage });
-    const response = await app.request('/api/parks/akasmannyn-kansallispuisto/visits', {
+    const app = createAuthedApp({ storage });
+    const response = await requestAsAdmin(app, '/api/parks/akasmannyn-kansallispuisto/visits', {
       body: JSON.stringify({ visitedOn: '2026-04-20' }),
       headers: { 'content-type': 'application/json' },
       method: 'POST'
@@ -55,12 +96,12 @@ describe('Visit image routes', () => {
   };
 
   const uploadImages = async (visitId: number, files: File[]) => {
-    const app = createApp({ database: testDatabase.database, storage });
+    const app = createAuthedApp({ storage });
     const formData = new FormData();
     for (const file of files) {
       formData.append('images', file);
     }
-    return app.request(`/api/visits/${visitId}/images`, {
+    return requestAsAdmin(app, `/api/visits/${visitId}/images`, {
       body: formData,
       method: 'POST'
     });
@@ -69,13 +110,12 @@ describe('Visit image routes', () => {
   const createDirectUploadPlan = async (
     visitId: number,
     file: File,
-    app = createApp({
+    app = createAuthedApp({
       allowServerImageUploads: false,
-      database: testDatabase.database,
       storage
     })
   ) => {
-    return app.request(`/api/visits/${visitId}/images/upload-url`, {
+    return requestAsAdmin(app, `/api/visits/${visitId}/images/upload-url`, {
       body: JSON.stringify({
         contentType: file.type,
         fileSizeBytes: file.size,
@@ -123,9 +163,8 @@ describe('Visit image routes', () => {
     const visitId = await createVisit();
     const buffer = await createTestImageBuffer(1400, 900);
     const file = new File([buffer], 'cloud.jpg', { type: 'image/jpeg' });
-    const app = createApp({
+    const app = createAuthedApp({
       allowServerImageUploads: false,
-      database: testDatabase.database,
       storage
     });
 
@@ -147,7 +186,7 @@ describe('Visit image routes', () => {
 
     await storage.upload(initBody.key, buffer, file.type);
 
-    const completeResponse = await app.request(`/api/visits/${visitId}/images/complete`, {
+    const completeResponse = await requestAsAdmin(app, `/api/visits/${visitId}/images/complete`, {
       body: JSON.stringify({
         fullHeight: 900,
         fullWidth: 1400,
@@ -206,7 +245,7 @@ describe('Visit image routes', () => {
 
     await uploadImages(visitId, [file]);
 
-    const app = createApp({ database: testDatabase.database, storage });
+    const app = createAuthedApp({ storage });
     const response = await app.request('/api/parks/akasmannyn-kansallispuisto/visits');
     const body = (await response.json()) as {
       visits: Array<{
@@ -230,8 +269,8 @@ describe('Visit image routes', () => {
     };
     const imageId = uploadBody.images[0]!.id;
 
-    const app = createApp({ database: testDatabase.database, storage });
-    const deleteResponse = await app.request(`/api/visits/${visitId}/images/${imageId}`, {
+    const app = createAuthedApp({ storage });
+    const deleteResponse = await requestAsAdmin(app, `/api/visits/${visitId}/images/${imageId}`, {
       method: 'DELETE'
     });
 
@@ -258,8 +297,8 @@ describe('Visit image routes', () => {
     expect(uploadBody.images[0]!.displayOrder).toBe(0);
     expect(uploadBody.images[1]!.displayOrder).toBe(0);
 
-    const app = createApp({ database: testDatabase.database, storage });
-    const reorderResponse = await app.request(`/api/visits/${visitId}/images/reorder`, {
+    const app = createAuthedApp({ storage });
+    const reorderResponse = await requestAsAdmin(app, `/api/visits/${visitId}/images/reorder`, {
       body: JSON.stringify({
         imageIds: [uploadBody.images[1]!.id, uploadBody.images[0]!.id]
       }),
@@ -286,7 +325,7 @@ describe('Visit image routes', () => {
     const secondFile = new File([await createTestImageBuffer()], 'second.jpg', {
       type: 'image/jpeg'
     });
-    const app = createApp({ database: testDatabase.database, storage });
+    const app = createAuthedApp({ storage });
 
     const firstSummaryResponse = await app.request('/api/public/home-summary');
     const firstSummaryBody = (await firstSummaryResponse.json()) as {
@@ -304,7 +343,7 @@ describe('Visit image routes', () => {
 
     expect(secondSummaryBody.version).toBeGreaterThan(firstSummaryBody.version);
 
-    const reorderResponse = await app.request(`/api/visits/${visitId}/images/reorder`, {
+    const reorderResponse = await requestAsAdmin(app, `/api/visits/${visitId}/images/reorder`, {
       body: JSON.stringify({
         imageIds: [uploadBody.images[1]!.id, uploadBody.images[0]!.id]
       }),
@@ -321,7 +360,8 @@ describe('Visit image routes', () => {
 
     expect(thirdSummaryBody.version).toBeGreaterThan(secondSummaryBody.version);
 
-    const deleteResponse = await app.request(
+    const deleteResponse = await requestAsAdmin(
+      app,
       `/api/visits/${visitId}/images/${uploadBody.images[0]!.id}`,
       {
         method: 'DELETE'
@@ -346,6 +386,23 @@ describe('Visit image routes', () => {
     expect(response.status).toBe(404);
   });
 
+  it('requires an admin session for multipart uploads', async () => {
+    const visitId = await createVisit();
+    const file = new File([await createTestImageBuffer()], 'private.jpg', { type: 'image/jpeg' });
+    const app = createAuthedApp({ storage });
+    const formData = new FormData();
+    formData.append('images', file);
+
+    const response = await app.request(`/api/visits/${visitId}/images`, {
+      body: formData,
+      method: 'POST'
+    });
+    const body = (await response.json()) as { error: string };
+
+    expect(response.status).toBe(401);
+    expect(body.error).toBe('Unauthorized');
+  });
+
   it('returns 404 when creating a direct upload plan for a missing visit', async () => {
     const file = new File([await createTestImageBuffer()], 'orphan.jpg', { type: 'image/jpeg' });
 
@@ -356,13 +413,12 @@ describe('Visit image routes', () => {
 
   it('returns 413 when a direct upload plan declares a file above the size limit', async () => {
     const visitId = await createVisit();
-    const app = createApp({
+    const app = createAuthedApp({
       allowServerImageUploads: false,
-      database: testDatabase.database,
       storage
     });
 
-    const response = await app.request(`/api/visits/${visitId}/images/upload-url`, {
+    const response = await requestAsAdmin(app, `/api/visits/${visitId}/images/upload-url`, {
       body: JSON.stringify({
         contentType: 'image/jpeg',
         fileSizeBytes: 16 * 1024 * 1024,
@@ -377,9 +433,31 @@ describe('Visit image routes', () => {
     expect(body.error).toContain('File too large');
   });
 
+  it('requires an admin session for direct upload plans', async () => {
+    const visitId = await createVisit();
+    const app = createAuthedApp({
+      allowServerImageUploads: false,
+      storage
+    });
+
+    const response = await app.request(`/api/visits/${visitId}/images/upload-url`, {
+      body: JSON.stringify({
+        contentType: 'image/jpeg',
+        fileSizeBytes: 100,
+        originalName: 'private.jpg'
+      }),
+      headers: { 'content-type': 'application/json' },
+      method: 'POST'
+    });
+    const body = (await response.json()) as { error: string };
+
+    expect(response.status).toBe(401);
+    expect(body.error).toBe('Unauthorized');
+  });
+
   it('returns 404 when reordering a missing visit', async () => {
-    const app = createApp({ database: testDatabase.database, storage });
-    const response = await app.request('/api/visits/99999/images/reorder', {
+    const app = createAuthedApp({ storage });
+    const response = await requestAsAdmin(app, '/api/visits/99999/images/reorder', {
       body: JSON.stringify({ imageIds: [1] }),
       headers: { 'content-type': 'application/json' },
       method: 'PATCH'
@@ -390,8 +468,8 @@ describe('Visit image routes', () => {
 
   it('returns 422 when reordering with invalid image IDs', async () => {
     const visitId = await createVisit();
-    const app = createApp({ database: testDatabase.database, storage });
-    const response = await app.request(`/api/visits/${visitId}/images/reorder`, {
+    const app = createAuthedApp({ storage });
+    const response = await requestAsAdmin(app, `/api/visits/${visitId}/images/reorder`, {
       body: JSON.stringify({ imageIds: [99999] }),
       headers: { 'content-type': 'application/json' },
       method: 'PATCH'
@@ -400,22 +478,48 @@ describe('Visit image routes', () => {
     expect(response.status).toBe(422);
   });
 
+  it('requires an admin session for reordering visit images', async () => {
+    const visitId = await createVisit();
+    const app = createAuthedApp({ storage });
+    const response = await app.request(`/api/visits/${visitId}/images/reorder`, {
+      body: JSON.stringify({ imageIds: [1] }),
+      headers: { 'content-type': 'application/json' },
+      method: 'PATCH'
+    });
+    const body = (await response.json()) as { error: string };
+
+    expect(response.status).toBe(401);
+    expect(body.error).toBe('Unauthorized');
+  });
+
   it('returns 404 when deleting a missing image', async () => {
     const visitId = await createVisit();
-    const app = createApp({ database: testDatabase.database, storage });
-    const response = await app.request(`/api/visits/${visitId}/images/99999`, {
+    const app = createAuthedApp({ storage });
+    const response = await requestAsAdmin(app, `/api/visits/${visitId}/images/99999`, {
       method: 'DELETE'
     });
 
     expect(response.status).toBe(404);
   });
 
+  it('requires an admin session for deleting visit images', async () => {
+    const visitId = await createVisit();
+    const app = createAuthedApp({ storage });
+    const response = await app.request(`/api/visits/${visitId}/images/99999`, {
+      method: 'DELETE'
+    });
+    const body = (await response.json()) as { error: string };
+
+    expect(response.status).toBe(401);
+    expect(body.error).toBe('Unauthorized');
+  });
+
   it('returns 400 when no valid files are provided', async () => {
     const visitId = await createVisit();
-    const app = createApp({ database: testDatabase.database, storage });
+    const app = createAuthedApp({ storage });
     const formData = new FormData();
     formData.append('images', 'not-a-file');
-    const response = await app.request(`/api/visits/${visitId}/images`, {
+    const response = await requestAsAdmin(app, `/api/visits/${visitId}/images`, {
       body: formData,
       method: 'POST'
     });
@@ -426,12 +530,12 @@ describe('Visit image routes', () => {
   it('ignores non-file multipart values when valid files are also provided', async () => {
     const visitId = await createVisit();
     const file = new File([await createTestImageBuffer()], 'mixed.jpg', { type: 'image/jpeg' });
-    const app = createApp({ database: testDatabase.database, storage });
+    const app = createAuthedApp({ storage });
     const formData = new FormData();
     formData.append('images', 'not-a-file');
     formData.append('images', file);
 
-    const response = await app.request(`/api/visits/${visitId}/images`, {
+    const response = await requestAsAdmin(app, `/api/visits/${visitId}/images`, {
       body: formData,
       method: 'POST'
     });
@@ -447,15 +551,14 @@ describe('Visit image routes', () => {
   it('returns 422 when completing a direct upload before the object exists in storage', async () => {
     const visitId = await createVisit();
     const file = new File([await createTestImageBuffer()], 'pending.jpg', { type: 'image/jpeg' });
-    const app = createApp({
+    const app = createAuthedApp({
       allowServerImageUploads: false,
-      database: testDatabase.database,
       storage
     });
     const initResponse = await createDirectUploadPlan(visitId, file, app);
     const initBody = (await initResponse.json()) as { key: string };
 
-    const completeResponse = await app.request(`/api/visits/${visitId}/images/complete`, {
+    const completeResponse = await requestAsAdmin(app, `/api/visits/${visitId}/images/complete`, {
       body: JSON.stringify({
         fullHeight: 600,
         fullWidth: 800,
@@ -472,13 +575,12 @@ describe('Visit image routes', () => {
   });
 
   it('returns 404 when completing a direct upload for a missing visit', async () => {
-    const app = createApp({
+    const app = createAuthedApp({
       allowServerImageUploads: false,
-      database: testDatabase.database,
       storage
     });
 
-    const response = await app.request('/api/visits/99999/images/complete', {
+    const response = await requestAsAdmin(app, '/api/visits/99999/images/complete', {
       body: JSON.stringify({
         key: 'visits/99999/missing.jpg',
         originalName: 'missing.jpg'
@@ -494,13 +596,12 @@ describe('Visit image routes', () => {
 
   it('returns 422 when a direct upload key belongs to a different visit', async () => {
     const visitId = await createVisit();
-    const app = createApp({
+    const app = createAuthedApp({
       allowServerImageUploads: false,
-      database: testDatabase.database,
       storage
     });
 
-    const response = await app.request(`/api/visits/${visitId}/images/complete`, {
+    const response = await requestAsAdmin(app, `/api/visits/${visitId}/images/complete`, {
       body: JSON.stringify({
         key: 'visits/99999/wrong.jpg',
         originalName: 'wrong.jpg'
@@ -514,11 +615,31 @@ describe('Visit image routes', () => {
     expect(body.error).toContain('does not belong to this visit');
   });
 
+  it('requires an admin session for direct upload completion', async () => {
+    const visitId = await createVisit();
+    const app = createAuthedApp({
+      allowServerImageUploads: false,
+      storage
+    });
+
+    const response = await app.request(`/api/visits/${visitId}/images/complete`, {
+      body: JSON.stringify({
+        key: `visits/${visitId}/private.jpg`,
+        originalName: 'private.jpg'
+      }),
+      headers: { 'content-type': 'application/json' },
+      method: 'POST'
+    });
+    const body = (await response.json()) as { error: string };
+
+    expect(response.status).toBe(401);
+    expect(body.error).toBe('Unauthorized');
+  });
+
   it('returns 422 when a stored direct upload has an unsupported content type', async () => {
     const visitId = await createVisit();
-    const app = createApp({
+    const app = createAuthedApp({
       allowServerImageUploads: false,
-      database: testDatabase.database,
       storage
     });
     const initResponse = await createDirectUploadPlan(
@@ -530,7 +651,7 @@ describe('Visit image routes', () => {
 
     await storage.upload(initBody.key, Buffer.from('hello'), 'text/plain');
 
-    const response = await app.request(`/api/visits/${visitId}/images/complete`, {
+    const response = await requestAsAdmin(app, `/api/visits/${visitId}/images/complete`, {
       body: JSON.stringify({
         key: initBody.key,
         originalName: 'bad.jpg'
@@ -554,13 +675,12 @@ describe('Visit image routes', () => {
         contentType: 'image/jpeg'
       })
     };
-    const app = createApp({
+    const app = createAuthedApp({
       allowServerImageUploads: false,
-      database: testDatabase.database,
       storage: storageWithNullMetadata
     });
 
-    const initResponse = await app.request(`/api/visits/${visitId}/images/upload-url`, {
+    const initResponse = await requestAsAdmin(app, `/api/visits/${visitId}/images/upload-url`, {
       body: JSON.stringify({
         contentType: 'image/jpeg',
         fileSizeBytes: 100,
@@ -573,7 +693,7 @@ describe('Visit image routes', () => {
 
     await baseStorage.upload(initBody.key, Buffer.from('jpeg-data'), 'image/jpeg');
 
-    const response = await app.request(`/api/visits/${visitId}/images/complete`, {
+    const response = await requestAsAdmin(app, `/api/visits/${visitId}/images/complete`, {
       body: JSON.stringify({
         key: initBody.key
       }),
@@ -608,13 +728,12 @@ describe('Visit image routes', () => {
         contentType: null
       })
     };
-    const app = createApp({
+    const app = createAuthedApp({
       allowServerImageUploads: false,
-      database: testDatabase.database,
       storage: storageWithMissingContentType
     });
 
-    const response = await app.request(`/api/visits/${visitId}/images/complete`, {
+    const response = await requestAsAdmin(app, `/api/visits/${visitId}/images/complete`, {
       body: JSON.stringify({
         key: `visits/${visitId}/missing-type.jpg`,
         originalName: 'missing-type.jpg'
@@ -717,15 +836,14 @@ describe('Visit image routes', () => {
     const file = new File([await createTestImageBuffer()], 'local-only.jpg', {
       type: 'image/jpeg'
     });
-    const app = createApp({
+    const app = createAuthedApp({
       allowServerImageUploads: false,
-      database: testDatabase.database,
       storage
     });
     const formData = new FormData();
     formData.append('images', file);
 
-    const response = await app.request(`/api/visits/${visitId}/images`, {
+    const response = await requestAsAdmin(app, `/api/visits/${visitId}/images`, {
       body: formData,
       method: 'POST'
     });
