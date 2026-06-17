@@ -35,9 +35,11 @@ const createAdminSessionCookie = async () => {
 
 describe('API routes', () => {
   let testDatabase: Awaited<ReturnType<typeof createTestDatabase>>;
+  let adminSessionCookie: string;
 
   beforeEach(async () => {
     testDatabase = await createTestDatabase();
+    adminSessionCookie = await createAdminSessionCookie();
 
     await importParks({
       database: testDatabase.database,
@@ -98,6 +100,28 @@ describe('API routes', () => {
     await testDatabase.dispose();
   });
 
+  const createAuthedApp = (overrides: Parameters<typeof createApp>[0] = {}) => {
+    return createApp({
+      auth: authConfig,
+      database: testDatabase.database,
+      ...overrides
+    });
+  };
+
+  const requestAsAdmin = (
+    app: ReturnType<typeof createApp>,
+    input: Parameters<typeof app.request>[0],
+    init?: Parameters<typeof app.request>[1]
+  ) => {
+    const headers = new Headers(init?.headers);
+    headers.set('cookie', adminSessionCookie);
+
+    return app.request(input, {
+      ...init,
+      headers
+    });
+  };
+
   const createVisit = async (
     app: ReturnType<typeof createApp>,
     slug: string,
@@ -108,7 +132,7 @@ describe('API routes', () => {
       visitedOn: string;
     }
   ) => {
-    const response = await app.request(`/api/parks/${slug}/visits`, {
+    const response = await requestAsAdmin(app, `/api/parks/${slug}/visits`, {
       method: 'POST',
       body: JSON.stringify(body),
       headers: {
@@ -123,7 +147,7 @@ describe('API routes', () => {
   };
 
   it('serves the public park list without boundary geometry and with cache validators', async () => {
-    const app = createApp({ database: testDatabase.database });
+    const app = createAuthedApp();
     const response = await app.request('/api/parks');
     const body = (await response.json()) as {
       parks: Array<Record<string, unknown>>;
@@ -144,7 +168,7 @@ describe('API routes', () => {
   });
 
   it('serves lightweight park search results with cache validators', async () => {
-    const app = createApp({ database: testDatabase.database });
+    const app = createAuthedApp();
     const firstResponse = await app.request('/api/parks/search');
     const firstBody = (await firstResponse.json()) as {
       parks: Array<Record<string, unknown>>;
@@ -180,7 +204,7 @@ describe('API routes', () => {
   });
 
   it('filters lightweight park search results by type and category', async () => {
-    const app = createApp({ database: testDatabase.database });
+    const app = createAuthedApp();
 
     const typeResponse = await app.request('/api/parks/search?type=outdoor-recreation-area');
     const typeBody = (await typeResponse.json()) as {
@@ -287,7 +311,7 @@ describe('API routes', () => {
       now: () => '2026-05-01T10:00:00.000Z'
     });
 
-    const app = createApp({ database: testDatabase.database });
+    const app = createAuthedApp();
     const listResponse = await app.request('/api/parks?type=nature-reserve-area');
     const detailResponse = await app.request('/api/parks/merenkurkun-maailmanperintoalue');
     const listBody = (await listResponse.json()) as {
@@ -325,7 +349,7 @@ describe('API routes', () => {
       now: () => '2026-05-01T10:00:00.000Z'
     });
 
-    const app = createApp({ database: testDatabase.database });
+    const app = createAuthedApp();
     const response = await app.request('/api/parks?type=cultural-history-area');
     const body = (await response.json()) as {
       parks: Array<Record<string, unknown>>;
@@ -374,7 +398,7 @@ describe('API routes', () => {
       })
     });
 
-    const app = createApp({ database: testDatabase.database });
+    const app = createAuthedApp();
     const response = await app.request('/api/parks?category=trails-and-routes');
     const body = (await response.json()) as {
       parks: Array<{
@@ -420,7 +444,7 @@ describe('API routes', () => {
       })
     });
 
-    const app = createApp({ database: testDatabase.database });
+    const app = createAuthedApp();
     const response = await app.request('/api/parks?category=hiking-and-wilderness-areas');
     const body = (await response.json()) as {
       parks: Array<{
@@ -447,7 +471,7 @@ describe('API routes', () => {
   });
 
   it('returns 304 when the public list ETag matches', async () => {
-    const app = createApp({ database: testDatabase.database });
+    const app = createAuthedApp();
     const firstResponse = await app.request('/api/parks');
     const etag = firstResponse.headers.get('etag');
 
@@ -463,7 +487,7 @@ describe('API routes', () => {
   });
 
   it('changes the public list ETag after catalog data changes', async () => {
-    const app = createApp({ database: testDatabase.database });
+    const app = createAuthedApp();
     const firstResponse = await app.request('/api/parks');
     const firstEtag = firstResponse.headers.get('etag');
 
@@ -533,7 +557,7 @@ describe('API routes', () => {
   });
 
   it('serves park detail with optional boundary geometry and no personal state', async () => {
-    const app = createApp({ database: testDatabase.database });
+    const app = createAuthedApp();
     const summaryResponse = await app.request('/api/parks/akasmannyn-kansallispuisto');
     const summaryBody = (await summaryResponse.json()) as Record<string, unknown>;
     const etag = summaryResponse.headers.get('etag');
@@ -568,7 +592,7 @@ describe('API routes', () => {
   });
 
   it('returns raw and derived location fields consistently in park detail', async () => {
-    const app = createApp({ auth: authConfig, database: testDatabase.database });
+    const app = createAuthedApp();
     const publicResponse = await app.request('/api/parks/akasmannyn-kansallispuisto');
     const publicBody = (await publicResponse.json()) as Record<string, unknown>;
     const adminResponse = await app.request('/api/parks/akasmannyn-kansallispuisto', {
@@ -597,7 +621,7 @@ describe('API routes', () => {
   });
 
   it('allows admin park edits and auto-generates a slug when the name changes', async () => {
-    const app = createApp({ auth: authConfig, database: testDatabase.database });
+    const app = createAuthedApp();
     const sessionCookie = await createAdminSessionCookie();
 
     const response = await app.request('/api/parks/akasmannyn-kansallispuisto', {
@@ -724,7 +748,7 @@ describe('API routes', () => {
       })
     });
 
-    const app = createApp({ auth: authConfig, database: testDatabase.database });
+    const app = createAuthedApp();
     const unauthorizedResponse = await app.request('/api/parks/akasmannyn-kansallispuisto', {
       method: 'PATCH',
       body: JSON.stringify({
@@ -769,6 +793,28 @@ describe('API routes', () => {
     expect(missingResponse.status).toBe(404);
     expect(invalidUrlResponse.status).toBe(422);
     expect(conflictingSlugResponse.status).toBe(409);
+  });
+
+  it('returns 503 for admin routes when OAuth session auth is not configured', async () => {
+    const app = createApp({ database: testDatabase.database });
+
+    const createVisitResponse = await app.request('/api/parks/akasmannyn-kansallispuisto/visits', {
+      method: 'POST',
+      body: JSON.stringify({
+        visitedOn: '2026-04-20'
+      }),
+      headers: {
+        'content-type': 'application/json'
+      }
+    });
+    const createVisitBody = (await createVisitResponse.json()) as { error: string };
+    const visibilityResponse = await app.request('/api/admin/parks/visibility');
+    const visibilityBody = (await visibilityResponse.json()) as { error: string };
+
+    expect(createVisitResponse.status).toBe(503);
+    expect(createVisitBody.error).toBe('OAuth not configured.');
+    expect(visibilityResponse.status).toBe(503);
+    expect(visibilityBody.error).toBe('OAuth not configured.');
   });
 
   it('serves standalone nature trails through the HTTP contract', async () => {
@@ -846,7 +892,7 @@ describe('API routes', () => {
       })
     });
 
-    const app = createApp({ database: testDatabase.database });
+    const app = createAuthedApp();
     const listResponse = await app.request('/api/parks?type=nature-trail');
     const listBody = (await listResponse.json()) as {
       parks: Array<Record<string, unknown>>;
@@ -879,7 +925,7 @@ describe('API routes', () => {
   });
 
   it('normalizes API address values when postal fields duplicate or replace the address', async () => {
-    const app = createApp({ database: testDatabase.database });
+    const app = createAuthedApp();
 
     await testDatabase.database
       .update(parks)
@@ -903,7 +949,7 @@ describe('API routes', () => {
   });
 
   it('explicitly omits boundary geometry when includeBoundary=false', async () => {
-    const app = createApp({ database: testDatabase.database });
+    const app = createAuthedApp();
     const response = await app.request(
       '/api/parks/akasmannyn-kansallispuisto?includeBoundary=false'
     );
@@ -914,7 +960,7 @@ describe('API routes', () => {
   });
 
   it('filters the public park list by type slug', async () => {
-    const app = createApp({ database: testDatabase.database });
+    const app = createAuthedApp();
     const response = await app.request('/api/parks?type=outdoor-recreation-area');
     const body = (await response.json()) as {
       parks: Array<{
@@ -941,7 +987,7 @@ describe('API routes', () => {
   });
 
   it('serves lightweight public home summary data with shared-cache validators', async () => {
-    const app = createApp({ database: testDatabase.database });
+    const app = createAuthedApp();
 
     await createVisit(app, 'akasmannyn-kansallispuisto', {
       author: 'Hiker One',
@@ -1066,7 +1112,7 @@ describe('API routes', () => {
   });
 
   it('orders latest visit entries by addition time instead of visit date', async () => {
-    const app = createApp({ database: testDatabase.database });
+    const app = createAuthedApp();
 
     await createVisit(app, 'akasmannyn-kansallispuisto', {
       visitedOn: '2026-04-22'
@@ -1126,7 +1172,7 @@ describe('API routes', () => {
       })
     });
 
-    const app = createApp({ database: testDatabase.database });
+    const app = createAuthedApp();
     await createVisit(app, 'testin-luontopolku', {
       visitedOn: '2026-05-01'
     });
@@ -1192,7 +1238,7 @@ describe('API routes', () => {
       })
     });
 
-    const app = createApp({ database: testDatabase.database });
+    const app = createAuthedApp();
     await createVisit(app, 'pisavaaran-retkeilyalue', {
       visitedOn: '2026-05-01'
     });
@@ -1247,7 +1293,7 @@ describe('API routes', () => {
   });
 
   it('serves lightweight public map summary data with per-park visited summaries', async () => {
-    const app = createApp({ database: testDatabase.database });
+    const app = createAuthedApp();
 
     await createVisit(app, 'akasmannyn-kansallispuisto', {
       visitedOn: '2026-04-20'
@@ -1291,7 +1337,7 @@ describe('API routes', () => {
   });
 
   it('returns 304 for matching public map summary ETags', async () => {
-    const app = createApp({ database: testDatabase.database });
+    const app = createAuthedApp();
     const firstResponse = await app.request('/api/public/map-summary');
     const etag = firstResponse.headers.get('etag');
 
@@ -1307,7 +1353,7 @@ describe('API routes', () => {
   });
 
   it('returns 304 for matching public summary ETags and changes them when public visit data changes', async () => {
-    const app = createApp({ database: testDatabase.database });
+    const app = createAuthedApp();
 
     const firstResponse = await app.request('/api/public/home-summary');
     const firstEtag = firstResponse.headers.get('etag');
@@ -1338,7 +1384,7 @@ describe('API routes', () => {
     expect(secondEtag).not.toBe(firstEtag);
     expect(secondBody.version).toBeGreaterThan(firstBody.version);
 
-    await app.request(`/api/visits/${createdVisit.id}`, {
+    await requestAsAdmin(app, `/api/visits/${createdVisit.id}`, {
       method: 'PATCH',
       body: JSON.stringify({
         visitedOn: '2026-04-21'
@@ -1358,7 +1404,7 @@ describe('API routes', () => {
     expect(thirdEtag).not.toBe(secondEtag);
     expect(thirdBody.version).toBeGreaterThan(secondBody.version);
 
-    await app.request(`/api/visits/${createdVisit.id}`, {
+    await requestAsAdmin(app, `/api/visits/${createdVisit.id}`, {
       method: 'DELETE'
     });
 
@@ -1376,25 +1422,29 @@ describe('API routes', () => {
   });
 
   it('supports visit workflows with private cache policy', async () => {
-    const app = createApp({ database: testDatabase.database });
+    const app = createAuthedApp();
 
-    const createVisitResponse = await app.request('/api/parks/akasmannyn-kansallispuisto/visits', {
-      method: 'POST',
-      body: JSON.stringify({
-        author: 'Hiker One',
-        note: 'Windy but sunny.',
-        route: 'North trail',
-        visitedOn: '2026-04-20'
-      }),
-      headers: {
-        'content-type': 'application/json'
+    const createVisitResponse = await requestAsAdmin(
+      app,
+      '/api/parks/akasmannyn-kansallispuisto/visits',
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          author: 'Hiker One',
+          note: 'Windy but sunny.',
+          route: 'North trail',
+          visitedOn: '2026-04-20'
+        }),
+        headers: {
+          'content-type': 'application/json'
+        }
       }
-    });
+    );
     const createdVisit = (await createVisitResponse.json()) as { id: number };
 
     expect(createVisitResponse.status).toBe(201);
 
-    const patchVisitResponse = await app.request(`/api/visits/${createdVisit.id}`, {
+    const patchVisitResponse = await requestAsAdmin(app, `/api/visits/${createdVisit.id}`, {
       method: 'PATCH',
       body: JSON.stringify({
         author: 'Hiker Two',
@@ -1468,7 +1518,7 @@ describe('API routes', () => {
       slug: 'akasmannyn-kansallispuisto'
     });
 
-    const deleteResponse = await app.request(`/api/visits/${createdVisit.id}`, {
+    const deleteResponse = await requestAsAdmin(app, `/api/visits/${createdVisit.id}`, {
       method: 'DELETE'
     });
 
@@ -1477,7 +1527,7 @@ describe('API routes', () => {
   });
 
   it('serves visit resources and returns 404s for missing resources', async () => {
-    const app = createApp({ database: testDatabase.database });
+    const app = createAuthedApp();
 
     const parkVisitsResponse = await app.request('/api/parks/akasmannyn-kansallispuisto/visits');
     const parkVisitsBody = (await parkVisitsResponse.json()) as {
@@ -1505,7 +1555,7 @@ describe('API routes', () => {
 
     const missingCatalog = await app.request('/api/parks/missing-park');
     const missingParkVisits = await app.request('/api/parks/missing-park/visits');
-    const missingVisitCreate = await app.request('/api/parks/missing-park/visits', {
+    const missingVisitCreate = await requestAsAdmin(app, '/api/parks/missing-park/visits', {
       method: 'POST',
       body: JSON.stringify({
         visitedOn: '2026-04-20'
@@ -1515,7 +1565,7 @@ describe('API routes', () => {
       }
     });
     const missingVisitGet = await app.request('/api/visits/99999');
-    const missingVisitPatch = await app.request('/api/visits/99999', {
+    const missingVisitPatch = await requestAsAdmin(app, '/api/visits/99999', {
       method: 'PATCH',
       body: JSON.stringify({
         note: 'No visit'
@@ -1524,7 +1574,7 @@ describe('API routes', () => {
         'content-type': 'application/json'
       }
     });
-    const missingVisitDelete = await app.request('/api/visits/99999', {
+    const missingVisitDelete = await requestAsAdmin(app, '/api/visits/99999', {
       method: 'DELETE'
     });
 
@@ -1537,16 +1587,20 @@ describe('API routes', () => {
   });
 
   it('hides removed parks from catalog and visit responses', async () => {
-    const app = createApp({ database: testDatabase.database });
-    const createVisitResponse = await app.request('/api/parks/akasmannyn-kansallispuisto/visits', {
-      method: 'POST',
-      body: JSON.stringify({
-        visitedOn: '2026-04-20'
-      }),
-      headers: {
-        'content-type': 'application/json'
+    const app = createAuthedApp();
+    const createVisitResponse = await requestAsAdmin(
+      app,
+      '/api/parks/akasmannyn-kansallispuisto/visits',
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          visitedOn: '2026-04-20'
+        }),
+        headers: {
+          'content-type': 'application/json'
+        }
       }
-    });
+    );
     const createdVisit = (await createVisitResponse.json()) as { id: number };
 
     await testDatabase.database
@@ -1565,7 +1619,8 @@ describe('API routes', () => {
       visits: Array<{ id: number }>;
     };
     const visitDetailResponse = await app.request(`/api/visits/${createdVisit.id}`);
-    const createRemovedVisitResponse = await app.request(
+    const createRemovedVisitResponse = await requestAsAdmin(
+      app,
       '/api/parks/akasmannyn-kansallispuisto/visits',
       {
         method: 'POST',
@@ -1597,25 +1652,18 @@ describe('API routes', () => {
       .set({ removed: true })
       .where(eq(parks.slug, 'akasmannyn-kansallispuisto'));
 
-    const app = createApp({ auth: authConfig, database: testDatabase.database });
+    const app = createAuthedApp();
     const unauthorizedResponse = await app.request('/api/parks/akasmannyn-kansallispuisto');
     const invalidCookieResponse = await app.request('/api/parks/akasmannyn-kansallispuisto', {
       headers: {
         cookie: `${authConfig.cookieName}=invalid-token`
       }
     });
-    const authorizedResponse = await app.request('/api/parks/akasmannyn-kansallispuisto', {
-      headers: {
-        cookie: await createAdminSessionCookie()
-      }
-    });
-    const authorizedBoundaryResponse = await app.request(
+    const authorizedResponse = await requestAsAdmin(app, '/api/parks/akasmannyn-kansallispuisto');
+    const authorizedBoundaryResponse = await requestAsAdmin(
+      app,
       '/api/parks/akasmannyn-kansallispuisto?includeBoundary=true',
-      {
-        headers: {
-          cookie: await createAdminSessionCookie()
-        }
-      }
+      {}
     );
     const authorizedBody = (await authorizedResponse.json()) as Record<string, unknown>;
     const authorizedBoundaryBody = (await authorizedBoundaryResponse.json()) as Record<
@@ -1636,32 +1684,40 @@ describe('API routes', () => {
   });
 
   it('allows authenticated UI to disable and restore a park by slug', async () => {
-    const app = createApp({ database: testDatabase.database });
+    const app = createAuthedApp();
 
-    const disableResponse = await app.request('/api/parks/akasmannyn-kansallispuisto/removed', {
-      method: 'PATCH',
-      body: JSON.stringify({
-        removed: true
-      }),
-      headers: {
-        'content-type': 'application/json'
+    const disableResponse = await requestAsAdmin(
+      app,
+      '/api/parks/akasmannyn-kansallispuisto/removed',
+      {
+        method: 'PATCH',
+        body: JSON.stringify({
+          removed: true
+        }),
+        headers: {
+          'content-type': 'application/json'
+        }
       }
-    });
+    );
 
     expect(disableResponse.status).toBe(204);
     await expect(
       getParkBySlug(testDatabase.database, 'akasmannyn-kansallispuisto')
     ).resolves.toBeNull();
 
-    const restoreResponse = await app.request('/api/parks/akasmannyn-kansallispuisto/removed', {
-      method: 'PATCH',
-      body: JSON.stringify({
-        removed: false
-      }),
-      headers: {
-        'content-type': 'application/json'
+    const restoreResponse = await requestAsAdmin(
+      app,
+      '/api/parks/akasmannyn-kansallispuisto/removed',
+      {
+        method: 'PATCH',
+        body: JSON.stringify({
+          removed: false
+        }),
+        headers: {
+          'content-type': 'application/json'
+        }
       }
-    });
+    );
 
     expect(restoreResponse.status).toBe(204);
     await expect(
@@ -1670,7 +1726,7 @@ describe('API routes', () => {
       slug: 'akasmannyn-kansallispuisto'
     });
 
-    const missingResponse = await app.request('/api/parks/missing-park/removed', {
+    const missingResponse = await requestAsAdmin(app, '/api/parks/missing-park/removed', {
       method: 'PATCH',
       body: JSON.stringify({
         removed: true
@@ -1683,10 +1739,13 @@ describe('API routes', () => {
     expect(missingResponse.status).toBe(404);
   });
 
-  it('lists removed parks for admin restore usage', async () => {
-    const app = createApp({ database: testDatabase.database });
+  it('requires an admin session for park removal and visit mutations', async () => {
+    const app = createAuthedApp();
+    const { body: createdVisit } = await createVisit(app, 'akasmannyn-kansallispuisto', {
+      visitedOn: '2026-04-20'
+    });
 
-    await app.request('/api/parks/akasmannyn-kansallispuisto/removed', {
+    const removeParkResponse = await app.request('/api/parks/akasmannyn-kansallispuisto/removed', {
       method: 'PATCH',
       body: JSON.stringify({
         removed: true
@@ -1695,38 +1754,36 @@ describe('API routes', () => {
         'content-type': 'application/json'
       }
     });
+    const updateVisitResponse = await app.request(`/api/visits/${createdVisit.id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({
+        note: 'Unauthorized edit'
+      }),
+      headers: {
+        'content-type': 'application/json'
+      }
+    });
+    const deleteVisitResponse = await app.request(`/api/visits/${createdVisit.id}`, {
+      method: 'DELETE'
+    });
+    const removeParkBody = (await removeParkResponse.json()) as { error: string };
+    const updateVisitBody = (await updateVisitResponse.json()) as { error: string };
+    const deleteVisitBody = (await deleteVisitResponse.json()) as { error: string };
 
-    const response = await app.request('/api/parks/removed');
-    const body = (await response.json()) as {
-      parks: Array<{
-        catalogStatus: 'active' | 'inactive';
-        name: string;
-        removed: true;
-        slug: string;
-      }>;
-    };
-
-    expect(response.status).toBe(200);
-    expect(response.headers.get('cache-control')).toBe('private, no-store');
-    expect(body.parks).toEqual([
-      expect.objectContaining({
-        address: 'Puistotie 1, 00999 Testikylä',
-        catalogStatus: 'active',
-        locationLabel: 'Puistotie 1',
-        name: 'Äkäsmännyn kansallispuisto',
-        postalCode: '00999',
-        postalOffice: 'Testikylä',
-        removed: true,
-        slug: 'akasmannyn-kansallispuisto'
-      })
-    ]);
-    expect(body.parks[0]).not.toHaveProperty('location');
+    expect(removeParkResponse.status).toBe(401);
+    expect(removeParkBody.error).toBe('Unauthorized');
+    expect(updateVisitResponse.status).toBe(401);
+    expect(updateVisitBody.error).toBe('Unauthorized');
+    expect(deleteVisitResponse.status).toBe(401);
+    expect(deleteVisitBody.error).toBe('Unauthorized');
   });
 
   it('serves lightweight admin park visibility data for visible and removed parks', async () => {
-    const app = createApp({ database: testDatabase.database });
+    const app = createAuthedApp();
 
-    await app.request('/api/parks/akasmannyn-kansallispuisto/removed', {
+    const unauthorizedResponse = await app.request('/api/admin/parks/visibility');
+
+    await requestAsAdmin(app, '/api/parks/akasmannyn-kansallispuisto/removed', {
       method: 'PATCH',
       body: JSON.stringify({
         removed: true
@@ -1736,12 +1793,13 @@ describe('API routes', () => {
       }
     });
 
-    const response = await app.request('/api/admin/parks/visibility');
+    const response = await requestAsAdmin(app, '/api/admin/parks/visibility');
     const body = (await response.json()) as {
       removedParks: Array<Record<string, unknown>>;
       visibleParks: Array<Record<string, unknown>>;
     };
 
+    expect(unauthorizedResponse.status).toBe(401);
     expect(response.status).toBe(200);
     expect(response.headers.get('cache-control')).toBe('private, no-store');
     expect(body.visibleParks).toHaveLength(3);
@@ -1774,7 +1832,7 @@ describe('API routes', () => {
   });
 
   it('returns CORS headers for preflight requests on API routes', async () => {
-    const app = createApp({ auth: authConfig, database: testDatabase.database });
+    const app = createAuthedApp();
     const response = await app.request('/api/parks/akasmannyn-kansallispuisto/visits', {
       headers: {
         'access-control-request-headers': 'content-type',
@@ -1791,8 +1849,8 @@ describe('API routes', () => {
   });
 
   it('returns CORS headers for actual cross-origin API requests', async () => {
-    const app = createApp({ auth: authConfig, database: testDatabase.database });
-    const response = await app.request('/api/parks/akasmannyn-kansallispuisto/visits', {
+    const app = createAuthedApp();
+    const response = await requestAsAdmin(app, '/api/parks/akasmannyn-kansallispuisto/visits', {
       body: JSON.stringify({ visitedOn: '2026-04-20' }),
       headers: {
         'content-type': 'application/json',
@@ -1807,7 +1865,7 @@ describe('API routes', () => {
   });
 
   it('returns CORS headers for catalog API routes', async () => {
-    const app = createApp({ auth: authConfig, database: testDatabase.database });
+    const app = createAuthedApp();
     const response = await app.request('/api/parks', {
       headers: {
         origin: authConfig.frontendUrl
