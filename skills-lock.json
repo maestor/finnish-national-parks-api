@@ -11,13 +11,13 @@
       "source": "maestor/agent-skills",
       "sourceType": "github",
       "skillPath": "skills/git-pr-workflow/SKILL.md",
-      "computedHash": "0dc1c064459c2ba9d939c8a159b646ccb99ccc395b25e6cae0d1aeb5a268cc1d"
+      "computedHash": "3dd69c25853bb424992e96fb073bd376b1005e1a28c72c6e08e7f771903502ce"
     },
     "intelligence-testing": {
       "source": "maestor/agent-skills",
       "sourceType": "github",
       "skillPath": "skills/intelligence-testing/SKILL.md",
-      "computedHash": "a82c5d9827487b84c319e624d5c30632c8e1e1d3129248400a418d229eb49d3d"
+      "computedHash": "e00a3e6efa923d8bff983646494759832bb84ad86d9d96598371d6a28118017c"
     },
     "local-first-verification": {
       "source": "maestor/agent-skills",
