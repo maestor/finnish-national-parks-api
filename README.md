@@ -64,7 +64,6 @@ FRONTEND_URL=http://localhost:4300
 # Optional: Cloudflare R2 storage for visit images and park logos
 R2_BUCKET_NAME=
 R2_ENDPOINT=
-R2_PUBLIC_URL=
 R2_ACCESS_KEY_ID=
 R2_SECRET_ACCESS_KEY=
 ```
@@ -72,14 +71,14 @@ R2_SECRET_ACCESS_KEY=
 Production notes:
 
 - Vercel deployments must set `DATABASE_URL` to a remote `libsql://...` database instead of the local file default.
-- Vercel deployments should always set `API_KEY`, because non-public endpoints are bearer-protected outside localhost.
+- Vercel deployments should always set `API_KEY`, because every `/api/*` endpoint is bearer-protected outside localhost today.
 - If Google OAuth is enabled in Vercel, `FRONTEND_URL` must be the deployed frontend origin.
 - If Google calls the API directly, Google must allow `https://your-api-domain.vercel.app/auth/google/callback`.
 - If `/auth/*` is exposed through a frontend proxy or rewrite, set `GOOGLE_REDIRECT_URI=https://your-frontend-domain/auth/google/callback`, register that exact URI in Google Cloud, and start the login flow through that same public domain so the OAuth cookies stay on the right host.
 - `MEMORY_STORAGE=true` is for tests and local-only development, not Vercel.
 - `npm run db:backup` reads the current remote `DATABASE_URL` and `DATABASE_AUTH_TOKEN`, then writes a timestamped SQLite backup under `data/backups/`. You can append an optional label with `npm run db:backup -- before-import`.
 - `npm run park:move-visits -- --from <source-slug> --to <target-slug> [--dry-run]` reassigns all visits for one park slug to another. Visit images stay attached automatically because they belong to the visit rows.
-- `npm run park:logo -- <park-slug>` uploads either `data/logos/<park-slug>.png` or, when multiple parks share one `displayTypeName`, `data/logos/display-types/<normalized-display-type>.png`. Shared display-type logos are stored once under `logos/display-types/` in R2 and linked from every matching park row. Set `R2_PUBLIC_URL` if you want park APIs to return a stable public logo URL for the UI.
+- `npm run park:logo -- <park-slug>` uploads either `data/logos/<park-slug>.png` or, when multiple parks share one `displayTypeName`, `data/logos/display-types/<normalized-display-type>.png`. Shared display-type logos are stored once under `logos/display-types/` in R2 and linked from every matching park row. Park APIs currently expose presigned logo URLs instead of a configurable public base URL.
 
 The importer's LIPAS source URL and supported type-code list are internal configuration, not a normal `.env` setting.
 
@@ -89,7 +88,6 @@ The importer's LIPAS source URL and supported type-code list are internal config
 - `GET /openapi.json`
 - `GET /api/parks`
 - `GET /api/parks/search`
-- `GET /api/parks/removed`
 - `GET /api/admin/parks/visibility`
 - `GET /api/parks/:slug`
 - `PATCH /api/parks/:slug`
@@ -119,8 +117,7 @@ Catalog endpoints stay cache-friendly and database-backed:
 
 - `GET /api/parks` returns lightweight list data without boundary GeoJSON.
 - `GET /api/parks/search` returns an even smaller visible-park payload for autocomplete and other text-search UIs.
-- `GET /api/parks/removed` returns an auth-restricted admin list of removed parks so the UI can restore visibility when needed.
-- `GET /api/admin/parks/visibility` returns lightweight visible and removed park arrays in one private response for admin visibility management.
+- `GET /api/admin/parks/visibility` returns lightweight visible and removed park arrays in one admin-session-protected response for admin visibility management.
 - `GET /api/parks?type=hiking-area` filters by normalized type slug.
 - `GET /api/parks?category=hiking-and-wilderness-areas` combines `hiking-area` and `wilderness-area` under the public category `Erämaa-/retkeilyalue` while preserving each park's source `type`.
 - `GET /api/parks?category=trails-and-routes` filters by a derived API category while park responses still preserve the original imported `type`.
@@ -129,19 +126,25 @@ Catalog endpoints stay cache-friendly and database-backed:
 - Park list, detail, removed, and public map responses include both the source `type` and a derived `category`.
 - Park list, detail, removed, and public map responses include `logo: { key, updatedAt, url } | null` when a logo has been linked to the park.
 - Park responses expose raw `locationLabel`, `postalCode`, and `postalOffice` fields from the database, plus a derived `address` string for display use.
-- `GET /api/public/home-summary` returns public visit totals, seasonal visit counts, type progress with a `visible` flag, category progress, recent activity, and a public data `version` / `updatedAt` signal without notes, routes, or images.
-- `GET /api/public/map-summary` returns lightweight park map data plus per-park visited summaries and the same public data version signal.
+- `GET /api/public/home-summary` returns cache-friendly frontend-public visit totals, seasonal visit counts, type progress with a `visible` flag, category progress, recent activity, and a public data `version` / `updatedAt` signal without notes, routes, or images.
+- `GET /api/public/map-summary` returns cache-friendly frontend-public park map data plus per-park visited summaries and the same public data version signal.
 - `GET /api/parks/:slug/visits` returns visit history plus a visited summary for one park.
 - `GET /api/visits` returns flat visit resources with their parent park reference.
 - `GET /api/visits/:id` returns one visit with its parent park reference.
 - Catalog and public summary `GET` endpoints emit deterministic `ETag` headers and support `304 Not Modified`.
-- Public summary endpoints use `Cache-Control: public, max-age=0, s-maxage=3600, stale-while-revalidate=86400`.
+- Public summary endpoints use `Cache-Control: public, max-age=0, s-maxage=600`.
 - Public summary versions bump when public visit data changes, including visit create/update/delete and visit image upload/delete/reorder.
 - Visit and management endpoints use `Cache-Control: private, no-store`.
+- All write routes and `GET /api/admin/parks/visibility` require a valid admin session cookie.
 - `PATCH /api/parks/:slug` updates the admin-editable park fields (`name`, `slug`, `locationLabel`, `postalOffice`, `postalCode`, `areaKm2`, `establishmentYear`, `luontoonUrl`, `displayTypeName`) and auto-generates a slug from `name` when `slug` is omitted.
-- `PATCH /api/parks/:slug/removed` lets the UI hide or restore a park by toggling its persisted `removed` flag.
+- `PATCH /api/parks/:slug/removed` lets the admin UI hide or restore a park by toggling its persisted `removed` flag.
+- `POST /api/parks/:slug/visits`, `PATCH /api/visits/:id`, and `DELETE /api/visits/:id` are admin-session write routes for owned visit data.
 - Deployed clients should use the two-step direct upload flow: `POST /api/visits/:id/images/upload-url`, upload the file to R2 with the returned `PUT` URL, then call `POST /api/visits/:id/images/complete`.
+- `POST /api/visits/:id/images`, `DELETE /api/visits/:visitId/images/:imageId`, and `PATCH /api/visits/:id/images/reorder` are also admin-session write routes.
 - `POST /api/visits/:id/images` remains available for localhost-style server uploads, but Vercel runtime disables that Sharp-based path so uploads do not pass through the function body limit.
+- `GET /health` and `GET /openapi.json` are the only anonymous data endpoints today.
+- `/auth/*` routes are anonymous login-control endpoints, not public data endpoints.
+- `/api/public/*` names frontend-facing payloads, but those routes are still API-key-protected when `API_KEY` is configured.
 
 ## Data Source
 
@@ -201,4 +204,5 @@ It runs typecheck, lint, and coverage tests with 100 percent thresholds for firs
 
 - [AGENTS.md](AGENTS.md): codebase rules for future agents and implementation sessions.
 - [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md): local development, database, importer, and deployment notes.
+- [docs/SECURITY.md](docs/SECURITY.md): current security and operational sustainability priorities, plus contributor guardrails.
 - [docs/TESTING.md](docs/TESTING.md): testing strategy and verification expectations.
