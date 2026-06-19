@@ -49,7 +49,8 @@ describe('migrateDatabase', () => {
       '0011_refresh_park_type_slugs.sql',
       '0012_supported_catalog_types.sql',
       '0013_park_imported_editable_fields.sql',
-      '0014_cultural_history_area_type.sql'
+      '0014_cultural_history_area_type.sql',
+      '0015_rename_park_urls.sql'
     ]);
     expect(parkTypes.rows.map((row) => String(row.slug))).toEqual([
       'outdoor-recreation-area',

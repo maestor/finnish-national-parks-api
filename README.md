@@ -136,7 +136,7 @@ Catalog endpoints stay cache-friendly and database-backed:
 - Public summary versions bump when public visit data changes, including visit create/update/delete and visit image upload/delete/reorder.
 - Visit and management endpoints use `Cache-Control: private, no-store`.
 - All write routes and `GET /api/admin/parks/visibility` require a valid admin session cookie.
-- `PATCH /api/parks/:slug` updates the admin-editable park fields (`name`, `slug`, `locationLabel`, `postalOffice`, `postalCode`, `areaKm2`, `establishmentYear`, `luontoonUrl`, `displayTypeName`) and auto-generates a slug from `name` when `slug` is omitted.
+- `PATCH /api/parks/:slug` updates the admin-editable park fields (`name`, `slug`, `locationLabel`, `postalOffice`, `postalCode`, `areaKm2`, `establishmentYear`, `parkUrl`, `displayTypeName`) and auto-generates a slug from `name` when `slug` is omitted.
 - `PATCH /api/parks/:slug/removed` lets the admin UI hide or restore a park by toggling its persisted `removed` flag.
 - `POST /api/parks/:slug/visits`, `PATCH /api/visits/:id`, and `DELETE /api/visits/:id` are admin-session write routes for owned visit data.
 - Deployed clients should use the two-step direct upload flow: `POST /api/visits/:id/images/upload-url`, upload the file to R2 with the returned `PUT` URL, then call `POST /api/visits/:id/images/complete`.
@@ -175,7 +175,7 @@ Importer expectations:
 - Skip trail imports whose normalized `locationLabel`, `postalCode`, and `postalOffice` exactly match one imported area record, because those are also treated as nested visit targets.
 - Import `4403` walking trails and `4405` hiking trails as removed-by-default catalog rows so the UI can opt into showing them separately from the main public catalog.
 - Exclude LIPAS contact email, phone number, and comment text.
-- Refresh `luontoonUrl` from Luontoon's official Finnish sitemap when a matching destination exists, instead of trusting LIPAS `www` blindly.
+- Refresh imported `parkUrl` values from Luontoon's official Finnish sitemap when a matching destination exists, instead of trusting LIPAS `www` blindly.
 - Preserve personal notes and visit history across imports.
 - Preserve manual park removals across imports and exclude removed rows from API responses.
 - Preserve manual edits to the editable park fields across imports by storing the latest imported baseline separately from the current admin-managed values.
@@ -188,7 +188,7 @@ The supported manual catalog import currently covers:
 npm run import:special-parks
 ```
 
-It imports curated non-LIPAS catalog rows such as Merenkurkun maailmanperintöalue, Sammallahdenmäki, Suomenlinna, Vanha Rauma, Paistjärvi, and selected cultural-history areas, keeps their source geometry, preserves custom display labels such as `Maailmanperintökohde` and `Tehdaskylä`, and protects those rows from later LIPAS deactivation.
+It imports curated non-LIPAS catalog rows such as Merenkurkun maailmanperintöalue, Sammallahdenmäki, Suomenlinna, Vanha Rauma, Paistjärvi, Uutelan ulkoilualue, Kallahden ulkoilualue, Seurasaari, Mustikkamaa, and selected cultural-history areas, keeps their source geometry, preserves custom display labels such as `Maailmanperintökohde` and `Tehdaskylä`, and protects those rows from later LIPAS deactivation.
 
 ## Verification
 

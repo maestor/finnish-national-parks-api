@@ -9,7 +9,7 @@ export const createParkSlug = (value: string) => {
   return slug || 'park';
 };
 
-export const normalizeLuontoonUrl = (value?: string | null) => {
+export const normalizeParkUrl = (value?: string | null) => {
   if (!value) {
     return null;
   }
@@ -24,8 +24,14 @@ export const normalizeLuontoonUrl = (value?: string | null) => {
   try {
     const url = new URL(normalizedInput);
     const pathname = url.pathname.replace(/\/+$/, '');
+    const normalizedPath = pathname || '/';
+    const normalizedUrl = new URL(url.toString());
 
-    return `https://www.luontoon.fi${pathname}`;
+    normalizedUrl.pathname = normalizedPath;
+
+    return normalizedPath === '/'
+      ? `${normalizedUrl.origin}${normalizedUrl.search}${normalizedUrl.hash}`
+      : normalizedUrl.toString();
   } catch {
     return null;
   }

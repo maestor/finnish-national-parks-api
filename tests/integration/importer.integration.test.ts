@@ -140,7 +140,7 @@ describe('importParks', () => {
         displayTypeName: 'Oma kohdelaji',
         establishmentYear: 2001,
         locationLabel: 'Oma osoite 7',
-        luontoonUrl: null,
+        parkUrl: null,
         name: 'Oma puistonimi',
         postalCode: '99870',
         postalOffice: 'Inari',
@@ -178,7 +178,7 @@ describe('importParks', () => {
       displayTypeName: 'Oma kohdelaji',
       establishmentYear: 2001,
       locationLabel: 'Oma osoite 7',
-      luontoonUrl: null,
+      parkUrl: null,
       name: 'Oma puistonimi',
       postalCode: '99870',
       postalOffice: 'Inari',
@@ -841,12 +841,12 @@ describe('importParks', () => {
     await expect(
       getParkBySlug(testDatabase.database, 'aittovuoren-ulkoilualue')
     ).resolves.toMatchObject({
-      luontoonUrl: 'https://www.luontoon.fi/fi/kohteet/aittovuoren-ulkoilualue-jyvaskyla-72648'
+      parkUrl: 'https://www.luontoon.fi/fi/kohteet/aittovuoren-ulkoilualue-jyvaskyla-72648'
     });
     await expect(
       getParkBySlug(testDatabase.database, 'langinkosken-luonnonsuojelualue')
     ).resolves.toMatchObject({
-      luontoonUrl: 'https://www.luontoon.fi/fi/kohteet/langinkosken-luonnonsuojelualue'
+      parkUrl: 'https://www.luontoon.fi/fi/kohteet/langinkosken-luonnonsuojelualue'
     });
   });
 
@@ -881,7 +881,7 @@ describe('importParks', () => {
     await expect(
       getParkBySlug(testDatabase.database, 'tuntematon-ulkoilualue')
     ).resolves.toMatchObject({
-      luontoonUrl: 'https://www.luontoon.fi/tuntematon-ulkoilualue'
+      parkUrl: 'https://www.luontoon.fi/tuntematon-ulkoilualue'
     });
   });
 
@@ -916,7 +916,7 @@ describe('importParks', () => {
     await expect(
       getParkBySlug(testDatabase.database, 'hammastunturin-eramaa-alue')
     ).resolves.toMatchObject({
-      luontoonUrl: 'https://www.luontoon.fi/fi/kohteet/hammastunturin-eramaa'
+      parkUrl: 'https://www.luontoon.fi/fi/kohteet/hammastunturin-eramaa'
     });
   });
 
@@ -993,7 +993,7 @@ describe('importParks', () => {
     await expect(
       getParkBySlug(testDatabase.database, 'finnoon-luontopolku')
     ).resolves.toMatchObject({
-      luontoonUrl: 'https://www.luontoon.fi/fi/reitit/finnoon-luontopolku-espoo-527072'
+      parkUrl: 'https://www.luontoon.fi/fi/reitit/finnoon-luontopolku-espoo-527072'
     });
   });
 

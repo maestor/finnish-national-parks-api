@@ -119,8 +119,8 @@ The importer should:
 - Import `4403` walking trails and `4405` hiking trails as removed-by-default catalog rows.
 - Preserve personal visit history during catalog re-imports.
 - Preserve any manually set `parks.removed` flags during catalog re-imports.
-- Preserve admin-managed edits to `name`, `slug`, `location_label`, `postal_office`, `postal_code`, `area_km2`, `establishment_year`, `luontoon_url`, and `display_type_name` during catalog re-imports while still refreshing the imported baseline for those fields.
-- Refresh destination `luontoonUrl` values from `https://www.luontoon.fi/resources/sitemap/fi.xml` when the official sitemap contains a matching base destination URL.
+- Preserve admin-managed edits to `name`, `slug`, `location_label`, `postal_office`, `postal_code`, `area_km2`, `establishment_year`, `park_url`, and `display_type_name` during catalog re-imports while still refreshing the imported baseline for those fields.
+- Refresh destination `parkUrl` values from `https://www.luontoon.fi/resources/sitemap/fi.xml` when the official sitemap contains a matching base destination URL.
 - Derive slug, marker point, and bounding box from imported data.
 - Store boundary GeoJSON for detail/map-boundary usage.
 - Exclude contact email, phone number, and comment text.
@@ -132,7 +132,7 @@ If a destination cannot be matched from the official Luontoon sitemap, the impor
 
 ### Manual Catalog Imports
 
-This repo also supports a one-off manual catalog import for curated non-LIPAS parks, including Merenkurkun maailmanperintöalue, Sammallahdenmäki, Suomenlinna, Vanha Rauma, and Paistjärvi:
+This repo also supports a one-off manual catalog import for curated non-LIPAS parks, including Merenkurkun maailmanperintöalue, Sammallahdenmäki, Suomenlinna, Vanha Rauma, Paistjärvi, Uutelan ulkoilualue, Kallahden ulkoilualue, Seurasaari, and Mustikkamaa:
 
 ```sh
 npm run import:special-parks
