@@ -103,7 +103,7 @@ describe('repositories', () => {
       displayTypeName: null,
       establishmentYear: 1999,
       locationLabel: 'Oma osoite 4',
-      luontoonUrl: 'www.luontoon.fi/oma-kohde',
+      parkUrl: 'www.luontoon.fi/oma-kohde',
       name: 'Oma kohde',
       postalCode: null,
       postalOffice: 'Muonio'
@@ -114,7 +114,7 @@ describe('repositories', () => {
       areaKm2: null,
       establishmentYear: 1999,
       locationLabel: 'Oma osoite 4',
-      luontoonUrl: 'https://www.luontoon.fi/oma-kohde',
+      parkUrl: 'https://www.luontoon.fi/oma-kohde',
       name: 'Oma kohde',
       postalCode: null,
       postalOffice: 'Muonio',
@@ -154,9 +154,9 @@ describe('repositories', () => {
 
     await expect(
       updateParkDetails(testDatabase.database, 'akasmannyn-kansallispuisto', {
-        luontoonUrl: 'not a real url'
+        parkUrl: 'not a real url'
       })
-    ).rejects.toThrow('Invalid Luontoon URL.');
+    ).rejects.toThrow('Invalid park URL.');
 
     await expect(
       updateParkDetails(testDatabase.database, 'akasmannyn-kansallispuisto', {
@@ -171,9 +171,9 @@ describe('repositories', () => {
     ).rejects.toThrow('Name is required.');
   });
 
-  it('can clear luontoon url while leaving other editable fields unchanged', async () => {
+  it('can clear park url while leaving other editable fields unchanged', async () => {
     const updated = await updateParkDetails(testDatabase.database, 'akasmannyn-kansallispuisto', {
-      luontoonUrl: null,
+      parkUrl: null,
       name: 'Päivitetty puisto'
     });
 
@@ -182,13 +182,23 @@ describe('repositories', () => {
       areaKm2: 12.5,
       establishmentYear: 1982,
       locationLabel: 'Puistotie 1',
-      luontoonUrl: null,
+      parkUrl: null,
       name: 'Päivitetty puisto',
       postalCode: '00999',
       postalOffice: 'Testikylä',
       slug: 'paivitetty-puisto'
     });
     expect(updated).not.toHaveProperty('displayTypeName');
+  });
+
+  it('accepts non-Luontoon park urls for admin-managed park details', async () => {
+    const updated = await updateParkDetails(testDatabase.database, 'akasmannyn-kansallispuisto', {
+      parkUrl: 'https://www.hel.fi/fi/kulttuuri-ja-vapaa-aika/kohteet/testipuisto/'
+    });
+
+    expect(updated).toMatchObject({
+      parkUrl: 'https://www.hel.fi/fi/kulttuuri-ja-vapaa-aika/kohteet/testipuisto'
+    });
   });
 
   it('lists park records including removed rows with display type names', async () => {

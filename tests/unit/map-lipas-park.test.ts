@@ -16,7 +16,7 @@ describe('mapLipasPark', () => {
       locationLabel: 'Puistotie 1',
       postalOffice: 'Testikylä',
       municipalityCode: 734,
-      luontoonUrl: 'https://www.luontoon.fi/testi-puisto',
+      parkUrl: 'https://www.luontoon.fi/testi-puisto?foo=bar',
       sourceEventDate: '2024-04-01T12:00:00.000Z',
       boundingBox: {
         minLon: 24,
@@ -50,18 +50,40 @@ describe('mapLipasPark', () => {
     const mapped = mapLipasPark(source);
 
     expect(mapped.slug).toBe('park');
-    expect(mapped.luontoonUrl).toBeNull();
+    expect(mapped.parkUrl).toBeNull();
     expect(mapped.locationLabel).toBe('!!!');
   });
 
-  it('normalizes root-relative luontoon urls to absolute urls', () => {
+  it('normalizes root-relative Luontoon urls to absolute urls', () => {
     const mapped = mapLipasPark(
       createLipasPark({
         www: '/saaristo'
       })
     );
 
-    expect(mapped.luontoonUrl).toBe('https://www.luontoon.fi/saaristo');
+    expect(mapped.parkUrl).toBe('https://www.luontoon.fi/saaristo');
+  });
+
+  it('preserves non-Luontoon hosts for absolute park urls', () => {
+    const mapped = mapLipasPark(
+      createLipasPark({
+        www: 'https://www.hel.fi/fi/kulttuuri-ja-vapaa-aika/kohteet/testipuisto/'
+      })
+    );
+
+    expect(mapped.parkUrl).toBe(
+      'https://www.hel.fi/fi/kulttuuri-ja-vapaa-aika/kohteet/testipuisto'
+    );
+  });
+
+  it('preserves root-level absolute park urls with query and hash', () => {
+    const mapped = mapLipasPark(
+      createLipasPark({
+        www: 'https://www.hel.fi?foo=bar#baz'
+      })
+    );
+
+    expect(mapped.parkUrl).toBe('https://www.hel.fi?foo=bar#baz');
   });
 
   it('falls back to null for missing optional numeric and date fields', () => {
@@ -111,7 +133,7 @@ describe('mapLipasPark', () => {
       name: 'Testin luontopolku',
       postalOffice: 'Testikylä',
       slug: 'testin-luontopolku',
-      luontoonUrl: 'https://www.luontoon.fi/testi-luontopolku',
+      parkUrl: 'https://www.luontoon.fi/testi-luontopolku',
       boundingBox: {
         minLon: 24.2,
         minLat: 60.2,
@@ -170,6 +192,6 @@ describe('mapLipasPark', () => {
       })
     );
 
-    expect(mapped.luontoonUrl).toBeNull();
+    expect(mapped.parkUrl).toBeNull();
   });
 });

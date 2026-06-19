@@ -1,7 +1,7 @@
 import { and, asc, desc, eq, inArray, notInArray, sql } from 'drizzle-orm';
 
 import type { GeoJsonFeatureCollection } from '../importer/geometry.js';
-import { createParkSlug, normalizeLuontoonUrl } from '../parks/park-normalization.js';
+import { createParkSlug, normalizeParkUrl } from '../parks/park-normalization.js';
 import type { SupportedParkCategorySlug, SupportedParkTypeSlug } from '../parks/park-types.js';
 import {
   getParkCategoryByTypeSlug,
@@ -40,7 +40,7 @@ type UpdateParkDetailsInput = {
   displayTypeName?: string | null | undefined;
   establishmentYear?: number | null | undefined;
   locationLabel?: string | undefined;
-  luontoonUrl?: string | null | undefined;
+  parkUrl?: string | null | undefined;
   name?: string | undefined;
   postalCode?: string | null | undefined;
   postalOffice?: string | null | undefined;
@@ -106,7 +106,7 @@ type PublicParkRow = {
   locationLabel: string;
   logoKey: string | null;
   logoUpdatedAt: string | null;
-  luontoonUrl: string | null;
+  parkUrl: string | null;
   mapKey: string | null;
   mapUpdatedAt: string | null;
   markerLat: number;
@@ -163,7 +163,7 @@ type UpsertCatalogParkInput = Omit<
   | 'importedDisplayTypeName'
   | 'importedEstablishmentYear'
   | 'importedLocationLabel'
-  | 'importedLuontoonUrl'
+  | 'importedParkUrl'
   | 'importedName'
   | 'importedPostalCode'
   | 'importedPostalOffice'
@@ -341,7 +341,7 @@ const toPark = async (
     establishmentYear: row.park.establishmentYear,
     lipasId: row.park.lipasId,
     logo: await toLogo(row.park.logoKey, row.park.logoUpdatedAt, getLogoPublicUrl),
-    luontoonUrl: row.park.luontoonUrl,
+    parkUrl: row.park.parkUrl,
     map: await toMap(row.park.mapKey, row.park.mapUpdatedAt, getMapPublicUrl),
     markerPoint: toMarkerPoint(row.park),
     municipalityCode: row.park.municipalityCode,
@@ -371,7 +371,7 @@ const toPublicPark = async (
     category: toParkCategory(row.typeSlug as SupportedParkTypeSlug),
     establishmentYear: row.establishmentYear,
     logo: await toLogo(row.logoKey, row.logoUpdatedAt, getLogoPublicUrl),
-    luontoonUrl: row.luontoonUrl,
+    parkUrl: row.parkUrl,
     map: await toMap(row.mapKey, row.mapUpdatedAt, getMapPublicUrl),
     markerPoint: {
       lat: row.markerLat,
@@ -542,7 +542,7 @@ const listPublicParkRows = async (database: Database) => {
       locationLabel: parks.locationLabel,
       logoKey: parks.logoKey,
       logoUpdatedAt: parks.logoUpdatedAt,
-      luontoonUrl: parks.luontoonUrl,
+      parkUrl: parks.parkUrl,
       mapKey: parks.mapKey,
       mapUpdatedAt: parks.mapUpdatedAt,
       markerLat: parks.markerLat,
@@ -870,7 +870,7 @@ export const listRemovedParks = async (
         catalogStatus: row.park.catalogStatus as 'active' | 'inactive',
         establishmentYear: row.park.establishmentYear,
         logo: await toLogo(row.park.logoKey, row.park.logoUpdatedAt, getLogoPublicUrl),
-        luontoonUrl: row.park.luontoonUrl,
+        parkUrl: row.park.parkUrl,
         map: await toMap(row.park.mapKey, row.park.mapUpdatedAt, getMapPublicUrl),
         markerPoint: toMarkerPoint(row.park),
         name: row.park.name,
@@ -1293,15 +1293,15 @@ export const updateParkDetails = async (
     input.locationLabel === undefined
       ? park.locationLabel
       : normalizeRequiredText(input.locationLabel, 'Location label');
-  const nextLuontoonUrl =
-    input.luontoonUrl === undefined
-      ? park.luontoonUrl
-      : input.luontoonUrl === null
+  const nextParkUrl =
+    input.parkUrl === undefined
+      ? park.parkUrl
+      : input.parkUrl === null
         ? null
-        : normalizeLuontoonUrl(input.luontoonUrl);
+        : normalizeParkUrl(input.parkUrl);
 
-  if (input.luontoonUrl !== undefined && input.luontoonUrl !== null && !nextLuontoonUrl) {
-    throw new Error('Invalid Luontoon URL.');
+  if (input.parkUrl !== undefined && input.parkUrl !== null && !nextParkUrl) {
+    throw new Error('Invalid park URL.');
   }
 
   const conflictingPark = await database.query.parks.findFirst({
@@ -1325,7 +1325,7 @@ export const updateParkDetails = async (
       establishmentYear:
         input.establishmentYear === undefined ? park.establishmentYear : input.establishmentYear,
       locationLabel: nextLocationLabel,
-      luontoonUrl: nextLuontoonUrl,
+      parkUrl: nextParkUrl,
       name: nextName,
       postalCode:
         input.postalCode === undefined ? park.postalCode : normalizeOptionalText(input.postalCode),
@@ -1503,7 +1503,7 @@ export const upsertCatalogPark = async (database: DbClient, values: UpsertCatalo
     importedDisplayTypeName: values.displayTypeName,
     importedEstablishmentYear: values.establishmentYear,
     importedLocationLabel: values.locationLabel,
-    importedLuontoonUrl: values.luontoonUrl,
+    importedParkUrl: values.parkUrl,
     importedName: values.name,
     importedPostalCode: values.postalCode,
     importedPostalOffice: values.postalOffice,
@@ -1540,7 +1540,7 @@ export const upsertCatalogPark = async (database: DbClient, values: UpsertCatalo
         importedDisplayTypeName: valuesWithImportedFields.importedDisplayTypeName,
         importedEstablishmentYear: valuesWithImportedFields.importedEstablishmentYear,
         importedLocationLabel: valuesWithImportedFields.importedLocationLabel,
-        importedLuontoonUrl: valuesWithImportedFields.importedLuontoonUrl,
+        importedParkUrl: valuesWithImportedFields.importedParkUrl,
         importedName: valuesWithImportedFields.importedName,
         importedPostalCode: valuesWithImportedFields.importedPostalCode,
         importedPostalOffice: valuesWithImportedFields.importedPostalOffice,
@@ -1551,10 +1551,10 @@ export const upsertCatalogPark = async (database: DbClient, values: UpsertCatalo
             THEN excluded.imported_location_label
           ELSE ${parks.locationLabel}
         END`,
-        luontoonUrl: sql`CASE
-          WHEN ${parks.luontoonUrl} IS ${parks.importedLuontoonUrl}
-            THEN excluded.imported_luontoon_url
-          ELSE ${parks.luontoonUrl}
+        parkUrl: sql`CASE
+          WHEN ${parks.parkUrl} IS ${parks.importedParkUrl}
+            THEN excluded.imported_park_url
+          ELSE ${parks.parkUrl}
         END`,
         managedByLipasImport: values.managedByLipasImport,
         markerLat: values.markerLat,

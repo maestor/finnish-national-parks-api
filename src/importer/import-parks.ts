@@ -162,7 +162,7 @@ export const importParks = async ({
   const effectiveFetchLuontoonSitemap =
     fetchLuontoonSitemap ??
     (fetchSource === defaultFetchSource ? defaultFetchLuontoonSitemap : emptyLuontoonSitemap);
-  const resolveLuontoonUrl = createLuontoonUrlResolver(
+  const resolveParkUrl = createLuontoonUrlResolver(
     await effectiveFetchLuontoonSitemap(LUONTOON_SITEMAP_URL)
   );
   const activeItems = payload.items.filter((item) => {
@@ -215,7 +215,7 @@ export const importParks = async ({
       }
 
       const mapped = mapLipasPark(item, existingImportedSlugByLipasId.get(lipasId));
-      const resolvedLuontoonUrl = resolveLuontoonUrl(mapped) ?? mapped.luontoonUrl;
+      const resolvedParkUrl = resolveParkUrl(mapped) ?? mapped.parkUrl;
       const slug =
         existingImportedSlugByLipasId.get(lipasId) ??
         ensureUniqueSlug(mapped.slug, lipasId, takenSlugs);
@@ -235,7 +235,7 @@ export const importParks = async ({
         lastImportRunId: importRunId,
         lipasId: mapped.lipasId,
         locationLabel: mapped.locationLabel,
-        luontoonUrl: resolvedLuontoonUrl,
+        parkUrl: resolvedParkUrl,
         managedByLipasImport: true,
         markerLat: mapped.markerPoint.lat,
         removed:

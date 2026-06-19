@@ -96,7 +96,7 @@ type SpecialParkConfig = {
   };
   filterFeatures?: (feature: { properties: { ely?: string | undefined; nimi: string } }) => boolean;
   locationLabel: string;
-  luontoonUrl: string | null;
+  parkUrl: string | null;
   name: string;
   parkTypeSlug: SupportedParkTypeSlug;
   postalCode: string | null;
@@ -114,7 +114,7 @@ type SykeProtectedSitesSourceType = 'private' | 'state';
 type SykeSpecialParkSeed = {
   displayTypeName: string | null;
   locationLabel?: string;
-  luontoonUrl: string | null;
+  parkUrl: string | null;
   name: string;
   parkTypeSlug: SupportedParkTypeSlug;
   postalCode?: string | null;
@@ -128,7 +128,7 @@ type SykeSpecialParkSeed = {
 type LuontoonDestinationAreaSeed = {
   displayTypeName: string | null;
   locationLabel?: string;
-  luontoonUrl: string | null;
+  parkUrl: string | null;
   name: string;
   parkTypeSlug: SupportedParkTypeSlug;
   postalCode?: string | null;
@@ -141,7 +141,7 @@ type MuseovirastoRkyAreaSeed = {
   displayTypeName: string | null;
   excludedSourceNames?: string[];
   locationLabel?: string;
-  luontoonUrl: string | null;
+  parkUrl: string | null;
   name: string;
   parkTypeSlug: SupportedParkTypeSlug;
   postalCode?: string | null;
@@ -274,7 +274,7 @@ const buildSykePrivateProtectedSitesCompositeSourceUrl = (sourceNames: string[])
 const createSykeSpecialParkConfig = ({
   displayTypeName,
   locationLabel,
-  luontoonUrl,
+  parkUrl,
   name,
   parkTypeSlug,
   postalCode,
@@ -286,7 +286,7 @@ const createSykeSpecialParkConfig = ({
 }: SykeSpecialParkSeed): SpecialParkConfig => ({
   displayTypeName: normalizeSpecialParkDisplayTypeName(name, displayTypeName),
   locationLabel: locationLabel ?? name,
-  luontoonUrl,
+  parkUrl,
   name,
   parkTypeSlug,
   postalCode: postalCode ?? null,
@@ -378,7 +378,7 @@ const buildMuseovirastoRkyAreaSourceUrl = ({
 const createMuseovirastoSpecialParkConfig = ({
   displayTypeName,
   locationLabel,
-  luontoonUrl,
+  parkUrl,
   name,
   parkTypeSlug,
   postalCode,
@@ -389,7 +389,7 @@ const createMuseovirastoSpecialParkConfig = ({
 }: SykeSpecialParkSeed): SpecialParkConfig => ({
   displayTypeName: normalizeSpecialParkDisplayTypeName(name, displayTypeName),
   locationLabel: locationLabel ?? name,
-  luontoonUrl,
+  parkUrl,
   name,
   parkTypeSlug,
   postalCode: postalCode ?? null,
@@ -404,7 +404,7 @@ const createMuseovirastoSpecialParkConfig = ({
 const createLuontoonDestinationAreaConfig = ({
   displayTypeName,
   locationLabel,
-  luontoonUrl,
+  parkUrl,
   name,
   parkTypeSlug,
   postalCode,
@@ -415,7 +415,7 @@ const createLuontoonDestinationAreaConfig = ({
   displayTypeName: normalizeSpecialParkDisplayTypeName(name, displayTypeName),
   extractMetadata: extractLuontoonDestinationMetadata,
   locationLabel: locationLabel ?? name,
-  luontoonUrl,
+  parkUrl,
   name,
   parkTypeSlug,
   postalCode: postalCode ?? null,
@@ -434,7 +434,7 @@ const createMuseovirastoRkyAreaConfig = ({
   displayTypeName,
   excludedSourceNames,
   locationLabel,
-  luontoonUrl,
+  parkUrl,
   name,
   parkTypeSlug,
   postalCode,
@@ -446,7 +446,7 @@ const createMuseovirastoRkyAreaConfig = ({
 }: MuseovirastoRkyAreaSeed): SpecialParkConfig => ({
   displayTypeName: normalizeSpecialParkDisplayTypeName(name, displayTypeName),
   locationLabel: locationLabel ?? name,
-  luontoonUrl,
+  parkUrl,
   name,
   parkTypeSlug,
   postalCode: postalCode ?? null,
@@ -466,7 +466,7 @@ const baseSpecialParkConfigs: SpecialParkConfig[] = [
   {
     displayTypeName: 'Maailmanperintökohde',
     locationLabel: 'Raippaluodontie 2',
-    luontoonUrl: 'https://www.luontoon.fi/fi/kohteet/merenkurkun-maailmanperintoalue',
+    parkUrl: 'https://www.luontoon.fi/fi/kohteet/merenkurkun-maailmanperintoalue',
     name: 'Merenkurkun maailmanperintöalue',
     parkTypeSlug: 'nature-reserve-area',
     postalCode: '65800',
@@ -482,7 +482,7 @@ const baseSpecialParkConfigs: SpecialParkConfig[] = [
   {
     displayTypeName: 'Maailmanperintökohde',
     locationLabel: 'Sammallahdentie',
-    luontoonUrl: null,
+    parkUrl: null,
     name: 'Sammallahdenmäki',
     parkTypeSlug: 'cultural-history-area',
     postalCode: '27230',
@@ -498,7 +498,7 @@ const baseSpecialParkConfigs: SpecialParkConfig[] = [
   {
     displayTypeName: 'Maailmanperintökohde',
     locationLabel: 'Suomenlinna',
-    luontoonUrl: null,
+    parkUrl: null,
     name: 'Suomenlinna',
     parkTypeSlug: 'cultural-history-area',
     postalCode: '00190',
@@ -514,7 +514,7 @@ const baseSpecialParkConfigs: SpecialParkConfig[] = [
   {
     displayTypeName: 'Maailmanperintökohde',
     locationLabel: 'Vanha Rauma',
-    luontoonUrl: null,
+    parkUrl: null,
     name: 'Vanha Rauma',
     parkTypeSlug: 'cultural-history-area',
     postalCode: '26100',
@@ -530,7 +530,7 @@ const baseSpecialParkConfigs: SpecialParkConfig[] = [
   {
     displayTypeName: 'Luonnonpuisto',
     locationLabel: 'Kevon luonnonpuisto',
-    luontoonUrl: 'https://www.luontoon.fi/fi/kohteet/kevon-luonnonpuisto',
+    parkUrl: 'https://www.luontoon.fi/fi/kohteet/kevon-luonnonpuisto',
     name: 'Kevon luonnonpuisto',
     parkTypeSlug: 'nature-reserve-area',
     postalCode: null,
@@ -545,7 +545,7 @@ const baseSpecialParkConfigs: SpecialParkConfig[] = [
     displayTypeName: null,
     filterFeatures: (feature) => feature.properties.ely === 'Uudenmaan ELY-keskus',
     locationLabel: 'Laajalahden luonnonsuojelualue',
-    luontoonUrl: 'https://www.luontoon.fi/fi/kohteet/laajalahden-luonnonsuojelualue',
+    parkUrl: 'https://www.luontoon.fi/fi/kohteet/laajalahden-luonnonsuojelualue',
     name: 'Laajalahden luonnonsuojelualue',
     parkTypeSlug: 'nature-reserve-area',
     postalCode: null,
@@ -559,7 +559,7 @@ const baseSpecialParkConfigs: SpecialParkConfig[] = [
   {
     displayTypeName: 'Lintuvesi',
     locationLabel: 'Liminganlahti',
-    luontoonUrl: 'https://www.luontoon.fi/fi/kohteet/liminganlahti',
+    parkUrl: 'https://www.luontoon.fi/fi/kohteet/liminganlahti',
     name: 'Liminganlahti',
     parkTypeSlug: 'nature-reserve-area',
     postalCode: null,
@@ -573,7 +573,7 @@ const baseSpecialParkConfigs: SpecialParkConfig[] = [
   {
     displayTypeName: 'Luonnonpuisto',
     locationLabel: 'Mallan luonnonpuisto',
-    luontoonUrl: 'https://www.luontoon.fi/fi/kohteet/mallan-luonnonpuisto',
+    parkUrl: 'https://www.luontoon.fi/fi/kohteet/mallan-luonnonpuisto',
     name: 'Mallan luonnonpuisto',
     parkTypeSlug: 'nature-reserve-area',
     postalCode: null,
@@ -587,7 +587,7 @@ const baseSpecialParkConfigs: SpecialParkConfig[] = [
   {
     displayTypeName: null,
     locationLabel: 'Siikalahden luonnonsuojelualue',
-    luontoonUrl: 'https://www.luontoon.fi/fi/kohteet/siikalahden-luonnonsuojelualue',
+    parkUrl: 'https://www.luontoon.fi/fi/kohteet/siikalahden-luonnonsuojelualue',
     name: 'Siikalahden luonnonsuojelualue',
     parkTypeSlug: 'nature-reserve-area',
     postalCode: null,
@@ -602,7 +602,7 @@ const baseSpecialParkConfigs: SpecialParkConfig[] = [
     displayTypeName: 'Valtion retkeilyalue',
     extractMetadata: extractHikingAreaMetadata,
     locationLabel: 'Vaattunkikönkääntie',
-    luontoonUrl: 'https://www.luontoon.fi/fi/kohteet/napapiirin-retkeilyalue',
+    parkUrl: 'https://www.luontoon.fi/fi/kohteet/napapiirin-retkeilyalue',
     name: 'Napapiirin retkeilyalue',
     parkTypeSlug: 'hiking-area',
     postalCode: '96930',
@@ -615,7 +615,7 @@ const baseSpecialParkConfigs: SpecialParkConfig[] = [
   {
     displayTypeName: 'Valtion retkeilyalue',
     locationLabel: 'Inarintie 46',
-    luontoonUrl: 'https://www.luontoon.fi/fi/kohteet/inarin-retkeilyalue',
+    parkUrl: 'https://www.luontoon.fi/fi/kohteet/inarin-retkeilyalue',
     name: 'Inarin retkeilyalue',
     parkTypeSlug: 'hiking-area',
     postalCode: '99870',
@@ -628,7 +628,7 @@ const baseSpecialParkConfigs: SpecialParkConfig[] = [
   {
     displayTypeName: null,
     locationLabel: 'Pietiläntie 23',
-    luontoonUrl: null,
+    parkUrl: null,
     name: 'Paavolan luontopolku',
     parkTypeSlug: 'nature-trail',
     postalCode: '08800',
@@ -647,7 +647,7 @@ const baseSpecialParkConfigs: SpecialParkConfig[] = [
   {
     displayTypeName: null,
     locationLabel: 'Kipparitie 4',
-    luontoonUrl: null,
+    parkUrl: null,
     name: 'Santalahden luontopolku',
     parkTypeSlug: 'nature-trail',
     postalCode: '48310',
@@ -665,7 +665,7 @@ const baseSpecialParkConfigs: SpecialParkConfig[] = [
   {
     displayTypeName: null,
     locationLabel: 'Torholan luola',
-    luontoonUrl: 'https://www.luontoon.fi/fi/reitit/torholan-luolan-polku-lohja-194240',
+    parkUrl: 'https://www.luontoon.fi/fi/reitit/torholan-luolan-polku-lohja-194240',
     name: 'Torholan luola',
     parkTypeSlug: 'nature-trail',
     postalCode: null,
@@ -683,7 +683,7 @@ const baseSpecialParkConfigs: SpecialParkConfig[] = [
     displayTypeName: null,
     extractMetadata: extractLuontoonDestinationMetadata,
     locationLabel: 'Sonnasentie 948',
-    luontoonUrl: 'https://www.luontoon.fi/fi/kohteet/paistjarvi',
+    parkUrl: 'https://www.luontoon.fi/fi/kohteet/paistjarvi',
     name: 'Paistjärvi',
     parkTypeSlug: 'outdoor-recreation-area',
     postalCode: '18300',
@@ -699,8 +699,64 @@ const baseSpecialParkConfigs: SpecialParkConfig[] = [
   },
   {
     displayTypeName: null,
+    locationLabel: 'Uutelantie 1',
+    parkUrl:
+      'https://www.hel.fi/fi/kulttuuri-ja-vapaa-aika/ulkoilu-puistot-ja-luontokohteet/ulkoilualueet/uutelan-ulkoilualue',
+    name: 'Uutelan ulkoilualue',
+    parkTypeSlug: 'outdoor-recreation-area',
+    postalCode: '00990',
+    postalOffice: 'Helsinki',
+    responseShapeVersion: 'manual-helsinki-admin-division-v1',
+    slug: 'uutelan-ulkoilualue',
+    sourceUrl: 'special://uutelan-ulkoilualue',
+    syntheticLipasId: 9_001_070
+  },
+  {
+    displayTypeName: null,
+    locationLabel: 'Rantapaadentie 7',
+    parkUrl:
+      'https://www.hel.fi/fi/kulttuuri-ja-vapaa-aika/ulkoilu-puistot-ja-luontokohteet/ulkoilualueet/kallahden-ulkoilualue',
+    name: 'Kallahden ulkoilualue',
+    parkTypeSlug: 'outdoor-recreation-area',
+    postalCode: '00980',
+    postalOffice: 'Helsinki',
+    responseShapeVersion: 'manual-helsinki-admin-division-v1',
+    slug: 'kallahden-ulkoilualue',
+    sourceUrl: 'special://kallahden-ulkoilualue',
+    syntheticLipasId: 9_001_071
+  },
+  {
+    displayTypeName: null,
+    locationLabel: 'Seurasaarentie 15',
+    parkUrl:
+      'https://www.hel.fi/fi/kulttuuri-ja-vapaa-aika/ulkoilu-puistot-ja-luontokohteet/ulkoilualueet/seurasaari',
+    name: 'Seurasaari',
+    parkTypeSlug: 'outdoor-recreation-area',
+    postalCode: '00250',
+    postalOffice: 'Helsinki',
+    responseShapeVersion: 'manual-osm-island-boundary-v1',
+    slug: 'seurasaari',
+    sourceUrl: 'special://seurasaari',
+    syntheticLipasId: 9_001_072
+  },
+  {
+    displayTypeName: null,
+    locationLabel: 'Mustikkamaantie 10',
+    parkUrl:
+      'https://www.hel.fi/fi/kulttuuri-ja-vapaa-aika/ulkoilu-puistot-ja-luontokohteet/ulkoilualueet/mustikkamaa',
+    name: 'Mustikkamaa',
+    parkTypeSlug: 'outdoor-recreation-area',
+    postalCode: '00570',
+    postalOffice: 'Helsinki',
+    responseShapeVersion: 'manual-osm-island-boundary-v1',
+    slug: 'mustikkamaa',
+    sourceUrl: 'special://mustikkamaa',
+    syntheticLipasId: 9_001_073
+  },
+  {
+    displayTypeName: null,
     locationLabel: 'Seili',
-    luontoonUrl: 'https://www.luontoon.fi/fi/kohteet/seili',
+    parkUrl: 'https://www.luontoon.fi/fi/kohteet/seili',
     name: 'Seili',
     parkTypeSlug: 'cultural-history-area',
     postalCode: null,
@@ -713,7 +769,7 @@ const baseSpecialParkConfigs: SpecialParkConfig[] = [
   {
     displayTypeName: null,
     locationLabel: 'Vallisaari',
-    luontoonUrl: 'https://www.luontoon.fi/fi/kohteet/vallisaari',
+    parkUrl: 'https://www.luontoon.fi/fi/kohteet/vallisaari',
     name: 'Vallisaari',
     parkTypeSlug: 'outdoor-recreation-area',
     postalCode: null,
@@ -726,7 +782,7 @@ const baseSpecialParkConfigs: SpecialParkConfig[] = [
   {
     displayTypeName: null,
     locationLabel: 'Hailuoto',
-    luontoonUrl: 'https://www.luontoon.fi/fi/kohteet/hailuoto',
+    parkUrl: 'https://www.luontoon.fi/fi/kohteet/hailuoto',
     name: 'Hailuoto',
     parkTypeSlug: 'outdoor-recreation-area',
     postalCode: null,
@@ -742,7 +798,7 @@ const baseSpecialParkConfigs: SpecialParkConfig[] = [
   {
     displayTypeName: null,
     locationLabel: 'Loppula',
-    luontoonUrl: 'https://www.luontoon.fi/fi/kohteet/sanginjoki',
+    parkUrl: 'https://www.luontoon.fi/fi/kohteet/sanginjoki',
     name: 'Sanginjoki',
     parkTypeSlug: 'nature-reserve-area',
     postalCode: null,
@@ -760,8 +816,7 @@ const baseSpecialParkConfigs: SpecialParkConfig[] = [
 const sourceReadyReserveParkSeeds: SykeSpecialParkSeed[] = [
   {
     displayTypeName: 'Ystävyyden puisto',
-    luontoonUrl:
-      'https://www.luontoon.fi/fi/kohteet/elimyssalon-luonnonsuojelualue-ystavyyden-puisto',
+    parkUrl: 'https://www.luontoon.fi/fi/kohteet/elimyssalon-luonnonsuojelualue-ystavyyden-puisto',
     name: 'Elimyssalon luonnonsuojelualue',
     parkTypeSlug: 'nature-reserve-area',
     slug: 'elimyssalon-luonnonsuojelualue-ystavyyden-puisto',
@@ -770,7 +825,7 @@ const sourceReadyReserveParkSeeds: SykeSpecialParkSeed[] = [
   },
   {
     displayTypeName: null,
-    luontoonUrl: 'https://www.luontoon.fi/fi/kohteet/hiidenvaaran-luonnonsuojelualue',
+    parkUrl: 'https://www.luontoon.fi/fi/kohteet/hiidenvaaran-luonnonsuojelualue',
     name: 'Hiidenvaaran luonnonsuojelualue',
     parkTypeSlug: 'nature-reserve-area',
     slug: 'hiidenvaaran-luonnonsuojelualue',
@@ -779,7 +834,7 @@ const sourceReadyReserveParkSeeds: SykeSpecialParkSeed[] = [
   },
   {
     displayTypeName: 'Ystävyyden puisto',
-    luontoonUrl:
+    parkUrl:
       'https://www.luontoon.fi/fi/kohteet/ison-palosen-ja-maariansarkkien-luonnonsuojelualue-ystavyyden-puisto',
     name: 'Ison-Palosen ja Maariansarkkien luonnonsuojelualue',
     parkTypeSlug: 'nature-reserve-area',
@@ -789,7 +844,7 @@ const sourceReadyReserveParkSeeds: SykeSpecialParkSeed[] = [
   },
   {
     displayTypeName: null,
-    luontoonUrl: 'https://www.luontoon.fi/fi/kohteet/jouhtenisen-luonnonsuojelualue',
+    parkUrl: 'https://www.luontoon.fi/fi/kohteet/jouhtenisen-luonnonsuojelualue',
     name: 'Jouhtenisen luonnonsuojelualue',
     parkTypeSlug: 'nature-reserve-area',
     slug: 'jouhtenisen-luonnonsuojelualue',
@@ -798,7 +853,7 @@ const sourceReadyReserveParkSeeds: SykeSpecialParkSeed[] = [
   },
   {
     displayTypeName: null,
-    luontoonUrl: 'https://www.luontoon.fi/fi/kohteet/kermajarven-luonnonsuojelualue',
+    parkUrl: 'https://www.luontoon.fi/fi/kohteet/kermajarven-luonnonsuojelualue',
     name: 'Kermajärven luonnonsuojelualue',
     parkTypeSlug: 'nature-reserve-area',
     slug: 'kermajarven-luonnonsuojelualue',
@@ -807,7 +862,7 @@ const sourceReadyReserveParkSeeds: SykeSpecialParkSeed[] = [
   },
   {
     displayTypeName: 'Ystävyyden puisto',
-    luontoonUrl: 'https://www.luontoon.fi/fi/kohteet/lentuan-luonnonsuojelualue-ystavyyden-puisto',
+    parkUrl: 'https://www.luontoon.fi/fi/kohteet/lentuan-luonnonsuojelualue-ystavyyden-puisto',
     name: 'Lentuan luonnonsuojelualue',
     parkTypeSlug: 'nature-reserve-area',
     slug: 'lentuan-luonnonsuojelualue-ystavyyden-puisto',
@@ -816,7 +871,7 @@ const sourceReadyReserveParkSeeds: SykeSpecialParkSeed[] = [
   },
   {
     displayTypeName: null,
-    luontoonUrl: 'https://www.luontoon.fi/fi/kohteet/levanevan-luonnonsuojelualue',
+    parkUrl: 'https://www.luontoon.fi/fi/kohteet/levanevan-luonnonsuojelualue',
     name: 'Levänevan luonnonsuojelualue',
     parkTypeSlug: 'nature-reserve-area',
     slug: 'levanevan-luonnonsuojelualue',
@@ -825,7 +880,7 @@ const sourceReadyReserveParkSeeds: SykeSpecialParkSeed[] = [
   },
   {
     displayTypeName: null,
-    luontoonUrl: 'https://www.luontoon.fi/fi/kohteet/medvaston-ja-stormossenin-luonnonsuojelualue',
+    parkUrl: 'https://www.luontoon.fi/fi/kohteet/medvaston-ja-stormossenin-luonnonsuojelualue',
     name: 'Medvastön ja Stormossenin luonnonsuojelualue',
     parkTypeSlug: 'nature-reserve-area',
     slug: 'medvaston-ja-stormossenin-luonnonsuojelualue',
@@ -834,7 +889,7 @@ const sourceReadyReserveParkSeeds: SykeSpecialParkSeed[] = [
   },
   {
     displayTypeName: null,
-    luontoonUrl: 'https://www.luontoon.fi/fi/kohteet/mietoistenlahden-luonnonsuojelualue',
+    parkUrl: 'https://www.luontoon.fi/fi/kohteet/mietoistenlahden-luonnonsuojelualue',
     name: 'Mietoistenlahden luonnonsuojelualue',
     parkTypeSlug: 'nature-reserve-area',
     slug: 'mietoistenlahden-luonnonsuojelualue',
@@ -843,7 +898,7 @@ const sourceReadyReserveParkSeeds: SykeSpecialParkSeed[] = [
   },
   {
     displayTypeName: null,
-    luontoonUrl: 'https://www.luontoon.fi/fi/kohteet/mujejarven-luonnonsuojelualue',
+    parkUrl: 'https://www.luontoon.fi/fi/kohteet/mujejarven-luonnonsuojelualue',
     name: 'Mujejärven luonnonsuojelualue',
     parkTypeSlug: 'nature-reserve-area',
     slug: 'mujejarven-luonnonsuojelualue',
@@ -852,7 +907,7 @@ const sourceReadyReserveParkSeeds: SykeSpecialParkSeed[] = [
   },
   {
     displayTypeName: null,
-    luontoonUrl: 'https://www.luontoon.fi/fi/kohteet/otajarven-luonnonsuojelualue',
+    parkUrl: 'https://www.luontoon.fi/fi/kohteet/otajarven-luonnonsuojelualue',
     name: 'Otajärven luonnonsuojelualue',
     parkTypeSlug: 'nature-reserve-area',
     slug: 'otajarven-luonnonsuojelualue',
@@ -861,7 +916,7 @@ const sourceReadyReserveParkSeeds: SykeSpecialParkSeed[] = [
   },
   {
     displayTypeName: null,
-    luontoonUrl: 'https://www.luontoon.fi/fi/kohteet/pihlajaveden-luonnonsuojelualue',
+    parkUrl: 'https://www.luontoon.fi/fi/kohteet/pihlajaveden-luonnonsuojelualue',
     name: 'Pihlajaveden luonnonsuojelualue',
     parkTypeSlug: 'nature-reserve-area',
     slug: 'pihlajaveden-luonnonsuojelualue',
@@ -870,7 +925,7 @@ const sourceReadyReserveParkSeeds: SykeSpecialParkSeed[] = [
   },
   {
     displayTypeName: null,
-    luontoonUrl: 'https://www.luontoon.fi/fi/kohteet/punkaharjun-luonnonsuojelualue',
+    parkUrl: 'https://www.luontoon.fi/fi/kohteet/punkaharjun-luonnonsuojelualue',
     name: 'Punkaharjun luonnonsuojelualue',
     parkTypeSlug: 'nature-reserve-area',
     slug: 'punkaharjun-luonnonsuojelualue',
@@ -879,7 +934,7 @@ const sourceReadyReserveParkSeeds: SykeSpecialParkSeed[] = [
   },
   {
     displayTypeName: null,
-    luontoonUrl: 'https://www.luontoon.fi/fi/kohteet/saltfjardenin-luonnonsuojelualue',
+    parkUrl: 'https://www.luontoon.fi/fi/kohteet/saltfjardenin-luonnonsuojelualue',
     name: 'Saltfjärdenin luonnonsuojelualue',
     parkTypeSlug: 'nature-reserve-area',
     slug: 'saltfjardenin-luonnonsuojelualue',
@@ -888,8 +943,7 @@ const sourceReadyReserveParkSeeds: SykeSpecialParkSeed[] = [
   },
   {
     displayTypeName: null,
-    luontoonUrl:
-      'https://www.luontoon.fi/fi/kohteet/taktominlahden-ja-svanvikenin-luonnonsuojelualue',
+    parkUrl: 'https://www.luontoon.fi/fi/kohteet/taktominlahden-ja-svanvikenin-luonnonsuojelualue',
     name: 'Täktominlahden ja Svanvikenin luonnonsuojelualue',
     parkTypeSlug: 'nature-reserve-area',
     slug: 'taktominlahden-ja-svanvikenin-luonnonsuojelualue',
@@ -898,7 +952,7 @@ const sourceReadyReserveParkSeeds: SykeSpecialParkSeed[] = [
   },
   {
     displayTypeName: null,
-    luontoonUrl: 'https://www.luontoon.fi/fi/kohteet/vaisakon-luonnonsuojelualue',
+    parkUrl: 'https://www.luontoon.fi/fi/kohteet/vaisakon-luonnonsuojelualue',
     name: 'Vaisakon luonnonsuojelualue',
     parkTypeSlug: 'nature-reserve-area',
     slug: 'vaisakon-luonnonsuojelualue',
@@ -907,7 +961,7 @@ const sourceReadyReserveParkSeeds: SykeSpecialParkSeed[] = [
   },
   {
     displayTypeName: null,
-    luontoonUrl: 'https://www.luontoon.fi/fi/kohteet/valtavaaran-ja-pyhavaaran-luonnonsuojelualue',
+    parkUrl: 'https://www.luontoon.fi/fi/kohteet/valtavaaran-ja-pyhavaaran-luonnonsuojelualue',
     name: 'Valtavaaran ja Pyhävaaran luonnonsuojelualue',
     parkTypeSlug: 'nature-reserve-area',
     slug: 'valtavaaran-ja-pyhavaaran-luonnonsuojelualue',
@@ -916,7 +970,7 @@ const sourceReadyReserveParkSeeds: SykeSpecialParkSeed[] = [
   },
   {
     displayTypeName: null,
-    luontoonUrl: 'https://www.luontoon.fi/fi/kohteet/ilmakkiaavan-soidensuojelualue',
+    parkUrl: 'https://www.luontoon.fi/fi/kohteet/ilmakkiaavan-soidensuojelualue',
     name: 'Ilmakkiaavan soidensuojelualue',
     parkTypeSlug: 'nature-reserve-area',
     slug: 'ilmakkiaavan-soidensuojelualue',
@@ -925,7 +979,7 @@ const sourceReadyReserveParkSeeds: SykeSpecialParkSeed[] = [
   },
   {
     displayTypeName: 'Ystävyyden puisto',
-    luontoonUrl:
+    parkUrl:
       'https://www.luontoon.fi/fi/kohteet/juortanansalon-lapinsuon-soidensuojelualue-ystavyyden-puisto',
     name: 'Juortanansalon-Lapinsuon soidensuojelualue',
     parkTypeSlug: 'nature-reserve-area',
@@ -935,7 +989,7 @@ const sourceReadyReserveParkSeeds: SykeSpecialParkSeed[] = [
   },
   {
     displayTypeName: null,
-    luontoonUrl: 'https://www.luontoon.fi/fi/kohteet/siikanevan-soidensuojelualue',
+    parkUrl: 'https://www.luontoon.fi/fi/kohteet/siikanevan-soidensuojelualue',
     name: 'Siikanevan soidensuojelualue',
     parkTypeSlug: 'nature-reserve-area',
     slug: 'siikanevan-soidensuojelualue',
@@ -944,7 +998,7 @@ const sourceReadyReserveParkSeeds: SykeSpecialParkSeed[] = [
   },
   {
     displayTypeName: null,
-    luontoonUrl: 'https://www.luontoon.fi/fi/kohteet/viiankiaavan-soidensuojelualue',
+    parkUrl: 'https://www.luontoon.fi/fi/kohteet/viiankiaavan-soidensuojelualue',
     name: 'Viiankiaavan soidensuojelualue',
     parkTypeSlug: 'nature-reserve-area',
     slug: 'viiankiaavan-soidensuojelualue',
@@ -953,7 +1007,7 @@ const sourceReadyReserveParkSeeds: SykeSpecialParkSeed[] = [
   },
   {
     displayTypeName: 'Luonnonpuisto',
-    luontoonUrl: 'https://www.luontoon.fi/fi/kohteet/karkalin-luonnonpuisto',
+    parkUrl: 'https://www.luontoon.fi/fi/kohteet/karkalin-luonnonpuisto',
     name: 'Karkalin luonnonpuisto',
     parkTypeSlug: 'nature-reserve-area',
     slug: 'karkalin-luonnonpuisto',
@@ -962,7 +1016,7 @@ const sourceReadyReserveParkSeeds: SykeSpecialParkSeed[] = [
   },
   {
     displayTypeName: 'Luonnonpuisto',
-    luontoonUrl: 'https://www.luontoon.fi/fi/kohteet/paljakan-luonnonpuisto',
+    parkUrl: 'https://www.luontoon.fi/fi/kohteet/paljakan-luonnonpuisto',
     name: 'Paljakan luonnonpuisto',
     parkTypeSlug: 'nature-reserve-area',
     slug: 'paljakan-luonnonpuisto',
@@ -971,7 +1025,7 @@ const sourceReadyReserveParkSeeds: SykeSpecialParkSeed[] = [
   },
   {
     displayTypeName: 'Luonnonpuisto',
-    luontoonUrl: 'https://www.luontoon.fi/fi/kohteet/salamanperan-luonnonpuisto',
+    parkUrl: 'https://www.luontoon.fi/fi/kohteet/salamanperan-luonnonpuisto',
     name: 'Salamanperän luonnonpuisto',
     parkTypeSlug: 'nature-reserve-area',
     slug: 'salamanperan-luonnonpuisto',
@@ -980,7 +1034,7 @@ const sourceReadyReserveParkSeeds: SykeSpecialParkSeed[] = [
   },
   {
     displayTypeName: 'Luonnonpuisto',
-    luontoonUrl: 'https://www.luontoon.fi/fi/kohteet/sompion-luonnonpuisto',
+    parkUrl: 'https://www.luontoon.fi/fi/kohteet/sompion-luonnonpuisto',
     name: 'Sompion luonnonpuisto',
     parkTypeSlug: 'nature-reserve-area',
     slug: 'sompion-luonnonpuisto',
@@ -989,7 +1043,7 @@ const sourceReadyReserveParkSeeds: SykeSpecialParkSeed[] = [
   },
   {
     displayTypeName: 'Luonnonpuisto',
-    luontoonUrl: 'https://www.luontoon.fi/fi/kohteet/vaskijarven-luonnonpuisto',
+    parkUrl: 'https://www.luontoon.fi/fi/kohteet/vaskijarven-luonnonpuisto',
     name: 'Vaskijärven luonnonpuisto',
     parkTypeSlug: 'nature-reserve-area',
     slug: 'vaskijarven-luonnonpuisto',
@@ -1001,7 +1055,7 @@ const sourceReadyReserveParkSeeds: SykeSpecialParkSeed[] = [
 const sourceReadyDestinationAreaSeeds: SykeSpecialParkSeed[] = [
   {
     displayTypeName: null,
-    luontoonUrl: 'https://www.luontoon.fi/fi/kohteet/liimanninkosken-lehtojensuojelualue',
+    parkUrl: 'https://www.luontoon.fi/fi/kohteet/liimanninkosken-lehtojensuojelualue',
     name: 'Liimanninkosken lehtojensuojelualue',
     parkTypeSlug: 'nature-reserve-area',
     slug: 'liimanninkosken-lehtojensuojelualue',
@@ -1010,7 +1064,7 @@ const sourceReadyDestinationAreaSeeds: SykeSpecialParkSeed[] = [
   },
   {
     displayTypeName: null,
-    luontoonUrl: null,
+    parkUrl: null,
     name: 'Lapakisto',
     parkTypeSlug: 'nature-reserve-area',
     slug: 'lapakisto',
@@ -1020,7 +1074,7 @@ const sourceReadyDestinationAreaSeeds: SykeSpecialParkSeed[] = [
   },
   {
     displayTypeName: null,
-    luontoonUrl: 'https://www.luontoon.fi/fi/kohteet/dagmarin-puisto',
+    parkUrl: 'https://www.luontoon.fi/fi/kohteet/dagmarin-puisto',
     name: 'Dagmarin puisto',
     parkTypeSlug: 'cultural-history-area',
     slug: 'dagmarin-puisto',
@@ -1030,7 +1084,7 @@ const sourceReadyDestinationAreaSeeds: SykeSpecialParkSeed[] = [
   },
   {
     displayTypeName: 'Luonnonpuisto',
-    luontoonUrl: 'https://www.luontoon.fi/fi/kohteet/olvassuo',
+    parkUrl: 'https://www.luontoon.fi/fi/kohteet/olvassuo',
     name: 'Olvassuon luonnonpuisto',
     parkTypeSlug: 'nature-reserve-area',
     slug: 'olvassuon-luonnonpuisto',
@@ -1039,7 +1093,7 @@ const sourceReadyDestinationAreaSeeds: SykeSpecialParkSeed[] = [
   },
   {
     displayTypeName: 'Luonnonpuisto',
-    luontoonUrl: 'https://www.luontoon.fi/fi/reitit/tapion-taival-reitti-ilomantsi-47985',
+    parkUrl: 'https://www.luontoon.fi/fi/reitit/tapion-taival-reitti-ilomantsi-47985',
     name: 'Koivusuon luonnonpuisto',
     parkTypeSlug: 'nature-reserve-area',
     slug: 'koivusuon-luonnonpuisto',
@@ -1048,7 +1102,7 @@ const sourceReadyDestinationAreaSeeds: SykeSpecialParkSeed[] = [
   },
   {
     displayTypeName: null,
-    luontoonUrl: 'https://www.luontoon.fi/fi/kohteet/korouoma',
+    parkUrl: 'https://www.luontoon.fi/fi/kohteet/korouoma',
     name: 'Korouoma',
     parkTypeSlug: 'nature-reserve-area',
     slug: 'korouoma',
@@ -1060,7 +1114,7 @@ const sourceReadyDestinationAreaSeeds: SykeSpecialParkSeed[] = [
 const sourceReadyLuontoonDestinationAreaSeeds: LuontoonDestinationAreaSeed[] = [
   {
     displayTypeName: null,
-    luontoonUrl: 'https://www.luontoon.fi/fi/kohteet/litokairan-soidensuojelualue',
+    parkUrl: 'https://www.luontoon.fi/fi/kohteet/litokairan-soidensuojelualue',
     name: 'Litokairan soidensuojelualue',
     parkTypeSlug: 'nature-reserve-area',
     slug: 'litokairan-soidensuojelualue',
@@ -1068,7 +1122,7 @@ const sourceReadyLuontoonDestinationAreaSeeds: LuontoonDestinationAreaSeed[] = [
   },
   {
     displayTypeName: null,
-    luontoonUrl: 'https://www.luontoon.fi/fi/kohteet/martimoaavan-soidensuojelualue',
+    parkUrl: 'https://www.luontoon.fi/fi/kohteet/martimoaavan-soidensuojelualue',
     name: 'Martimoaavan soidensuojelualue',
     parkTypeSlug: 'nature-reserve-area',
     slug: 'martimoaavan-soidensuojelualue',
@@ -1076,7 +1130,7 @@ const sourceReadyLuontoonDestinationAreaSeeds: LuontoonDestinationAreaSeed[] = [
   },
   {
     displayTypeName: null,
-    luontoonUrl: 'https://www.luontoon.fi/fi/kohteet/paukanevan-soidensuojelualue',
+    parkUrl: 'https://www.luontoon.fi/fi/kohteet/paukanevan-soidensuojelualue',
     name: 'Paukanevan soidensuojelualue',
     parkTypeSlug: 'nature-reserve-area',
     slug: 'paukanevan-soidensuojelualue',
@@ -1084,7 +1138,7 @@ const sourceReadyLuontoonDestinationAreaSeeds: LuontoonDestinationAreaSeed[] = [
   },
   {
     displayTypeName: null,
-    luontoonUrl: 'https://www.luontoon.fi/fi/kohteet/neitvuori-ja-luonterin-luonnonsuojelualue',
+    parkUrl: 'https://www.luontoon.fi/fi/kohteet/neitvuori-ja-luonterin-luonnonsuojelualue',
     name: 'Neitvuori ja Luonterin luonnonsuojelualue',
     parkTypeSlug: 'nature-reserve-area',
     slug: 'neitvuori-ja-luonterin-luonnonsuojelualue',
@@ -1092,7 +1146,7 @@ const sourceReadyLuontoonDestinationAreaSeeds: LuontoonDestinationAreaSeed[] = [
   },
   {
     displayTypeName: null,
-    luontoonUrl: 'https://www.luontoon.fi/fi/kohteet/koskeljarvi',
+    parkUrl: 'https://www.luontoon.fi/fi/kohteet/koskeljarvi',
     name: 'Koskeljärvi',
     parkTypeSlug: 'outdoor-recreation-area',
     slug: 'koskeljarvi',
@@ -1100,7 +1154,7 @@ const sourceReadyLuontoonDestinationAreaSeeds: LuontoonDestinationAreaSeed[] = [
   },
   {
     displayTypeName: null,
-    luontoonUrl: 'https://www.luontoon.fi/fi/kohteet/kurimonkoski',
+    parkUrl: 'https://www.luontoon.fi/fi/kohteet/kurimonkoski',
     name: 'Kurimonkoski',
     parkTypeSlug: 'outdoor-recreation-area',
     slug: 'kurimonkoski',
@@ -1108,7 +1162,7 @@ const sourceReadyLuontoonDestinationAreaSeeds: LuontoonDestinationAreaSeed[] = [
   },
   {
     displayTypeName: null,
-    luontoonUrl: 'https://www.luontoon.fi/fi/kohteet/pukala',
+    parkUrl: 'https://www.luontoon.fi/fi/kohteet/pukala',
     name: 'Pukala',
     parkTypeSlug: 'outdoor-recreation-area',
     slug: 'pukala',
@@ -1116,7 +1170,7 @@ const sourceReadyLuontoonDestinationAreaSeeds: LuontoonDestinationAreaSeed[] = [
   },
   {
     displayTypeName: null,
-    luontoonUrl: 'https://www.luontoon.fi/fi/kohteet/peurajarvi',
+    parkUrl: 'https://www.luontoon.fi/fi/kohteet/peurajarvi',
     name: 'Peurajärvi',
     parkTypeSlug: 'outdoor-recreation-area',
     slug: 'peurajarvi',
@@ -1124,7 +1178,7 @@ const sourceReadyLuontoonDestinationAreaSeeds: LuontoonDestinationAreaSeed[] = [
   },
   {
     displayTypeName: null,
-    luontoonUrl: 'https://www.luontoon.fi/fi/kohteet/hepokongas',
+    parkUrl: 'https://www.luontoon.fi/fi/kohteet/hepokongas',
     name: 'Hepoköngäs',
     parkTypeSlug: 'nature-reserve-area',
     slug: 'hepokongas',
@@ -1132,7 +1186,7 @@ const sourceReadyLuontoonDestinationAreaSeeds: LuontoonDestinationAreaSeed[] = [
   },
   {
     displayTypeName: null,
-    luontoonUrl: 'https://www.luontoon.fi/fi/kohteet/auttikongas',
+    parkUrl: 'https://www.luontoon.fi/fi/kohteet/auttikongas',
     name: 'Auttiköngäs',
     parkTypeSlug: 'outdoor-recreation-area',
     slug: 'auttikongas',
@@ -1140,7 +1194,7 @@ const sourceReadyLuontoonDestinationAreaSeeds: LuontoonDestinationAreaSeed[] = [
   },
   {
     displayTypeName: null,
-    luontoonUrl: 'https://www.luontoon.fi/fi/kohteet/pinkjarvi',
+    parkUrl: 'https://www.luontoon.fi/fi/kohteet/pinkjarvi',
     name: 'Pinkjärvi',
     parkTypeSlug: 'outdoor-recreation-area',
     slug: 'pinkjarvi',
@@ -1148,7 +1202,7 @@ const sourceReadyLuontoonDestinationAreaSeeds: LuontoonDestinationAreaSeed[] = [
   },
   {
     displayTypeName: null,
-    luontoonUrl: 'https://www.luontoon.fi/fi/kohteet/soiperoinen',
+    parkUrl: 'https://www.luontoon.fi/fi/kohteet/soiperoinen',
     name: 'Soiperoinen',
     parkTypeSlug: 'outdoor-recreation-area',
     slug: 'soiperoinen',
@@ -1156,7 +1210,7 @@ const sourceReadyLuontoonDestinationAreaSeeds: LuontoonDestinationAreaSeed[] = [
   },
   {
     displayTypeName: null,
-    luontoonUrl: 'https://www.luontoon.fi/fi/kohteet/unarinkongas',
+    parkUrl: 'https://www.luontoon.fi/fi/kohteet/unarinkongas',
     name: 'Unarinköngäs',
     parkTypeSlug: 'outdoor-recreation-area',
     slug: 'unarinkongas',
@@ -1167,7 +1221,7 @@ const sourceReadyLuontoonDestinationAreaSeeds: LuontoonDestinationAreaSeed[] = [
 const sourceReadyHistoryAreaSeeds: SykeSpecialParkSeed[] = [
   {
     displayTypeName: null,
-    luontoonUrl: 'https://www.luontoon.fi/fi/kohteet/harola',
+    parkUrl: 'https://www.luontoon.fi/fi/kohteet/harola',
     name: 'Harola',
     parkTypeSlug: 'outdoor-recreation-area',
     slug: 'harola',
@@ -1176,7 +1230,7 @@ const sourceReadyHistoryAreaSeeds: SykeSpecialParkSeed[] = [
   },
   {
     displayTypeName: null,
-    luontoonUrl: 'https://www.luontoon.fi/fi/kohteet/kajaanin-linna',
+    parkUrl: 'https://www.luontoon.fi/fi/kohteet/kajaanin-linna',
     name: 'Kajaanin linna',
     parkTypeSlug: 'cultural-history-area',
     slug: 'kajaanin-linna',
@@ -1185,7 +1239,7 @@ const sourceReadyHistoryAreaSeeds: SykeSpecialParkSeed[] = [
   },
   {
     displayTypeName: null,
-    luontoonUrl: 'https://www.luontoon.fi/fi/kohteet/raaseporin-linna',
+    parkUrl: 'https://www.luontoon.fi/fi/kohteet/raaseporin-linna',
     name: 'Raaseporin linna',
     parkTypeSlug: 'cultural-history-area',
     slug: 'raaseporin-linna',
@@ -1194,7 +1248,7 @@ const sourceReadyHistoryAreaSeeds: SykeSpecialParkSeed[] = [
   },
   {
     displayTypeName: null,
-    luontoonUrl: 'https://www.luontoon.fi/fi/kohteet/svartholma',
+    parkUrl: 'https://www.luontoon.fi/fi/kohteet/svartholma',
     name: 'Svartholma',
     parkTypeSlug: 'cultural-history-area',
     slug: 'svartholma',
@@ -1203,7 +1257,7 @@ const sourceReadyHistoryAreaSeeds: SykeSpecialParkSeed[] = [
   },
   {
     displayTypeName: null,
-    luontoonUrl: 'https://www.luontoon.fi/fi/kohteet/kuusiston-linna',
+    parkUrl: 'https://www.luontoon.fi/fi/kohteet/kuusiston-linna',
     name: 'Kuusiston linna',
     parkTypeSlug: 'cultural-history-area',
     slug: 'kuusiston-linna',
@@ -1212,7 +1266,7 @@ const sourceReadyHistoryAreaSeeds: SykeSpecialParkSeed[] = [
   },
   {
     displayTypeName: null,
-    luontoonUrl: 'https://www.luontoon.fi/fi/kohteet/latokartanonkoski',
+    parkUrl: 'https://www.luontoon.fi/fi/kohteet/latokartanonkoski',
     name: 'Latokartanonkoski',
     parkTypeSlug: 'cultural-history-area',
     slug: 'latokartanonkoski',
@@ -1221,7 +1275,7 @@ const sourceReadyHistoryAreaSeeds: SykeSpecialParkSeed[] = [
   },
   {
     displayTypeName: null,
-    luontoonUrl: 'https://www.luontoon.fi/fi/kohteet/karnakosken-linnoitus',
+    parkUrl: 'https://www.luontoon.fi/fi/kohteet/karnakosken-linnoitus',
     name: 'Kärnäkosken linnoitus',
     parkTypeSlug: 'cultural-history-area',
     slug: 'karnakosken-linnoitus',
@@ -1233,7 +1287,7 @@ const sourceReadyHistoryAreaSeeds: SykeSpecialParkSeed[] = [
 const sourceReadyHistoryRkyAreaSeeds: MuseovirastoRkyAreaSeed[] = [
   {
     displayTypeName: null,
-    luontoonUrl: null,
+    parkUrl: null,
     name: 'Bengtskärin majakka',
     parkTypeSlug: 'cultural-history-area',
     slug: 'bengtskarin-majakka',
@@ -1242,7 +1296,7 @@ const sourceReadyHistoryRkyAreaSeeds: MuseovirastoRkyAreaSeed[] = [
   },
   {
     displayTypeName: null,
-    luontoonUrl: null,
+    parkUrl: null,
     name: 'Haapasaaren saaristokylä',
     parkTypeSlug: 'cultural-history-area',
     slug: 'haapasaaren-saaristokyla',
@@ -1251,7 +1305,7 @@ const sourceReadyHistoryRkyAreaSeeds: MuseovirastoRkyAreaSeed[] = [
   },
   {
     displayTypeName: null,
-    luontoonUrl: null,
+    parkUrl: null,
     name: 'Kaunissaaren saaristokylä',
     parkTypeSlug: 'cultural-history-area',
     slug: 'kaunissaaren-saaristokyla',
@@ -1260,7 +1314,7 @@ const sourceReadyHistoryRkyAreaSeeds: MuseovirastoRkyAreaSeed[] = [
   },
   {
     displayTypeName: null,
-    luontoonUrl: null,
+    parkUrl: null,
     name: 'Vanajanlinna',
     parkTypeSlug: 'cultural-history-area',
     slug: 'vanajanlinna',
@@ -1269,7 +1323,7 @@ const sourceReadyHistoryRkyAreaSeeds: MuseovirastoRkyAreaSeed[] = [
   },
   {
     displayTypeName: null,
-    luontoonUrl: null,
+    parkUrl: null,
     name: 'Kissakosken kanava',
     parkTypeSlug: 'cultural-history-area',
     slug: 'kissakosken-kanava',
@@ -1278,7 +1332,7 @@ const sourceReadyHistoryRkyAreaSeeds: MuseovirastoRkyAreaSeed[] = [
   },
   {
     displayTypeName: null,
-    luontoonUrl: null,
+    parkUrl: null,
     name: 'Jyväskylän harju',
     parkTypeSlug: 'cultural-history-area',
     slug: 'harju',
@@ -1287,7 +1341,7 @@ const sourceReadyHistoryRkyAreaSeeds: MuseovirastoRkyAreaSeed[] = [
   },
   {
     displayTypeName: 'Maailmanperintökohde',
-    luontoonUrl: null,
+    parkUrl: null,
     name: 'Petäjäveden vanha kirkko',
     parkTypeSlug: 'cultural-history-area',
     slug: 'petajaveden-vanha-kirkko',
@@ -1296,7 +1350,7 @@ const sourceReadyHistoryRkyAreaSeeds: MuseovirastoRkyAreaSeed[] = [
   },
   {
     displayTypeName: null,
-    luontoonUrl: null,
+    parkUrl: null,
     name: 'Ylivieskan savisilta',
     parkTypeSlug: 'cultural-history-area',
     slug: 'savisilta',
@@ -1305,7 +1359,7 @@ const sourceReadyHistoryRkyAreaSeeds: MuseovirastoRkyAreaSeed[] = [
   },
   {
     displayTypeName: null,
-    luontoonUrl: null,
+    parkUrl: null,
     name: 'Vääksyn kanava',
     parkTypeSlug: 'cultural-history-area',
     slug: 'vaaksyn-kanava',
@@ -1314,7 +1368,7 @@ const sourceReadyHistoryRkyAreaSeeds: MuseovirastoRkyAreaSeed[] = [
   },
   {
     displayTypeName: null,
-    luontoonUrl: null,
+    parkUrl: null,
     name: 'Reposaari',
     parkTypeSlug: 'cultural-history-area',
     slug: 'reposaari',
@@ -1323,7 +1377,7 @@ const sourceReadyHistoryRkyAreaSeeds: MuseovirastoRkyAreaSeed[] = [
   },
   {
     displayTypeName: null,
-    luontoonUrl: null,
+    parkUrl: null,
     name: 'Träskändan kartano',
     parkTypeSlug: 'cultural-history-area',
     slug: 'traskandan-kartano',
@@ -1332,7 +1386,7 @@ const sourceReadyHistoryRkyAreaSeeds: MuseovirastoRkyAreaSeed[] = [
   },
   {
     displayTypeName: null,
-    luontoonUrl: null,
+    parkUrl: null,
     name: 'Helsingin Vanhakaupunki',
     parkTypeSlug: 'cultural-history-area',
     slug: 'helsingin-vanhakaupunki',
@@ -1345,7 +1399,7 @@ const sourceReadyFactoryVillageSeeds: MuseovirastoRkyAreaSeed[] = [
   {
     displayTypeName: 'Tehdaskylä',
     locationLabel: 'Antskogintie 259',
-    luontoonUrl: null,
+    parkUrl: null,
     name: 'Antskogin ruukki',
     parkTypeSlug: 'cultural-history-area',
     postalCode: '10410',
@@ -1358,7 +1412,7 @@ const sourceReadyFactoryVillageSeeds: MuseovirastoRkyAreaSeed[] = [
   {
     displayTypeName: 'Tehdaskylä',
     locationLabel: 'Ruukintie 8',
-    luontoonUrl: null,
+    parkUrl: null,
     name: 'Billnäsin ruukki',
     parkTypeSlug: 'cultural-history-area',
     postalCode: '10330',
@@ -1371,7 +1425,7 @@ const sourceReadyFactoryVillageSeeds: MuseovirastoRkyAreaSeed[] = [
   {
     displayTypeName: 'Tehdaskylä',
     locationLabel: 'Fiskarsintie 9',
-    luontoonUrl: null,
+    parkUrl: null,
     name: 'Fiskarsin ruukki',
     parkTypeSlug: 'cultural-history-area',
     postalCode: '10470',
@@ -1383,7 +1437,7 @@ const sourceReadyFactoryVillageSeeds: MuseovirastoRkyAreaSeed[] = [
   },
   {
     displayTypeName: 'Tehdaskylä',
-    luontoonUrl: null,
+    parkUrl: null,
     name: 'Inhan ruukkiyhdyskunta',
     parkTypeSlug: 'cultural-history-area',
     slug: 'inhan-ruukkiyhdyskunta',
@@ -1393,7 +1447,7 @@ const sourceReadyFactoryVillageSeeds: MuseovirastoRkyAreaSeed[] = [
   {
     displayTypeName: 'Tehdaskylä',
     locationLabel: 'Björkbodan ruukinalue',
-    luontoonUrl: null,
+    parkUrl: null,
     name: 'Björkbodan ruukinalue',
     parkTypeSlug: 'cultural-history-area',
     slug: 'bjorkbodan-ruukinalue',
@@ -1403,7 +1457,7 @@ const sourceReadyFactoryVillageSeeds: MuseovirastoRkyAreaSeed[] = [
   {
     displayTypeName: 'Tehdaskylä',
     locationLabel: 'Fagervikintie 21',
-    luontoonUrl: null,
+    parkUrl: null,
     name: 'Fagervikin ruukki',
     parkTypeSlug: 'cultural-history-area',
     postalCode: '10230',
@@ -1416,7 +1470,7 @@ const sourceReadyFactoryVillageSeeds: MuseovirastoRkyAreaSeed[] = [
     displayTypeName: 'Tehdaskylä',
     excludedSourceNames: ['Kulosuonmäen kaivos'],
     locationLabel: 'Bremerintie 10',
-    luontoonUrl: null,
+    parkUrl: null,
     name: 'Högforsin ruukki',
     parkTypeSlug: 'cultural-history-area',
     postalCode: '03600',
@@ -1429,7 +1483,7 @@ const sourceReadyFactoryVillageSeeds: MuseovirastoRkyAreaSeed[] = [
     displayTypeName: 'Tehdaskylä',
     excludedSourceNames: ['Lohiluoma'],
     locationLabel: 'Kauttuan Ruukinpuisto, Tehtaantie 1',
-    luontoonUrl: null,
+    parkUrl: null,
     name: 'Kauttuan ruukki',
     parkTypeSlug: 'cultural-history-area',
     postalCode: '27500',
@@ -1441,7 +1495,7 @@ const sourceReadyFactoryVillageSeeds: MuseovirastoRkyAreaSeed[] = [
   {
     displayTypeName: 'Tehdaskylä',
     locationLabel: 'Kärkelänkartanontie 411',
-    luontoonUrl: null,
+    parkUrl: null,
     name: 'Kärkelän ruukki',
     parkTypeSlug: 'cultural-history-area',
     postalCode: '25470',
@@ -1453,7 +1507,7 @@ const sourceReadyFactoryVillageSeeds: MuseovirastoRkyAreaSeed[] = [
   {
     displayTypeName: 'Tehdaskylä',
     locationLabel: 'Kimon ruukki',
-    luontoonUrl: null,
+    parkUrl: null,
     name: 'Kimon ruukki',
     parkTypeSlug: 'cultural-history-area',
     slug: 'kimon-ruukki',
@@ -1463,7 +1517,7 @@ const sourceReadyFactoryVillageSeeds: MuseovirastoRkyAreaSeed[] = [
   {
     displayTypeName: 'Tehdaskylä',
     locationLabel: 'Kosken ruukki',
-    luontoonUrl: null,
+    parkUrl: null,
     name: 'Kosken ruukki',
     parkTypeSlug: 'cultural-history-area',
     slug: 'kosken-ruukki',
@@ -1473,7 +1527,7 @@ const sourceReadyFactoryVillageSeeds: MuseovirastoRkyAreaSeed[] = [
   {
     displayTypeName: 'Tehdaskylä',
     locationLabel: 'Ruukintie 16',
-    luontoonUrl: null,
+    parkUrl: null,
     name: 'Leineperin ruukki',
     parkTypeSlug: 'cultural-history-area',
     postalCode: '29320',
@@ -1485,7 +1539,7 @@ const sourceReadyFactoryVillageSeeds: MuseovirastoRkyAreaSeed[] = [
   {
     displayTypeName: 'Tehdaskylä',
     locationLabel: 'Kellokoskentie 2',
-    luontoonUrl: null,
+    parkUrl: null,
     name: 'Kellokosken ruukki',
     parkTypeSlug: 'cultural-history-area',
     postalCode: '04500',
@@ -1497,7 +1551,7 @@ const sourceReadyFactoryVillageSeeds: MuseovirastoRkyAreaSeed[] = [
   {
     displayTypeName: 'Tehdaskylä',
     locationLabel: 'Pruukinraitti 15',
-    luontoonUrl: null,
+    parkUrl: null,
     name: 'Nuutajärven lasikylä',
     parkTypeSlug: 'cultural-history-area',
     postalCode: '31160',
@@ -1509,7 +1563,7 @@ const sourceReadyFactoryVillageSeeds: MuseovirastoRkyAreaSeed[] = [
   {
     displayTypeName: 'Tehdaskylä',
     locationLabel: 'Ruukinrannantie 6',
-    luontoonUrl: null,
+    parkUrl: null,
     name: 'Mathildedalin ruukkikylä',
     parkTypeSlug: 'cultural-history-area',
     postalCode: '25660',
@@ -1521,7 +1575,7 @@ const sourceReadyFactoryVillageSeeds: MuseovirastoRkyAreaSeed[] = [
   {
     displayTypeName: 'Tehdaskylä',
     locationLabel: 'Männäisten ruukki',
-    luontoonUrl: null,
+    parkUrl: null,
     name: 'Männäisten ruukki',
     parkTypeSlug: 'cultural-history-area',
     slug: 'mannaisten-ruukki',
@@ -1531,7 +1585,7 @@ const sourceReadyFactoryVillageSeeds: MuseovirastoRkyAreaSeed[] = [
   {
     displayTypeName: 'Tehdaskylä',
     locationLabel: 'Möhköntie 209',
-    luontoonUrl: null,
+    parkUrl: null,
     name: 'Möhkön ruukki',
     parkTypeSlug: 'cultural-history-area',
     postalCode: '82980',
@@ -1543,7 +1597,7 @@ const sourceReadyFactoryVillageSeeds: MuseovirastoRkyAreaSeed[] = [
   {
     displayTypeName: 'Tehdaskylä',
     locationLabel: 'Hållsnäsintie 89',
-    luontoonUrl: null,
+    parkUrl: null,
     name: 'Mustion ruukki ja linna',
     parkTypeSlug: 'cultural-history-area',
     postalCode: '10360',
@@ -1555,7 +1609,7 @@ const sourceReadyFactoryVillageSeeds: MuseovirastoRkyAreaSeed[] = [
   {
     displayTypeName: 'Tehdaskylä',
     locationLabel: 'Ahlströmintie 1',
-    luontoonUrl: null,
+    parkUrl: null,
     name: 'Noormarkun ruukki',
     parkTypeSlug: 'cultural-history-area',
     postalCode: '29600',
@@ -1567,7 +1621,7 @@ const sourceReadyFactoryVillageSeeds: MuseovirastoRkyAreaSeed[] = [
   {
     displayTypeName: 'Tehdaskylä',
     locationLabel: 'Orisbergin ruukinalue',
-    luontoonUrl: null,
+    parkUrl: null,
     name: 'Orisbergin ruukinalue',
     parkTypeSlug: 'cultural-history-area',
     slug: 'orisbergin-ruukinalue',
@@ -1577,7 +1631,7 @@ const sourceReadyFactoryVillageSeeds: MuseovirastoRkyAreaSeed[] = [
   {
     displayTypeName: 'Tehdaskylä',
     locationLabel: 'Ruukintie 11',
-    luontoonUrl: null,
+    parkUrl: null,
     name: 'Strömforsin ruukki',
     parkTypeSlug: 'cultural-history-area',
     postalCode: '07970',
@@ -1589,7 +1643,7 @@ const sourceReadyFactoryVillageSeeds: MuseovirastoRkyAreaSeed[] = [
   {
     displayTypeName: 'Tehdaskylä',
     locationLabel: 'Telakkatie 17',
-    luontoonUrl: null,
+    parkUrl: null,
     name: 'Teijon ruukki',
     parkTypeSlug: 'cultural-history-area',
     postalCode: '25570',
@@ -1601,7 +1655,7 @@ const sourceReadyFactoryVillageSeeds: MuseovirastoRkyAreaSeed[] = [
   {
     displayTypeName: 'Tehdaskylä',
     locationLabel: 'Tullbacksvägen 2',
-    luontoonUrl: null,
+    parkUrl: null,
     name: 'Taalintehtaan ruukki',
     parkTypeSlug: 'cultural-history-area',
     postalCode: '25900',
@@ -1613,7 +1667,7 @@ const sourceReadyFactoryVillageSeeds: MuseovirastoRkyAreaSeed[] = [
   {
     displayTypeName: 'Maailmanperintökohde',
     locationLabel: 'Verlantie 295',
-    luontoonUrl: null,
+    parkUrl: null,
     name: 'Verla',
     parkTypeSlug: 'cultural-history-area',
     postalCode: '47850',
@@ -1626,7 +1680,7 @@ const sourceReadyFactoryVillageSeeds: MuseovirastoRkyAreaSeed[] = [
     displayTypeName: 'Tehdaskylä',
     excludedSourceNames: ['hiiliuunit'],
     locationLabel: 'Juankosken ruukki',
-    luontoonUrl: null,
+    parkUrl: null,
     name: 'Juankosken ruukki',
     parkTypeSlug: 'cultural-history-area',
     slug: 'juankosken-ruukki',
@@ -1635,7 +1689,7 @@ const sourceReadyFactoryVillageSeeds: MuseovirastoRkyAreaSeed[] = [
   },
   {
     displayTypeName: 'Tehdaskylä',
-    luontoonUrl: null,
+    parkUrl: null,
     name: 'Lapuan patruunatehdas',
     parkTypeSlug: 'cultural-history-area',
     slug: 'lapuan-patruunatehdas',
@@ -1644,7 +1698,7 @@ const sourceReadyFactoryVillageSeeds: MuseovirastoRkyAreaSeed[] = [
   },
   {
     displayTypeName: 'Tehdaskylä',
-    luontoonUrl: null,
+    parkUrl: null,
     name: 'Vääräkosken kartonkitehdas',
     parkTypeSlug: 'cultural-history-area',
     slug: 'vaarakosken-kartonkitehdas',
@@ -1653,7 +1707,7 @@ const sourceReadyFactoryVillageSeeds: MuseovirastoRkyAreaSeed[] = [
   },
   {
     displayTypeName: 'Tehdaskylä',
-    luontoonUrl: null,
+    parkUrl: null,
     name: 'Riihimäen lasitehdas',
     parkTypeSlug: 'cultural-history-area',
     slug: 'riihimaen-lasitehdas',
@@ -1662,7 +1716,7 @@ const sourceReadyFactoryVillageSeeds: MuseovirastoRkyAreaSeed[] = [
   },
   {
     displayTypeName: 'Tehdaskylä',
-    luontoonUrl: null,
+    parkUrl: null,
     name: 'Koskenkylän ruukinalue',
     parkTypeSlug: 'cultural-history-area',
     slug: 'koskenkylan-ruukinalue',
@@ -1675,7 +1729,7 @@ const sourceReadyFactoryVillageProtectedSiteSeeds: SykeSpecialParkSeed[] = [
   {
     displayTypeName: 'Tehdaskylä',
     locationLabel: 'Jyrkänjoentie 217',
-    luontoonUrl: null,
+    parkUrl: null,
     name: 'Jyrkkäkosken ruukki',
     parkTypeSlug: 'cultural-history-area',
     postalCode: '74360',
@@ -1687,7 +1741,7 @@ const sourceReadyFactoryVillageProtectedSiteSeeds: SykeSpecialParkSeed[] = [
   {
     displayTypeName: 'Tehdaskylä',
     locationLabel: 'Haapakoskentie 506',
-    luontoonUrl: null,
+    parkUrl: null,
     name: 'Haapakosken ruukki',
     parkTypeSlug: 'cultural-history-area',
     postalCode: '77520',
@@ -1841,7 +1895,7 @@ export const importSpecialParks = async ({
         lastImportRunId: importRunId,
         lipasId: config.syntheticLipasId,
         locationLabel: config.locationLabel,
-        luontoonUrl: config.luontoonUrl,
+        parkUrl: config.parkUrl,
         managedByLipasImport: false,
         markerLat: (boundingBox.minLat + boundingBox.maxLat) / 2,
         markerLon: (boundingBox.minLon + boundingBox.maxLon) / 2,

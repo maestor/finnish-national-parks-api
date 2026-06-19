@@ -28,7 +28,7 @@ Use focused unit tests for:
 
 - LIPAS-to-domain mapping
 - slug creation
-- Luontoon URL normalization
+- Park URL normalization
 - bounding box calculation
 - marker point derivation
 - small pure validation helpers

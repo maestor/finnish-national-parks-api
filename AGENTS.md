@@ -26,7 +26,8 @@ This repository is a local-first TypeScript API that imports Finnish park, prote
 
 ## Data Rules
 - Use LIPAS as the machine-readable source for park, protected-area, and nature-trail catalog data.
-- Use Luontoon URLs only as official external references.
+- Prefer Luontoon as the first official external reference for `parkUrl` when a clearly matching park or destination page exists.
+- If no suitable Luontoon page exists for `parkUrl`, use another clearly suitable official page such as a municipality, park, or route page instead of inventing a destination URL.
 - Do not scrape or republish Luontoon page content unless a future decision explicitly revisits licensing and terms.
 - The importer must filter LIPAS records to active supported catalog types, exclude contact email, phone number, and comment text from stored catalog data, and skip `4404` nature trails whose full route geometry is contained inside an imported area or whose normalized `locationLabel`, `postalCode`, and `postalOffice` exactly match an imported area.
 - Personal notes and visit history are owned local data and must survive catalog re-imports.

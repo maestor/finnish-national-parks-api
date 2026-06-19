@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { createParkSlug, normalizeLuontoonUrl } from '../parks/park-normalization.js';
+import { createParkSlug, normalizeParkUrl } from '../parks/park-normalization.js';
 import { getSupportedParkTypeByCode, getSupportedParkTypeBySlug } from '../parks/park-types.js';
 import type { BoundingBox, GeoJsonFeatureCollection } from './geometry.js';
 import { deriveBoundingBox } from './geometry.js';
@@ -67,7 +67,7 @@ export type MappedPark = {
   establishmentYear: number | null;
   lipasId: number;
   locationLabel: string;
-  luontoonUrl: string | null;
+  parkUrl: string | null;
   markerPoint: {
     lat: number;
     lon: number;
@@ -110,7 +110,7 @@ export const mapLipasPark = (source: unknown, existingSlug?: string): MappedPark
     establishmentYear: park['construction-year'] ?? null,
     lipasId: park['lipas-id'],
     locationLabel: park.location.address ?? park.location['postal-office'] ?? park.name,
-    luontoonUrl: normalizeLuontoonUrl(park.www),
+    parkUrl: normalizeParkUrl(park.www),
     markerPoint: {
       lat: (boundingBox.minLat + boundingBox.maxLat) / 2,
       lon: (boundingBox.minLon + boundingBox.maxLon) / 2

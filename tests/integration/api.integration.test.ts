@@ -190,7 +190,7 @@ describe('API routes', () => {
     expect(firstBody.parks[0]).not.toHaveProperty('boundingBox');
     expect(firstBody.parks[0]).not.toHaveProperty('category');
     expect(firstBody.parks[0]).not.toHaveProperty('logo');
-    expect(firstBody.parks[0]).not.toHaveProperty('luontoonUrl');
+    expect(firstBody.parks[0]).not.toHaveProperty('parkUrl');
     expect(firstBody.parks[0]).not.toHaveProperty('map');
     expect(firstBody.parks[0]).not.toHaveProperty('markerPoint');
 
@@ -631,7 +631,7 @@ describe('API routes', () => {
         displayTypeName: 'Ystävyyden puisto',
         establishmentYear: 1990,
         locationLabel: 'Korjattu puistotie 9',
-        luontoonUrl: '/fi/kohteet/korjattu-puisto',
+        parkUrl: '/fi/kohteet/korjattu-puisto',
         name: 'Korjattu puisto',
         postalCode: '99130',
         postalOffice: 'Kittilä'
@@ -659,7 +659,7 @@ describe('API routes', () => {
       displayTypeName: 'Ystävyyden puisto',
       establishmentYear: 1990,
       locationLabel: 'Korjattu puistotie 9',
-      luontoonUrl: 'https://www.luontoon.fi/fi/kohteet/korjattu-puisto',
+      parkUrl: 'https://www.luontoon.fi/fi/kohteet/korjattu-puisto',
       name: 'Korjattu puisto',
       postalCode: '99130',
       postalOffice: 'Kittilä',
@@ -679,7 +679,7 @@ describe('API routes', () => {
       displayTypeName: 'Ystävyyden puisto',
       establishmentYear: 1990,
       locationLabel: 'Korjattu puistotie 9',
-      luontoonUrl: 'https://www.luontoon.fi/fi/kohteet/korjattu-puisto',
+      parkUrl: 'https://www.luontoon.fi/fi/kohteet/korjattu-puisto',
       name: 'Korjattu puisto',
       postalCode: '99130',
       postalOffice: 'Kittilä',
@@ -771,7 +771,7 @@ describe('API routes', () => {
     const invalidUrlResponse = await app.request('/api/parks/akasmannyn-kansallispuisto', {
       method: 'PATCH',
       body: JSON.stringify({
-        luontoonUrl: 'bad url'
+        parkUrl: 'bad url'
       }),
       headers: {
         cookie: await createAdminSessionCookie(),
@@ -1827,7 +1827,7 @@ describe('API routes', () => {
     expect(body.visibleParks[0]).toHaveProperty('type');
     expect(body.visibleParks[0]).not.toHaveProperty('areaKm2');
     expect(body.visibleParks[0]).not.toHaveProperty('logo');
-    expect(body.visibleParks[0]).not.toHaveProperty('luontoonUrl');
+    expect(body.visibleParks[0]).not.toHaveProperty('parkUrl');
     expect(body.visibleParks[0]).not.toHaveProperty('map');
   });
 

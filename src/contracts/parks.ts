@@ -69,7 +69,7 @@ export const parkListItemSchema = z.object({
   establishmentYear: z.number().int().nullable(),
   locationLabel: z.string(),
   logo: parkLogoSchema.nullable(),
-  luontoonUrl: z.string().nullable(),
+  parkUrl: z.string().nullable(),
   map: parkMapSchema.nullable(),
   markerPoint: pointSchema,
   name: z.string(),
@@ -280,7 +280,7 @@ export const updateParkRequestSchema = z
     displayTypeName: z.string().max(120).nullable().optional(),
     establishmentYear: z.number().int().nullable().optional(),
     locationLabel: z.string().trim().min(1).max(255).optional(),
-    luontoonUrl: z.string().trim().min(1).max(500).nullable().optional(),
+    parkUrl: z.string().trim().min(1).max(500).nullable().optional(),
     name: z.string().trim().min(1).max(255).optional(),
     postalCode: z.string().trim().max(20).nullable().optional(),
     postalOffice: z.string().trim().max(120).nullable().optional(),
@@ -292,7 +292,7 @@ export const updateParkRequestSchema = z
       input.displayTypeName !== undefined ||
       input.establishmentYear !== undefined ||
       input.locationLabel !== undefined ||
-      input.luontoonUrl !== undefined ||
+      input.parkUrl !== undefined ||
       input.name !== undefined ||
       input.postalCode !== undefined ||
       input.postalOffice !== undefined ||
