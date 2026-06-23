@@ -1392,6 +1392,15 @@ const sourceReadyHistoryRkyAreaSeeds: MuseovirastoRkyAreaSeed[] = [
     slug: 'helsingin-vanhakaupunki',
     sourceName: 'Helsingin Vanhakaupunki',
     syntheticLipasId: 9_001_069
+  },
+  {
+    displayTypeName: null,
+    parkUrl: 'https://www.rky.fi/read/asp/r_kohde_det.aspx?KOHDE_ID=1840',
+    name: 'Pyhämaa',
+    parkTypeSlug: 'cultural-history-area',
+    slug: 'pyhamaa',
+    sourceName: 'Pyhämaan kirkot ja kyläasutus',
+    syntheticLipasId: 9_001_074
   }
 ];
 
