@@ -1401,6 +1401,15 @@ const sourceReadyHistoryRkyAreaSeeds: MuseovirastoRkyAreaSeed[] = [
     slug: 'pyhamaa',
     sourceName: 'Pyhämaan kirkot ja kyläasutus',
     syntheticLipasId: 9_001_074
+  },
+  {
+    displayTypeName: null,
+    parkUrl: 'https://www.rky.fi/read/asp/r_kohde_det.aspx?KOHDE_ID=284',
+    name: 'Hollolan kirkonkylä',
+    parkTypeSlug: 'cultural-history-area',
+    slug: 'hollolan-kirkonkyla',
+    sourceName: 'Hollolan kirkko ja historiallinen pitäjänkeskus',
+    syntheticLipasId: 9_001_075
   }
 ];
 
