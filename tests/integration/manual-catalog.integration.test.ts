@@ -44,7 +44,7 @@ describe('manual catalog imports', () => {
       now: () => '2026-05-27T08:00:00.000Z'
     });
 
-    expect(result.results).toHaveLength(120);
+    expect(result.results).toHaveLength(121);
 
     const merenkurkku = await getParkBySlug(
       testDatabase.database,
@@ -263,6 +263,21 @@ describe('manual catalog imports', () => {
       name: 'Dagmarin puisto',
       type: { slug: 'cultural-history-area' }
     });
+
+    const kuhakoski = await getParkBySlug(testDatabase.database, 'kuhakoski');
+    expect(kuhakoski).toMatchObject({
+      address: 'Valkjärventie 604, Nurmijärvi',
+      lipasId: 9001076,
+      locationLabel: 'Valkjärventie 604',
+      parkUrl:
+        'https://www.suomenvesiputoukset.fi/vesiputoukset/suomen-vesiputoukset-luettelossa/kuhakoski/',
+      name: 'Kuhakoski',
+      postalCode: null,
+      postalOffice: 'Nurmijärvi',
+      type: { slug: 'cultural-history-area' }
+    });
+    expect(kuhakoski?.boundaryGeoJson?.features).toHaveLength(1);
+    expect(kuhakoski?.boundaryGeoJson?.features[0]?.geometry.type).toBe('Polygon');
 
     const paistjarvi = await getParkBySlug(testDatabase.database, 'paistjarvi');
     expect(paistjarvi).toMatchObject({
@@ -745,7 +760,7 @@ describe('manual catalog imports', () => {
     );
     const kevo = await getParkBySlug(testDatabase.database, 'kevon-luonnonpuisto');
 
-    expect(allParks).toHaveLength(120);
+    expect(allParks).toHaveLength(121);
     expect(merenkurkku).toMatchObject({ catalogStatus: 'active' });
     expect(kevo).toMatchObject({ catalogStatus: 'active' });
   });
@@ -822,7 +837,7 @@ describe('manual catalog imports', () => {
       database: testDatabase.database
     });
 
-    expect(result.results).toHaveLength(120);
+    expect(result.results).toHaveLength(121);
 
     const merenkurkku = await getParkBySlug(
       testDatabase.database,
@@ -863,6 +878,12 @@ describe('manual catalog imports', () => {
     expect(hailuoto).toMatchObject({
       name: 'Hailuoto',
       type: { slug: 'outdoor-recreation-area' }
+    });
+
+    const kuhakoski = await getParkBySlug(testDatabase.database, 'kuhakoski');
+    expect(kuhakoski).toMatchObject({
+      name: 'Kuhakoski',
+      type: { slug: 'cultural-history-area' }
     });
 
     const kallahti = await getParkBySlug(testDatabase.database, 'kallahden-ulkoilualue');
