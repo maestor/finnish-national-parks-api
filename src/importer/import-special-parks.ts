@@ -768,6 +768,20 @@ const baseSpecialParkConfigs: SpecialParkConfig[] = [
   },
   {
     displayTypeName: null,
+    locationLabel: 'Valkjärventie 604',
+    parkUrl:
+      'https://www.suomenvesiputoukset.fi/vesiputoukset/suomen-vesiputoukset-luettelossa/kuhakoski/',
+    name: 'Kuhakoski',
+    parkTypeSlug: 'cultural-history-area',
+    postalCode: null,
+    postalOffice: 'Nurmijärvi',
+    responseShapeVersion: 'manual-nurmijarvi-map-point-proxy-v1',
+    slug: 'kuhakoski',
+    sourceUrl: 'special://kuhakoski',
+    syntheticLipasId: 9_001_076
+  },
+  {
+    displayTypeName: null,
     locationLabel: 'Vallisaari',
     parkUrl: 'https://www.luontoon.fi/fi/kohteet/vallisaari',
     name: 'Vallisaari',
