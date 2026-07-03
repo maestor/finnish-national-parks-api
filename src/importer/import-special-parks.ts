@@ -1424,6 +1424,15 @@ const sourceReadyHistoryRkyAreaSeeds: MuseovirastoRkyAreaSeed[] = [
     slug: 'hollolan-kirkonkyla',
     sourceName: 'Hollolan kirkko ja historiallinen pitäjänkeskus',
     syntheticLipasId: 9_001_075
+  },
+  {
+    displayTypeName: null,
+    parkUrl: 'https://www.rky.fi/read/asp/r_kohde_det.aspx?KOHDE_ID=5021',
+    name: 'Tammerkoski',
+    parkTypeSlug: 'cultural-history-area',
+    slug: 'tammerkoski',
+    sourceName: 'Tammerkosken teollisuusmaisema',
+    syntheticLipasId: 9_001_077
   }
 ];
 
