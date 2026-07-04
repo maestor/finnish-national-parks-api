@@ -699,6 +699,19 @@ const baseSpecialParkConfigs: SpecialParkConfig[] = [
   },
   {
     displayTypeName: null,
+    locationLabel: 'Kalajoen hiekkasärkät',
+    parkUrl: null,
+    name: 'Kalajoen hiekkasärkät',
+    parkTypeSlug: 'outdoor-recreation-area',
+    postalCode: null,
+    postalOffice: 'Kalajoki',
+    responseShapeVersion: 'manual-kalajoen-hiekkasarkat-osm-beach-v2',
+    slug: 'kalajoen-hiekkasarkat',
+    sourceUrl: 'special://kalajoen-hiekkasarkat',
+    syntheticLipasId: 9_002_032
+  },
+  {
+    displayTypeName: null,
     locationLabel: 'Uutelantie 1',
     parkUrl:
       'https://www.hel.fi/fi/kulttuuri-ja-vapaa-aika/ulkoilu-puistot-ja-luontokohteet/ulkoilualueet/uutelan-ulkoilualue',
