@@ -44,7 +44,7 @@ describe('manual catalog imports', () => {
       now: () => '2026-05-27T08:00:00.000Z'
     });
 
-    expect(result.results).toHaveLength(122);
+    expect(result.results).toHaveLength(123);
 
     const merenkurkku = await getParkBySlug(
       testDatabase.database,
@@ -292,6 +292,27 @@ describe('manual catalog imports', () => {
     });
     expect(paistjarvi?.boundaryGeoJson?.features).toHaveLength(1);
     expect(paistjarvi?.boundaryGeoJson?.features[0]?.geometry.type).toBe('Polygon');
+
+    const kalajoenHiekkasarkat = await getParkBySlug(
+      testDatabase.database,
+      'kalajoen-hiekkasarkat'
+    );
+    expect(kalajoenHiekkasarkat).toMatchObject({
+      address: 'Kalajoen hiekkasärkät, Kalajoki',
+      lipasId: 9002032,
+      locationLabel: 'Kalajoen hiekkasärkät',
+      parkUrl: null,
+      name: 'Kalajoen hiekkasärkät',
+      postalCode: null,
+      postalOffice: 'Kalajoki',
+      type: { slug: 'outdoor-recreation-area' }
+    });
+    expect(kalajoenHiekkasarkat?.boundaryGeoJson?.features).toHaveLength(1);
+    expect(kalajoenHiekkasarkat?.boundaryGeoJson?.features[0]?.geometry.type).toBe('Polygon');
+    expect(kalajoenHiekkasarkat?.boundingBox.minLon).toBeCloseTo(23.8043738, 6);
+    expect(kalajoenHiekkasarkat?.boundingBox.maxLon).toBeCloseTo(23.8277159, 6);
+    expect(kalajoenHiekkasarkat?.boundingBox.minLat).toBeCloseTo(64.2320993, 6);
+    expect(kalajoenHiekkasarkat?.boundingBox.maxLat).toBeCloseTo(64.2464813, 6);
 
     const uutela = await getParkBySlug(testDatabase.database, 'uutelan-ulkoilualue');
     expect(uutela).toMatchObject({
@@ -768,7 +789,7 @@ describe('manual catalog imports', () => {
     );
     const kevo = await getParkBySlug(testDatabase.database, 'kevon-luonnonpuisto');
 
-    expect(allParks).toHaveLength(122);
+    expect(allParks).toHaveLength(123);
     expect(merenkurkku).toMatchObject({ catalogStatus: 'active' });
     expect(kevo).toMatchObject({ catalogStatus: 'active' });
   });
@@ -845,7 +866,7 @@ describe('manual catalog imports', () => {
       database: testDatabase.database
     });
 
-    expect(result.results).toHaveLength(122);
+    expect(result.results).toHaveLength(123);
 
     const merenkurkku = await getParkBySlug(
       testDatabase.database,

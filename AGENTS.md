@@ -99,6 +99,7 @@ This repository is a local-first TypeScript API that imports Finnish park, prote
 ### Review pause
 - After finishing a batch, summarize the change and pause for user review.
 - Wait for explicit acceptance before proceeding to the final gate.
+- Treat a brief approval after that pause, such as `done`, `looks good`, `approved`, or equivalent acceptance, as authorization to continue the remaining workflow steps unless the user explicitly says to stop before verify, commit, or push.
 
 ### Final verification and delivery
 1. Run `npm run verify` after user acceptance.
