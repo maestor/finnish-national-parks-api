@@ -1493,6 +1493,15 @@ const sourceReadyHistoryRkyAreaSeeds: MuseovirastoRkyAreaSeed[] = [
   },
   {
     displayTypeName: null,
+    parkUrl: 'https://www.rky.fi/read/asp/r_kohde_det.aspx?KOHDE_ID=1750',
+    name: 'Louhisaaren kartano',
+    parkTypeSlug: 'cultural-history-area',
+    slug: 'louhisaaren-kartano',
+    sourceName: 'Louhisaaren kartano ja Askaisten kirkko',
+    syntheticLipasId: 9_001_081
+  },
+  {
+    displayTypeName: null,
     parkUrl: 'https://www.rky.fi/read/asp/r_kohde_det.aspx?KOHDE_ID=1799',
     name: 'Turunmaan kalkkilouhokset',
     parkTypeSlug: 'cultural-history-area',

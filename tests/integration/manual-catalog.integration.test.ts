@@ -44,7 +44,7 @@ describe('manual catalog imports', () => {
       now: () => '2026-05-27T08:00:00.000Z'
     });
 
-    expect(result.results).toHaveLength(126);
+    expect(result.results).toHaveLength(127);
 
     const merenkurkku = await getParkBySlug(
       testDatabase.database,
@@ -706,6 +706,14 @@ describe('manual catalog imports', () => {
       type: { slug: 'cultural-history-area' }
     });
 
+    const louhisaarenKartano = await getParkBySlug(testDatabase.database, 'louhisaaren-kartano');
+    expect(louhisaarenKartano).toMatchObject({
+      lipasId: 9001081,
+      parkUrl: 'https://www.rky.fi/read/asp/r_kohde_det.aspx?KOHDE_ID=1750',
+      name: 'Louhisaaren kartano',
+      type: { slug: 'cultural-history-area' }
+    });
+
     const turunmaanKalkkilouhokset = await getParkBySlug(
       testDatabase.database,
       'turunmaan-kalkkilouhokset'
@@ -825,7 +833,7 @@ describe('manual catalog imports', () => {
     );
     const kevo = await getParkBySlug(testDatabase.database, 'kevon-luonnonpuisto');
 
-    expect(allParks).toHaveLength(126);
+    expect(allParks).toHaveLength(127);
     expect(merenkurkku).toMatchObject({ catalogStatus: 'active' });
     expect(kevo).toMatchObject({ catalogStatus: 'active' });
   });
@@ -902,7 +910,7 @@ describe('manual catalog imports', () => {
       database: testDatabase.database
     });
 
-    expect(result.results).toHaveLength(126);
+    expect(result.results).toHaveLength(127);
 
     const merenkurkku = await getParkBySlug(
       testDatabase.database,
@@ -1016,7 +1024,7 @@ describe('manual catalog imports', () => {
       now: () => '2026-05-27T08:00:00.000Z'
     });
 
-    expect(result.results).toHaveLength(126);
+    expect(result.results).toHaveLength(127);
   });
 
   it('fails clearly when a selected special-park slug is unknown', async () => {
