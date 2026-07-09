@@ -189,7 +189,9 @@ The supported manual catalog import currently covers:
 npm run import:special-parks
 ```
 
-It imports curated non-LIPAS catalog rows such as Merenkurkun maailmanperintöalue, Sammallahdenmäki, Suomenlinna, Vanha Rauma, Paistjärvi, Uutelan ulkoilualue, Kallahden ulkoilualue, Seurasaari, Mustikkamaa, and selected cultural-history areas, keeps their source geometry, preserves custom display labels such as `Maailmanperintökohde` and `Tehdaskylä`, and protects those rows from later LIPAS deactivation.
+It imports curated non-LIPAS catalog rows such as Merenkurkun maailmanperintöalue, Sammallahdenmäki, Suomenlinna, Vanha Rauma, Paistjärvi, Uutelan ulkoilualue, Kallahden ulkoilualue, Seurasaari, Mustikkamaa, Tullisaaren kartanopuisto, and selected cultural-history areas, keeps their source geometry, preserves custom display labels such as `Maailmanperintökohde` and `Tehdaskylä`, and protects those rows from later LIPAS deactivation.
+
+For the reproducible workflow for special imports, including Helsinki WFS sourcing, see [docs/IMPORTING.md](docs/IMPORTING.md).
 
 For faster local iteration, you can import only selected special parks by slug:
 
@@ -211,5 +213,6 @@ It runs typecheck, lint, and coverage tests with 100 percent thresholds for firs
 
 - [AGENTS.md](AGENTS.md): codebase rules for future agents and implementation sessions.
 - [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md): local development, database, importer, and deployment notes.
+- [docs/IMPORTING.md](docs/IMPORTING.md): reproducible import workflow for curated special parks, including Helsinki-specific sourcing tips.
 - [docs/SECURITY.md](docs/SECURITY.md): current security and operational sustainability priorities, plus contributor guardrails.
 - [docs/TESTING.md](docs/TESTING.md): testing strategy and verification expectations.

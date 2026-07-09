@@ -134,7 +134,7 @@ If a destination cannot be matched from the official Luontoon sitemap, the impor
 
 ### Manual Catalog Imports
 
-This repo also supports a one-off manual catalog import for curated non-LIPAS parks, including Merenkurkun maailmanperintöalue, Sammallahdenmäki, Suomenlinna, Vanha Rauma, Paistjärvi, Uutelan ulkoilualue, Kallahden ulkoilualue, Seurasaari, and Mustikkamaa:
+This repo also supports a one-off manual catalog import for curated non-LIPAS parks, including Merenkurkun maailmanperintöalue, Sammallahdenmäki, Suomenlinna, Vanha Rauma, Paistjärvi, Uutelan ulkoilualue, Kallahden ulkoilualue, Seurasaari, Mustikkamaa, and Tullisaaren kartanopuisto:
 
 ```sh
 npm run import:special-parks
@@ -154,6 +154,8 @@ For faster local iteration when adding only a few curated parks, pass one or mor
 ```sh
 npm run import:special-parks -- loviisan-alakaupunki turunmaan-kalkkilouhokset
 ```
+
+For the reproducible contributor workflow for special imports, including how to source Helsinki geometry from the official WFS layers and when to prefer local `special://...` GeoJSON, see [docs/IMPORTING.md](./IMPORTING.md).
 
 ### Park Logos
 
