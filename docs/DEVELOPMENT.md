@@ -134,7 +134,7 @@ If a destination cannot be matched from the official Luontoon sitemap, the impor
 
 ### Manual Catalog Imports
 
-This repo also supports a one-off manual catalog import for curated non-LIPAS parks, including Merenkurkun maailmanperintöalue, Sammallahdenmäki, Suomenlinna, Vanha Rauma, Paistjärvi, Uutelan ulkoilualue, Kallahden ulkoilualue, Seurasaari, and Mustikkamaa:
+This repo also supports curated special imports for non-LIPAS parks:
 
 ```sh
 npm run import:special-parks
@@ -143,10 +143,7 @@ npm run import:special-parks
 That command:
 
 - imports curated official geometry into the existing `parks` table
-- stores curated cultural-history imports under the normalized `cultural-history-area` type, with `displayTypeName: Tehdaskylä` for former factory-village rows
-- includes selected cultural world-heritage sites under `cultural-history-area` with `displayTypeName: Maailmanperintökohde`
-- stores Merenkurkun maailmanperintöalue under the normalized `nature-reserve-area` type
-- uses curated location details such as `Raippaluodontie 2, 65800 Raippaluoto`, `Suomenlinna, 00190 Helsinki`, and `Sonnasentie 948, 18300 Heinola`
+- stores curated rows under the same normalized catalog types used elsewhere in the API, including curated display labels where needed
 - marks the rows as not managed by the LIPAS cleanup step, so later `npm run import:parks` executions do not deactivate them
 
 For faster local iteration when adding only a few curated parks, pass one or more special-park slugs after `--`:
@@ -154,6 +151,8 @@ For faster local iteration when adding only a few curated parks, pass one or mor
 ```sh
 npm run import:special-parks -- loviisan-alakaupunki turunmaan-kalkkilouhokset
 ```
+
+For the reproducible contributor workflow for curated special imports, source-family selection, and when to prefer local `special://...` GeoJSON, see [docs/IMPORTING.md](./IMPORTING.md).
 
 ### Park Logos
 

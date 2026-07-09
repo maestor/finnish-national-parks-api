@@ -788,6 +788,20 @@ const baseSpecialParkConfigs: SpecialParkConfig[] = [
   },
   {
     displayTypeName: null,
+    extractMetadata: extractGeoJsonAreaM2Metadata,
+    locationLabel: 'Henrik Borgströmin polku',
+    parkUrl: 'https://vihreatsylit.fi/tullisaaren-kartanopuisto/',
+    name: 'Tullisaaren kartanopuisto',
+    parkTypeSlug: 'outdoor-recreation-area',
+    postalCode: null,
+    postalOffice: 'Helsinki',
+    responseShapeVersion: 'manual-helsinki-ylre-viheralue-v1',
+    slug: 'tullisaaren-kartanopuisto',
+    sourceUrl: 'special://tullisaaren-kartanopuisto',
+    syntheticLipasId: 9_001_084
+  },
+  {
+    displayTypeName: null,
     locationLabel: 'Seili',
     parkUrl: 'https://www.luontoon.fi/fi/kohteet/seili',
     name: 'Seili',
@@ -1508,6 +1522,15 @@ const sourceReadyHistoryRkyAreaSeeds: MuseovirastoRkyAreaSeed[] = [
     slug: 'sipoonlinna',
     sourceName: 'Sibbesborgin keskiaikainen linnasaari ja Sipoonjokilaakson viljelymaisema',
     syntheticLipasId: 9_001_082
+  },
+  {
+    displayTypeName: null,
+    parkUrl: 'https://www.rky.fi/read/asp/r_kohde_det.aspx?KOHDE_ID=5118',
+    name: 'Iniön kirkonkylä',
+    parkTypeSlug: 'cultural-history-area',
+    slug: 'inion-kirkonkyla',
+    sourceName: 'Iniön kirkonkylä',
+    syntheticLipasId: 9_001_083
   },
   {
     displayTypeName: null,

@@ -44,7 +44,7 @@ describe('manual catalog imports', () => {
       now: () => '2026-05-27T08:00:00.000Z'
     });
 
-    expect(result.results).toHaveLength(128);
+    expect(result.results).toHaveLength(130);
 
     const merenkurkku = await getParkBySlug(
       testDatabase.database,
@@ -391,6 +391,21 @@ describe('manual catalog imports', () => {
     expect(mustikkamaa?.boundaryGeoJson?.features).toHaveLength(1);
     expect(mustikkamaa?.boundaryGeoJson?.features[0]?.geometry.type).toBe('Polygon');
 
+    const tullisaari = await getParkBySlug(testDatabase.database, 'tullisaaren-kartanopuisto');
+    expect(tullisaari).toMatchObject({
+      address: 'Henrik Borgströmin polku, Helsinki',
+      lipasId: 9001084,
+      locationLabel: 'Henrik Borgströmin polku',
+      parkUrl: 'https://vihreatsylit.fi/tullisaaren-kartanopuisto/',
+      name: 'Tullisaaren kartanopuisto',
+      postalCode: null,
+      postalOffice: 'Helsinki',
+      type: { slug: 'outdoor-recreation-area' }
+    });
+    expect(tullisaari?.areaKm2).toBeCloseTo(0.35, 2);
+    expect(tullisaari?.boundaryGeoJson?.features).toHaveLength(7);
+    expect(tullisaari?.boundaryGeoJson?.features[0]?.geometry.type).toBe('Polygon');
+
     const expectedLuontoonDestinationImports: ExpectedLuontoonDestinationImport[] = [
       {
         displayTypeName: 'Soidensuojelualue',
@@ -722,6 +737,21 @@ describe('manual catalog imports', () => {
       type: { slug: 'cultural-history-area' }
     });
 
+    const inionKirkonkyla = await getParkBySlug(testDatabase.database, 'inion-kirkonkyla');
+    expect(inionKirkonkyla).toMatchObject({
+      lipasId: 9001083,
+      parkUrl: 'https://www.rky.fi/read/asp/r_kohde_det.aspx?KOHDE_ID=5118',
+      name: 'Iniön kirkonkylä',
+      type: { slug: 'cultural-history-area' }
+    });
+
+    expect(tullisaari).toMatchObject({
+      lipasId: 9001084,
+      parkUrl: 'https://vihreatsylit.fi/tullisaaren-kartanopuisto/',
+      name: 'Tullisaaren kartanopuisto',
+      type: { slug: 'outdoor-recreation-area' }
+    });
+
     const turunmaanKalkkilouhokset = await getParkBySlug(
       testDatabase.database,
       'turunmaan-kalkkilouhokset'
@@ -841,7 +871,7 @@ describe('manual catalog imports', () => {
     );
     const kevo = await getParkBySlug(testDatabase.database, 'kevon-luonnonpuisto');
 
-    expect(allParks).toHaveLength(128);
+    expect(allParks).toHaveLength(130);
     expect(merenkurkku).toMatchObject({ catalogStatus: 'active' });
     expect(kevo).toMatchObject({ catalogStatus: 'active' });
   });
@@ -918,7 +948,7 @@ describe('manual catalog imports', () => {
       database: testDatabase.database
     });
 
-    expect(result.results).toHaveLength(128);
+    expect(result.results).toHaveLength(130);
 
     const merenkurkku = await getParkBySlug(
       testDatabase.database,
@@ -1032,7 +1062,7 @@ describe('manual catalog imports', () => {
       now: () => '2026-05-27T08:00:00.000Z'
     });
 
-    expect(result.results).toHaveLength(128);
+    expect(result.results).toHaveLength(130);
   });
 
   it('fails clearly when a selected special-park slug is unknown', async () => {
