@@ -44,7 +44,7 @@ describe('manual catalog imports', () => {
       now: () => '2026-05-27T08:00:00.000Z'
     });
 
-    expect(result.results).toHaveLength(123);
+    expect(result.results).toHaveLength(126);
 
     const merenkurkku = await getParkBySlug(
       testDatabase.database,
@@ -256,6 +256,23 @@ describe('manual catalog imports', () => {
       name: 'Hailuoto',
       type: { slug: 'outdoor-recreation-area' }
     });
+
+    const rokovallio = await getParkBySlug(testDatabase.database, 'rokokallio');
+    expect(rokovallio).toMatchObject({
+      address: 'Rokokallio, 03790 Vihti',
+      areaKm2: 0.89,
+      lipasId: 9001080,
+      locationLabel: 'Rokokallio',
+      parkUrl: null,
+      name: 'Rokokallio',
+      postalCode: '03790',
+      postalOffice: 'Vihti',
+      type: { slug: 'outdoor-recreation-area' }
+    });
+    expect(rokovallio?.boundaryGeoJson?.features).toHaveLength(3);
+    expect(
+      rokovallio?.boundaryGeoJson?.features.every((feature) => feature.geometry.type === 'Polygon')
+    ).toBe(true);
 
     const dagmarinPuisto = await getParkBySlug(testDatabase.database, 'dagmarin-puisto');
     expect(dagmarinPuisto).toMatchObject({
@@ -681,6 +698,25 @@ describe('manual catalog imports', () => {
       type: { slug: 'cultural-history-area' }
     });
 
+    const loviisanAlakaupunki = await getParkBySlug(testDatabase.database, 'loviisan-alakaupunki');
+    expect(loviisanAlakaupunki).toMatchObject({
+      lipasId: 9001078,
+      parkUrl: 'https://www.rky.fi/read/asp/r_kohde_det.aspx?KOHDE_ID=1519',
+      name: 'Loviisan alakaupunki',
+      type: { slug: 'cultural-history-area' }
+    });
+
+    const turunmaanKalkkilouhokset = await getParkBySlug(
+      testDatabase.database,
+      'turunmaan-kalkkilouhokset'
+    );
+    expect(turunmaanKalkkilouhokset).toMatchObject({
+      lipasId: 9001079,
+      parkUrl: 'https://www.rky.fi/read/asp/r_kohde_det.aspx?KOHDE_ID=1799',
+      name: 'Turunmaan kalkkilouhokset',
+      type: { slug: 'cultural-history-area' }
+    });
+
     const fiskars = await getParkBySlug(testDatabase.database, 'fiskarsin-ruukki');
     expect(fiskars).toMatchObject({
       address: 'Fiskarsintie 9, 10470 Fiskars',
@@ -789,7 +825,7 @@ describe('manual catalog imports', () => {
     );
     const kevo = await getParkBySlug(testDatabase.database, 'kevon-luonnonpuisto');
 
-    expect(allParks).toHaveLength(123);
+    expect(allParks).toHaveLength(126);
     expect(merenkurkku).toMatchObject({ catalogStatus: 'active' });
     expect(kevo).toMatchObject({ catalogStatus: 'active' });
   });
@@ -866,7 +902,7 @@ describe('manual catalog imports', () => {
       database: testDatabase.database
     });
 
-    expect(result.results).toHaveLength(123);
+    expect(result.results).toHaveLength(126);
 
     const merenkurkku = await getParkBySlug(
       testDatabase.database,
@@ -909,6 +945,12 @@ describe('manual catalog imports', () => {
       type: { slug: 'outdoor-recreation-area' }
     });
 
+    const rokovallio = await getParkBySlug(testDatabase.database, 'rokokallio');
+    expect(rokovallio).toMatchObject({
+      name: 'Rokokallio',
+      type: { slug: 'outdoor-recreation-area' }
+    });
+
     const kuhakoski = await getParkBySlug(testDatabase.database, 'kuhakoski');
     expect(kuhakoski).toMatchObject({
       name: 'Kuhakoski',
@@ -920,6 +962,72 @@ describe('manual catalog imports', () => {
       name: 'Kallahden ulkoilualue',
       type: { slug: 'outdoor-recreation-area' }
     });
+  });
+
+  it('can import only selected special parks by slug', async () => {
+    const result = await importSpecialParks({
+      database: testDatabase.database,
+      fetchSource: createSpecialParksSource(),
+      includeSlugs: ['loviisan-alakaupunki', 'turunmaan-kalkkilouhokset'],
+      now: () => '2026-05-27T08:00:00.000Z'
+    });
+
+    expect(result.results).toEqual([
+      {
+        featureCount: 1,
+        importRunId: 1,
+        name: 'Loviisan alakaupunki',
+        slug: 'loviisan-alakaupunki'
+      },
+      {
+        featureCount: 4,
+        importRunId: 2,
+        name: 'Turunmaan kalkkilouhokset',
+        slug: 'turunmaan-kalkkilouhokset'
+      }
+    ]);
+
+    const allParks = await listParks(testDatabase.database);
+    expect(allParks).toHaveLength(2);
+
+    const loviisanAlakaupunki = await getParkBySlug(testDatabase.database, 'loviisan-alakaupunki');
+    expect(loviisanAlakaupunki).toMatchObject({
+      lipasId: 9001078,
+      name: 'Loviisan alakaupunki',
+      type: { slug: 'cultural-history-area' }
+    });
+
+    const turunmaanKalkkilouhokset = await getParkBySlug(
+      testDatabase.database,
+      'turunmaan-kalkkilouhokset'
+    );
+    expect(turunmaanKalkkilouhokset).toMatchObject({
+      lipasId: 9001079,
+      name: 'Turunmaan kalkkilouhokset',
+      type: { slug: 'cultural-history-area' }
+    });
+  });
+
+  it('treats an empty selected-slug list like a full special import', async () => {
+    const result = await importSpecialParks({
+      database: testDatabase.database,
+      fetchSource: createSpecialParksSource(),
+      includeSlugs: [],
+      now: () => '2026-05-27T08:00:00.000Z'
+    });
+
+    expect(result.results).toHaveLength(126);
+  });
+
+  it('fails clearly when a selected special-park slug is unknown', async () => {
+    await expect(
+      importSpecialParks({
+        database: testDatabase.database,
+        fetchSource: createSpecialParksSource(),
+        includeSlugs: ['missing-special-park'],
+        now: () => '2026-05-27T08:00:00.000Z'
+      })
+    ).rejects.toThrow('Unknown special park slug(s): missing-special-park.');
   });
 
   it('derives area and establishment year from SYKE features', async () => {
@@ -1133,6 +1241,51 @@ describe('manual catalog imports', () => {
 
     expect(inari?.areaKm2).toBeNull();
     expect(inari?.establishmentYear).toBeNull();
+  });
+
+  it('keeps GeoJSON area metadata null when area_m2 is missing', async () => {
+    await importSpecialParks({
+      database: testDatabase.database,
+      fetchSource: async (sourceUrl) => {
+        if (sourceUrl.includes("cql_filter=nimi='Rokokallio'")) {
+          return {
+            type: 'FeatureCollection',
+            features: [
+              {
+                geometry: {
+                  coordinates: [
+                    [
+                      [
+                        [24.45, 60.48],
+                        [24.47, 60.48],
+                        [24.47, 60.5],
+                        [24.45, 60.5],
+                        [24.45, 60.48]
+                      ]
+                    ]
+                  ],
+                  type: 'MultiPolygon'
+                },
+                properties: {
+                  nimi: 'Rokokallio'
+                },
+                type: 'Feature'
+              }
+            ]
+          };
+        }
+
+        return createSpecialParksSource()(sourceUrl);
+      },
+      now: () => '2026-05-27T08:00:00.000Z'
+    });
+
+    const rokovallio = await testDatabase.database.query.parks.findFirst({
+      where: eq(parks.slug, 'rokokallio')
+    });
+
+    expect(rokovallio?.areaKm2).toBeNull();
+    expect(rokovallio?.establishmentYear).toBeNull();
   });
 
   it('fails when a special:// source has no matching features', async () => {

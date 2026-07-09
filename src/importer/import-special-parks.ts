@@ -251,6 +251,22 @@ const extractLuontoonDestinationMetadata = (
   };
 };
 
+const extractGeoJsonAreaM2Metadata = (
+  features: Array<{
+    properties?: Record<string, unknown> | undefined;
+  }>
+) => {
+  const totalAreaM2 = features.reduce(
+    (sum, f) => sum + ((f.properties?.area_m2 as number | undefined) ?? 0),
+    0
+  );
+
+  return {
+    areaKm2: totalAreaM2 > 0 ? Math.round((totalAreaM2 / 1_000_000) * 100) / 100 : null,
+    establishmentYear: null
+  };
+};
+
 const buildSykeProtectedSitesSourceUrl = (
   sourceName: string,
   sourceType: SykeProtectedSitesSourceType = 'state'
@@ -307,6 +323,10 @@ const normalizeSpecialParkDisplayTypeName = (name: string, displayTypeName: stri
 
 const buildMuseovirastoProtectedSitesSourceUrl = (sourceName: string) => {
   return `https://geoserver.museovirasto.fi/geoserver/rajapinta_suojellut/wfs?service=WFS&request=GetFeature&version=2.0.0&typeNames=rajapinta_suojellut:muinaisjaannos_alue&outputFormat=application/json&srsName=EPSG:4326&cql_filter=kohdenimi='${sourceName}'`;
+};
+
+const buildSykeGeologicalRockAreaSourceUrl = (sourceName: string) => {
+  return `https://paikkatiedot.ymparisto.fi/geoserver/syke_geologisetmuodostumat/wfs?service=WFS&request=GetFeature&version=2.0.0&typeNames=syke_geologisetmuodostumat:Arvokkaat_kallioalueet&outputFormat=application/json&srsName=EPSG:4326&cql_filter=nimi='${sourceName}'`;
 };
 
 const buildArcGisGeoJsonQuerySourceUrl = ({
@@ -821,6 +841,21 @@ const baseSpecialParkConfigs: SpecialParkConfig[] = [
       sourceName: 'Hailuoto'
     }),
     syntheticLipasId: 9_001_036
+  },
+  {
+    displayTypeName: null,
+    extractMetadata: extractGeoJsonAreaM2Metadata,
+    locationLabel: 'Rokokallio',
+    parkUrl: null,
+    name: 'Rokokallio',
+    parkTypeSlug: 'outdoor-recreation-area',
+    postalCode: '03790',
+    postalOffice: 'Vihti',
+    responseShapeVersion: 'syke-geological-rock-areas-v1',
+    slug: 'rokokallio',
+    sourceParser: 'geojson',
+    sourceUrl: buildSykeGeologicalRockAreaSourceUrl('Rokokallio'),
+    syntheticLipasId: 9_001_080
   },
   {
     displayTypeName: null,
@@ -1446,6 +1481,24 @@ const sourceReadyHistoryRkyAreaSeeds: MuseovirastoRkyAreaSeed[] = [
     slug: 'tammerkoski',
     sourceName: 'Tammerkosken teollisuusmaisema',
     syntheticLipasId: 9_001_077
+  },
+  {
+    displayTypeName: null,
+    parkUrl: 'https://www.rky.fi/read/asp/r_kohde_det.aspx?KOHDE_ID=1519',
+    name: 'Loviisan alakaupunki',
+    parkTypeSlug: 'cultural-history-area',
+    slug: 'loviisan-alakaupunki',
+    sourceName: 'Loviisan alakaupunki',
+    syntheticLipasId: 9_001_078
+  },
+  {
+    displayTypeName: null,
+    parkUrl: 'https://www.rky.fi/read/asp/r_kohde_det.aspx?KOHDE_ID=1799',
+    name: 'Turunmaan kalkkilouhokset',
+    parkTypeSlug: 'cultural-history-area',
+    slug: 'turunmaan-kalkkilouhokset',
+    sourceName: 'Turunmaan rannikon kalkkilouhokset ja Paraisten kalkkitehdas',
+    syntheticLipasId: 9_001_079
   }
 ];
 
@@ -1820,6 +1873,7 @@ const specialParkConfigs: SpecialParkConfig[] = [
 type ImportSpecialParksOptions = {
   database: Database;
   fetchSource?: (sourceUrl: string) => Promise<unknown>;
+  includeSlugs?: string[];
   now?: () => string;
 };
 
@@ -1857,10 +1911,29 @@ const extractSykeMetadata = (
 export const importSpecialParks = async ({
   database,
   fetchSource = defaultFetchSource,
+  includeSlugs,
   now = () => new Date().toISOString()
 }: ImportSpecialParksOptions) => {
   const importedAt = now();
   await syncParkTypes(database);
+  const selectedConfigs =
+    includeSlugs && includeSlugs.length > 0
+      ? (() => {
+          const requestedSlugs = new Set(includeSlugs);
+          const matchingConfigs = specialParkConfigs.filter((config) =>
+            requestedSlugs.has(config.slug)
+          );
+          const missingSlugs = includeSlugs.filter(
+            (slug) => !matchingConfigs.some((config) => config.slug === slug)
+          );
+
+          if (missingSlugs.length > 0) {
+            throw new Error(`Unknown special park slug(s): ${missingSlugs.join(', ')}.`);
+          }
+
+          return matchingConfigs;
+        })()
+      : specialParkConfigs;
 
   const results: Array<{
     featureCount: number;
@@ -1869,7 +1942,7 @@ export const importSpecialParks = async ({
     slug: string;
   }> = [];
 
-  for (const config of specialParkConfigs) {
+  for (const config of selectedConfigs) {
     const payload = await fetchSource(config.sourceUrl);
 
     let sourceFeatures: Array<{
