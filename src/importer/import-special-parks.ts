@@ -1502,6 +1502,15 @@ const sourceReadyHistoryRkyAreaSeeds: MuseovirastoRkyAreaSeed[] = [
   },
   {
     displayTypeName: null,
+    parkUrl: 'https://www.rky.fi/read/asp/r_kohde_det.aspx?KOHDE_ID=4142',
+    name: 'Sipoonlinna',
+    parkTypeSlug: 'cultural-history-area',
+    slug: 'sipoonlinna',
+    sourceName: 'Sibbesborgin keskiaikainen linnasaari ja Sipoonjokilaakson viljelymaisema',
+    syntheticLipasId: 9_001_082
+  },
+  {
+    displayTypeName: null,
     parkUrl: 'https://www.rky.fi/read/asp/r_kohde_det.aspx?KOHDE_ID=1799',
     name: 'Turunmaan kalkkilouhokset',
     parkTypeSlug: 'cultural-history-area',
