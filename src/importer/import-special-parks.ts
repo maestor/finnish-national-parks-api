@@ -1511,6 +1511,15 @@ const sourceReadyHistoryRkyAreaSeeds: MuseovirastoRkyAreaSeed[] = [
   },
   {
     displayTypeName: null,
+    parkUrl: 'https://www.rky.fi/read/asp/r_kohde_det.aspx?KOHDE_ID=5118',
+    name: 'Iniön kirkonkylä',
+    parkTypeSlug: 'cultural-history-area',
+    slug: 'inion-kirkonkyla',
+    sourceName: 'Iniön kirkonkylä',
+    syntheticLipasId: 9_001_083
+  },
+  {
+    displayTypeName: null,
     parkUrl: 'https://www.rky.fi/read/asp/r_kohde_det.aspx?KOHDE_ID=1799',
     name: 'Turunmaan kalkkilouhokset',
     parkTypeSlug: 'cultural-history-area',
