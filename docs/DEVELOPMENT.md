@@ -9,6 +9,7 @@ npm install
 npm run db:migrate
 npm run import:parks
 npm run import:special-parks
+npm run import:special-parks -- <special-park-slug> [<special-park-slug> ...]
 npm run park:move-visits -- --from <source-slug> --to <target-slug> [--dry-run]
 npm run park:logo -- <park-slug>
 npm run db:backup
@@ -147,6 +148,12 @@ That command:
 - stores Merenkurkun maailmanperintöalue under the normalized `nature-reserve-area` type
 - uses curated location details such as `Raippaluodontie 2, 65800 Raippaluoto`, `Suomenlinna, 00190 Helsinki`, and `Sonnasentie 948, 18300 Heinola`
 - marks the rows as not managed by the LIPAS cleanup step, so later `npm run import:parks` executions do not deactivate them
+
+For faster local iteration when adding only a few curated parks, pass one or more special-park slugs after `--`:
+
+```sh
+npm run import:special-parks -- loviisan-alakaupunki turunmaan-kalkkilouhokset
+```
 
 ### Park Logos
 

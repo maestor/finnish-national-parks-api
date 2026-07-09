@@ -34,6 +34,7 @@ cp .env.example .env
 npm run db:migrate
 npm run import:parks
 npm run import:special-parks
+npm run import:special-parks -- <special-park-slug> [<special-park-slug> ...]
 npm run park:move-visits -- --from <source-slug> --to <target-slug> [--dry-run]
 npm run park:logo -- <park-slug>
 npm run db:backup
@@ -189,6 +190,12 @@ npm run import:special-parks
 ```
 
 It imports curated non-LIPAS catalog rows such as Merenkurkun maailmanperintöalue, Sammallahdenmäki, Suomenlinna, Vanha Rauma, Paistjärvi, Uutelan ulkoilualue, Kallahden ulkoilualue, Seurasaari, Mustikkamaa, and selected cultural-history areas, keeps their source geometry, preserves custom display labels such as `Maailmanperintökohde` and `Tehdaskylä`, and protects those rows from later LIPAS deactivation.
+
+For faster local iteration, you can import only selected special parks by slug:
+
+```sh
+npm run import:special-parks -- loviisan-alakaupunki turunmaan-kalkkilouhokset
+```
 
 ## Verification
 
