@@ -802,6 +802,84 @@ const baseSpecialParkConfigs: SpecialParkConfig[] = [
   },
   {
     displayTypeName: null,
+    locationLabel: 'Pihlajamäki',
+    parkUrl: 'https://vihreatsylit.fi/aarnipata-ja-rauninmalja/',
+    name: 'Pihlajamäen hiidenkirnut',
+    parkTypeSlug: 'outdoor-recreation-area',
+    postalCode: null,
+    postalOffice: 'Helsinki',
+    responseShapeVersion: 'manual-helsinki-vihreat-sylit-point-proxy-v1',
+    slug: 'pihlajamaen-hiidenkirnut',
+    sourceUrl: 'special://pihlajamaen-hiidenkirnut',
+    syntheticLipasId: 9_002_033
+  },
+  {
+    displayTypeName: null,
+    locationLabel: 'Niinisaarentie',
+    parkUrl: 'https://vihreatsylit.fi/vuosaarenhuippu/',
+    name: 'Vuosaarenhuippu',
+    parkTypeSlug: 'outdoor-recreation-area',
+    postalCode: null,
+    postalOffice: 'Helsinki',
+    responseShapeVersion: 'manual-osm-park-boundary-v1',
+    slug: 'vuosaarenhuippu',
+    sourceUrl: 'special://vuosaarenhuippu',
+    syntheticLipasId: 9_002_034
+  },
+  {
+    displayTypeName: null,
+    locationLabel: 'Sahaajankatu',
+    parkUrl: 'https://vihreatsylit.fi/kirsikkapuisto/',
+    name: 'Kirsikkapuisto',
+    parkTypeSlug: 'outdoor-recreation-area',
+    postalCode: null,
+    postalOffice: 'Helsinki',
+    responseShapeVersion: 'manual-osm-park-boundary-v1',
+    slug: 'kirsikkapuisto',
+    sourceUrl: 'special://kirsikkapuisto',
+    syntheticLipasId: 9_002_035
+  },
+  {
+    displayTypeName: null,
+    locationLabel: 'Tervasaarenkannas',
+    parkUrl: 'https://vihreatsylit.fi/tervasaari/',
+    name: 'Tervasaari',
+    parkTypeSlug: 'outdoor-recreation-area',
+    postalCode: null,
+    postalOffice: 'Helsinki',
+    responseShapeVersion: 'manual-helsinki-tervasaari-wfs-v2',
+    slug: 'tervasaari',
+    sourceUrl: 'special://tervasaari',
+    syntheticLipasId: 9_002_036
+  },
+  {
+    displayTypeName: null,
+    locationLabel: 'Talvipuutarha',
+    parkUrl: 'https://vihreatsylit.fi/kaupunginpuutarha/',
+    name: 'Talvipuutarha',
+    parkTypeSlug: 'outdoor-recreation-area',
+    postalCode: '00250',
+    postalOffice: 'Helsinki',
+    responseShapeVersion: 'manual-osm-garden-boundary-v1',
+    slug: 'talvipuutarha',
+    sourceUrl: 'special://talvipuutarha',
+    syntheticLipasId: 9_002_037
+  },
+  {
+    displayTypeName: null,
+    locationLabel: 'Uutelankanava',
+    parkUrl: 'https://vihreatsylit.fi/uutelan-kanava-ja-kauniinilmanpuisto/',
+    name: 'Uutelan kanava',
+    parkTypeSlug: 'outdoor-recreation-area',
+    postalCode: null,
+    postalOffice: 'Helsinki',
+    responseShapeVersion: 'manual-osm-water-boundary-v1',
+    slug: 'uutelan-kanava',
+    sourceUrl: 'special://uutelan-kanava',
+    syntheticLipasId: 9_002_038
+  },
+  {
+    displayTypeName: null,
     locationLabel: 'Seili',
     parkUrl: 'https://www.luontoon.fi/fi/kohteet/seili',
     name: 'Seili',
@@ -826,6 +904,19 @@ const baseSpecialParkConfigs: SpecialParkConfig[] = [
     slug: 'kuhakoski',
     sourceUrl: 'special://kuhakoski',
     syntheticLipasId: 9_001_076
+  },
+  {
+    displayTypeName: null,
+    locationLabel: 'Hiidenkirnujentie',
+    parkUrl: null,
+    name: 'Askolan hiidenkirnut',
+    parkTypeSlug: 'outdoor-recreation-area',
+    postalCode: '07530',
+    postalOffice: 'Askola',
+    responseShapeVersion: 'manual-askola-user-guided-proxy-v1',
+    slug: 'askolan-hiidenkirnut',
+    sourceUrl: 'special://askolan-hiidenkirnut',
+    syntheticLipasId: 9_002_039
   },
   {
     displayTypeName: null,
@@ -1540,6 +1631,33 @@ const sourceReadyHistoryRkyAreaSeeds: MuseovirastoRkyAreaSeed[] = [
     slug: 'turunmaan-kalkkilouhokset',
     sourceName: 'Turunmaan rannikon kalkkilouhokset ja Paraisten kalkkitehdas',
     syntheticLipasId: 9_001_079
+  },
+  {
+    displayTypeName: null,
+    parkUrl: 'https://www.rky.fi/read/asp/r_kohde_det.aspx?KOHDE_ID=1506',
+    name: 'Helsingin pitäjän kirkonkylä',
+    parkTypeSlug: 'cultural-history-area',
+    slug: 'helsingin-pitajan-kirkonkyla',
+    sourceName: 'Helsingin pitäjän kirkonkylä',
+    syntheticLipasId: 9_001_085
+  },
+  {
+    displayTypeName: null,
+    parkUrl: 'https://www.rky.fi/read/asp/r_kohde_det.aspx?KOHDE_ID=4836',
+    name: 'Backaksen kartano',
+    parkTypeSlug: 'cultural-history-area',
+    slug: 'backaksen-kartano',
+    sourceName: 'Backas - Elannon suurtila',
+    syntheticLipasId: 9_001_086
+  },
+  {
+    displayTypeName: null,
+    parkUrl: 'https://www.rky.fi/read/asp/r_kohde_det.aspx?KOHDE_ID=1509',
+    name: 'Håkansbölen kartano',
+    parkTypeSlug: 'cultural-history-area',
+    slug: 'hakansbolen-kartano',
+    sourceName: 'Sotungin kylä ja Håkansböle',
+    syntheticLipasId: 9_001_087
   }
 ];
 

@@ -21,6 +21,7 @@ This repository is a local-first TypeScript API that imports Finnish park, prote
 - Update `docs/SECURITY.md` when auth policy, secrets handling, storage upload behavior, cache exposure, external request-path dependencies, or operational hardening priorities change.
 - Update `docs/TESTING.md` when test strategy, commands, or quality gates change.
 - When adding, removing, or changing API endpoints, request or response fields, or database schema, update the relevant README endpoint lists and docs references in the same session.
+- When implementing user-requested special-park additions, always offer a copy-pasteable one-line `npm run import:special-parks -- <slug...>` command covering the new slugs so the user can import and review the batch before final acceptance.
 - If docs mention a contributor-facing env var, it must also exist in `src/env.ts` and `.env.example` in the same change.
 - Prefer linking to source documents instead of duplicating long explanations.
 

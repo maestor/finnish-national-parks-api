@@ -17,6 +17,17 @@ type ExpectedLuontoonDestinationImport = {
   typeSlug: string;
 };
 
+type ExpectedManualImport = {
+  lipasId: number;
+  locationLabel?: string;
+  name: string;
+  parkUrl: string | null;
+  postalCode?: string | null;
+  postalOffice?: string | null;
+  slug: string;
+  typeSlug: string;
+};
+
 const merenkurkkuSourceUrl =
   'https://geoserver.museovirasto.fi/geoserver/rajapinta_suojellut/wfs?service=WFS&request=GetFeature&version=2.0.0&typeNames=rajapinta_suojellut:maailmanperinto_alue&outputFormat=application/json&srsName=EPSG:4326';
 
@@ -44,7 +55,7 @@ describe('manual catalog imports', () => {
       now: () => '2026-05-27T08:00:00.000Z'
     });
 
-    expect(result.results).toHaveLength(130);
+    expect(result.results).toHaveLength(140);
 
     const merenkurkku = await getParkBySlug(
       testDatabase.database,
@@ -405,6 +416,120 @@ describe('manual catalog imports', () => {
     expect(tullisaari?.areaKm2).toBeCloseTo(0.35, 2);
     expect(tullisaari?.boundaryGeoJson?.features).toHaveLength(7);
     expect(tullisaari?.boundaryGeoJson?.features[0]?.geometry.type).toBe('Polygon');
+
+    const expectedNewManualImports: ExpectedManualImport[] = [
+      {
+        lipasId: 9002033,
+        locationLabel: 'Pihlajamäki',
+        name: 'Pihlajamäen hiidenkirnut',
+        parkUrl: 'https://vihreatsylit.fi/aarnipata-ja-rauninmalja/',
+        postalCode: null,
+        postalOffice: 'Helsinki',
+        slug: 'pihlajamaen-hiidenkirnut',
+        typeSlug: 'outdoor-recreation-area'
+      },
+      {
+        lipasId: 9002034,
+        locationLabel: 'Niinisaarentie',
+        name: 'Vuosaarenhuippu',
+        parkUrl: 'https://vihreatsylit.fi/vuosaarenhuippu/',
+        postalCode: null,
+        postalOffice: 'Helsinki',
+        slug: 'vuosaarenhuippu',
+        typeSlug: 'outdoor-recreation-area'
+      },
+      {
+        lipasId: 9002035,
+        locationLabel: 'Sahaajankatu',
+        name: 'Kirsikkapuisto',
+        parkUrl: 'https://vihreatsylit.fi/kirsikkapuisto/',
+        postalCode: null,
+        postalOffice: 'Helsinki',
+        slug: 'kirsikkapuisto',
+        typeSlug: 'outdoor-recreation-area'
+      },
+      {
+        lipasId: 9002036,
+        locationLabel: 'Tervasaarenkannas',
+        name: 'Tervasaari',
+        parkUrl: 'https://vihreatsylit.fi/tervasaari/',
+        postalCode: null,
+        postalOffice: 'Helsinki',
+        slug: 'tervasaari',
+        typeSlug: 'outdoor-recreation-area'
+      },
+      {
+        lipasId: 9002037,
+        locationLabel: 'Talvipuutarha',
+        name: 'Talvipuutarha',
+        parkUrl: 'https://vihreatsylit.fi/kaupunginpuutarha/',
+        postalCode: '00250',
+        postalOffice: 'Helsinki',
+        slug: 'talvipuutarha',
+        typeSlug: 'outdoor-recreation-area'
+      },
+      {
+        lipasId: 9002038,
+        locationLabel: 'Uutelankanava',
+        name: 'Uutelan kanava',
+        parkUrl: 'https://vihreatsylit.fi/uutelan-kanava-ja-kauniinilmanpuisto/',
+        postalCode: null,
+        postalOffice: 'Helsinki',
+        slug: 'uutelan-kanava',
+        typeSlug: 'outdoor-recreation-area'
+      },
+      {
+        lipasId: 9002039,
+        locationLabel: 'Hiidenkirnujentie',
+        name: 'Askolan hiidenkirnut',
+        parkUrl: null,
+        postalCode: '07530',
+        postalOffice: 'Askola',
+        slug: 'askolan-hiidenkirnut',
+        typeSlug: 'outdoor-recreation-area'
+      },
+      {
+        lipasId: 9001085,
+        name: 'Helsingin pitäjän kirkonkylä',
+        parkUrl: 'https://www.rky.fi/read/asp/r_kohde_det.aspx?KOHDE_ID=1506',
+        slug: 'helsingin-pitajan-kirkonkyla',
+        typeSlug: 'cultural-history-area'
+      },
+      {
+        lipasId: 9001086,
+        name: 'Backaksen kartano',
+        parkUrl: 'https://www.rky.fi/read/asp/r_kohde_det.aspx?KOHDE_ID=4836',
+        slug: 'backaksen-kartano',
+        typeSlug: 'cultural-history-area'
+      },
+      {
+        lipasId: 9001087,
+        name: 'Håkansbölen kartano',
+        parkUrl: 'https://www.rky.fi/read/asp/r_kohde_det.aspx?KOHDE_ID=1509',
+        slug: 'hakansbolen-kartano',
+        typeSlug: 'cultural-history-area'
+      }
+    ];
+
+    for (const expectedPark of expectedNewManualImports) {
+      const park = await getParkBySlug(testDatabase.database, expectedPark.slug);
+
+      expect(park).toMatchObject({
+        ...(expectedPark.locationLabel ? { locationLabel: expectedPark.locationLabel } : {}),
+        lipasId: expectedPark.lipasId,
+        ...(expectedPark.parkUrl !== undefined ? { parkUrl: expectedPark.parkUrl } : {}),
+        name: expectedPark.name,
+        ...(expectedPark.postalCode !== undefined ? { postalCode: expectedPark.postalCode } : {}),
+        ...(expectedPark.postalOffice !== undefined
+          ? { postalOffice: expectedPark.postalOffice }
+          : {}),
+        type: { slug: expectedPark.typeSlug }
+      });
+      expect(park?.boundaryGeoJson?.features.length).toBeGreaterThan(0);
+      expect(
+        park?.boundaryGeoJson?.features.every((feature) => feature.geometry.type === 'Polygon')
+      ).toBe(true);
+    }
 
     const expectedLuontoonDestinationImports: ExpectedLuontoonDestinationImport[] = [
       {
@@ -871,7 +996,7 @@ describe('manual catalog imports', () => {
     );
     const kevo = await getParkBySlug(testDatabase.database, 'kevon-luonnonpuisto');
 
-    expect(allParks).toHaveLength(130);
+    expect(allParks).toHaveLength(140);
     expect(merenkurkku).toMatchObject({ catalogStatus: 'active' });
     expect(kevo).toMatchObject({ catalogStatus: 'active' });
   });
@@ -948,7 +1073,7 @@ describe('manual catalog imports', () => {
       database: testDatabase.database
     });
 
-    expect(result.results).toHaveLength(130);
+    expect(result.results).toHaveLength(140);
 
     const merenkurkku = await getParkBySlug(
       testDatabase.database,
@@ -1062,7 +1187,7 @@ describe('manual catalog imports', () => {
       now: () => '2026-05-27T08:00:00.000Z'
     });
 
-    expect(result.results).toHaveLength(130);
+    expect(result.results).toHaveLength(140);
   });
 
   it('fails clearly when a selected special-park slug is unknown', async () => {
