@@ -1,0 +1,26 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Askolan hiidenkirnut",
+        "source": "Manual bounding zone wrapping parking lot, trail, and kettles; anchored by official OSM points and user-provided corners"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [25.5865, 60.5802],
+            [25.5925, 60.5815],
+            [25.596, 60.5805],
+            [25.599, 60.5755],
+            [25.5935, 60.5745],
+            [25.5895, 60.5752],
+            [25.5865, 60.5802]
+          ]
+        ]
+      }
+    }
+  ]
+}

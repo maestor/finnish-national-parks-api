@@ -226,7 +226,7 @@ const createMultiLineStringFeature = (
 
 const readSpecialSourceFile = async (sourceUrl: string) => {
   const slug = sourceUrl.slice('special://'.length);
-  const fileUrl = new URL(`../../src/importer/data/${slug}.json`, import.meta.url);
+  const fileUrl = new URL(`../../src/importer/special-parks/data/${slug}.json`, import.meta.url);
   const content = await readFile(fileURLToPath(fileUrl), 'utf-8');
   return JSON.parse(content);
 };

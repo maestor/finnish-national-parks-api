@@ -12,9 +12,10 @@ Use this guide when you need to reproduce or extend the curated special import w
 The normal special-import edit path is:
 
 - [src/importer/import-special-parks.ts](../src/importer/import-special-parks.ts)
+- [src/importer/special-parks/](../src/importer/special-parks)
 - [tests/integration/manual-catalog.integration.test.ts](../tests/integration/manual-catalog.integration.test.ts)
 - [tests/fixtures/special-parks.ts](../tests/fixtures/special-parks.ts) when the source stays remote in tests
-- `src/importer/data/<slug>.json` when the source should be stored locally as `special://...`
+- `src/importer/special-parks/data/<slug>.json` when the source should be stored locally as `special://...`
 
 When a batch adds new curated special parks for the user, finish the implementation pass by offering a copy-pasteable one-liner import command that lists the new slugs explicitly, for example:
 
@@ -230,7 +231,7 @@ Use the envelope filter when:
 
 Use this when the final stored geometry should live in the repo instead of being fetched live every test run.
 
-- `special://<slug>` maps to `src/importer/data/<slug>.json`
+- `special://<slug>` maps to `src/importer/special-parks/data/<slug>.json`
 - the importer loads these files directly from the repo
 - `tests/fixtures/special-parks.ts` does not need an entry for local `special://` sources
 
@@ -282,8 +283,8 @@ That means the source file does not need to be pre-flattened unless doing so mak
 
 When adding or changing one curated special park:
 
-1. Add or update the seed in [src/importer/import-special-parks.ts](../src/importer/import-special-parks.ts).
-2. Add a local GeoJSON file under `src/importer/data/` when the source should be stored as `special://...`.
+1. Add or update the seed or direct config in [src/importer/special-parks/](../src/importer/special-parks), and touch [src/importer/import-special-parks.ts](../src/importer/import-special-parks.ts) only when the runtime import flow itself changes.
+2. Add a local GeoJSON file under `src/importer/special-parks/data/` when the source should be stored as `special://...`.
 3. Update [tests/integration/manual-catalog.integration.test.ts](../tests/integration/manual-catalog.integration.test.ts):
    - total import counts when the full curated list changes
    - park-specific assertions for the new row

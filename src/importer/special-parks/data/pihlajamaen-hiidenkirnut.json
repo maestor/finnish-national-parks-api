@@ -1,0 +1,24 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Pihlajamäen hiidenkirnut",
+        "source": "Official Helsinki Vihreat sylit map point proxy polygon"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [25.00295, 60.2382],
+            [25.00295, 60.23935],
+            [25.00455, 60.23935],
+            [25.00455, 60.2382],
+            [25.00295, 60.2382]
+          ]
+        ]
+      }
+    }
+  ]
+}
