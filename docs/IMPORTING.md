@@ -16,6 +16,14 @@ The normal special-import edit path is:
 - [tests/fixtures/special-parks.ts](../tests/fixtures/special-parks.ts) when the source stays remote in tests
 - `src/importer/data/<slug>.json` when the source should be stored locally as `special://...`
 
+When a batch adds new curated special parks for the user, finish the implementation pass by offering a copy-pasteable one-liner import command that lists the new slugs explicitly, for example:
+
+```bash
+npm run import:special-parks -- slug-one slug-two slug-three
+```
+
+That lets the user run the import, review the resulting catalog rows locally, and only then give final acceptance for the verify/commit/push phase.
+
 ## Source Selection
 
 Prefer official, machine-readable geometry first.
