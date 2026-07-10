@@ -1,0 +1,24 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Kuhakoski",
+        "source": "Official Nurmijärvi map indexed point proxy polygon"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [24.71195, 60.43215],
+            [24.71195, 60.434],
+            [24.71435, 60.434],
+            [24.71435, 60.43215],
+            [24.71195, 60.43215]
+          ]
+        ]
+      }
+    }
+  ]
+}

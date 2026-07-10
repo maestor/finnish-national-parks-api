@@ -1,7 +1,8 @@
 node_modules/
 coverage/
 data/
-!src/importer/data/
+!src/importer/special-parks/data/
+!src/importer/special-parks/data/*.json
 .DS_Store
 .env
 docs/plans/
