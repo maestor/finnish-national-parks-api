@@ -1,5 +1,6 @@
 import type { Database } from '../db/database.js';
 import { listTripPlannerCandidateParks } from '../db/repositories.js';
+import { isTrailTypeSlug } from '../parks/park-types.js';
 import {
   boundingBoxesIntersect,
   expandBoundingBoxByKm,
@@ -45,6 +46,8 @@ const roundDistanceKm = (distanceMeters: number) => {
   return Math.round((distanceMeters / 1000) * 10) / 10;
 };
 
+const MAX_UNVISITED_TRAILS = 10;
+
 const getDistanceFromRouteMeters = (
   route: Parameters<typeof getRouteDistanceToFeatureCollectionMeters>[0],
   park: TripPlannerParkCandidate
@@ -62,18 +65,27 @@ const getDistanceFromRouteMeters = (
   return getRouteDistanceToPointMeters(route, park.markerPoint);
 };
 
-const sortResults = (parks: TripPlannerSearchResponse['parks']) => {
+const sortByDistanceAndName = (parks: TripPlannerSearchResponse['parks']) => {
   return [...parks].sort((first, second) => {
-    if (first.visitedSummary.visited !== second.visitedSummary.visited) {
-      return Number(first.visitedSummary.visited) - Number(second.visitedSummary.visited);
-    }
-
     if (first.distanceFromRouteKm !== second.distanceFromRouteKm) {
       return first.distanceFromRouteKm - second.distanceFromRouteKm;
     }
 
     return first.name.localeCompare(second.name);
   });
+};
+
+const orderResults = (parks: TripPlannerSearchResponse['parks']) => {
+  const unvisitedParks = parks.filter((park) => !park.visitedSummary.visited);
+  const visitedParks = parks.filter((park) => park.visitedSummary.visited);
+  const unvisitedAreas = sortByDistanceAndName(
+    unvisitedParks.filter((park) => !isTrailTypeSlug(park.type.slug))
+  );
+  const unvisitedTrails = sortByDistanceAndName(
+    unvisitedParks.filter((park) => isTrailTypeSlug(park.type.slug))
+  ).slice(0, MAX_UNVISITED_TRAILS);
+
+  return [...unvisitedAreas, ...unvisitedTrails, ...sortByDistanceAndName(visitedParks)];
 };
 
 const assertModeSupported = (mode: TripPlannerMode) => {
@@ -145,7 +157,7 @@ export const createTripPlannerService = ({
         return {
           destination,
           origin,
-          parks: sortResults(parks),
+          parks: orderResults(parks),
           route: {
             distanceMeters: route.distanceMeters,
             durationSeconds: route.durationSeconds,

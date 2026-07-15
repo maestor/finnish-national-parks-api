@@ -5,7 +5,7 @@ import { createVisit } from '../../src/db/repositories.js';
 import { importParks } from '../../src/importer/import-parks.js';
 import { createGeoapifyClient } from '../../src/trip-planner/geoapify.js';
 import { createTripPlannerService } from '../../src/trip-planner/search.js';
-import { createLipasPark, parkTypeFixtures } from '../fixtures/lipas.js';
+import { createLipasPark, createLipasTrail, parkTypeFixtures } from '../fixtures/lipas.js';
 import { createTestDatabase } from '../helpers/test-db.js';
 
 const createPolygon = (minLon: number, minLat: number, maxLon: number, maxLat: number) => ({
@@ -115,7 +115,7 @@ describe('trip planner route', () => {
 
     await importParks({
       database: testDatabase.database,
-      expectedActiveCount: 3,
+      expectedActiveCount: 4,
       now: () => '2026-07-15T18:00:00.000Z',
       sourceUrl: 'https://example.test/lipas',
       fetchSource: async () => ({
@@ -142,6 +142,30 @@ describe('trip planner route', () => {
               'type-code': parkTypeFixtures.otherNatureReserve.typeCode
             },
             www: 'https://www.luontoon.fi/reittipuisto'
+          }),
+          createLipasTrail({
+            'lipas-id': 1004,
+            location: {
+              address: 'Reittipolku 4',
+              geometries: {
+                features: [
+                  {
+                    geometry: {
+                      coordinates: [
+                        [24.04, 60],
+                        [24.09, 60]
+                      ],
+                      type: 'LineString'
+                    },
+                    type: 'Feature'
+                  }
+                ],
+                type: 'FeatureCollection'
+              },
+              'postal-office': 'Espoo'
+            },
+            name: 'Reittipolku',
+            www: 'https://www.luontoon.fi/reittipolku'
           }),
           createLipasPark({
             'lipas-id': 1003,
@@ -202,7 +226,7 @@ describe('trip planner route', () => {
     });
   };
 
-  it('returns route-nearby parks with visited summaries and unvisited-first ordering', async () => {
+  it('returns unvisited areas first, then unvisited trails, then visited results', async () => {
     const app = createTripPlannerApp(mockGeoapifyFetch() as typeof fetch);
     const response = await requestAsRemote(app, {
       destinationQuery: 'Destination',
@@ -229,19 +253,29 @@ describe('trip planner route', () => {
       durationSeconds: 1_200,
       mode: 'drive'
     });
-    expect(body.parks.map((park) => park.slug)).toEqual(['reitinvieri', 'reittipuisto']);
+    expect(body.parks.map((park) => park.slug)).toEqual([
+      'reitinvieri',
+      'reittipolku',
+      'reittipuisto'
+    ]);
     expect(body.parks[0]?.visitedSummary).toEqual({
       lastVisitedOn: null,
       visitCount: 0,
       visited: false
     });
     expect(body.parks[1]?.visitedSummary).toEqual({
+      lastVisitedOn: null,
+      visitCount: 0,
+      visited: false
+    });
+    expect(body.parks[2]?.visitedSummary).toEqual({
       lastVisitedOn: '2026-07-10',
       visitCount: 1,
       visited: true
     });
     expect(body.parks[0]?.distanceFromRouteKm).toBeGreaterThan(4);
     expect(body.parks[1]?.distanceFromRouteKm).toBe(0);
+    expect(body.parks[2]?.distanceFromRouteKm).toBe(0);
   });
 
   it('returns 422 when the origin cannot be geocoded', async () => {

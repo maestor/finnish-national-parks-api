@@ -89,6 +89,23 @@ const createCandidate = (
   ...overrides
 });
 
+const createTrailCandidate = (
+  overrides: Partial<TripPlannerParkCandidate> = {}
+): TripPlannerParkCandidate =>
+  createCandidate({
+    category: {
+      name: 'Polut/Reitit',
+      slug: 'trails-and-routes'
+    },
+    type: {
+      code: 4404,
+      id: 4404,
+      name: 'Luontopolku',
+      slug: 'nature-trail'
+    },
+    ...overrides
+  });
+
 const createProvider = (overrides: Partial<TripPlannerProvider> = {}): TripPlannerProvider => ({
   geocode: vi.fn(async (query: string) => ({
     coordinate: query === 'Origin' ? { lat: 60, lon: 24 } : { lat: 60, lon: 24.2 },
@@ -114,9 +131,19 @@ describe('trip planner service', () => {
     listTripPlannerCandidateParks.mockReset();
   });
 
-  it('sorts unvisited parks first, then distance, then name', async () => {
+  it('groups unvisited areas first, then unvisited trails, then visited results', async () => {
     listTripPlannerCandidateParks.mockResolvedValue([
-      createCandidate({ name: 'Zoo Park', slug: 'zoo-park' }),
+      createTrailCandidate({
+        boundaryGeoJson: null,
+        boundingBox: {
+          maxLat: 60.005,
+          maxLon: 24.12,
+          minLat: 60.001,
+          minLon: 24.1
+        },
+        name: 'Trail First By Distance',
+        slug: 'trail-first'
+      }),
       createCandidate({
         name: 'A Park',
         slug: 'visited-park',
@@ -126,7 +153,39 @@ describe('trip planner service', () => {
           visited: true
         }
       }),
-      createCandidate({ name: 'Alpha Park', slug: 'alpha-park' })
+      createCandidate({
+        boundaryGeoJson: null,
+        boundingBox: {
+          maxLat: 60.04,
+          maxLon: 24.18,
+          minLat: 60.03,
+          minLon: 24.16
+        },
+        name: 'Far Area',
+        slug: 'far-area'
+      }),
+      createCandidate({
+        boundaryGeoJson: null,
+        boundingBox: {
+          maxLat: 60.003,
+          maxLon: 24.08,
+          minLat: 60.001,
+          minLon: 24.06
+        },
+        name: 'Near Area',
+        slug: 'near-area'
+      }),
+      createTrailCandidate({
+        boundaryGeoJson: null,
+        boundingBox: {
+          maxLat: 60.006,
+          maxLon: 24.19,
+          minLat: 60.004,
+          minLon: 24.17
+        },
+        name: 'Trail Second By Distance',
+        slug: 'trail-second'
+      })
     ]);
     const service = createTripPlannerService({
       database: {} as Database,
@@ -140,10 +199,105 @@ describe('trip planner service', () => {
     });
 
     expect(result.parks.map((park) => park.slug)).toEqual([
-      'alpha-park',
-      'zoo-park',
+      'near-area',
+      'far-area',
+      'trail-first',
+      'trail-second',
       'visited-park'
     ]);
+  });
+
+  it('limits unvisited trails to the 10 nearest results', async () => {
+    listTripPlannerCandidateParks.mockResolvedValue([
+      createCandidate({
+        boundaryGeoJson: null,
+        boundingBox: {
+          maxLat: 60.003,
+          maxLon: 24.08,
+          minLat: 60.001,
+          minLon: 24.06
+        },
+        name: 'Area Result',
+        slug: 'area-result'
+      }),
+      ...Array.from({ length: 12 }, (_, index) =>
+        createTrailCandidate({
+          boundaryGeoJson: null,
+          boundingBox: {
+            maxLat: 60.001 + (index + 1) * 0.002,
+            maxLon: 24.06 + (index + 1) * 0.01,
+            minLat: 60 + (index + 1) * 0.002,
+            minLon: 24.05 + (index + 1) * 0.01
+          },
+          name: `Trail ${index + 1}`,
+          slug: `trail-${index + 1}`
+        })
+      )
+    ]);
+    const service = createTripPlannerService({
+      database: {} as Database,
+      provider: createProvider()
+    });
+
+    const result = await service.search({
+      destinationQuery: 'Destination',
+      mode: 'drive',
+      originQuery: 'Origin'
+    });
+
+    expect(result.parks.map((park) => park.slug)).toEqual([
+      'area-result',
+      'trail-1',
+      'trail-2',
+      'trail-3',
+      'trail-4',
+      'trail-5',
+      'trail-6',
+      'trail-7',
+      'trail-8',
+      'trail-9',
+      'trail-10'
+    ]);
+  });
+
+  it('sorts same-distance areas by name inside the unvisited area group', async () => {
+    listTripPlannerCandidateParks.mockResolvedValue([
+      createCandidate({
+        boundaryGeoJson: null,
+        boundingBox: {
+          maxLat: 60.02,
+          maxLon: 24.12,
+          minLat: 60.01,
+          minLon: 24.1
+        },
+        name: 'Zoo Area',
+        slug: 'zoo-area'
+      }),
+      createCandidate({
+        boundaryGeoJson: null,
+        boundingBox: {
+          maxLat: 60.02,
+          maxLon: 24.12,
+          minLat: 60.01,
+          minLon: 24.1
+        },
+        name: 'Alpha Area',
+        slug: 'alpha-area'
+      })
+    ]);
+    const service = createTripPlannerService({
+      database: {} as Database,
+      provider: createProvider()
+    });
+
+    const result = await service.search({
+      destinationQuery: 'Destination',
+      mode: 'drive',
+      originQuery: 'Origin'
+    });
+
+    expect(result.parks.map((park) => park.slug)).toEqual(['alpha-area', 'zoo-area']);
+    expect(result.parks[0]?.distanceFromRouteKm).toBe(result.parks[1]?.distanceFromRouteKm);
   });
 
   it('omits displayTypeName when it is missing and falls back to marker point distance', async () => {
