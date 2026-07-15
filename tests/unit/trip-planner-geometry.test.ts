@@ -9,7 +9,8 @@ import {
   getRouteDistanceToFeatureCollectionMeters,
   getRouteDistanceToLineStringMeters,
   getRouteDistanceToPointMeters,
-  getRouteDistanceToPolygonMeters
+  getRouteDistanceToPolygonMeters,
+  simplifyRouteGeometry
 } from '../../src/trip-planner/geometry.js';
 
 const route: GeoJsonFeatureCollection = {
@@ -388,5 +389,128 @@ describe('trip planner geometry', () => {
         type: 'LineString'
       })
     ).toBe(Number.POSITIVE_INFINITY);
+  });
+
+  it('simplifies dense routes while preserving line endpoints', () => {
+    const denseRoute: GeoJsonFeatureCollection = {
+      features: [
+        {
+          geometry: {
+            coordinates: [
+              [24, 60],
+              [24.01, 60.00001],
+              [24.02, 60.00002],
+              [24.03, 60.00001],
+              [24.04, 60]
+            ],
+            type: 'LineString'
+          },
+          type: 'Feature'
+        }
+      ],
+      type: 'FeatureCollection'
+    };
+
+    const simplifiedRoute = simplifyRouteGeometry(denseRoute, 50);
+
+    expect(simplifiedRoute.features[0]?.geometry).toEqual({
+      coordinates: [
+        [24, 60],
+        [24.04, 60]
+      ],
+      type: 'LineString'
+    });
+  });
+
+  it('keeps meaningful bends when route simplification exceeds tolerance', () => {
+    const bentRoute: GeoJsonFeatureCollection = {
+      features: [
+        {
+          geometry: {
+            coordinates: [
+              [24, 60],
+              [24.01, 60.005],
+              [24.02, 60.01],
+              [24.03, 60.005],
+              [24.04, 60]
+            ],
+            type: 'LineString'
+          },
+          type: 'Feature'
+        }
+      ],
+      type: 'FeatureCollection'
+    };
+
+    const simplifiedRoute = simplifyRouteGeometry(bentRoute, 100);
+
+    expect(simplifiedRoute.features[0]?.geometry.type).toBe('LineString');
+    expect(simplifiedRoute.features[0]?.geometry).toEqual({
+      coordinates: [
+        [24, 60],
+        [24.02, 60.01],
+        [24.04, 60]
+      ],
+      type: 'LineString'
+    });
+  });
+
+  it('returns the original route when simplification tolerance is zero', () => {
+    expect(simplifyRouteGeometry(route, 0)).toBe(route);
+  });
+
+  it('returns the original route when the geometry has no finite bounds', () => {
+    const invalidRoute: GeoJsonFeatureCollection = {
+      features: [
+        {
+          geometry: {
+            coordinates: [],
+            type: 'LineString'
+          },
+          type: 'Feature'
+        }
+      ],
+      type: 'FeatureCollection'
+    };
+
+    expect(simplifyRouteGeometry(invalidRoute, 50)).toBe(invalidRoute);
+  });
+
+  it('leaves non-linestring features untouched during simplification', () => {
+    const mixedRoute: GeoJsonFeatureCollection = {
+      features: [
+        {
+          geometry: {
+            coordinates: [
+              [
+                [24, 60],
+                [24.01, 60],
+                [24.01, 60.01],
+                [24, 60.01],
+                [24, 60]
+              ]
+            ],
+            type: 'Polygon'
+          },
+          type: 'Feature'
+        },
+        {
+          geometry: {
+            coordinates: [
+              [24, 60],
+              [24.01, 60.00001],
+              [24.02, 60]
+            ],
+            type: 'LineString'
+          },
+          type: 'Feature'
+        }
+      ],
+      type: 'FeatureCollection'
+    };
+
+    const simplifiedRoute = simplifyRouteGeometry(mixedRoute, 50);
+
+    expect(simplifiedRoute.features[0]).toEqual(mixedRoute.features[0]);
   });
 });

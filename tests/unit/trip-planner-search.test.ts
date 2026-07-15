@@ -126,9 +126,71 @@ const createProvider = (overrides: Partial<TripPlannerProvider> = {}): TripPlann
   ...overrides
 });
 
+const createDeferred = <T>() => {
+  let reject!: (reason?: unknown) => void;
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  const promise = new Promise<T>((promiseResolve, promiseReject) => {
+    reject = promiseReject;
+    resolve = promiseResolve;
+  });
+
+  return {
+    promise,
+    reject,
+    resolve
+  };
+};
+
 describe('trip planner service', () => {
   beforeEach(() => {
     listTripPlannerCandidateParks.mockReset();
+  });
+
+  it('starts origin and destination geocoding in parallel', async () => {
+    listTripPlannerCandidateParks.mockResolvedValue([]);
+    const originDeferred = createDeferred<{
+      coordinate: { lat: number; lon: number };
+      label: string;
+    } | null>();
+    const destinationDeferred = createDeferred<{
+      coordinate: { lat: number; lon: number };
+      label: string;
+    } | null>();
+    const geocode = vi.fn((query: string) => {
+      return query === 'Origin' ? originDeferred.promise : destinationDeferred.promise;
+    });
+    const service = createTripPlannerService({
+      database: {} as Database,
+      provider: createProvider({
+        geocode
+      })
+    });
+
+    const searchPromise = service.search({
+      destinationQuery: 'Destination',
+      mode: 'drive',
+      originQuery: 'Origin'
+    });
+
+    expect(geocode.mock.calls).toEqual([['Origin'], ['Destination']]);
+
+    originDeferred.resolve({
+      coordinate: { lat: 60, lon: 24 },
+      label: 'Origin label'
+    });
+    destinationDeferred.resolve({
+      coordinate: { lat: 60, lon: 24.2 },
+      label: 'Destination label'
+    });
+
+    await expect(searchPromise).resolves.toMatchObject({
+      destination: {
+        label: 'Destination label'
+      },
+      origin: {
+        label: 'Origin label'
+      }
+    });
   });
 
   it('groups unvisited areas first, then unvisited trails, then visited results', async () => {
@@ -207,6 +269,84 @@ describe('trip planner service', () => {
     ]);
   });
 
+  it('orders unvisited areas by preferred type priority before distance', async () => {
+    listTripPlannerCandidateParks.mockResolvedValue([
+      createCandidate({
+        boundaryGeoJson: null,
+        boundingBox: {
+          maxLat: 60.003,
+          maxLon: 24.08,
+          minLat: 60.001,
+          minLon: 24.06
+        },
+        name: 'Nearby Outdoor Area',
+        slug: 'nearby-outdoor-area'
+      }),
+      createCandidate({
+        boundaryGeoJson: null,
+        boundingBox: {
+          maxLat: 60.02,
+          maxLon: 24.12,
+          minLat: 60.01,
+          minLon: 24.1
+        },
+        name: 'Far National Park',
+        slug: 'far-national-park',
+        type: {
+          code: 111,
+          id: 111,
+          name: 'Kansallispuisto',
+          slug: 'national-park'
+        }
+      }),
+      createCandidate({
+        boundaryGeoJson: null,
+        boundingBox: {
+          maxLat: 60.01,
+          maxLon: 24.1,
+          minLat: 60.008,
+          minLon: 24.09
+        },
+        name: 'Mid Hiking Area',
+        slug: 'mid-hiking-area',
+        type: {
+          code: 109,
+          id: 109,
+          name: 'Retkeilyalue',
+          slug: 'hiking-area'
+        }
+      }),
+      createTrailCandidate({
+        boundaryGeoJson: null,
+        boundingBox: {
+          maxLat: 60.006,
+          maxLon: 24.19,
+          minLat: 60.004,
+          minLon: 24.17
+        },
+        name: 'Trail Result',
+        slug: 'trail-result'
+      })
+    ]);
+    const service = createTripPlannerService({
+      database: {} as Database,
+      provider: createProvider()
+    });
+
+    const result = await service.search({
+      destinationQuery: 'Destination',
+      mode: 'drive',
+      originQuery: 'Origin'
+    });
+
+    expect(result.parks.map((park) => park.slug)).toEqual([
+      'far-national-park',
+      'mid-hiking-area',
+      'nearby-outdoor-area',
+      'trail-result'
+    ]);
+  });
+
   it('limits unvisited trails to the 10 nearest results', async () => {
     listTripPlannerCandidateParks.mockResolvedValue([
       createCandidate({
@@ -258,6 +398,46 @@ describe('trip planner service', () => {
       'trail-9',
       'trail-10'
     ]);
+  });
+
+  it('sorts same-distance trails by name inside the unvisited trail group', async () => {
+    listTripPlannerCandidateParks.mockResolvedValue([
+      createTrailCandidate({
+        boundaryGeoJson: null,
+        boundingBox: {
+          maxLat: 60.02,
+          maxLon: 24.12,
+          minLat: 60.01,
+          minLon: 24.1
+        },
+        name: 'Zoo Trail',
+        slug: 'zoo-trail'
+      }),
+      createTrailCandidate({
+        boundaryGeoJson: null,
+        boundingBox: {
+          maxLat: 60.02,
+          maxLon: 24.12,
+          minLat: 60.01,
+          minLon: 24.1
+        },
+        name: 'Alpha Trail',
+        slug: 'alpha-trail'
+      })
+    ]);
+    const service = createTripPlannerService({
+      database: {} as Database,
+      provider: createProvider()
+    });
+
+    const result = await service.search({
+      destinationQuery: 'Destination',
+      mode: 'drive',
+      originQuery: 'Origin'
+    });
+
+    expect(result.parks.map((park) => park.slug)).toEqual(['alpha-trail', 'zoo-trail']);
+    expect(result.parks[0]?.distanceFromRouteKm).toBe(result.parks[1]?.distanceFromRouteKm);
   });
 
   it('sorts same-distance areas by name inside the unvisited area group', async () => {

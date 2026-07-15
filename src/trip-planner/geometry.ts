@@ -79,6 +79,15 @@ const pointToSegmentDistanceMeters = (
   return Math.hypot(point.x - closest.x, point.y - closest.y);
 };
 
+const pointToSegmentDistanceSquared = (
+  point: CartesianPoint,
+  start: CartesianPoint,
+  end: CartesianPoint
+) => {
+  const distance = pointToSegmentDistanceMeters(point, start, end);
+  return distance * distance;
+};
+
 const cross = (a: CartesianPoint, b: CartesianPoint, c: CartesianPoint) => {
   return (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
 };
@@ -189,6 +198,52 @@ const createSegments = (coordinates: GeoJsonCoordinate[]) => {
   }
 
   return segments;
+};
+
+const simplifyLineStringCoordinates = (
+  coordinates: GeoJsonCoordinate[],
+  toleranceMeters: number,
+  projector: PlanarProjector
+) => {
+  if (coordinates.length <= 2 || toleranceMeters <= 0) {
+    return coordinates;
+  }
+
+  const projectedCoordinates = coordinates.map((coordinate) => projector.toCartesian(coordinate));
+  const keep = new Array(coordinates.length).fill(false);
+  const segmentsToProcess: Array<[number, number]> = [[0, coordinates.length - 1]];
+  const toleranceSquared = toleranceMeters * toleranceMeters;
+
+  keep[0] = true;
+  keep[coordinates.length - 1] = true;
+
+  while (segmentsToProcess.length > 0) {
+    const [startIndex, endIndex] = segmentsToProcess.pop()!;
+    const segmentStart = projectedCoordinates[startIndex]!;
+    const segmentEnd = projectedCoordinates[endIndex]!;
+    let farthestDistanceSquared = 0;
+    let farthestIndex = -1;
+
+    for (let index = startIndex + 1; index < endIndex; index += 1) {
+      const distanceSquared = pointToSegmentDistanceSquared(
+        projectedCoordinates[index]!,
+        segmentStart,
+        segmentEnd
+      );
+
+      if (distanceSquared > farthestDistanceSquared) {
+        farthestDistanceSquared = distanceSquared;
+        farthestIndex = index;
+      }
+    }
+
+    if (farthestIndex !== -1 && farthestDistanceSquared > toleranceSquared) {
+      keep[farthestIndex] = true;
+      segmentsToProcess.push([startIndex, farthestIndex], [farthestIndex, endIndex]);
+    }
+  }
+
+  return coordinates.filter((_, index) => keep[index]);
 };
 
 const getRouteSegments = (route: GeoJsonFeatureCollection) => {
@@ -331,6 +386,63 @@ export const deriveBoundingBox = (route: GeoJsonFeatureCollection): BoundingBox 
       minLon: Number.POSITIVE_INFINITY
     }
   );
+};
+
+export const simplifyRouteGeometry = (
+  route: GeoJsonFeatureCollection,
+  toleranceMeters: number
+): GeoJsonFeatureCollection => {
+  if (toleranceMeters <= 0 || route.features.length === 0) {
+    return route;
+  }
+
+  const routeBoundingBox = deriveBoundingBox(route);
+
+  if (
+    !Number.isFinite(routeBoundingBox.minLat) ||
+    !Number.isFinite(routeBoundingBox.minLon) ||
+    !Number.isFinite(routeBoundingBox.maxLat) ||
+    !Number.isFinite(routeBoundingBox.maxLon)
+  ) {
+    return route;
+  }
+
+  const projector = createProjector(createBBoxReferencePoint(routeBoundingBox));
+  let hasChanges = false;
+  const simplifiedFeatures = route.features.map((feature) => {
+    if (feature.geometry.type !== 'LineString') {
+      return feature;
+    }
+
+    const simplifiedCoordinates = simplifyLineStringCoordinates(
+      feature.geometry.coordinates,
+      toleranceMeters,
+      projector
+    );
+
+    if (simplifiedCoordinates.length === feature.geometry.coordinates.length) {
+      return feature;
+    }
+
+    hasChanges = true;
+
+    return {
+      ...feature,
+      geometry: {
+        ...feature.geometry,
+        coordinates: simplifiedCoordinates
+      }
+    };
+  });
+
+  if (!hasChanges) {
+    return route;
+  }
+
+  return {
+    ...route,
+    features: simplifiedFeatures
+  };
 };
 
 export const expandBoundingBoxByKm = (

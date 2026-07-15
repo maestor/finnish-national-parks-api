@@ -1,12 +1,14 @@
 import type { Database } from '../db/database.js';
 import { listTripPlannerCandidateParks } from '../db/repositories.js';
+import type { SupportedParkTypeSlug } from '../parks/park-types.js';
 import { isTrailTypeSlug } from '../parks/park-types.js';
 import {
   boundingBoxesIntersect,
   expandBoundingBoxByKm,
   getRouteDistanceToBoundingBoxMeters,
   getRouteDistanceToFeatureCollectionMeters,
-  getRouteDistanceToPointMeters
+  getRouteDistanceToPointMeters,
+  simplifyRouteGeometry
 } from './geometry.js';
 import type {
   TripPlannerMode,
@@ -47,6 +49,18 @@ const roundDistanceKm = (distanceMeters: number) => {
 };
 
 const MAX_UNVISITED_TRAILS = 10;
+const ROUTE_DISTANCE_SIMPLIFICATION_TOLERANCE_METERS = 100;
+const areaTypePriority: Record<
+  Exclude<SupportedParkTypeSlug, 'walking-trail' | 'nature-trail' | 'hiking-trail'>,
+  number
+> = {
+  'cultural-history-area': 4,
+  'hiking-area': 2,
+  'national-park': 1,
+  'nature-reserve-area': 6,
+  'outdoor-recreation-area': 5,
+  'wilderness-area': 3
+};
 
 const getDistanceFromRouteMeters = (
   route: Parameters<typeof getRouteDistanceToFeatureCollectionMeters>[0],
@@ -75,10 +89,28 @@ const sortByDistanceAndName = (parks: TripPlannerSearchResponse['parks']) => {
   });
 };
 
+const sortAreasByPriorityDistanceAndName = (parks: TripPlannerSearchResponse['parks']) => {
+  return [...parks].sort((first, second) => {
+    const priorityDifference =
+      areaTypePriority[first.type.slug as keyof typeof areaTypePriority] -
+      areaTypePriority[second.type.slug as keyof typeof areaTypePriority];
+
+    if (priorityDifference !== 0) {
+      return priorityDifference;
+    }
+
+    if (first.distanceFromRouteKm !== second.distanceFromRouteKm) {
+      return first.distanceFromRouteKm - second.distanceFromRouteKm;
+    }
+
+    return first.name.localeCompare(second.name);
+  });
+};
+
 const orderResults = (parks: TripPlannerSearchResponse['parks']) => {
   const unvisitedParks = parks.filter((park) => !park.visitedSummary.visited);
   const visitedParks = parks.filter((park) => park.visitedSummary.visited);
-  const unvisitedAreas = sortByDistanceAndName(
+  const unvisitedAreas = sortAreasByPriorityDistanceAndName(
     unvisitedParks.filter((park) => !isTrailTypeSlug(park.type.slug))
   );
   const unvisitedTrails = sortByDistanceAndName(
@@ -108,13 +140,14 @@ export const createTripPlannerService = ({
       assertModeSupported(mode);
 
       try {
-        const origin = await provider.geocode(originQuery);
+        const [origin, destination] = await Promise.all([
+          provider.geocode(originQuery),
+          provider.geocode(destinationQuery)
+        ]);
 
         if (!origin) {
           throw new TripPlannerError('origin_not_found', 'Origin was not found.', 422);
         }
-
-        const destination = await provider.geocode(destinationQuery);
 
         if (!destination) {
           throw new TripPlannerError('destination_not_found', 'Destination was not found.', 422);
@@ -132,10 +165,14 @@ export const createTripPlannerService = ({
 
         const candidateBoundingBox = expandBoundingBoxByKm(route.boundingBox, maxDistanceKm);
         const maxDistanceMeters = maxDistanceKm * 1000;
+        const routeGeometry = simplifyRouteGeometry(
+          route.geometry,
+          ROUTE_DISTANCE_SIMPLIFICATION_TOLERANCE_METERS
+        );
         const parks = (await listTripPlannerCandidateParks(database))
           .filter((park) => boundingBoxesIntersect(candidateBoundingBox, park.boundingBox))
           .map((park) => ({
-            distanceFromRouteMeters: getDistanceFromRouteMeters(route.geometry, park),
+            distanceFromRouteMeters: getDistanceFromRouteMeters(routeGeometry, park),
             park
           }))
           .filter(({ distanceFromRouteMeters }) => distanceFromRouteMeters <= maxDistanceMeters)
