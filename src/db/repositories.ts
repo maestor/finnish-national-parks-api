@@ -10,6 +10,7 @@ import {
   isTrailTypeSlug,
   supportedParkTypes
 } from '../parks/park-types.js';
+import type { TripPlannerParkCandidate } from '../trip-planner/types.js';
 import type { Database, DbClient } from './database.js';
 import {
   admins,
@@ -109,6 +110,27 @@ type PublicParkRow = {
   parkUrl: string | null;
   mapKey: string | null;
   mapUpdatedAt: string | null;
+  markerLat: number;
+  markerLon: number;
+  name: string;
+  parkId: number;
+  postalCode: string | null;
+  postalOffice: string | null;
+  slug: string;
+  typeCode: number;
+  typeId: number;
+  typeName: string;
+  typeSlug: string;
+};
+
+type TripPlannerParkRow = {
+  bboxMaxLat: number;
+  bboxMaxLon: number;
+  bboxMinLat: number;
+  bboxMinLon: number;
+  boundaryGeojson: string;
+  displayTypeName: string | null;
+  locationLabel: string;
   markerLat: number;
   markerLon: number;
   name: string;
@@ -404,6 +426,36 @@ const toSearchPark = (row: LightweightParkRow) => {
   });
 };
 
+const toTripPlannerPark = (row: TripPlannerParkRow, visits: Array<{ visitedOn: string }>) => {
+  return withOptionalDisplayTypeName(row, {
+    address: toAddress(row.locationLabel, row.postalCode, row.postalOffice),
+    boundingBox: {
+      maxLat: row.bboxMaxLat,
+      maxLon: row.bboxMaxLon,
+      minLat: row.bboxMinLat,
+      minLon: row.bboxMinLon
+    },
+    boundaryGeoJson: JSON.parse(row.boundaryGeojson) as GeoJsonFeatureCollection,
+    category: toParkCategory(row.typeSlug as SupportedParkTypeSlug),
+    locationLabel: row.locationLabel,
+    markerPoint: {
+      lat: row.markerLat,
+      lon: row.markerLon
+    },
+    name: row.name,
+    postalCode: row.postalCode,
+    postalOffice: row.postalOffice,
+    slug: row.slug,
+    type: {
+      code: row.typeCode,
+      id: row.typeId,
+      name: row.typeName,
+      slug: row.typeSlug as SupportedParkTypeSlug
+    },
+    visitedSummary: toVisitedSummary(visits)
+  }) as TripPlannerParkCandidate;
+};
+
 const toAdminVisibilityPark = (row: LightweightParkRow) => {
   return {
     ...toSearchPark(row),
@@ -545,6 +597,34 @@ const listPublicParkRows = async (database: Database) => {
       parkUrl: parks.parkUrl,
       mapKey: parks.mapKey,
       mapUpdatedAt: parks.mapUpdatedAt,
+      markerLat: parks.markerLat,
+      markerLon: parks.markerLon,
+      name: parks.name,
+      parkId: parks.id,
+      postalCode: parks.postalCode,
+      postalOffice: parks.postalOffice,
+      slug: parks.slug,
+      typeCode: parkTypes.code,
+      typeId: parkTypes.id,
+      typeName: parkTypes.name,
+      typeSlug: parkTypes.slug
+    })
+    .from(parks)
+    .innerJoin(parkTypes, eq(parks.typeId, parkTypes.id))
+    .where(visibleCatalogWhere())
+    .orderBy(parks.name);
+};
+
+const listTripPlannerParkRows = async (database: Database) => {
+  return database
+    .select({
+      bboxMaxLat: parks.bboxMaxLat,
+      bboxMaxLon: parks.bboxMaxLon,
+      bboxMinLat: parks.bboxMinLat,
+      bboxMinLon: parks.bboxMinLon,
+      boundaryGeojson: parks.boundaryGeojson,
+      displayTypeName: parks.displayTypeName,
+      locationLabel: parks.locationLabel,
       markerLat: parks.markerLat,
       markerLon: parks.markerLon,
       name: parks.name,
@@ -1131,6 +1211,24 @@ export const getPublicMapSummary = async (
     updatedAt: version.updatedAt,
     version: version.version
   };
+};
+
+export const listTripPlannerCandidateParks = async (database: Database) => {
+  const [parkRows, visitRows] = await Promise.all([
+    listTripPlannerParkRows(database),
+    listPublicVisitRows(database)
+  ]);
+  const visitsByParkId = new Map<number, PublicVisitRow[]>();
+
+  for (const visit of visitRows) {
+    const visits = visitsByParkId.get(visit.parkId) ?? [];
+    visits.push(visit);
+    visitsByParkId.set(visit.parkId, visits);
+  }
+
+  return parkRows.map((parkRow) =>
+    toTripPlannerPark(parkRow, visitsByParkId.get(parkRow.parkId) ?? [])
+  );
 };
 
 export const createVisit = async (database: Database, slug: string, input: PutVisitInput) => {

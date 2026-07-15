@@ -1,9 +1,11 @@
 import { createApp } from './app.js';
 import { createDatabaseClient } from './db/client.js';
-import { createDatabase } from './db/database.js';
+import { createDatabase, type Database } from './db/database.js';
 import { type Env, getEnv, isVercelDeployment } from './env.js';
 import { createMemoryStorage } from './storage/memory-storage.js';
 import { createR2Client } from './storage/r2-client.js';
+import { createGeoapifyClient } from './trip-planner/geoapify.js';
+import { createTripPlannerService } from './trip-planner/search.js';
 
 export const createStorage = (env: Env) => {
   if (env.MEMORY_STORAGE === 'true') {
@@ -45,14 +47,30 @@ export const createAuthConfig = (env: Env) => {
   };
 };
 
+export const createTripPlanner = (env: Env, database: Database) => {
+  if (!env.GEOAPIFY_API_KEY) {
+    return undefined;
+  }
+
+  return createTripPlannerService({
+    database,
+    provider: createGeoapifyClient({
+      apiKey: env.GEOAPIFY_API_KEY
+    })
+  });
+};
+
 export const env = getEnv();
 export const databaseClient = createDatabaseClient();
+export const database = createDatabase(databaseClient);
+export const tripPlanner = createTripPlanner(env, database);
 export const app = createApp({
   apiKey: env.API_KEY,
   allowServerImageUploads: !isVercelDeployment(),
   auth: createAuthConfig(env),
-  database: createDatabase(databaseClient),
+  database,
   getLogoPublicUrl: undefined,
   getMapPublicUrl: undefined,
-  storage: createStorage(env)
+  storage: createStorage(env),
+  tripPlanner
 });

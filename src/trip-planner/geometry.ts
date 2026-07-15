@@ -1,0 +1,456 @@
+import type {
+  BoundingBox,
+  GeoJsonCoordinate,
+  GeoJsonFeatureCollection,
+  LineStringGeometry,
+  PolygonGeometry
+} from '../importer/geometry.js';
+import type { TripPlannerCoordinate } from './types.js';
+
+type CartesianPoint = {
+  x: number;
+  y: number;
+};
+
+type PlanarProjector = {
+  toCartesian: (coordinate: GeoJsonCoordinate) => CartesianPoint;
+};
+
+type RouteSegment = {
+  end: GeoJsonCoordinate;
+  start: GeoJsonCoordinate;
+};
+
+const EARTH_METERS_PER_DEGREE = 111_320;
+
+const clamp = (value: number, min: number, max: number) => {
+  return Math.min(Math.max(value, min), max);
+};
+
+const toRadians = (value: number) => (value * Math.PI) / 180;
+
+const createProjector = (reference: TripPlannerCoordinate): PlanarProjector => {
+  const metersPerDegreeLat = EARTH_METERS_PER_DEGREE;
+  const metersPerDegreeLon =
+    EARTH_METERS_PER_DEGREE * Math.cos(toRadians(clamp(reference.lat, -89.9999, 89.9999)));
+
+  return {
+    toCartesian: ([lon, lat]) => ({
+      x: (lon - reference.lon) * metersPerDegreeLon,
+      y: (lat - reference.lat) * metersPerDegreeLat
+    })
+  };
+};
+
+const createBBoxReferencePoint = (boundingBox: BoundingBox): TripPlannerCoordinate => {
+  return {
+    lat: (boundingBox.minLat + boundingBox.maxLat) / 2,
+    lon: (boundingBox.minLon + boundingBox.maxLon) / 2
+  };
+};
+
+const subtract = (a: CartesianPoint, b: CartesianPoint) => ({
+  x: a.x - b.x,
+  y: a.y - b.y
+});
+
+const dot = (a: CartesianPoint, b: CartesianPoint) => a.x * b.x + a.y * b.y;
+
+const squaredLength = (point: CartesianPoint) => point.x * point.x + point.y * point.y;
+
+const pointToSegmentDistanceMeters = (
+  point: CartesianPoint,
+  start: CartesianPoint,
+  end: CartesianPoint
+) => {
+  const segment = subtract(end, start);
+  const segmentLength = squaredLength(segment);
+
+  if (segmentLength === 0) {
+    return Math.hypot(point.x - start.x, point.y - start.y);
+  }
+
+  const projection = clamp(dot(subtract(point, start), segment) / segmentLength, 0, 1);
+  const closest = {
+    x: start.x + segment.x * projection,
+    y: start.y + segment.y * projection
+  };
+
+  return Math.hypot(point.x - closest.x, point.y - closest.y);
+};
+
+const cross = (a: CartesianPoint, b: CartesianPoint, c: CartesianPoint) => {
+  return (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
+};
+
+const isPointOnSegment = (point: CartesianPoint, start: CartesianPoint, end: CartesianPoint) => {
+  const minX = Math.min(start.x, end.x) - 1e-9;
+  const maxX = Math.max(start.x, end.x) + 1e-9;
+  const minY = Math.min(start.y, end.y) - 1e-9;
+  const maxY = Math.max(start.y, end.y) + 1e-9;
+
+  return (
+    Math.abs(cross(start, end, point)) <= 1e-9 &&
+    point.x >= minX &&
+    point.x <= maxX &&
+    point.y >= minY &&
+    point.y <= maxY
+  );
+};
+
+const segmentsIntersect = (
+  firstStart: CartesianPoint,
+  firstEnd: CartesianPoint,
+  secondStart: CartesianPoint,
+  secondEnd: CartesianPoint
+) => {
+  const d1 = cross(firstStart, firstEnd, secondStart);
+  const d2 = cross(firstStart, firstEnd, secondEnd);
+  const d3 = cross(secondStart, secondEnd, firstStart);
+  const d4 = cross(secondStart, secondEnd, firstEnd);
+  const firstStraddles = d1 * d2 < 0;
+  const secondStraddles = d3 * d4 < 0;
+
+  if (firstStraddles && secondStraddles) {
+    return true;
+  }
+
+  return (
+    isPointOnSegment(secondStart, firstStart, firstEnd) ||
+    isPointOnSegment(secondEnd, firstStart, firstEnd) ||
+    isPointOnSegment(firstStart, secondStart, secondEnd) ||
+    isPointOnSegment(firstEnd, secondStart, secondEnd)
+  );
+};
+
+const segmentToSegmentDistanceMeters = (
+  firstStart: CartesianPoint,
+  firstEnd: CartesianPoint,
+  secondStart: CartesianPoint,
+  secondEnd: CartesianPoint
+) => {
+  if (segmentsIntersect(firstStart, firstEnd, secondStart, secondEnd)) {
+    return 0;
+  }
+
+  return Math.min(
+    pointToSegmentDistanceMeters(firstStart, secondStart, secondEnd),
+    pointToSegmentDistanceMeters(firstEnd, secondStart, secondEnd),
+    pointToSegmentDistanceMeters(secondStart, firstStart, firstEnd),
+    pointToSegmentDistanceMeters(secondEnd, firstStart, firstEnd)
+  );
+};
+
+const pointInRing = (point: GeoJsonCoordinate, ring: GeoJsonCoordinate[]) => {
+  const [x, y] = point;
+  let inside = false;
+
+  for (
+    let index = 0, previousIndex = ring.length - 1;
+    index < ring.length;
+    previousIndex = index++
+  ) {
+    const [currentX, currentY] = ring[index]!;
+    const [previousX, previousY] = ring[previousIndex]!;
+    const intersects =
+      currentY > y !== previousY > y &&
+      x < ((previousX - currentX) * (y - currentY)) / (previousY - currentY) + currentX;
+
+    if (intersects) {
+      inside = !inside;
+    }
+  }
+
+  return inside;
+};
+
+const pointInPolygon = (point: GeoJsonCoordinate, polygon: PolygonGeometry) => {
+  if (!pointInRing(point, polygon.coordinates[0] ?? [])) {
+    return false;
+  }
+
+  for (let index = 1; index < polygon.coordinates.length; index += 1) {
+    if (pointInRing(point, polygon.coordinates[index]!)) {
+      return false;
+    }
+  }
+
+  return true;
+};
+
+const createSegments = (coordinates: GeoJsonCoordinate[]) => {
+  const segments: RouteSegment[] = [];
+
+  for (let index = 1; index < coordinates.length; index += 1) {
+    segments.push({
+      end: coordinates[index]!,
+      start: coordinates[index - 1]!
+    });
+  }
+
+  return segments;
+};
+
+const getRouteSegments = (route: GeoJsonFeatureCollection) => {
+  return route.features.flatMap((feature) =>
+    feature.geometry.type === 'LineString' ? createSegments(feature.geometry.coordinates) : []
+  );
+};
+
+const getRoutePoints = (route: GeoJsonFeatureCollection) => {
+  return route.features.flatMap((feature) =>
+    feature.geometry.type === 'LineString' ? feature.geometry.coordinates : []
+  );
+};
+
+const ringDistanceMeters = (
+  routeSegments: RouteSegment[],
+  ring: GeoJsonCoordinate[],
+  projector: PlanarProjector
+) => {
+  const ringSegments = createSegments(ring);
+
+  if (ringSegments.length === 0 || routeSegments.length === 0) {
+    return Number.POSITIVE_INFINITY;
+  }
+
+  let minimumDistance = Number.POSITIVE_INFINITY;
+
+  for (const routeSegment of routeSegments) {
+    const routeStart = projector.toCartesian(routeSegment.start);
+    const routeEnd = projector.toCartesian(routeSegment.end);
+
+    for (const ringSegment of ringSegments) {
+      const ringStart = projector.toCartesian(ringSegment.start);
+      const ringEnd = projector.toCartesian(ringSegment.end);
+      minimumDistance = Math.min(
+        minimumDistance,
+        segmentToSegmentDistanceMeters(routeStart, routeEnd, ringStart, ringEnd)
+      );
+
+      if (minimumDistance === 0) {
+        return 0;
+      }
+    }
+  }
+
+  return minimumDistance;
+};
+
+const getRouteToLineStringDistanceMeters = (
+  routeSegments: RouteSegment[],
+  lineString: LineStringGeometry,
+  projector: PlanarProjector
+) => {
+  const lineSegments = createSegments(lineString.coordinates);
+
+  if (routeSegments.length === 0 || lineSegments.length === 0) {
+    return Number.POSITIVE_INFINITY;
+  }
+
+  let minimumDistance = Number.POSITIVE_INFINITY;
+
+  for (const routeSegment of routeSegments) {
+    const routeStart = projector.toCartesian(routeSegment.start);
+    const routeEnd = projector.toCartesian(routeSegment.end);
+
+    for (const lineSegment of lineSegments) {
+      const lineStart = projector.toCartesian(lineSegment.start);
+      const lineEnd = projector.toCartesian(lineSegment.end);
+      minimumDistance = Math.min(
+        minimumDistance,
+        segmentToSegmentDistanceMeters(routeStart, routeEnd, lineStart, lineEnd)
+      );
+
+      if (minimumDistance === 0) {
+        return 0;
+      }
+    }
+  }
+
+  return minimumDistance;
+};
+
+const getRouteToPolygonDistanceMeters = (
+  routeSegments: RouteSegment[],
+  routePoints: GeoJsonCoordinate[],
+  polygon: PolygonGeometry,
+  projector: PlanarProjector
+) => {
+  if (routePoints.some((point) => pointInPolygon(point, polygon))) {
+    return 0;
+  }
+
+  let minimumDistance = Number.POSITIVE_INFINITY;
+
+  for (const ring of polygon.coordinates) {
+    minimumDistance = Math.min(minimumDistance, ringDistanceMeters(routeSegments, ring, projector));
+
+    if (minimumDistance === 0) {
+      return 0;
+    }
+  }
+
+  return minimumDistance;
+};
+
+const createBoundingBoxPolygon = (boundingBox: BoundingBox): PolygonGeometry => ({
+  coordinates: [
+    [
+      [boundingBox.minLon, boundingBox.minLat],
+      [boundingBox.maxLon, boundingBox.minLat],
+      [boundingBox.maxLon, boundingBox.maxLat],
+      [boundingBox.minLon, boundingBox.maxLat],
+      [boundingBox.minLon, boundingBox.minLat]
+    ]
+  ],
+  type: 'Polygon'
+});
+
+export const deriveBoundingBox = (route: GeoJsonFeatureCollection): BoundingBox => {
+  return route.features.reduce<BoundingBox>(
+    (boundingBox, feature) => {
+      const coordinates =
+        feature.geometry.type === 'LineString'
+          ? feature.geometry.coordinates
+          : feature.geometry.coordinates.flat();
+
+      for (const [lon, lat] of coordinates) {
+        boundingBox.minLon = Math.min(boundingBox.minLon, lon);
+        boundingBox.minLat = Math.min(boundingBox.minLat, lat);
+        boundingBox.maxLon = Math.max(boundingBox.maxLon, lon);
+        boundingBox.maxLat = Math.max(boundingBox.maxLat, lat);
+      }
+
+      return boundingBox;
+    },
+    {
+      maxLat: Number.NEGATIVE_INFINITY,
+      maxLon: Number.NEGATIVE_INFINITY,
+      minLat: Number.POSITIVE_INFINITY,
+      minLon: Number.POSITIVE_INFINITY
+    }
+  );
+};
+
+export const expandBoundingBoxByKm = (
+  boundingBox: BoundingBox,
+  distanceKm: number
+): BoundingBox => {
+  const centerLat = (boundingBox.minLat + boundingBox.maxLat) / 2;
+  const latDelta = distanceKm / 110.574;
+  const lonDelta = distanceKm / (111.32 * Math.cos(toRadians(clamp(centerLat, -89.9999, 89.9999))));
+
+  return {
+    maxLat: boundingBox.maxLat + latDelta,
+    maxLon: boundingBox.maxLon + lonDelta,
+    minLat: boundingBox.minLat - latDelta,
+    minLon: boundingBox.minLon - lonDelta
+  };
+};
+
+export const boundingBoxesIntersect = (first: BoundingBox, second: BoundingBox) => {
+  return !(
+    first.maxLon < second.minLon ||
+    first.minLon > second.maxLon ||
+    first.maxLat < second.minLat ||
+    first.minLat > second.maxLat
+  );
+};
+
+export const getRouteDistanceToPointMeters = (
+  route: GeoJsonFeatureCollection,
+  point: TripPlannerCoordinate
+) => {
+  const routeBoundingBox = deriveBoundingBox(route);
+  const projector = createProjector(createBBoxReferencePoint(routeBoundingBox));
+  const routeSegments = getRouteSegments(route);
+  const projectedPoint = projector.toCartesian([point.lon, point.lat]);
+
+  if (routeSegments.length === 0) {
+    return Number.POSITIVE_INFINITY;
+  }
+
+  return routeSegments.reduce((minimumDistance, routeSegment) => {
+    const routeStart = projector.toCartesian(routeSegment.start);
+    const routeEnd = projector.toCartesian(routeSegment.end);
+
+    return Math.min(
+      minimumDistance,
+      pointToSegmentDistanceMeters(projectedPoint, routeStart, routeEnd)
+    );
+  }, Number.POSITIVE_INFINITY);
+};
+
+export const getRouteDistanceToBoundingBoxMeters = (
+  route: GeoJsonFeatureCollection,
+  boundingBox: BoundingBox
+) => {
+  return getRouteDistanceToPolygonMeters(route, createBoundingBoxPolygon(boundingBox));
+};
+
+export const getRouteDistanceToPolygonMeters = (
+  route: GeoJsonFeatureCollection,
+  polygon: PolygonGeometry
+) => {
+  const routeBoundingBox = deriveBoundingBox(route);
+  const polygonBoundingBox = deriveBoundingBox({
+    features: [{ geometry: polygon, type: 'Feature' }],
+    type: 'FeatureCollection'
+  });
+  const projector = createProjector(
+    createBBoxReferencePoint({
+      maxLat: Math.max(routeBoundingBox.maxLat, polygonBoundingBox.maxLat),
+      maxLon: Math.max(routeBoundingBox.maxLon, polygonBoundingBox.maxLon),
+      minLat: Math.min(routeBoundingBox.minLat, polygonBoundingBox.minLat),
+      minLon: Math.min(routeBoundingBox.minLon, polygonBoundingBox.minLon)
+    })
+  );
+  const routeSegments = getRouteSegments(route);
+  const routePoints = getRoutePoints(route);
+
+  return getRouteToPolygonDistanceMeters(routeSegments, routePoints, polygon, projector);
+};
+
+export const getRouteDistanceToLineStringMeters = (
+  route: GeoJsonFeatureCollection,
+  lineString: LineStringGeometry
+) => {
+  const routeBoundingBox = deriveBoundingBox(route);
+  const lineBoundingBox = deriveBoundingBox({
+    features: [{ geometry: lineString, type: 'Feature' }],
+    type: 'FeatureCollection'
+  });
+  const projector = createProjector(
+    createBBoxReferencePoint({
+      maxLat: Math.max(routeBoundingBox.maxLat, lineBoundingBox.maxLat),
+      maxLon: Math.max(routeBoundingBox.maxLon, lineBoundingBox.maxLon),
+      minLat: Math.min(routeBoundingBox.minLat, lineBoundingBox.minLat),
+      minLon: Math.min(routeBoundingBox.minLon, lineBoundingBox.minLon)
+    })
+  );
+
+  return getRouteToLineStringDistanceMeters(getRouteSegments(route), lineString, projector);
+};
+
+export const getRouteDistanceToFeatureCollectionMeters = (
+  route: GeoJsonFeatureCollection,
+  featureCollection: GeoJsonFeatureCollection
+) => {
+  let minimumDistance = Number.POSITIVE_INFINITY;
+
+  for (const feature of featureCollection.features) {
+    minimumDistance = Math.min(
+      minimumDistance,
+      feature.geometry.type === 'Polygon'
+        ? getRouteDistanceToPolygonMeters(route, feature.geometry)
+        : getRouteDistanceToLineStringMeters(route, feature.geometry)
+    );
+
+    if (minimumDistance === 0) {
+      return 0;
+    }
+  }
+
+  return minimumDistance;
+};

@@ -10,6 +10,7 @@ const envSchema = z.object({
   DATABASE_AUTH_TOKEN: z.string().optional(),
   DATABASE_URL: z.string().default('file:./data/local.db'),
   FRONTEND_URL: z.string().url().default('http://localhost:4300'),
+  GEOAPIFY_API_KEY: z.string().min(1).optional(),
   GOOGLE_CLIENT_ID: z.string().optional(),
   GOOGLE_CLIENT_SECRET: z.string().optional(),
   GOOGLE_REDIRECT_URI: z.string().url().optional(),

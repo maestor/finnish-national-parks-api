@@ -1,0 +1,350 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { createApp } from '../../src/app.js';
+import { createVisit } from '../../src/db/repositories.js';
+import { importParks } from '../../src/importer/import-parks.js';
+import { createGeoapifyClient } from '../../src/trip-planner/geoapify.js';
+import { createTripPlannerService } from '../../src/trip-planner/search.js';
+import { createLipasPark, parkTypeFixtures } from '../fixtures/lipas.js';
+import { createTestDatabase } from '../helpers/test-db.js';
+
+const createPolygon = (minLon: number, minLat: number, maxLon: number, maxLat: number) => ({
+  features: [
+    {
+      geometry: {
+        coordinates: [
+          [
+            [minLon, minLat],
+            [maxLon, minLat],
+            [maxLon, maxLat],
+            [minLon, maxLat],
+            [minLon, minLat]
+          ]
+        ],
+        type: 'Polygon' as const
+      },
+      type: 'Feature' as const
+    }
+  ],
+  type: 'FeatureCollection' as const
+});
+
+const mockGeoapifyFetch = ({
+  destinationFound = true,
+  originFound = true,
+  routeStatus = 200
+} = {}) => {
+  return vi.fn().mockImplementation((input: string | URL) => {
+    const url = new URL(String(input));
+
+    if (url.pathname === '/v1/geocode/search') {
+      const text = url.searchParams.get('text');
+
+      if (text === 'Origin') {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              results: originFound ? [{ formatted: 'Origin label', lat: 60, lon: 24 }] : []
+            }),
+            {
+              headers: { 'content-type': 'application/json' },
+              status: 200
+            }
+          )
+        );
+      }
+
+      if (text === 'Destination') {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              results: destinationFound
+                ? [{ formatted: 'Destination label', lat: 60, lon: 24.3 }]
+                : []
+            }),
+            {
+              headers: { 'content-type': 'application/json' },
+              status: 200
+            }
+          )
+        );
+      }
+    }
+
+    if (url.pathname === '/v1/routing') {
+      return Promise.resolve(
+        new Response(
+          routeStatus === 200
+            ? JSON.stringify({
+                features: [
+                  {
+                    geometry: {
+                      coordinates: [
+                        [
+                          [24, 60],
+                          [24.3, 60]
+                        ]
+                      ],
+                      type: 'MultiLineString'
+                    },
+                    properties: {
+                      distance: 20_000,
+                      time: 1_200
+                    }
+                  }
+                ]
+              })
+            : 'provider down',
+          {
+            headers: { 'content-type': 'application/json' },
+            status: routeStatus
+          }
+        )
+      );
+    }
+
+    return Promise.resolve(new Response('not found', { status: 404 }));
+  });
+};
+
+describe('trip planner route', () => {
+  let testDatabase: Awaited<ReturnType<typeof createTestDatabase>>;
+
+  beforeEach(async () => {
+    testDatabase = await createTestDatabase();
+
+    await importParks({
+      database: testDatabase.database,
+      expectedActiveCount: 3,
+      now: () => '2026-07-15T18:00:00.000Z',
+      sourceUrl: 'https://example.test/lipas',
+      fetchSource: async () => ({
+        items: [
+          createLipasPark({
+            'lipas-id': 1001,
+            location: {
+              address: 'Reitinvieri 1',
+              geometries: createPolygon(24.11, 60.04, 24.16, 60.06),
+              'postal-office': 'Espoo'
+            },
+            name: 'Reitinvieri',
+            www: 'https://www.luontoon.fi/reitinvieri'
+          }),
+          createLipasPark({
+            'lipas-id': 1002,
+            location: {
+              address: 'Reittipuisto 2',
+              geometries: createPolygon(24.2, 59.995, 24.24, 60.005),
+              'postal-office': 'Vantaa'
+            },
+            name: 'Reittipuisto',
+            type: {
+              'type-code': parkTypeFixtures.otherNatureReserve.typeCode
+            },
+            www: 'https://www.luontoon.fi/reittipuisto'
+          }),
+          createLipasPark({
+            'lipas-id': 1003,
+            location: {
+              address: 'Kaukopuisto 3',
+              geometries: createPolygon(24.1, 60.33, 24.18, 60.37),
+              'postal-office': 'Lahti'
+            },
+            name: 'Kaukopuisto',
+            type: {
+              'type-code': parkTypeFixtures.outdoorRecreationArea.typeCode
+            },
+            www: 'https://www.luontoon.fi/kaukopuisto'
+          })
+        ]
+      })
+    });
+
+    await createVisit(testDatabase.database, 'reittipuisto', {
+      visitedOn: '2026-07-10'
+    });
+  });
+
+  afterEach(async () => {
+    await testDatabase.dispose();
+    vi.restoreAllMocks();
+  });
+
+  const createTripPlannerApp = (fetchFn: typeof fetch) => {
+    return createApp({
+      apiKey: 'test-api-key',
+      database: testDatabase.database,
+      tripPlanner: createTripPlannerService({
+        database: testDatabase.database,
+        provider: createGeoapifyClient({
+          apiKey: 'geoapify-test',
+          fetchFn
+        })
+      })
+    });
+  };
+
+  const requestAsRemote = (
+    app: ReturnType<typeof createApp>,
+    body: Record<string, unknown>,
+    headers: Record<string, string> = {}
+  ) => {
+    return app.request('/api/trip-planner/search', {
+      body: JSON.stringify(body),
+      headers: {
+        authorization: 'Bearer test-api-key',
+        'content-type': 'application/json',
+        host: 'parks.example.com',
+        'x-forwarded-for': '203.0.113.1',
+        ...headers
+      },
+      method: 'POST'
+    });
+  };
+
+  it('returns route-nearby parks with visited summaries and unvisited-first ordering', async () => {
+    const app = createTripPlannerApp(mockGeoapifyFetch() as typeof fetch);
+    const response = await requestAsRemote(app, {
+      destinationQuery: 'Destination',
+      mode: 'drive',
+      originQuery: 'Origin'
+    });
+    const body = (await response.json()) as {
+      destination: { label: string };
+      origin: { label: string };
+      parks: Array<{
+        distanceFromRouteKm: number;
+        slug: string;
+        visitedSummary: { visitCount: number; visited: boolean };
+      }>;
+      route: { distanceMeters: number; durationSeconds: number; mode: string };
+    };
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('cache-control')).toBe('private, no-store');
+    expect(body.origin.label).toBe('Origin label');
+    expect(body.destination.label).toBe('Destination label');
+    expect(body.route).toEqual({
+      distanceMeters: 20_000,
+      durationSeconds: 1_200,
+      mode: 'drive'
+    });
+    expect(body.parks.map((park) => park.slug)).toEqual(['reitinvieri', 'reittipuisto']);
+    expect(body.parks[0]?.visitedSummary).toEqual({
+      lastVisitedOn: null,
+      visitCount: 0,
+      visited: false
+    });
+    expect(body.parks[1]?.visitedSummary).toEqual({
+      lastVisitedOn: '2026-07-10',
+      visitCount: 1,
+      visited: true
+    });
+    expect(body.parks[0]?.distanceFromRouteKm).toBeGreaterThan(4);
+    expect(body.parks[1]?.distanceFromRouteKm).toBe(0);
+  });
+
+  it('returns 422 when the origin cannot be geocoded', async () => {
+    const app = createTripPlannerApp(mockGeoapifyFetch({ originFound: false }) as typeof fetch);
+    const response = await requestAsRemote(app, {
+      destinationQuery: 'Destination',
+      mode: 'drive',
+      originQuery: 'Origin'
+    });
+    const body = (await response.json()) as {
+      error: string;
+      errorCode: string;
+    };
+
+    expect(response.status).toBe(422);
+    expect(body).toEqual({
+      error: 'Origin was not found.',
+      errorCode: 'origin_not_found'
+    });
+  });
+
+  it('returns 503 when Geoapify routing is unavailable', async () => {
+    const app = createTripPlannerApp(mockGeoapifyFetch({ routeStatus: 503 }) as typeof fetch);
+    const response = await requestAsRemote(app, {
+      destinationQuery: 'Destination',
+      mode: 'drive',
+      originQuery: 'Origin'
+    });
+    const body = (await response.json()) as {
+      error: string;
+      errorCode: string;
+    };
+
+    expect(response.status).toBe(503);
+    expect(body).toEqual({
+      error: 'Trip planner provider is unavailable.',
+      errorCode: 'provider_unavailable'
+    });
+  });
+
+  it('requires bearer auth for remote requests', async () => {
+    const app = createTripPlannerApp(mockGeoapifyFetch() as typeof fetch);
+    const response = await app.request('/api/trip-planner/search', {
+      body: JSON.stringify({
+        destinationQuery: 'Destination',
+        mode: 'drive',
+        originQuery: 'Origin'
+      }),
+      headers: {
+        'content-type': 'application/json',
+        host: 'parks.example.com',
+        'x-forwarded-for': '203.0.113.1'
+      },
+      method: 'POST'
+    });
+    const body = (await response.json()) as { error: string };
+
+    expect(response.status).toBe(401);
+    expect(body.error).toBe('Unauthorized');
+  });
+
+  it('returns 503 when trip planner is not configured', async () => {
+    const app = createApp({
+      apiKey: 'test-api-key',
+      database: testDatabase.database
+    });
+    const response = await requestAsRemote(app, {
+      destinationQuery: 'Destination',
+      mode: 'drive',
+      originQuery: 'Origin'
+    });
+    const body = (await response.json()) as {
+      error: string;
+      errorCode: string;
+    };
+
+    expect(response.status).toBe(503);
+    expect(body).toEqual({
+      error: 'Trip planner is not configured.',
+      errorCode: 'trip_planner_not_configured'
+    });
+  });
+
+  it('returns 500 when the trip planner throws an unexpected error', async () => {
+    const app = createApp({
+      apiKey: 'test-api-key',
+      database: testDatabase.database,
+      tripPlanner: {
+        search: async () => {
+          throw new Error('unexpected');
+        }
+      }
+    });
+    const response = await requestAsRemote(app, {
+      destinationQuery: 'Destination',
+      mode: 'drive',
+      originQuery: 'Origin'
+    });
+    const body = (await response.json()) as { error: string };
+
+    expect(response.status).toBe(500);
+    expect(body).toEqual({
+      error: 'Internal server error.'
+    });
+  });
+});

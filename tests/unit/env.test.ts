@@ -10,6 +10,7 @@ const createEnv = (overrides: Partial<Env> = {}): Env => {
     DATABASE_AUTH_TOKEN: 'test-db-token',
     DATABASE_URL: 'libsql://parks-db.turso.io',
     FRONTEND_URL: 'https://parks.example.com',
+    GEOAPIFY_API_KEY: undefined,
     GOOGLE_CLIENT_ID: undefined,
     GOOGLE_CLIENT_SECRET: undefined,
     GOOGLE_REDIRECT_URI: undefined,
