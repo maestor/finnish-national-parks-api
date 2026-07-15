@@ -82,12 +82,14 @@ If an upload limit exists, at least one test should cover the real stored-object
 - Park responses expose raw `locationLabel`, `postalCode`, and `postalOffice` fields from the database, plus a derived `address` string for display use.
 - `GET /api/public/home-summary` returns cache-friendly frontend-public summary data including seasonal visit counts, `progressByType` visibility flags, and aggregated `progressByCategory`, without notes, routes, or images.
 - `GET /api/public/map-summary` returns lightweight frontend-public map data plus per-park visited summaries.
+- `POST /api/trip-planner/search` geocodes endpoints server-side, filters parks against the real routed path, excludes parks outside the corridor, and preserves the documented unvisited-first ordering.
 - `GET /api/parks/:slug/visits` returns park-scoped visit history and visited summary.
 - `GET /api/visits` and `GET /api/visits/:id` expose visit resources with parent park references.
 - Catalog and public summary `GET` endpoints emit ETags and return `304 Not Modified` for matching `If-None-Match`.
 - Catalog `GET` endpoints are safe for public caching.
 - Public summary endpoints use shared-cache headers and bump their version signal when visit or visit-image public data changes.
 - Visit and management endpoints are private or no-store.
+- Trip planner provider failures surface as stable app errors instead of raw Geoapify responses.
 - All write routes and admin-only visibility reads require an admin session and fail closed when OAuth session auth is unavailable.
 - Park removal toggle can hide and restore a park through the authenticated park-management API.
 - Visit create/edit/delete supports optional route and author fields.

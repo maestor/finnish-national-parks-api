@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Env } from '../../src/env.js';
-import { createAuthConfig, createStorage } from '../../src/runtime.js';
+import { createAuthConfig, createStorage, createTripPlanner } from '../../src/runtime.js';
 
 const createEnv = (overrides: Partial<Env> = {}): Env => {
   return {
@@ -10,6 +10,7 @@ const createEnv = (overrides: Partial<Env> = {}): Env => {
     DATABASE_AUTH_TOKEN: 'test-db-token',
     DATABASE_URL: 'libsql://parks-db.turso.io',
     FRONTEND_URL: 'https://parks.example.com',
+    GEOAPIFY_API_KEY: undefined,
     GOOGLE_CLIENT_ID: undefined,
     GOOGLE_CLIENT_SECRET: undefined,
     GOOGLE_REDIRECT_URI: undefined,
@@ -89,5 +90,19 @@ describe('runtime helpers', () => {
       googleRedirectUri: 'https://parks.example.com/auth/google/callback',
       jwtSecret: '12345678901234567890123456789012'
     });
+  });
+
+  it('creates a trip planner service only when a Geoapify key is configured', () => {
+    expect(createTripPlanner(createEnv(), {} as never)).toBeUndefined();
+
+    const tripPlanner = createTripPlanner(
+      createEnv({
+        GEOAPIFY_API_KEY: 'geoapify-key'
+      }),
+      {} as never
+    );
+
+    expect(tripPlanner).toBeDefined();
+    expect(typeof tripPlanner?.search).toBe('function');
   });
 });
