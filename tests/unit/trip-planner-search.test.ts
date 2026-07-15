@@ -269,7 +269,7 @@ describe('trip planner service', () => {
     ]);
   });
 
-  it('orders unvisited areas by preferred type priority before distance', async () => {
+  it('keeps national parks first and sorts other unvisited areas by distance', async () => {
     listTripPlannerCandidateParks.mockResolvedValue([
       createCandidate({
         boundaryGeoJson: null,
@@ -316,6 +316,23 @@ describe('trip planner service', () => {
           slug: 'hiking-area'
         }
       }),
+      createCandidate({
+        boundaryGeoJson: null,
+        boundingBox: {
+          maxLat: 60.005,
+          maxLon: 24.09,
+          minLat: 60.003,
+          minLon: 24.08
+        },
+        name: 'Near Wilderness Area',
+        slug: 'near-wilderness-area',
+        type: {
+          code: 110,
+          id: 110,
+          name: 'Erämaa-alue',
+          slug: 'wilderness-area'
+        }
+      }),
       createTrailCandidate({
         boundaryGeoJson: null,
         boundingBox: {
@@ -341,8 +358,9 @@ describe('trip planner service', () => {
 
     expect(result.parks.map((park) => park.slug)).toEqual([
       'far-national-park',
-      'mid-hiking-area',
       'nearby-outdoor-area',
+      'near-wilderness-area',
+      'mid-hiking-area',
       'trail-result'
     ]);
   });
