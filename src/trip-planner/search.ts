@@ -7,7 +7,8 @@ import {
   getRouteDistanceToBoundingBoxMeters,
   getRouteDistanceToFeatureCollectionMeters,
   getRouteDistanceToPointMeters,
-  simplifyRouteGeometry
+  simplifyRouteGeometry,
+  toRouteLineString
 } from './geometry.js';
 import type {
   TripPlannerMode,
@@ -149,6 +150,12 @@ export const createTripPlannerService = ({
           route.geometry,
           ROUTE_DISTANCE_SIMPLIFICATION_TOLERANCE_METERS
         );
+        const routeLineString = toRouteLineString(routeGeometry);
+
+        if (!routeLineString) {
+          throw new TripPlannerError('route_not_found', 'Route was not found.', 422);
+        }
+
         const parks = (await listTripPlannerCandidateParks(database))
           .filter((park) => boundingBoxesIntersect(candidateBoundingBox, park.boundingBox))
           .map((park) => ({
@@ -158,6 +165,7 @@ export const createTripPlannerService = ({
           .filter(({ distanceFromRouteMeters }) => distanceFromRouteMeters <= maxDistanceMeters)
           .map(({ distanceFromRouteMeters, park }) => ({
             address: park.address,
+            boundingBox: park.boundingBox,
             category: park.category,
             ...(park.displayTypeName ? { displayTypeName: park.displayTypeName } : {}),
             distanceFromRouteKm: roundDistanceKm(distanceFromRouteMeters),
@@ -176,8 +184,10 @@ export const createTripPlannerService = ({
           origin,
           parks: orderResults(parks),
           route: {
+            boundingBox: route.boundingBox,
             distanceMeters: route.distanceMeters,
             durationSeconds: route.durationSeconds,
+            geometry: routeLineString,
             mode: route.mode
           }
         };

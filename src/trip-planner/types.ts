@@ -1,4 +1,8 @@
-import type { BoundingBox, GeoJsonFeatureCollection } from '../importer/geometry.js';
+import type {
+  BoundingBox,
+  GeoJsonFeatureCollection,
+  LineStringGeometry
+} from '../importer/geometry.js';
 import type { SupportedParkCategorySlug, SupportedParkTypeSlug } from '../parks/park-types.js';
 
 export type TripPlannerMode = 'drive';
@@ -62,10 +66,7 @@ export type TripPlannerParkCandidate = {
   visitedSummary: TripPlannerVisitedSummary;
 };
 
-export type TripPlannerParkResult = Omit<
-  TripPlannerParkCandidate,
-  'boundingBox' | 'boundaryGeoJson'
-> & {
+export type TripPlannerParkResult = Omit<TripPlannerParkCandidate, 'boundaryGeoJson'> & {
   distanceFromRouteKm: number;
 };
 
@@ -74,8 +75,10 @@ export type TripPlannerSearchResponse = {
   origin: TripPlannerResolvedLocation;
   parks: TripPlannerParkResult[];
   route: {
+    boundingBox: BoundingBox;
     distanceMeters: number;
     durationSeconds: number;
+    geometry: LineStringGeometry;
     mode: TripPlannerMode;
   };
 };

@@ -551,6 +551,86 @@ describe('trip planner service', () => {
     expect(result.parks[0]?.displayTypeName).toBe('Retkikohde');
   });
 
+  it('returns map-ready route geometry and park bounding boxes', async () => {
+    listTripPlannerCandidateParks.mockResolvedValue([
+      createCandidate({
+        boundingBox: {
+          maxLat: 60.01,
+          maxLon: 24.05,
+          minLat: 59.99,
+          minLon: 24.02
+        }
+      })
+    ]);
+    const service = createTripPlannerService({
+      database: {} as Database,
+      provider: createProvider({
+        route: vi.fn(async () => ({
+          boundingBox: {
+            maxLat: 60.01,
+            maxLon: 24.2,
+            minLat: 59.99,
+            minLon: 24
+          },
+          distanceMeters: 12_345,
+          durationSeconds: 1_234,
+          geometry: {
+            features: [
+              {
+                geometry: {
+                  coordinates: [[24, 60] as [number, number], [24.1, 60] as [number, number]],
+                  type: 'LineString' as const
+                },
+                type: 'Feature' as const
+              },
+              {
+                geometry: {
+                  coordinates: [[24.1, 60] as [number, number], [24.2, 60.01] as [number, number]],
+                  type: 'LineString' as const
+                },
+                type: 'Feature' as const
+              }
+            ],
+            type: 'FeatureCollection' as const
+          },
+          mode: 'drive' as const
+        }))
+      })
+    });
+
+    const result = await service.search({
+      destinationQuery: 'Destination',
+      mode: 'drive',
+      originQuery: 'Origin'
+    });
+
+    expect(result.route).toEqual({
+      boundingBox: {
+        maxLat: 60.01,
+        maxLon: 24.2,
+        minLat: 59.99,
+        minLon: 24
+      },
+      distanceMeters: 12_345,
+      durationSeconds: 1_234,
+      geometry: {
+        coordinates: [
+          [24, 60],
+          [24.1, 60],
+          [24.2, 60.01]
+        ],
+        type: 'LineString'
+      },
+      mode: 'drive'
+    });
+    expect(result.parks[0]?.boundingBox).toEqual({
+      maxLat: 60.01,
+      maxLon: 24.05,
+      minLat: 59.99,
+      minLon: 24.02
+    });
+  });
+
   it('uses bounding box distance when geometry is missing but bounds are finite', async () => {
     listTripPlannerCandidateParks.mockResolvedValue([
       createCandidate({
@@ -658,6 +738,49 @@ describe('trip planner service', () => {
       database: {} as Database,
       provider: createProvider({
         route: vi.fn(async () => null)
+      })
+    });
+
+    await expect(
+      service.search({
+        destinationQuery: 'Destination',
+        mode: 'drive',
+        originQuery: 'Origin'
+      })
+    ).rejects.toMatchObject({
+      code: 'route_not_found',
+      status: 422
+    });
+  });
+
+  it('returns route_not_found when routing geometry cannot produce a displayable line', async () => {
+    listTripPlannerCandidateParks.mockResolvedValue([]);
+    const service = createTripPlannerService({
+      database: {} as Database,
+      provider: createProvider({
+        route: vi.fn(async () => ({
+          boundingBox: {
+            maxLat: 60,
+            maxLon: 24,
+            minLat: 60,
+            minLon: 24
+          },
+          distanceMeters: 12_345,
+          durationSeconds: 1_234,
+          geometry: {
+            features: [
+              {
+                geometry: {
+                  coordinates: [[24, 60] as [number, number], [24, 60] as [number, number]],
+                  type: 'LineString' as const
+                },
+                type: 'Feature' as const
+              }
+            ],
+            type: 'FeatureCollection' as const
+          },
+          mode: 'drive' as const
+        }))
       })
     });
 

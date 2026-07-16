@@ -237,11 +237,31 @@ describe('trip planner route', () => {
       destination: { label: string };
       origin: { label: string };
       parks: Array<{
+        boundingBox: {
+          maxLat: number;
+          maxLon: number;
+          minLat: number;
+          minLon: number;
+        };
         distanceFromRouteKm: number;
         slug: string;
         visitedSummary: { visitCount: number; visited: boolean };
       }>;
-      route: { distanceMeters: number; durationSeconds: number; mode: string };
+      route: {
+        boundingBox: {
+          maxLat: number;
+          maxLon: number;
+          minLat: number;
+          minLon: number;
+        };
+        distanceMeters: number;
+        durationSeconds: number;
+        geometry: {
+          coordinates: Array<[number, number]>;
+          type: string;
+        };
+        mode: string;
+      };
     };
 
     expect(response.status).toBe(200);
@@ -249,8 +269,21 @@ describe('trip planner route', () => {
     expect(body.origin.label).toBe('Origin label');
     expect(body.destination.label).toBe('Destination label');
     expect(body.route).toEqual({
+      boundingBox: {
+        maxLat: 60,
+        maxLon: 24.3,
+        minLat: 60,
+        minLon: 24
+      },
       distanceMeters: 20_000,
       durationSeconds: 1_200,
+      geometry: {
+        coordinates: [
+          [24, 60],
+          [24.3, 60]
+        ],
+        type: 'LineString'
+      },
       mode: 'drive'
     });
     expect(body.parks.map((park) => park.slug)).toEqual([
@@ -276,6 +309,62 @@ describe('trip planner route', () => {
     expect(body.parks[0]?.distanceFromRouteKm).toBeGreaterThan(4);
     expect(body.parks[1]?.distanceFromRouteKm).toBe(0);
     expect(body.parks[2]?.distanceFromRouteKm).toBe(0);
+    expect(body.parks[0]?.boundingBox).toEqual({
+      maxLat: 60.06,
+      maxLon: 24.16,
+      minLat: 60.04,
+      minLon: 24.11
+    });
+  });
+
+  it('publishes trip planner map fields in openapi.json', async () => {
+    const app = createTripPlannerApp(mockGeoapifyFetch() as typeof fetch);
+    const response = await app.request('/openapi.json');
+    const body = (await response.json()) as {
+      paths?: {
+        '/api/trip-planner/search'?: {
+          post?: {
+            responses?: {
+              '200'?: {
+                content?: {
+                  'application/json'?: {
+                    schema?: {
+                      properties?: {
+                        parks?: {
+                          items?: {
+                            properties?: Record<string, unknown>;
+                          };
+                        };
+                        route?: {
+                          properties?: Record<string, unknown>;
+                        };
+                      };
+                    };
+                  };
+                };
+              };
+            };
+          };
+        };
+      };
+    };
+
+    expect(response.status).toBe(200);
+    expect(
+      body.paths?.['/api/trip-planner/search']?.post?.responses?.['200']?.content?.[
+        'application/json'
+      ]?.schema?.properties?.route?.properties
+    ).toMatchObject({
+      boundingBox: expect.any(Object),
+      geometry: expect.any(Object)
+    });
+    expect(
+      body.paths?.['/api/trip-planner/search']?.post?.responses?.['200']?.content?.[
+        'application/json'
+      ]?.schema?.properties?.parks?.items?.properties
+    ).toMatchObject({
+      boundingBox: expect.any(Object)
+    });
   });
 
   it('returns 422 when the origin cannot be geocoded', async () => {
