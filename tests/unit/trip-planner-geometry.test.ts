@@ -10,7 +10,8 @@ import {
   getRouteDistanceToLineStringMeters,
   getRouteDistanceToPointMeters,
   getRouteDistanceToPolygonMeters,
-  simplifyRouteGeometry
+  simplifyRouteGeometry,
+  toRouteLineString
 } from '../../src/trip-planner/geometry.js';
 
 const route: GeoJsonFeatureCollection = {
@@ -64,6 +65,119 @@ describe('trip planner geometry', () => {
 
     expect(distance).toBeGreaterThan(950);
     expect(distance).toBeLessThan(1_050);
+  });
+
+  it('flattens route feature collections into a single display linestring', () => {
+    const lineString = toRouteLineString({
+      features: [
+        {
+          geometry: {
+            coordinates: [
+              [24, 60],
+              [24.05, 60]
+            ],
+            type: 'LineString'
+          },
+          type: 'Feature'
+        },
+        {
+          geometry: {
+            coordinates: [
+              [24.05, 60],
+              [24.1, 60.01]
+            ],
+            type: 'LineString'
+          },
+          type: 'Feature'
+        }
+      ],
+      type: 'FeatureCollection'
+    });
+
+    expect(lineString).toEqual({
+      coordinates: [
+        [24, 60],
+        [24.05, 60],
+        [24.1, 60.01]
+      ],
+      type: 'LineString'
+    });
+  });
+
+  it('returns null when a route has no usable linestring coordinates', () => {
+    expect(
+      toRouteLineString({
+        features: [],
+        type: 'FeatureCollection'
+      })
+    ).toBeNull();
+
+    expect(
+      toRouteLineString({
+        features: [
+          {
+            geometry: {
+              coordinates: [
+                [
+                  [24, 60],
+                  [24.1, 60],
+                  [24.1, 60.1],
+                  [24, 60]
+                ]
+              ],
+              type: 'Polygon'
+            },
+            type: 'Feature'
+          }
+        ],
+        type: 'FeatureCollection'
+      })
+    ).toBeNull();
+  });
+
+  it('drops duplicate consecutive route coordinates and returns null if fewer than two remain', () => {
+    expect(
+      toRouteLineString({
+        features: [
+          {
+            geometry: {
+              coordinates: [
+                [24, 60],
+                [24, 60],
+                [24.1, 60.01]
+              ],
+              type: 'LineString'
+            },
+            type: 'Feature'
+          }
+        ],
+        type: 'FeatureCollection'
+      })
+    ).toEqual({
+      coordinates: [
+        [24, 60],
+        [24.1, 60.01]
+      ],
+      type: 'LineString'
+    });
+
+    expect(
+      toRouteLineString({
+        features: [
+          {
+            geometry: {
+              coordinates: [
+                [24, 60],
+                [24, 60]
+              ],
+              type: 'LineString'
+            },
+            type: 'Feature'
+          }
+        ],
+        type: 'FeatureCollection'
+      })
+    ).toBeNull();
   });
 
   it('returns zero when route and line segments cross at an interior point', () => {

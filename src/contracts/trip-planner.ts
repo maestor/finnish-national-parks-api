@@ -1,7 +1,14 @@
 import { z } from '@hono/zod-openapi';
 
 import { errorSchema } from './common.js';
-import { parkCategorySchema, parkTypeSchema, pointSchema, visitedSummarySchema } from './parks.js';
+import {
+  boundingBoxSchema,
+  geoJsonLineStringSchema,
+  parkCategorySchema,
+  parkTypeSchema,
+  pointSchema,
+  visitedSummarySchema
+} from './parks.js';
 
 export const tripPlannerModeSchema = z.enum(['drive']);
 
@@ -18,13 +25,16 @@ export const tripPlannerLocationSchema = z.object({
 });
 
 export const tripPlannerRouteSchema = z.object({
+  boundingBox: boundingBoxSchema,
   distanceMeters: z.number().nonnegative(),
   durationSeconds: z.number().nonnegative(),
+  geometry: geoJsonLineStringSchema,
   mode: tripPlannerModeSchema
 });
 
 export const tripPlannerParkResultSchema = z.object({
   address: z.string(),
+  boundingBox: boundingBoxSchema,
   category: parkCategorySchema,
   displayTypeName: z.string().nullable().optional(),
   distanceFromRouteKm: z.number().nonnegative(),

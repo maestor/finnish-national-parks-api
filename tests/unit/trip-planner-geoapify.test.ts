@@ -86,6 +86,12 @@ describe('geoapify client', () => {
     expect(requestUrl.searchParams.get('mode')).toBe('drive');
     expect(requestUrl.searchParams.get('waypoints')).toBe('60.17,24.93|60.18,25.01');
     expect(route).toMatchObject({
+      boundingBox: {
+        maxLat: 60.18,
+        maxLon: 25.01,
+        minLat: 60.17,
+        minLon: 24.93
+      },
       distanceMeters: 8_450,
       durationSeconds: 760,
       mode: 'drive'

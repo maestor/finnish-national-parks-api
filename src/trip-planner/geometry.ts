@@ -445,6 +445,35 @@ export const simplifyRouteGeometry = (
   };
 };
 
+export const toRouteLineString = (route: GeoJsonFeatureCollection): LineStringGeometry | null => {
+  const coordinates = route.features.flatMap((feature) =>
+    feature.geometry.type === 'LineString' ? feature.geometry.coordinates : []
+  );
+
+  if (coordinates.length < 2) {
+    return null;
+  }
+
+  const deduplicatedCoordinates = coordinates.filter((coordinate, index) => {
+    if (index === 0) {
+      return true;
+    }
+
+    const previous = coordinates[index - 1]!;
+
+    return coordinate[0] !== previous[0] || coordinate[1] !== previous[1];
+  });
+
+  if (deduplicatedCoordinates.length < 2) {
+    return null;
+  }
+
+  return {
+    coordinates: deduplicatedCoordinates,
+    type: 'LineString'
+  };
+};
+
 export const expandBoundingBoxByKm = (
   boundingBox: BoundingBox,
   distanceKm: number

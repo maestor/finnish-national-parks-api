@@ -134,7 +134,7 @@ Catalog endpoints stay cache-friendly and database-backed:
 - Park responses expose raw `locationLabel`, `postalCode`, and `postalOffice` fields from the database, plus a derived `address` string for display use.
 - `GET /api/public/home-summary` returns cache-friendly frontend-public visit totals, seasonal visit counts, type progress with a `visible` flag, category progress, recent activity, and a public data `version` / `updatedAt` signal without notes, routes, or images.
 - `GET /api/public/map-summary` returns cache-friendly frontend-public park map data plus per-park visited summaries and the same public data version signal.
-- `POST /api/trip-planner/search` geocodes origin and destination server-side, fetches a real driving route from Geoapify, and returns visible catalog parks within a route corridor using stored park geometry plus visited summaries.
+- `POST /api/trip-planner/search` geocodes origin and destination server-side, fetches a real driving route from Geoapify, and returns visible catalog parks within a route corridor using stored park geometry plus visited summaries, route `LineString` geometry, and backend-provided route and park bounding boxes for map rendering.
 - Trip planner results are ordered with unvisited parks first, then shorter distance from the route, then park name.
 - `GET /api/parks/:slug/visits` returns visit history plus a visited summary for one park.
 - `GET /api/visits` returns flat visit resources with their parent park reference.
