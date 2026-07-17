@@ -321,7 +321,9 @@ describe('trip planner route', () => {
       originQuery: 'Origin'
     });
     const body = (await response.json()) as {
+      defaultDistanceKm: number;
       destination: { label: string };
+      maxDistanceKm: number;
       origin: { label: string };
       parks: Array<{
         boundingBox: {
@@ -353,6 +355,8 @@ describe('trip planner route', () => {
 
     expect(response.status).toBe(200);
     expect(response.headers.get('cache-control')).toBe('private, no-store');
+    expect(body.maxDistanceKm).toBe(25);
+    expect(body.defaultDistanceKm).toBe(20);
     expect(body.origin.label).toBe('Origin label');
     expect(body.destination.label).toBe('Destination label');
     expect(body.route).toEqual({
@@ -410,6 +414,8 @@ describe('trip planner route', () => {
       originQuery: 'Origin'
     });
     const body = (await response.json()) as {
+      defaultDistanceKm: number;
+      maxDistanceKm: number;
       origin: { label: string };
       parks: Array<{
         distanceFromOriginKm: number;
@@ -430,6 +436,8 @@ describe('trip planner route', () => {
 
     expect(response.status).toBe(200);
     expect(response.headers.get('cache-control')).toBe('private, no-store');
+    expect(body.maxDistanceKm).toBe(25);
+    expect(body.defaultDistanceKm).toBe(25);
     expect(body.origin.label).toBe('Origin label');
     expect(body.searchArea.center).toEqual({ lat: 60, lon: 24 });
     expect(body.searchArea.maxDistanceKm).toBe(25);
@@ -532,6 +540,15 @@ describe('trip planner route', () => {
     expect(
       body.paths?.['/api/trip-planner/search']?.post?.responses?.['200']?.content?.[
         'application/json'
+      ]?.schema?.properties
+    ).toMatchObject({
+      defaultDistanceKm: expect.any(Object),
+      maxDistanceKm: expect.any(Object),
+      route: expect.any(Object)
+    });
+    expect(
+      body.paths?.['/api/trip-planner/search']?.post?.responses?.['200']?.content?.[
+        'application/json'
       ]?.schema?.properties?.route?.properties
     ).toMatchObject({
       boundingBox: expect.any(Object),
@@ -543,6 +560,15 @@ describe('trip planner route', () => {
       ]?.schema?.properties?.parks?.items?.properties
     ).toMatchObject({
       boundingBox: expect.any(Object)
+    });
+    expect(
+      body.paths?.['/api/trip-planner/nearby']?.post?.responses?.['200']?.content?.[
+        'application/json'
+      ]?.schema?.properties
+    ).toMatchObject({
+      defaultDistanceKm: expect.any(Object),
+      maxDistanceKm: expect.any(Object),
+      searchArea: expect.any(Object)
     });
     expect(
       body.paths?.['/api/trip-planner/nearby']?.post?.responses?.['200']?.content?.[
@@ -776,6 +802,8 @@ describe('trip planner route', () => {
       database: testDatabase.database,
       tripPlanner: {
         searchNearby: async () => ({
+          defaultDistanceKm: 25,
+          maxDistanceKm: 25,
           origin: {
             coordinate: { lat: 60, lon: 24 },
             label: 'Origin'
@@ -796,10 +824,12 @@ describe('trip planner route', () => {
           }
         }),
         search: async () => ({
+          defaultDistanceKm: 25,
           destination: {
             coordinate: { lat: 60, lon: 24.3 },
             label: 'Destination'
           },
+          maxDistanceKm: 25,
           origin: {
             coordinate: { lat: 60, lon: 24 },
             label: 'Origin'
@@ -849,10 +879,12 @@ describe('trip planner route', () => {
           throw new Error('unexpected');
         },
         search: async () => ({
+          defaultDistanceKm: 25,
           destination: {
             coordinate: { lat: 60, lon: 24.3 },
             label: 'Destination'
           },
+          maxDistanceKm: 25,
           origin: {
             coordinate: { lat: 60, lon: 24 },
             label: 'Origin'

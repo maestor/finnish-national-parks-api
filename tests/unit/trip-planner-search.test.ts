@@ -199,6 +199,41 @@ describe('trip planner service', () => {
     expect(suggest).toHaveBeenCalledWith('He');
   });
 
+  it('returns default and max distance metadata for route search', async () => {
+    listTripPlannerCandidateParks.mockResolvedValue([]);
+    const service = createTripPlannerService({
+      database: {} as Database,
+      provider: createProvider()
+    });
+
+    const result = await service.search({
+      destinationQuery: 'Destination',
+      mode: 'drive',
+      originQuery: 'Origin'
+    });
+
+    expect(result.maxDistanceKm).toBe(25);
+    expect(result.defaultDistanceKm).toBe(13);
+  });
+
+  it('caps the route-based default distance by the requested max distance', async () => {
+    listTripPlannerCandidateParks.mockResolvedValue([]);
+    const service = createTripPlannerService({
+      database: {} as Database,
+      provider: createProvider()
+    });
+
+    const result = await service.search({
+      destinationQuery: 'Destination',
+      maxDistanceKm: 10,
+      mode: 'drive',
+      originQuery: 'Origin'
+    });
+
+    expect(result.maxDistanceKm).toBe(10);
+    expect(result.defaultDistanceKm).toBe(10);
+  });
+
   it('wraps provider failures from suggestions as provider_unavailable errors', async () => {
     const service = createTripPlannerService({
       database: {} as Database,
@@ -359,6 +394,8 @@ describe('trip planner service', () => {
       coordinate: { lat: 60, lon: 24 },
       label: 'Origin label'
     });
+    expect(result.defaultDistanceKm).toBe(25);
+    expect(result.maxDistanceKm).toBe(25);
     expect(result.searchArea.center).toEqual({ lat: 60, lon: 24 });
     expect(result.searchArea.maxDistanceKm).toBe(25);
     expect(result.searchArea.boundingBox.minLat).toBeLessThan(59.8);
@@ -411,6 +448,23 @@ describe('trip planner service', () => {
     expect(result.parks[0]?.distanceFromOriginKm).toBeLessThan(
       result.parks[1]?.distanceFromOriginKm ?? 0
     );
+  });
+
+  it('returns matching default and max distance metadata for nearby search', async () => {
+    listTripPlannerCandidateParks.mockResolvedValue([]);
+    const service = createTripPlannerService({
+      database: {} as Database,
+      provider: createProvider()
+    });
+
+    const result = await service.searchNearby({
+      maxDistanceKm: 7,
+      originQuery: 'Origin'
+    });
+
+    expect(result.maxDistanceKm).toBe(7);
+    expect(result.defaultDistanceKm).toBe(7);
+    expect(result.searchArea.maxDistanceKm).toBe(7);
   });
 
   it('groups unvisited areas first, then unvisited trails, then visited results', async () => {
@@ -1135,6 +1189,8 @@ describe('trip planner service', () => {
       },
       mode: 'drive'
     });
+    expect(result.maxDistanceKm).toBe(25);
+    expect(result.defaultDistanceKm).toBe(13);
     expect(result.parks[0]?.boundingBox).toEqual({
       maxLat: 60.01,
       maxLon: 24.05,

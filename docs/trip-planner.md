@@ -17,11 +17,13 @@ It is meant to answer two questions quickly:
   - geocodes the endpoints server-side
   - fetches a real driving route from Geoapify
   - returns visible catalog parks near that route
+  - returns response-level `maxDistanceKm` and `defaultDistanceKm` values for frontend distance filters
 - `POST /api/trip-planner/nearby`
   - accepts `originQuery` and optional `maxDistanceKm`
   - geocodes only the origin server-side
   - returns visible catalog parks near that point
   - returns a `searchArea` bounding box and center for map rendering without route geometry
+  - returns the same response-level `maxDistanceKm` and `defaultDistanceKm` fields as route search
 
 Both endpoints require the existing backend auth boundary outside localhost and depend on `GEOAPIFY_API_KEY`.
 
@@ -34,6 +36,12 @@ Both endpoints require the existing backend auth boundary outside localhost and 
   - the shortest side-distance from the routed path to the park geometry or marker point
 - `distanceFromOriginKm`
   - the shortest straight-line distance from the origin point to the park geometry or marker point
+- `maxDistanceKm`
+  - the effective corridor or nearby distance limit used for the request
+- `defaultDistanceKm`
+  - the frontend-friendly default filter distance
+  - for route search, this is the route length in kilometers rounded up and capped by `maxDistanceKm`
+  - for nearby search, this always matches `maxDistanceKm`
 - `distanceAlongRoute`
   - where the park sits along the trip, measured from the route origin to the closest point on the route
 - `start zone`
@@ -56,6 +64,7 @@ The current backend then refines that with long-trip behavior:
 3. On trips of at least `100 km`, treat the first `30 km` as a special start zone.
 4. Inside that start zone, apply a stricter effective side-distance limit of `10 km`.
 5. For the remaining qualified results on long trips, prefer later-route matches ahead of start-zone matches within the same result group.
+6. Return `defaultDistanceKm` as the route length rounded up to the next kilometer, capped by `maxDistanceKm`, so short trips do not default to the full corridor width in the UI.
 
 This is intended to reduce dense departure-area flooding such as Uusimaa or the capital region without making Lapland-style long-distance searches too strict.
 
@@ -73,6 +82,7 @@ Current nearby behavior:
 2. Build a search area from the origin point with the same default `25 km` distance.
 3. Filter parks by straight-line distance from the origin to stored park geometry, or to bounding-box / marker fallbacks when full geometry is missing.
 4. Return the origin, matching parks, and a backend-provided `searchArea` bounding box for the map.
+5. Return `defaultDistanceKm` equal to `maxDistanceKm` because there is no route-length-based default to derive.
 
 The nearby endpoint does not use:
 
