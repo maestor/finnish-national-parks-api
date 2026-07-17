@@ -6,6 +6,10 @@ import {
   deriveBoundingBox,
   expandBoundingBoxByKm,
   getDistanceAlongRouteToPointMeters,
+  getPointDistanceToBoundingBoxMeters,
+  getPointDistanceToFeatureCollectionMeters,
+  getPointDistanceToLineStringMeters,
+  getPointDistanceToPolygonMeters,
   getRouteDistanceToBoundingBoxMeters,
   getRouteDistanceToFeatureCollectionMeters,
   getRouteDistanceToLineStringMeters,
@@ -91,6 +95,126 @@ describe('trip planner geometry', () => {
     expect(nearFirstSegment).toBeLessThan(3_100);
     expect(nearSecondSegment).toBeGreaterThan(10_500);
     expect(nearSecondSegment).toBeLessThan(11_700);
+  });
+
+  it('measures point distance to nearby line geometry and handles too-short lines defensively', () => {
+    const distance = getPointDistanceToLineStringMeters(
+      { lat: 60, lon: 24 },
+      {
+        coordinates: [
+          [24.05, 60],
+          [24.1, 60]
+        ],
+        type: 'LineString'
+      }
+    );
+
+    expect(distance).toBeGreaterThan(2_500);
+    expect(distance).toBeLessThan(3_100);
+    expect(
+      getPointDistanceToLineStringMeters(
+        { lat: 60, lon: 24 },
+        {
+          coordinates: [[24.05, 60]],
+          type: 'LineString'
+        }
+      )
+    ).toBe(Number.POSITIVE_INFINITY);
+  });
+
+  it('returns zero when a point is inside a polygon or its bounding box', () => {
+    expect(
+      getPointDistanceToPolygonMeters(
+        { lat: 60, lon: 24.05 },
+        {
+          coordinates: [
+            [
+              [24.03, 59.99],
+              [24.07, 59.99],
+              [24.07, 60.01],
+              [24.03, 60.01],
+              [24.03, 59.99]
+            ]
+          ],
+          type: 'Polygon'
+        }
+      )
+    ).toBe(0);
+    expect(
+      getPointDistanceToBoundingBoxMeters(
+        { lat: 60, lon: 24.05 },
+        {
+          maxLat: 60.01,
+          maxLon: 24.07,
+          minLat: 59.99,
+          minLon: 24.03
+        }
+      )
+    ).toBe(0);
+  });
+
+  it('returns the nearest point distance across feature collections', () => {
+    const distance = getPointDistanceToFeatureCollectionMeters(
+      { lat: 60, lon: 24 },
+      {
+        features: [
+          {
+            geometry: {
+              coordinates: [
+                [
+                  [24.4, 60.3],
+                  [24.45, 60.3],
+                  [24.45, 60.35],
+                  [24.4, 60.35],
+                  [24.4, 60.3]
+                ]
+              ],
+              type: 'Polygon'
+            },
+            type: 'Feature'
+          },
+          {
+            geometry: {
+              coordinates: [
+                [24.04, 60],
+                [24.09, 60]
+              ],
+              type: 'LineString'
+            },
+            type: 'Feature'
+          }
+        ],
+        type: 'FeatureCollection'
+      }
+    );
+
+    expect(distance).toBeGreaterThan(2_000);
+    expect(distance).toBeLessThan(2_500);
+    expect(
+      getPointDistanceToFeatureCollectionMeters(
+        { lat: 60, lon: 24.05 },
+        {
+          features: [
+            {
+              geometry: {
+                coordinates: [
+                  [
+                    [24.03, 59.99],
+                    [24.07, 59.99],
+                    [24.07, 60.01],
+                    [24.03, 60.01],
+                    [24.03, 59.99]
+                  ]
+                ],
+                type: 'Polygon'
+              },
+              type: 'Feature'
+            }
+          ],
+          type: 'FeatureCollection'
+        }
+      )
+    ).toBe(0);
   });
 
   it('handles zero-length route segments and too-short route lines defensively', () => {

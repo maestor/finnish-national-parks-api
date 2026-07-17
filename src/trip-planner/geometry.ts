@@ -378,6 +378,59 @@ const getRouteToPolygonDistanceMeters = (
   return minimumDistance;
 };
 
+const pointToLineStringDistanceMeters = (
+  point: GeoJsonCoordinate,
+  lineString: LineStringGeometry,
+  projector: PlanarProjector
+) => {
+  const lineSegments = createSegments(lineString.coordinates);
+
+  if (lineSegments.length === 0) {
+    return Number.POSITIVE_INFINITY;
+  }
+
+  const projectedPoint = projector.toCartesian(point);
+
+  return lineSegments.reduce((minimumDistance, lineSegment) => {
+    const lineStart = projector.toCartesian(lineSegment.start);
+    const lineEnd = projector.toCartesian(lineSegment.end);
+
+    return Math.min(
+      minimumDistance,
+      pointToSegmentDistanceMeters(projectedPoint, lineStart, lineEnd)
+    );
+  }, Number.POSITIVE_INFINITY);
+};
+
+const pointToPolygonDistanceMeters = (
+  point: GeoJsonCoordinate,
+  polygon: PolygonGeometry,
+  projector: PlanarProjector
+) => {
+  if (pointInPolygon(point, polygon)) {
+    return 0;
+  }
+
+  let minimumDistance = Number.POSITIVE_INFINITY;
+  const projectedPoint = projector.toCartesian(point);
+
+  for (const ring of polygon.coordinates) {
+    const ringSegments = createSegments(ring);
+
+    for (const ringSegment of ringSegments) {
+      const ringStart = projector.toCartesian(ringSegment.start);
+      const ringEnd = projector.toCartesian(ringSegment.end);
+
+      minimumDistance = Math.min(
+        minimumDistance,
+        pointToSegmentDistanceMeters(projectedPoint, ringStart, ringEnd)
+      );
+    }
+  }
+
+  return minimumDistance;
+};
+
 const createBoundingBoxPolygon = (boundingBox: BoundingBox): PolygonGeometry => ({
   coordinates: [
     [
@@ -550,6 +603,87 @@ export const getRouteDistanceToPointMeters = (
       pointToSegmentDistanceMeters(projectedPoint, routeStart, routeEnd)
     );
   }, Number.POSITIVE_INFINITY);
+};
+
+export const getPointDistanceToBoundingBoxMeters = (
+  point: TripPlannerCoordinate,
+  boundingBox: BoundingBox
+) => {
+  return getPointDistanceToPolygonMeters(point, createBoundingBoxPolygon(boundingBox));
+};
+
+export const getPointDistanceToPolygonMeters = (
+  point: TripPlannerCoordinate,
+  polygon: PolygonGeometry
+) => {
+  const pointBoundingBox = {
+    maxLat: point.lat,
+    maxLon: point.lon,
+    minLat: point.lat,
+    minLon: point.lon
+  };
+  const polygonBoundingBox = deriveBoundingBox({
+    features: [{ geometry: polygon, type: 'Feature' }],
+    type: 'FeatureCollection'
+  });
+  const projector = createProjector(
+    createBBoxReferencePoint({
+      maxLat: Math.max(pointBoundingBox.maxLat, polygonBoundingBox.maxLat),
+      maxLon: Math.max(pointBoundingBox.maxLon, polygonBoundingBox.maxLon),
+      minLat: Math.min(pointBoundingBox.minLat, polygonBoundingBox.minLat),
+      minLon: Math.min(pointBoundingBox.minLon, polygonBoundingBox.minLon)
+    })
+  );
+
+  return pointToPolygonDistanceMeters([point.lon, point.lat], polygon, projector);
+};
+
+export const getPointDistanceToLineStringMeters = (
+  point: TripPlannerCoordinate,
+  lineString: LineStringGeometry
+) => {
+  const pointBoundingBox = {
+    maxLat: point.lat,
+    maxLon: point.lon,
+    minLat: point.lat,
+    minLon: point.lon
+  };
+  const lineBoundingBox = deriveBoundingBox({
+    features: [{ geometry: lineString, type: 'Feature' }],
+    type: 'FeatureCollection'
+  });
+  const projector = createProjector(
+    createBBoxReferencePoint({
+      maxLat: Math.max(pointBoundingBox.maxLat, lineBoundingBox.maxLat),
+      maxLon: Math.max(pointBoundingBox.maxLon, lineBoundingBox.maxLon),
+      minLat: Math.min(pointBoundingBox.minLat, lineBoundingBox.minLat),
+      minLon: Math.min(pointBoundingBox.minLon, lineBoundingBox.minLon)
+    })
+  );
+
+  return pointToLineStringDistanceMeters([point.lon, point.lat], lineString, projector);
+};
+
+export const getPointDistanceToFeatureCollectionMeters = (
+  point: TripPlannerCoordinate,
+  featureCollection: GeoJsonFeatureCollection
+) => {
+  let minimumDistance = Number.POSITIVE_INFINITY;
+
+  for (const feature of featureCollection.features) {
+    minimumDistance = Math.min(
+      minimumDistance,
+      feature.geometry.type === 'Polygon'
+        ? getPointDistanceToPolygonMeters(point, feature.geometry)
+        : getPointDistanceToLineStringMeters(point, feature.geometry)
+    );
+
+    if (minimumDistance === 0) {
+      return 0;
+    }
+  }
+
+  return minimumDistance;
 };
 
 export const getDistanceAlongRouteToPointMeters = (

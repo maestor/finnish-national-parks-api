@@ -19,6 +19,11 @@ export type TripPlannerSearchInput = {
   originQuery: string;
 };
 
+export type TripPlannerNearbySearchInput = {
+  maxDistanceKm?: number | undefined;
+  originQuery: string;
+};
+
 export type TripPlannerResolvedLocation = {
   coordinate: TripPlannerCoordinate;
   label: string;
@@ -72,6 +77,10 @@ export type TripPlannerParkResult = Omit<TripPlannerParkCandidate, 'boundaryGeoJ
   distanceFromRouteKm: number;
 };
 
+export type TripPlannerNearbyParkResult = Omit<TripPlannerParkCandidate, 'boundaryGeoJson'> & {
+  distanceFromOriginKm: number;
+};
+
 export type TripPlannerSearchResponse = {
   destination: TripPlannerResolvedLocation;
   origin: TripPlannerResolvedLocation;
@@ -82,6 +91,16 @@ export type TripPlannerSearchResponse = {
     durationSeconds: number;
     geometry: LineStringGeometry;
     mode: TripPlannerMode;
+  };
+};
+
+export type TripPlannerNearbySearchResponse = {
+  origin: TripPlannerResolvedLocation;
+  parks: TripPlannerNearbyParkResult[];
+  searchArea: {
+    boundingBox: BoundingBox;
+    center: TripPlannerCoordinate;
+    maxDistanceKm: number;
   };
 };
 
@@ -97,5 +116,6 @@ export type TripPlannerProvider = {
 
 export type TripPlannerService = {
   search: (input: TripPlannerSearchInput) => Promise<TripPlannerSearchResponse>;
+  searchNearby: (input: TripPlannerNearbySearchInput) => Promise<TripPlannerNearbySearchResponse>;
   suggest: (query: string) => Promise<TripPlannerSuggestion[]>;
 };

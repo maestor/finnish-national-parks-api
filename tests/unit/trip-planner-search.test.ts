@@ -284,6 +284,135 @@ describe('trip planner service', () => {
     });
   });
 
+  it('searches nearby parks around the origin without routing and returns a map-ready search area', async () => {
+    listTripPlannerCandidateParks.mockResolvedValue([
+      createTrailCandidate({
+        boundaryGeoJson: null,
+        boundingBox: {
+          maxLat: 60.001,
+          maxLon: 24.07,
+          minLat: 59.999,
+          minLon: 24.05
+        },
+        name: 'Nearby Trail',
+        slug: 'nearby-trail'
+      }),
+      createCandidate({
+        boundaryGeoJson: null,
+        boundingBox: {
+          maxLat: 60.02,
+          maxLon: 24.16,
+          minLat: 60.01,
+          minLon: 24.12
+        },
+        name: 'National Park Nearby',
+        slug: 'national-park-nearby',
+        type: {
+          code: 111,
+          id: 111,
+          name: 'Kansallispuisto',
+          slug: 'national-park'
+        }
+      }),
+      createCandidate({
+        boundaryGeoJson: null,
+        boundingBox: {
+          maxLat: 60.01,
+          maxLon: 24.23,
+          minLat: 59.99,
+          minLon: 24.2
+        },
+        name: 'Visited Nearby Area',
+        slug: 'visited-nearby-area',
+        visitedSummary: {
+          lastVisitedOn: '2026-07-10',
+          visitCount: 1,
+          visited: true
+        }
+      }),
+      createCandidate({
+        boundaryGeoJson: null,
+        boundingBox: {
+          maxLat: 60.01,
+          maxLon: 24.5,
+          minLat: 59.99,
+          minLon: 24.45
+        },
+        name: 'Far Away Area',
+        slug: 'far-away-area'
+      })
+    ]);
+    const route = vi.fn();
+    const service = createTripPlannerService({
+      database: {} as Database,
+      provider: createProvider({
+        route
+      })
+    });
+
+    const result = await service.searchNearby({
+      originQuery: 'Origin'
+    });
+
+    expect(route).not.toHaveBeenCalled();
+    expect(result.origin).toEqual({
+      coordinate: { lat: 60, lon: 24 },
+      label: 'Origin label'
+    });
+    expect(result.searchArea.center).toEqual({ lat: 60, lon: 24 });
+    expect(result.searchArea.maxDistanceKm).toBe(25);
+    expect(result.searchArea.boundingBox.minLat).toBeLessThan(59.8);
+    expect(result.searchArea.boundingBox.maxLat).toBeGreaterThan(60.2);
+    expect(result.parks.map((park) => park.slug)).toEqual([
+      'national-park-nearby',
+      'nearby-trail',
+      'visited-nearby-area'
+    ]);
+    expect(result.parks[0]?.distanceFromOriginKm).toBeGreaterThan(6);
+    expect(result.parks[1]?.distanceFromOriginKm).toBeLessThan(4);
+    expect(result.parks[2]?.distanceFromOriginKm).toBeGreaterThan(10);
+  });
+
+  it('sorts nearby same-group parks by shorter origin distance before name', async () => {
+    listTripPlannerCandidateParks.mockResolvedValue([
+      createCandidate({
+        boundaryGeoJson: null,
+        boundingBox: {
+          maxLat: 60.02,
+          maxLon: 24.2,
+          minLat: 60.01,
+          minLon: 24.18
+        },
+        name: 'Far Nearby Area',
+        slug: 'far-nearby-area'
+      }),
+      createCandidate({
+        boundaryGeoJson: null,
+        boundingBox: {
+          maxLat: 60.005,
+          maxLon: 24.08,
+          minLat: 60.001,
+          minLon: 24.06
+        },
+        name: 'Near Nearby Area',
+        slug: 'near-nearby-area'
+      })
+    ]);
+    const service = createTripPlannerService({
+      database: {} as Database,
+      provider: createProvider()
+    });
+
+    const result = await service.searchNearby({
+      originQuery: 'Origin'
+    });
+
+    expect(result.parks.map((park) => park.slug)).toEqual(['near-nearby-area', 'far-nearby-area']);
+    expect(result.parks[0]?.distanceFromOriginKm).toBeLessThan(
+      result.parks[1]?.distanceFromOriginKm ?? 0
+    );
+  });
+
   it('groups unvisited areas first, then unvisited trails, then visited results', async () => {
     listTripPlannerCandidateParks.mockResolvedValue([
       createTrailCandidate({
@@ -883,6 +1012,37 @@ describe('trip planner service', () => {
     expect(result.parks[0]?.distanceFromRouteKm).toBe(0);
   });
 
+  it('falls back to marker point distance for nearby search when bounds are not finite', async () => {
+    listTripPlannerCandidateParks.mockResolvedValue([
+      createCandidate({
+        boundingBox: {
+          maxLat: Number.POSITIVE_INFINITY,
+          maxLon: Number.POSITIVE_INFINITY,
+          minLat: Number.NEGATIVE_INFINITY,
+          minLon: Number.NEGATIVE_INFINITY
+        },
+        boundaryGeoJson: null,
+        markerPoint: {
+          lat: 60,
+          lon: 24.01
+        },
+        slug: 'marker-fallback-nearby'
+      })
+    ]);
+    const service = createTripPlannerService({
+      database: {} as Database,
+      provider: createProvider()
+    });
+
+    const result = await service.searchNearby({
+      originQuery: 'Origin'
+    });
+
+    expect(result.parks).toHaveLength(1);
+    expect(result.parks[0]?.slug).toBe('marker-fallback-nearby');
+    expect(result.parks[0]?.distanceFromOriginKm).toBeLessThan(1);
+  });
+
   it('includes displayTypeName when it is present', async () => {
     listTripPlannerCandidateParks.mockResolvedValue([
       createCandidate({
@@ -1084,6 +1244,25 @@ describe('trip planner service', () => {
     });
   });
 
+  it('returns origin_not_found when the nearby origin geocode misses', async () => {
+    listTripPlannerCandidateParks.mockResolvedValue([]);
+    const service = createTripPlannerService({
+      database: {} as Database,
+      provider: createProvider({
+        geocode: vi.fn(async () => null)
+      })
+    });
+
+    await expect(
+      service.searchNearby({
+        originQuery: 'Origin'
+      })
+    ).rejects.toMatchObject({
+      code: 'origin_not_found',
+      status: 422
+    });
+  });
+
   it('returns route_not_found when routing produces no path', async () => {
     listTripPlannerCandidateParks.mockResolvedValue([]);
     const service = createTripPlannerService({
@@ -1163,6 +1342,27 @@ describe('trip planner service', () => {
       service.search({
         destinationQuery: 'Destination',
         mode: 'drive',
+        originQuery: 'Origin'
+      })
+    ).rejects.toMatchObject({
+      code: 'provider_unavailable',
+      status: 503
+    });
+  });
+
+  it('wraps unexpected nearby provider errors as provider_unavailable', async () => {
+    listTripPlannerCandidateParks.mockResolvedValue([]);
+    const service = createTripPlannerService({
+      database: {} as Database,
+      provider: createProvider({
+        geocode: vi.fn(async () => {
+          throw new Error('boom');
+        })
+      })
+    });
+
+    await expect(
+      service.searchNearby({
         originQuery: 'Origin'
       })
     ).rejects.toMatchObject({

@@ -79,7 +79,7 @@ Production notes:
 - If Google OAuth is enabled in Vercel, `FRONTEND_URL` must be the deployed frontend origin.
 - If Google calls the API directly, Google must allow `https://your-api-domain.vercel.app/auth/google/callback`.
 - If `/auth/*` is exposed through a frontend proxy or rewrite, set `GOOGLE_REDIRECT_URI=https://your-frontend-domain/auth/google/callback`, register that exact URI in Google Cloud, and start the login flow through that same public domain so the OAuth cookies stay on the right host.
-- `GEOAPIFY_API_KEY` enables `POST /api/trip-planner/search` and `POST /api/trip-planner/suggestions`. Keep it server-side only; the UI should call the backend through its existing server proxy layer.
+- `GEOAPIFY_API_KEY` enables `POST /api/trip-planner/suggestions`, `POST /api/trip-planner/search`, and `POST /api/trip-planner/nearby`. Keep it server-side only; the UI should call the backend through its existing server proxy layer.
 - `MEMORY_STORAGE=true` is for tests and local-only development, not Vercel.
 - `npm run db:backup` reads the current remote `DATABASE_URL` and `DATABASE_AUTH_TOKEN`, then writes a timestamped SQLite backup under `data/backups/`. You can append an optional label with `npm run db:backup -- before-import`.
 - `npm run park:move-visits -- --from <source-slug> --to <target-slug> [--dry-run]` reassigns all visits for one park slug to another. Visit images stay attached automatically because they belong to the visit rows.
@@ -100,6 +100,7 @@ The importer's LIPAS source URL and supported type-code list are internal config
 - `GET /api/public/map-summary`
 - `POST /api/trip-planner/suggestions`
 - `POST /api/trip-planner/search`
+- `POST /api/trip-planner/nearby`
 - `GET /api/parks/:slug/visits`
 - `POST /api/parks/:slug/visits`
 - `PATCH /api/parks/:slug/removed`
@@ -137,6 +138,7 @@ Catalog endpoints stay cache-friendly and database-backed:
 - `GET /api/public/map-summary` returns cache-friendly frontend-public park map data plus per-park visited summaries and the same public data version signal.
 - `POST /api/trip-planner/suggestions` returns up to three Geoapify-backed place suggestions with labels and coordinates for origin/destination pickers.
 - `POST /api/trip-planner/search` geocodes origin and destination server-side, fetches a real driving route from Geoapify, and returns visible catalog parks within a route corridor using stored park geometry plus visited summaries, route `LineString` geometry, and backend-provided route and park bounding boxes for map rendering. On longer trips, the first 30 km from the origin is treated as a stricter start zone so dense departure-area clusters do not dominate the results.
+- `POST /api/trip-planner/nearby` geocodes only the origin server-side, filters visible catalog parks by straight-line proximity to that point, and returns visited summaries plus a backend-provided `searchArea` bounding box for map rendering without route geometry.
 - Trip planner results are ordered with unvisited parks first, then route-aware proximity; on longer trips, later-route matches are favored ahead of remaining start-zone matches within the same result group.
 - `GET /api/parks/:slug/visits` returns visit history plus a visited summary for one park.
 - `GET /api/visits` returns flat visit resources with their parent park reference.
@@ -145,7 +147,7 @@ Catalog endpoints stay cache-friendly and database-backed:
 - Public summary endpoints use `Cache-Control: public, max-age=0, s-maxage=600`.
 - Public summary versions bump when public visit data changes, including visit create/update/delete and visit image upload/delete/reorder.
 - Visit and management endpoints use `Cache-Control: private, no-store`.
-- Trip planner suggestion and search responses also use `Cache-Control: private, no-store`.
+- Trip planner suggestion, route-search, and nearby-origin responses also use `Cache-Control: private, no-store`.
 - All write routes and `GET /api/admin/parks/visibility` require a valid admin session cookie.
 - `PATCH /api/parks/:slug` updates the admin-editable park fields (`name`, `slug`, `locationLabel`, `postalOffice`, `postalCode`, `areaKm2`, `establishmentYear`, `parkUrl`, `displayTypeName`) and auto-generates a slug from `name` when `slug` is omitted.
 - `PATCH /api/parks/:slug/removed` lets the admin UI hide or restore a park by toggling its persisted `removed` flag.

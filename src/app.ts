@@ -89,7 +89,11 @@ import {
   updateVisitRoute,
   uploadVisitImagesRoute
 } from './routes/parks.js';
-import { searchTripPlannerRoute, suggestTripPlannerRoute } from './routes/trip-planner.js';
+import {
+  searchNearbyTripPlannerRoute,
+  searchTripPlannerRoute,
+  suggestTripPlannerRoute
+} from './routes/trip-planner.js';
 import type { StorageClient } from './storage/types.js';
 import { TripPlannerError } from './trip-planner/search.js';
 import type { TripPlannerService } from './trip-planner/types.js';
@@ -698,6 +702,40 @@ export const createApp = ({
 
       try {
         const result = await tripPlanner.search(body);
+
+        return context.json(result, 200);
+      } catch (error) {
+        if (error instanceof TripPlannerError) {
+          return context.json(
+            {
+              error: error.message,
+              errorCode: error.code
+            },
+            error.status
+          );
+        }
+
+        throw error;
+      }
+    });
+
+    app.openapi(searchNearbyTripPlannerRoute, async (context) => {
+      context.header('Cache-Control', PRIVATE_CACHE_CONTROL);
+
+      if (!tripPlanner) {
+        return context.json(
+          {
+            error: 'Trip planner is not configured.',
+            errorCode: 'trip_planner_not_configured' as const
+          },
+          503
+        );
+      }
+
+      const body = context.req.valid('json');
+
+      try {
+        const result = await tripPlanner.searchNearby(body);
 
         return context.json(result, 200);
       } catch (error) {

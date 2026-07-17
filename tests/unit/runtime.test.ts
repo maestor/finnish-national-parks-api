@@ -104,6 +104,7 @@ describe('runtime helpers', () => {
 
     expect(tripPlanner).toBeDefined();
     expect(typeof tripPlanner?.search).toBe('function');
+    expect(typeof tripPlanner?.searchNearby).toBe('function');
     expect(typeof tripPlanner?.suggest).toBe('function');
   });
 });
