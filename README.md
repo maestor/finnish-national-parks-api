@@ -136,8 +136,8 @@ Catalog endpoints stay cache-friendly and database-backed:
 - `GET /api/public/home-summary` returns cache-friendly frontend-public visit totals, seasonal visit counts, type progress with a `visible` flag, category progress, recent activity, and a public data `version` / `updatedAt` signal without notes, routes, or images.
 - `GET /api/public/map-summary` returns cache-friendly frontend-public park map data plus per-park visited summaries and the same public data version signal.
 - `POST /api/trip-planner/suggestions` returns up to three Geoapify-backed place suggestions with labels and coordinates for origin/destination pickers.
-- `POST /api/trip-planner/search` geocodes origin and destination server-side, fetches a real driving route from Geoapify, and returns visible catalog parks within a route corridor using stored park geometry plus visited summaries, route `LineString` geometry, and backend-provided route and park bounding boxes for map rendering.
-- Trip planner results are ordered with unvisited parks first, then shorter distance from the route, then park name.
+- `POST /api/trip-planner/search` geocodes origin and destination server-side, fetches a real driving route from Geoapify, and returns visible catalog parks within a route corridor using stored park geometry plus visited summaries, route `LineString` geometry, and backend-provided route and park bounding boxes for map rendering. On longer trips, the first 30 km from the origin is treated as a stricter start zone so dense departure-area clusters do not dominate the results.
+- Trip planner results are ordered with unvisited parks first, then route-aware proximity; on longer trips, later-route matches are favored ahead of remaining start-zone matches within the same result group.
 - `GET /api/parks/:slug/visits` returns visit history plus a visited summary for one park.
 - `GET /api/visits` returns flat visit resources with their parent park reference.
 - `GET /api/visits/:id` returns one visit with its parent park reference.
@@ -201,7 +201,7 @@ npm run import:special-parks
 
 It imports curated non-LIPAS catalog rows such as Merenkurkun maailmanperintöalue, Sammallahdenmäki, Suomenlinna, Vanha Rauma, Paistjärvi, Uutelan ulkoilualue, Kallahden ulkoilualue, Seurasaari, Mustikkamaa, Tullisaaren kartanopuisto, and selected cultural-history areas, keeps their source geometry, preserves custom display labels such as `Maailmanperintökohde` and `Tehdaskylä`, and protects those rows from later LIPAS deactivation.
 
-For the reproducible workflow for special imports, including Helsinki WFS sourcing, see [docs/IMPORTING.md](docs/IMPORTING.md).
+For the reproducible workflow for special imports, including Helsinki WFS sourcing, see [docs/importing.md](docs/importing.md).
 
 For faster local iteration, you can import only selected special parks by slug:
 
@@ -222,7 +222,8 @@ It runs typecheck, lint, and coverage tests with 100 percent thresholds for firs
 ## Documentation
 
 - [AGENTS.md](AGENTS.md): codebase rules for future agents and implementation sessions.
-- [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md): local development, database, importer, and deployment notes.
-- [docs/IMPORTING.md](docs/IMPORTING.md): reproducible import workflow for curated special parks, including Helsinki-specific sourcing tips.
-- [docs/SECURITY.md](docs/SECURITY.md): current security and operational sustainability priorities, plus contributor guardrails.
-- [docs/TESTING.md](docs/TESTING.md): testing strategy and verification expectations.
+- [docs/development.md](docs/development.md): local development, database, importer, and deployment notes.
+- [docs/importing.md](docs/importing.md): reproducible import workflow for curated special parks, including Helsinki-specific sourcing tips.
+- [docs/security.md](docs/security.md): current security and operational sustainability priorities, plus contributor guardrails.
+- [docs/testing.md](docs/testing.md): testing strategy and verification expectations.
+- [docs/trip-planner.md](docs/trip-planner.md): trip planner endpoints, route-corridor definitions, and long-trip start-zone logic.

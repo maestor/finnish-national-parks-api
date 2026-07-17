@@ -79,6 +79,35 @@ const pointToSegmentDistanceMeters = (
   return Math.hypot(point.x - closest.x, point.y - closest.y);
 };
 
+const projectPointToSegment = (
+  point: CartesianPoint,
+  start: CartesianPoint,
+  end: CartesianPoint
+) => {
+  const segment = subtract(end, start);
+  const segmentLengthSquared = squaredLength(segment);
+
+  if (segmentLengthSquared === 0) {
+    return {
+      distanceMeters: Math.hypot(point.x - start.x, point.y - start.y),
+      projection: 0,
+      segmentLengthMeters: 0
+    };
+  }
+
+  const projection = clamp(dot(subtract(point, start), segment) / segmentLengthSquared, 0, 1);
+  const closest = {
+    x: start.x + segment.x * projection,
+    y: start.y + segment.y * projection
+  };
+
+  return {
+    distanceMeters: Math.hypot(point.x - closest.x, point.y - closest.y),
+    projection,
+    segmentLengthMeters: Math.sqrt(segmentLengthSquared)
+  };
+};
+
 const pointToSegmentDistanceSquared = (
   point: CartesianPoint,
   start: CartesianPoint,
@@ -521,6 +550,42 @@ export const getRouteDistanceToPointMeters = (
       pointToSegmentDistanceMeters(projectedPoint, routeStart, routeEnd)
     );
   }, Number.POSITIVE_INFINITY);
+};
+
+export const getDistanceAlongRouteToPointMeters = (
+  route: LineStringGeometry,
+  point: TripPlannerCoordinate
+) => {
+  if (route.coordinates.length < 2) {
+    return Number.POSITIVE_INFINITY;
+  }
+
+  const [referenceLon, referenceLat] = route.coordinates[0]!;
+  const projector = createProjector({
+    lat: referenceLat,
+    lon: referenceLon
+  });
+  const projectedPoint = projector.toCartesian([point.lon, point.lat]);
+  let bestDistanceMeters = Number.POSITIVE_INFINITY;
+  let bestDistanceAlongRouteMeters = Number.POSITIVE_INFINITY;
+  let cumulativeDistanceMeters = 0;
+
+  for (let index = 1; index < route.coordinates.length; index += 1) {
+    const start = projector.toCartesian(route.coordinates[index - 1]!);
+    const end = projector.toCartesian(route.coordinates[index]!);
+    const projection = projectPointToSegment(projectedPoint, start, end);
+    const distanceAlongRouteMeters =
+      cumulativeDistanceMeters + projection.segmentLengthMeters * projection.projection;
+
+    if (projection.distanceMeters < bestDistanceMeters) {
+      bestDistanceMeters = projection.distanceMeters;
+      bestDistanceAlongRouteMeters = distanceAlongRouteMeters;
+    }
+
+    cumulativeDistanceMeters += projection.segmentLengthMeters;
+  }
+
+  return bestDistanceAlongRouteMeters;
 };
 
 export const getRouteDistanceToBoundingBoxMeters = (

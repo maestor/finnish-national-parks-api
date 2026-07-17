@@ -17,9 +17,9 @@ This repository is a local-first TypeScript API that imports Finnish park, prote
 
 ## Documentation Rules
 - Update `README.md` when project purpose, setup, or common commands change.
-- Update `docs/DEVELOPMENT.md` when local development, importer, database, or deployment workflow changes.
-- Update `docs/SECURITY.md` when auth policy, secrets handling, storage upload behavior, cache exposure, external request-path dependencies, or operational hardening priorities change.
-- Update `docs/TESTING.md` when test strategy, commands, or quality gates change.
+- Update `docs/development.md` when local development, importer, database, or deployment workflow changes.
+- Update `docs/security.md` when auth policy, secrets handling, storage upload behavior, cache exposure, external request-path dependencies, or operational hardening priorities change.
+- Update `docs/testing.md` when test strategy, commands, or quality gates change.
 - When adding, removing, or changing API endpoints, request or response fields, or database schema, update the relevant README endpoint lists and docs references in the same session.
 - When implementing user-requested special-park additions, always offer a copy-pasteable one-line `npm run import:special-parks -- <slug...>` command covering the new slugs so the user can import and review the batch before final acceptance.
 - If docs mention a contributor-facing env var, it must also exist in `src/env.ts` and `.env.example` in the same change.
@@ -53,7 +53,7 @@ This repository is a local-first TypeScript API that imports Finnish park, prote
 - Treat direct uploads as a cost and abuse surface: enforce limits against the actual stored object, not only client-declared metadata.
 - Keep storage private by default and prefer presigned URLs over permanently public buckets.
 - Before high-risk imports, schema changes, or large manual data operations against Turso, take a fresh backup or document why it is unnecessary.
-- When changing auth, cacheability, uploads, or external integrations, update the relevant tests and `docs/SECURITY.md` in the same session.
+- When changing auth, cacheability, uploads, or external integrations, update the relevant tests and `docs/security.md` in the same session.
 
 ## Testing Rules
 - Follow behavior-first TDD for application code.
