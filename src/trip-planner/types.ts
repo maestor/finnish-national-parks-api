@@ -82,7 +82,9 @@ export type TripPlannerNearbyParkResult = Omit<TripPlannerParkCandidate, 'bounda
 };
 
 export type TripPlannerSearchResponse = {
+  defaultDistanceKm: number;
   destination: TripPlannerResolvedLocation;
+  maxDistanceKm: number;
   origin: TripPlannerResolvedLocation;
   parks: TripPlannerParkResult[];
   route: {
@@ -95,6 +97,8 @@ export type TripPlannerSearchResponse = {
 };
 
 export type TripPlannerNearbySearchResponse = {
+  defaultDistanceKm: number;
+  maxDistanceKm: number;
   origin: TripPlannerResolvedLocation;
   parks: TripPlannerNearbyParkResult[];
   searchArea: {

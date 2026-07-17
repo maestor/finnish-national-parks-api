@@ -74,13 +74,17 @@ export const tripPlannerSearchAreaSchema = z.object({
 });
 
 export const tripPlannerSearchResponseSchema = z.object({
+  defaultDistanceKm: z.number().min(1).max(100),
   destination: tripPlannerLocationSchema,
+  maxDistanceKm: z.number().min(1).max(100),
   origin: tripPlannerLocationSchema,
   parks: z.array(tripPlannerParkResultSchema),
   route: tripPlannerRouteSchema
 });
 
 export const tripPlannerNearbyResponseSchema = z.object({
+  defaultDistanceKm: z.number().min(1).max(100),
+  maxDistanceKm: z.number().min(1).max(100),
   origin: tripPlannerLocationSchema,
   parks: z.array(tripPlannerNearbyParkResultSchema),
   searchArea: tripPlannerSearchAreaSchema

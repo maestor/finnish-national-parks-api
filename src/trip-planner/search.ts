@@ -55,6 +55,10 @@ const roundDistanceKm = (distanceMeters: number) => {
   return Math.round((distanceMeters / 1000) * 10) / 10;
 };
 
+const getDefaultDistanceKm = (distanceMeters: number, maxDistanceKm: number) => {
+  return Math.min(maxDistanceKm, Math.max(1, Math.ceil(distanceMeters / 1000)));
+};
+
 const MAX_UNVISITED_TRAILS = 10;
 const NATIONAL_PARK_TYPE_SLUG = 'national-park';
 const ROUTE_DISTANCE_SIMPLIFICATION_TOLERANCE_METERS = 100;
@@ -281,6 +285,7 @@ export const createTripPlannerService = ({
 
         const candidateBoundingBox = expandBoundingBoxByKm(route.boundingBox, maxDistanceKm);
         const maxDistanceMeters = maxDistanceKm * 1000;
+        const defaultDistanceKm = getDefaultDistanceKm(route.distanceMeters, maxDistanceKm);
         const routeGeometry = simplifyRouteGeometry(
           route.geometry,
           ROUTE_DISTANCE_SIMPLIFICATION_TOLERANCE_METERS
@@ -322,7 +327,9 @@ export const createTripPlannerService = ({
           }));
 
         return {
+          defaultDistanceKm,
           destination,
+          maxDistanceKm,
           origin,
           parks: orderResults(parks, {
             getDistanceAlongRouteMeters: (park) => park.distanceAlongRouteMeters,
@@ -385,6 +392,8 @@ export const createTripPlannerService = ({
           .filter((park) => park.distanceMeters <= maxDistanceMeters);
 
         return {
+          defaultDistanceKm: maxDistanceKm,
+          maxDistanceKm,
           origin,
           parks: orderResults(parks, {
             getDistanceKm: (park) => park.distanceKm,
