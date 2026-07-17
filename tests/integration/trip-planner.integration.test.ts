@@ -263,6 +263,24 @@ describe('trip planner route', () => {
     });
   };
 
+  const requestNearbyAsRemote = (
+    app: ReturnType<typeof createApp>,
+    body: Record<string, unknown>,
+    headers: Record<string, string> = {}
+  ) => {
+    return app.request('/api/trip-planner/nearby', {
+      body: JSON.stringify(body),
+      headers: {
+        authorization: 'Bearer test-api-key',
+        'content-type': 'application/json',
+        host: 'parks.example.com',
+        'x-forwarded-for': '203.0.113.1',
+        ...headers
+      },
+      method: 'POST'
+    });
+  };
+
   it('returns the top three trip planner suggestions', async () => {
     const app = createTripPlannerApp(mockGeoapifyFetch() as typeof fetch);
     const response = await requestSuggestionsAsRemote(app, {
@@ -386,6 +404,52 @@ describe('trip planner route', () => {
     });
   });
 
+  it('returns nearby parks around the origin with a map-ready search area', async () => {
+    const app = createTripPlannerApp(mockGeoapifyFetch() as typeof fetch);
+    const response = await requestNearbyAsRemote(app, {
+      originQuery: 'Origin'
+    });
+    const body = (await response.json()) as {
+      origin: { label: string };
+      parks: Array<{
+        distanceFromOriginKm: number;
+        slug: string;
+        visitedSummary: { visitCount: number; visited: boolean };
+      }>;
+      searchArea: {
+        boundingBox: {
+          maxLat: number;
+          maxLon: number;
+          minLat: number;
+          minLon: number;
+        };
+        center: { lat: number; lon: number };
+        maxDistanceKm: number;
+      };
+    };
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('cache-control')).toBe('private, no-store');
+    expect(body.origin.label).toBe('Origin label');
+    expect(body.searchArea.center).toEqual({ lat: 60, lon: 24 });
+    expect(body.searchArea.maxDistanceKm).toBe(25);
+    expect(body.searchArea.boundingBox.minLat).toBeLessThan(59.8);
+    expect(body.searchArea.boundingBox.maxLat).toBeGreaterThan(60.2);
+    expect(body.parks.map((park) => park.slug)).toEqual([
+      'reitinvieri',
+      'reittipolku',
+      'reittipuisto'
+    ]);
+    expect(body.parks[0]?.visitedSummary).toEqual({
+      lastVisitedOn: null,
+      visitCount: 0,
+      visited: false
+    });
+    expect(body.parks[1]?.distanceFromOriginKm ?? 0).toBeLessThan(
+      body.parks[2]?.distanceFromOriginKm ?? 0
+    );
+  });
+
   it('publishes trip planner map fields in openapi.json', async () => {
     const app = createTripPlannerApp(mockGeoapifyFetch() as typeof fetch);
     const response = await app.request('/openapi.json');
@@ -430,6 +494,30 @@ describe('trip planner route', () => {
             };
           };
         };
+        '/api/trip-planner/nearby'?: {
+          post?: {
+            responses?: {
+              '200'?: {
+                content?: {
+                  'application/json'?: {
+                    schema?: {
+                      properties?: {
+                        parks?: {
+                          items?: {
+                            properties?: Record<string, unknown>;
+                          };
+                        };
+                        searchArea?: {
+                          properties?: Record<string, unknown>;
+                        };
+                      };
+                    };
+                  };
+                };
+              };
+            };
+          };
+        };
       };
     };
 
@@ -455,6 +543,23 @@ describe('trip planner route', () => {
       ]?.schema?.properties?.parks?.items?.properties
     ).toMatchObject({
       boundingBox: expect.any(Object)
+    });
+    expect(
+      body.paths?.['/api/trip-planner/nearby']?.post?.responses?.['200']?.content?.[
+        'application/json'
+      ]?.schema?.properties?.searchArea?.properties
+    ).toMatchObject({
+      boundingBox: expect.any(Object),
+      center: expect.any(Object),
+      maxDistanceKm: expect.any(Object)
+    });
+    expect(
+      body.paths?.['/api/trip-planner/nearby']?.post?.responses?.['200']?.content?.[
+        'application/json'
+      ]?.schema?.properties?.parks?.items?.properties
+    ).toMatchObject({
+      boundingBox: expect.any(Object),
+      distanceFromOriginKm: expect.any(Object)
     });
   });
 
@@ -493,6 +598,23 @@ describe('trip planner route', () => {
     expect(body).toEqual({
       error: 'Trip planner provider is unavailable.',
       errorCode: 'provider_unavailable'
+    });
+  });
+
+  it('returns 422 when the nearby origin cannot be geocoded', async () => {
+    const app = createTripPlannerApp(mockGeoapifyFetch({ originFound: false }) as typeof fetch);
+    const response = await requestNearbyAsRemote(app, {
+      originQuery: 'Origin'
+    });
+    const body = (await response.json()) as {
+      error: string;
+      errorCode: string;
+    };
+
+    expect(response.status).toBe(422);
+    expect(body).toEqual({
+      error: 'Origin was not found.',
+      errorCode: 'origin_not_found'
     });
   });
 
@@ -579,6 +701,26 @@ describe('trip planner route', () => {
     });
   });
 
+  it('returns 503 for nearby when trip planner is not configured', async () => {
+    const app = createApp({
+      apiKey: 'test-api-key',
+      database: testDatabase.database
+    });
+    const response = await requestNearbyAsRemote(app, {
+      originQuery: 'Origin'
+    });
+    const body = (await response.json()) as {
+      error: string;
+      errorCode: string;
+    };
+
+    expect(response.status).toBe(503);
+    expect(body).toEqual({
+      error: 'Trip planner is not configured.',
+      errorCode: 'trip_planner_not_configured'
+    });
+  });
+
   it('returns 503 for suggestions when trip planner is not configured', async () => {
     const app = createApp({
       apiKey: 'test-api-key',
@@ -604,6 +746,9 @@ describe('trip planner route', () => {
       apiKey: 'test-api-key',
       database: testDatabase.database,
       tripPlanner: {
+        searchNearby: async () => {
+          throw new Error('unexpected');
+        },
         search: async () => {
           throw new Error('unexpected');
         },
@@ -630,6 +775,26 @@ describe('trip planner route', () => {
       apiKey: 'test-api-key',
       database: testDatabase.database,
       tripPlanner: {
+        searchNearby: async () => ({
+          origin: {
+            coordinate: { lat: 60, lon: 24 },
+            label: 'Origin'
+          },
+          parks: [],
+          searchArea: {
+            boundingBox: {
+              maxLat: 60.2,
+              maxLon: 24.2,
+              minLat: 59.8,
+              minLon: 23.8
+            },
+            center: {
+              lat: 60,
+              lon: 24
+            },
+            maxDistanceKm: 25
+          }
+        }),
         search: async () => ({
           destination: {
             coordinate: { lat: 60, lon: 24.3 },
@@ -666,6 +831,57 @@ describe('trip planner route', () => {
     });
     const response = await requestSuggestionsAsRemote(app, {
       query: 'He'
+    });
+    const body = (await response.json()) as { error: string };
+
+    expect(response.status).toBe(500);
+    expect(body).toEqual({
+      error: 'Internal server error.'
+    });
+  });
+
+  it('returns 500 when nearby search throws an unexpected error', async () => {
+    const app = createApp({
+      apiKey: 'test-api-key',
+      database: testDatabase.database,
+      tripPlanner: {
+        searchNearby: async () => {
+          throw new Error('unexpected');
+        },
+        search: async () => ({
+          destination: {
+            coordinate: { lat: 60, lon: 24.3 },
+            label: 'Destination'
+          },
+          origin: {
+            coordinate: { lat: 60, lon: 24 },
+            label: 'Origin'
+          },
+          parks: [],
+          route: {
+            boundingBox: {
+              maxLat: 60,
+              maxLon: 24.3,
+              minLat: 60,
+              minLon: 24
+            },
+            distanceMeters: 20_000,
+            durationSeconds: 1_200,
+            geometry: {
+              coordinates: [
+                [24, 60],
+                [24.3, 60]
+              ],
+              type: 'LineString'
+            },
+            mode: 'drive'
+          }
+        }),
+        suggest: async () => []
+      }
+    });
+    const response = await requestNearbyAsRemote(app, {
+      originQuery: 'Origin'
     });
     const body = (await response.json()) as { error: string };
 

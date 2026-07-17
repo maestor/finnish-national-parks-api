@@ -23,6 +23,11 @@ export const tripPlannerSearchRequestSchema = z.object({
   originQuery: z.string().trim().min(1).max(200)
 });
 
+export const tripPlannerNearbyRequestSchema = z.object({
+  maxDistanceKm: z.number().min(1).max(100).optional(),
+  originQuery: z.string().trim().min(1).max(200)
+});
+
 export const tripPlannerLocationSchema = z.object({
   coordinate: pointSchema,
   label: z.string()
@@ -56,11 +61,29 @@ export const tripPlannerParkResultSchema = z.object({
   visitedSummary: visitedSummarySchema
 });
 
+export const tripPlannerNearbyParkResultSchema = tripPlannerParkResultSchema
+  .omit({ distanceFromRouteKm: true })
+  .extend({
+    distanceFromOriginKm: z.number().nonnegative()
+  });
+
+export const tripPlannerSearchAreaSchema = z.object({
+  boundingBox: boundingBoxSchema,
+  center: pointSchema,
+  maxDistanceKm: z.number().min(1).max(100)
+});
+
 export const tripPlannerSearchResponseSchema = z.object({
   destination: tripPlannerLocationSchema,
   origin: tripPlannerLocationSchema,
   parks: z.array(tripPlannerParkResultSchema),
   route: tripPlannerRouteSchema
+});
+
+export const tripPlannerNearbyResponseSchema = z.object({
+  origin: tripPlannerLocationSchema,
+  parks: z.array(tripPlannerNearbyParkResultSchema),
+  searchArea: tripPlannerSearchAreaSchema
 });
 
 export const tripPlannerErrorCodeSchema = z.enum([

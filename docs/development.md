@@ -90,7 +90,7 @@ The importer's LIPAS source URL and supported type-code list are internal config
 
 OAuth routes (`/auth/*`) are only registered when `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, and `AUTH_JWT_SECRET` are all provided.
 `GOOGLE_REDIRECT_URI` is optional and only needed when the public OAuth callback is exposed through a frontend proxy or rewrite instead of the API domain itself.
-`POST /api/trip-planner/suggestions` and `POST /api/trip-planner/search` are available whenever the app boots with a database, but both return `503` until `GEOAPIFY_API_KEY` is configured.
+`POST /api/trip-planner/suggestions`, `POST /api/trip-planner/search`, and `POST /api/trip-planner/nearby` are available whenever the app boots with a database, but all three return `503` until `GEOAPIFY_API_KEY` is configured.
 Keep `GEOAPIFY_API_KEY` server-side only. The browser-facing UI should go through the frontend server proxy and the existing backend API-key boundary.
 For the current trip-planner search heuristics, start-zone behavior, and tuning definitions, see [docs/trip-planner.md](./trip-planner.md).
 
@@ -250,13 +250,14 @@ Key route behavior:
 - `GET /api/public/map-summary` returns lightweight frontend-public park map data plus per-park visited summaries.
 - `POST /api/trip-planner/suggestions` returns up to three Geoapify-backed place suggestions with labels and coordinates for origin/destination selection.
 - `POST /api/trip-planner/search` geocodes origin and destination, fetches a real Geoapify driving route, filters visible parks by a configurable corridor distance, and returns list-ready results with visited summaries plus a map-ready route `LineString` and backend-provided route and park bounding boxes. On longer trips, the first 30 km from the origin uses a stricter start-zone filter so dense departure areas do not flood the list.
+- `POST /api/trip-planner/nearby` geocodes only the origin, filters visible parks by straight-line proximity to that point, and returns list-ready results with visited summaries plus a backend-provided `searchArea` bounding box for map rendering without route geometry.
 - `GET /api/parks/:slug/visits` returns visit history plus a visited summary for one visible park.
 - `GET /api/visits` returns flat visit resources with their parent park reference.
 - `GET /api/visits/:id` returns one visit with its parent park reference.
 - Catalog and public summary routes emit deterministic `ETag` headers and support `304 Not Modified`.
 - Public summary routes use shared-cache headers and expose a public visit-data `version` / `updatedAt` signal that changes on visit create/update/delete and visit image upload/delete/reorder.
 - Visit and management routes use `private, no-store`.
-- Trip planner suggestion and search routes both use `private, no-store` and keep the provider key server-side.
+- Trip planner suggestion, route-search, and nearby-origin routes all use `private, no-store` and keep the provider key server-side.
 - All write routes and `GET /api/admin/parks/visibility` require a valid admin session cookie.
 - `PATCH /api/parks/:slug` updates the admin-editable park fields and auto-generates a slug from `name` when no explicit `slug` is provided.
 - `PATCH /api/parks/:slug/removed` toggles whether a park is hidden from catalog and visit responses.

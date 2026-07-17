@@ -17,6 +17,11 @@ It is meant to answer two questions quickly:
   - geocodes the endpoints server-side
   - fetches a real driving route from Geoapify
   - returns visible catalog parks near that route
+- `POST /api/trip-planner/nearby`
+  - accepts `originQuery` and optional `maxDistanceKm`
+  - geocodes only the origin server-side
+  - returns visible catalog parks near that point
+  - returns a `searchArea` bounding box and center for map rendering without route geometry
 
 Both endpoints require the existing backend auth boundary outside localhost and depend on `GEOAPIFY_API_KEY`.
 
@@ -27,6 +32,8 @@ Both endpoints require the existing backend auth boundary outside localhost and 
   - today the default search value remains `25 km`
 - `distanceFromRouteKm`
   - the shortest side-distance from the routed path to the park geometry or marker point
+- `distanceFromOriginKm`
+  - the shortest straight-line distance from the origin point to the park geometry or marker point
 - `distanceAlongRoute`
   - where the park sits along the trip, measured from the route origin to the closest point on the route
 - `start zone`
@@ -52,6 +59,28 @@ The current backend then refines that with long-trip behavior:
 
 This is intended to reduce dense departure-area flooding such as Uusimaa or the capital region without making Lapland-style long-distance searches too strict.
 
+## Nearby-Origin Logic
+
+The nearby endpoint is intentionally simpler than route search.
+
+It asks a different inclusion question:
+
+- is this park close enough to the chosen origin point, even when there is no trip route?
+
+Current nearby behavior:
+
+1. Geocode the origin only.
+2. Build a search area from the origin point with the same default `25 km` distance.
+3. Filter parks by straight-line distance from the origin to stored park geometry, or to bounding-box / marker fallbacks when full geometry is missing.
+4. Return the origin, matching parks, and a backend-provided `searchArea` bounding box for the map.
+
+The nearby endpoint does not use:
+
+- routed Geoapify path geometry
+- `distanceAlongRoute`
+- long-trip thresholds
+- start-zone tightening
+
 ## Result Ordering
 
 The existing public ordering intent still applies first:
@@ -66,6 +95,8 @@ Within each group:
 - shorter route distance still matters
 - on long trips, later-route matches are favored over remaining start-zone matches
 - name breaks remaining ties
+
+For the nearby endpoint, the same group order is reused, but the distance sort uses `distanceFromOriginKm` instead of route distance.
 
 ## Tuning Knobs
 
