@@ -32,6 +32,22 @@ const routeGeometry: GeoJsonFeatureCollection = {
   type: 'FeatureCollection'
 };
 
+const longRouteGeometry: GeoJsonFeatureCollection = {
+  features: [
+    {
+      geometry: {
+        coordinates: [
+          [24, 60],
+          [27, 60]
+        ],
+        type: 'LineString'
+      },
+      type: 'Feature'
+    }
+  ],
+  type: 'FeatureCollection'
+};
+
 const createCandidate = (
   overrides: Partial<TripPlannerParkCandidate> = {}
 ): TripPlannerParkCandidate => ({
@@ -437,6 +453,267 @@ describe('trip planner service', () => {
       'near-wilderness-area',
       'mid-hiking-area',
       'trail-result'
+    ]);
+  });
+
+  it('applies stricter start-zone filtering only on long routes', async () => {
+    listTripPlannerCandidateParks.mockResolvedValue([
+      createCandidate({
+        boundaryGeoJson: null,
+        boundingBox: {
+          maxLat: 60.14,
+          maxLon: 24.12,
+          minLat: 60.1,
+          minLon: 24.08
+        },
+        markerPoint: {
+          lat: 60.12,
+          lon: 24.1
+        },
+        name: 'Start Zone Wide Detour',
+        slug: 'start-zone-wide-detour'
+      }),
+      createCandidate({
+        boundaryGeoJson: null,
+        boundingBox: {
+          maxLat: 60.14,
+          maxLon: 25.52,
+          minLat: 60.1,
+          minLon: 25.48
+        },
+        markerPoint: {
+          lat: 60.12,
+          lon: 25.5
+        },
+        name: 'Farther Along Route',
+        slug: 'farther-along-route'
+      })
+    ]);
+    const service = createTripPlannerService({
+      database: {} as Database,
+      provider: createProvider({
+        route: vi.fn(async () => ({
+          boundingBox: {
+            maxLat: 60,
+            maxLon: 27,
+            minLat: 60,
+            minLon: 24
+          },
+          distanceMeters: 160_000,
+          durationSeconds: 9_000,
+          geometry: longRouteGeometry,
+          mode: 'drive' as const
+        }))
+      })
+    });
+
+    const result = await service.search({
+      destinationQuery: 'Destination',
+      mode: 'drive',
+      originQuery: 'Origin'
+    });
+
+    expect(result.parks.map((park) => park.slug)).toEqual(['farther-along-route']);
+  });
+
+  it('pushes remaining start-zone parks behind later route matches on long trips', async () => {
+    listTripPlannerCandidateParks.mockResolvedValue([
+      createCandidate({
+        boundaryGeoJson: null,
+        boundingBox: {
+          maxLat: 60.05,
+          maxLon: 24.07,
+          minLat: 60.03,
+          minLon: 24.05
+        },
+        markerPoint: {
+          lat: 60.04,
+          lon: 24.06
+        },
+        name: 'Start Zone Close Park',
+        slug: 'start-zone-close-park'
+      }),
+      createCandidate({
+        boundaryGeoJson: null,
+        boundingBox: {
+          maxLat: 60.07,
+          maxLon: 24.72,
+          minLat: 60.05,
+          minLon: 24.7
+        },
+        markerPoint: {
+          lat: 60.06,
+          lon: 24.71
+        },
+        name: 'Later Route Park',
+        slug: 'later-route-park'
+      })
+    ]);
+    const service = createTripPlannerService({
+      database: {} as Database,
+      provider: createProvider({
+        route: vi.fn(async () => ({
+          boundingBox: {
+            maxLat: 60,
+            maxLon: 27,
+            minLat: 60,
+            minLon: 24
+          },
+          distanceMeters: 160_000,
+          durationSeconds: 9_000,
+          geometry: longRouteGeometry,
+          mode: 'drive' as const
+        }))
+      })
+    });
+
+    const result = await service.search({
+      destinationQuery: 'Destination',
+      mode: 'drive',
+      originQuery: 'Origin'
+    });
+
+    expect(result.parks.map((park) => park.slug)).toEqual([
+      'later-route-park',
+      'start-zone-close-park'
+    ]);
+  });
+
+  it('breaks same-distance ties on long trips by earlier route progress before name', async () => {
+    listTripPlannerCandidateParks.mockResolvedValue([
+      createCandidate({
+        boundaryGeoJson: null,
+        boundingBox: {
+          maxLat: 60.09,
+          maxLon: 25.42,
+          minLat: 60.07,
+          minLon: 25.38
+        },
+        markerPoint: {
+          lat: 60.08,
+          lon: 25.4
+        },
+        name: 'Zulu Later Park',
+        slug: 'zulu-later-park'
+      }),
+      createCandidate({
+        boundaryGeoJson: null,
+        boundingBox: {
+          maxLat: 60.09,
+          maxLon: 24.82,
+          minLat: 60.07,
+          minLon: 24.78
+        },
+        markerPoint: {
+          lat: 60.08,
+          lon: 24.8
+        },
+        name: 'Alpha Earlier Park',
+        slug: 'alpha-earlier-park'
+      })
+    ]);
+    const service = createTripPlannerService({
+      database: {} as Database,
+      provider: createProvider({
+        route: vi.fn(async () => ({
+          boundingBox: {
+            maxLat: 60,
+            maxLon: 27,
+            minLat: 60,
+            minLon: 24
+          },
+          distanceMeters: 160_000,
+          durationSeconds: 9_000,
+          geometry: longRouteGeometry,
+          mode: 'drive' as const
+        }))
+      })
+    });
+
+    const result = await service.search({
+      destinationQuery: 'Destination',
+      mode: 'drive',
+      originQuery: 'Origin'
+    });
+
+    expect(result.parks.map((park) => park.slug)).toEqual([
+      'alpha-earlier-park',
+      'zulu-later-park'
+    ]);
+    expect(result.parks[0]?.distanceFromRouteKm).toBe(result.parks[1]?.distanceFromRouteKm);
+  });
+
+  it('keeps current near-start behavior on shorter routes', async () => {
+    listTripPlannerCandidateParks.mockResolvedValue([
+      createCandidate({
+        boundaryGeoJson: null,
+        boundingBox: {
+          maxLat: 60.06,
+          maxLon: 24.12,
+          minLat: 60.02,
+          minLon: 24.08
+        },
+        markerPoint: {
+          lat: 60.04,
+          lon: 24.1
+        },
+        name: 'Short Trip Start Zone Park',
+        slug: 'short-trip-start-zone-park'
+      }),
+      createCandidate({
+        boundaryGeoJson: null,
+        boundingBox: {
+          maxLat: 60.14,
+          maxLon: 24.5,
+          minLat: 60.1,
+          minLon: 24.46
+        },
+        markerPoint: {
+          lat: 60.12,
+          lon: 24.48
+        },
+        name: 'Short Trip Later Park',
+        slug: 'short-trip-later-park'
+      })
+    ]);
+    const service = createTripPlannerService({
+      database: {} as Database,
+      provider: createProvider({
+        route: vi.fn(async () => ({
+          boundingBox: {
+            maxLat: 60,
+            maxLon: 24.6,
+            minLat: 60,
+            minLon: 24
+          },
+          distanceMeters: 60_000,
+          durationSeconds: 4_000,
+          geometry: {
+            features: [
+              {
+                geometry: {
+                  coordinates: [[24, 60] as [number, number], [24.6, 60] as [number, number]],
+                  type: 'LineString' as const
+                },
+                type: 'Feature' as const
+              }
+            ],
+            type: 'FeatureCollection' as const
+          },
+          mode: 'drive' as const
+        }))
+      })
+    });
+
+    const result = await service.search({
+      destinationQuery: 'Destination',
+      mode: 'drive',
+      originQuery: 'Origin'
+    });
+
+    expect(result.parks.map((park) => park.slug)).toEqual([
+      'short-trip-start-zone-park',
+      'short-trip-later-park'
     ]);
   });
 

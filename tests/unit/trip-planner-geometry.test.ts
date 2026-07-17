@@ -5,6 +5,7 @@ import {
   boundingBoxesIntersect,
   deriveBoundingBox,
   expandBoundingBoxByKm,
+  getDistanceAlongRouteToPointMeters,
   getRouteDistanceToBoundingBoxMeters,
   getRouteDistanceToFeatureCollectionMeters,
   getRouteDistanceToLineStringMeters,
@@ -65,6 +66,68 @@ describe('trip planner geometry', () => {
 
     expect(distance).toBeGreaterThan(950);
     expect(distance).toBeLessThan(1_050);
+  });
+
+  it('measures where along the route a nearby point is closest', () => {
+    const lineString = {
+      coordinates: [
+        [24, 60] as [number, number],
+        [24.1, 60] as [number, number],
+        [24.1, 60.1] as [number, number]
+      ],
+      type: 'LineString' as const
+    };
+
+    const nearFirstSegment = getDistanceAlongRouteToPointMeters(lineString, {
+      lat: 60.01,
+      lon: 24.05
+    });
+    const nearSecondSegment = getDistanceAlongRouteToPointMeters(lineString, {
+      lat: 60.05,
+      lon: 24.11
+    });
+
+    expect(nearFirstSegment).toBeGreaterThan(2_500);
+    expect(nearFirstSegment).toBeLessThan(3_100);
+    expect(nearSecondSegment).toBeGreaterThan(10_500);
+    expect(nearSecondSegment).toBeLessThan(11_700);
+  });
+
+  it('handles zero-length route segments and too-short route lines defensively', () => {
+    const lineWithDuplicatePoint = {
+      coordinates: [
+        [24, 60] as [number, number],
+        [24, 60] as [number, number],
+        [24.1, 60] as [number, number]
+      ],
+      type: 'LineString' as const
+    };
+
+    expect(
+      getDistanceAlongRouteToPointMeters(lineWithDuplicatePoint, {
+        lat: 60,
+        lon: 24.05
+      })
+    ).toBeGreaterThan(2_500);
+    expect(
+      getDistanceAlongRouteToPointMeters(lineWithDuplicatePoint, {
+        lat: 60,
+        lon: 24.05
+      })
+    ).toBeLessThan(3_100);
+
+    expect(
+      getDistanceAlongRouteToPointMeters(
+        {
+          coordinates: [[24, 60] as [number, number]],
+          type: 'LineString'
+        },
+        {
+          lat: 60,
+          lon: 24.05
+        }
+      )
+    ).toBe(Number.POSITIVE_INFINITY);
   });
 
   it('flattens route feature collections into a single display linestring', () => {

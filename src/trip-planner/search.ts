@@ -4,6 +4,7 @@ import { isTrailTypeSlug } from '../parks/park-types.js';
 import {
   boundingBoxesIntersect,
   expandBoundingBoxByKm,
+  getDistanceAlongRouteToPointMeters,
   getRouteDistanceToBoundingBoxMeters,
   getRouteDistanceToFeatureCollectionMeters,
   getRouteDistanceToPointMeters,
@@ -52,6 +53,14 @@ const roundDistanceKm = (distanceMeters: number) => {
 const MAX_UNVISITED_TRAILS = 10;
 const NATIONAL_PARK_TYPE_SLUG = 'national-park';
 const ROUTE_DISTANCE_SIMPLIFICATION_TOLERANCE_METERS = 100;
+const LONG_ROUTE_START_ZONE_MIN_DISTANCE_METERS = 100_000;
+const START_ZONE_DISTANCE_LIMIT_METERS = 10_000;
+const START_ZONE_LENGTH_METERS = 30_000;
+
+type RankedParkResult = TripPlannerSearchResponse['parks'][number] & {
+  distanceAlongRouteMeters: number;
+  isInStartZone: boolean;
+};
 
 const getDistanceFromRouteMeters = (
   route: Parameters<typeof getRouteDistanceToFeatureCollectionMeters>[0],
@@ -70,35 +79,49 @@ const getDistanceFromRouteMeters = (
   return getRouteDistanceToPointMeters(route, park.markerPoint);
 };
 
-const sortByDistanceAndName = (parks: TripPlannerSearchResponse['parks']) => {
+const sortByDistanceAndName = (parks: RankedParkResult[], prioritizeStartZoneLast: boolean) => {
   return [...parks].sort((first, second) => {
+    if (prioritizeStartZoneLast && first.isInStartZone !== second.isInStartZone) {
+      return Number(first.isInStartZone) - Number(second.isInStartZone);
+    }
+
     if (first.distanceFromRouteKm !== second.distanceFromRouteKm) {
       return first.distanceFromRouteKm - second.distanceFromRouteKm;
+    }
+
+    if (
+      prioritizeStartZoneLast &&
+      first.distanceAlongRouteMeters !== second.distanceAlongRouteMeters
+    ) {
+      return first.distanceAlongRouteMeters - second.distanceAlongRouteMeters;
     }
 
     return first.name.localeCompare(second.name);
   });
 };
 
-const orderResults = (parks: TripPlannerSearchResponse['parks']) => {
+const orderResults = (parks: RankedParkResult[], prioritizeStartZoneLast: boolean) => {
   const unvisitedParks = parks.filter((park) => !park.visitedSummary.visited);
   const visitedParks = parks.filter((park) => park.visitedSummary.visited);
   const unvisitedAreas = unvisitedParks.filter((park) => !isTrailTypeSlug(park.type.slug));
   const unvisitedNationalParks = sortByDistanceAndName(
-    unvisitedAreas.filter((park) => park.type.slug === NATIONAL_PARK_TYPE_SLUG)
+    unvisitedAreas.filter((park) => park.type.slug === NATIONAL_PARK_TYPE_SLUG),
+    prioritizeStartZoneLast
   );
   const otherUnvisitedAreas = sortByDistanceAndName(
-    unvisitedAreas.filter((park) => park.type.slug !== NATIONAL_PARK_TYPE_SLUG)
+    unvisitedAreas.filter((park) => park.type.slug !== NATIONAL_PARK_TYPE_SLUG),
+    prioritizeStartZoneLast
   );
   const unvisitedTrails = sortByDistanceAndName(
-    unvisitedParks.filter((park) => isTrailTypeSlug(park.type.slug))
+    unvisitedParks.filter((park) => isTrailTypeSlug(park.type.slug)),
+    prioritizeStartZoneLast
   ).slice(0, MAX_UNVISITED_TRAILS);
 
   return [
     ...unvisitedNationalParks,
     ...otherUnvisitedAreas,
     ...unvisitedTrails,
-    ...sortByDistanceAndName(visitedParks)
+    ...sortByDistanceAndName(visitedParks, prioritizeStartZoneLast)
   ];
 };
 
@@ -174,6 +197,8 @@ export const createTripPlannerService = ({
           ROUTE_DISTANCE_SIMPLIFICATION_TOLERANCE_METERS
         );
         const routeLineString = toRouteLineString(routeGeometry);
+        const applyLongRouteStartZoneLogic =
+          route.distanceMeters >= LONG_ROUTE_START_ZONE_MIN_DISTANCE_METERS;
 
         if (!routeLineString) {
           throw new TripPlannerError('route_not_found', 'Route was not found.', 422);
@@ -182,16 +207,31 @@ export const createTripPlannerService = ({
         const parks = (await listTripPlannerCandidateParks(database))
           .filter((park) => boundingBoxesIntersect(candidateBoundingBox, park.boundingBox))
           .map((park) => ({
+            distanceAlongRouteMeters: getDistanceAlongRouteToPointMeters(
+              routeLineString,
+              park.markerPoint
+            ),
             distanceFromRouteMeters: getDistanceFromRouteMeters(routeGeometry, park),
             park
           }))
-          .filter(({ distanceFromRouteMeters }) => distanceFromRouteMeters <= maxDistanceMeters)
-          .map(({ distanceFromRouteMeters, park }) => ({
+          .filter(({ distanceAlongRouteMeters, distanceFromRouteMeters }) => {
+            const isInStartZone =
+              applyLongRouteStartZoneLogic && distanceAlongRouteMeters <= START_ZONE_LENGTH_METERS;
+            const effectiveMaxDistanceMeters = isInStartZone
+              ? Math.min(maxDistanceMeters, START_ZONE_DISTANCE_LIMIT_METERS)
+              : maxDistanceMeters;
+
+            return distanceFromRouteMeters <= effectiveMaxDistanceMeters;
+          })
+          .map(({ distanceAlongRouteMeters, distanceFromRouteMeters, park }) => ({
             address: park.address,
             boundingBox: park.boundingBox,
             category: park.category,
             ...(park.displayTypeName ? { displayTypeName: park.displayTypeName } : {}),
+            distanceAlongRouteMeters,
             distanceFromRouteKm: roundDistanceKm(distanceFromRouteMeters),
+            isInStartZone:
+              applyLongRouteStartZoneLogic && distanceAlongRouteMeters <= START_ZONE_LENGTH_METERS,
             locationLabel: park.locationLabel,
             markerPoint: park.markerPoint,
             name: park.name,
@@ -205,7 +245,13 @@ export const createTripPlannerService = ({
         return {
           destination,
           origin,
-          parks: orderResults(parks),
+          parks: orderResults(parks, applyLongRouteStartZoneLogic).map(
+            ({
+              distanceAlongRouteMeters: _distanceAlongRouteMeters,
+              isInStartZone: _isInStartZone,
+              ...park
+            }) => park
+          ),
           route: {
             boundingBox: route.boundingBox,
             distanceMeters: route.distanceMeters,

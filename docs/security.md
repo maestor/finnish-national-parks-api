@@ -37,7 +37,7 @@ Rules:
 - Never expose the shared `API_KEY` in browser-delivered code.
 - Browser-facing admin or mutation flows must use Google-backed admin sessions.
 - If OAuth/session auth is unavailable, admin-session routes should fail closed rather than silently downgrading to weaker auth.
-- When auth policy changes, update runtime enforcement, route contracts, integration tests, `README.md`, `docs/DEVELOPMENT.md`, and this file in the same change.
+- When auth policy changes, update runtime enforcement, route contracts, integration tests, `README.md`, `docs/development.md`, and this file in the same change.
 - When a route mixes API-key and session requirements, document both clearly in contract and contributor docs.
 
 ## Storage And Upload Rules

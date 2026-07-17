@@ -35,7 +35,7 @@ The deployment guardrail test for this lives in `tests/integration/vercel-entry.
 - Treat direct uploads as a storage-cost surface: enforce size and content-type limits against the actual stored object, not only the client request.
 - Prefer owned data and cached verification over new live third-party request-path dependencies.
 - Before risky imports, migrations, or large manual catalog updates against Turso, take a fresh `npm run db:backup`.
-- Keep the current hardening priorities in [docs/SECURITY.md](./SECURITY.md).
+- Keep the current hardening priorities in [docs/security.md](./security.md).
 
 ## Branch And PR Workflow
 
@@ -92,6 +92,7 @@ OAuth routes (`/auth/*`) are only registered when `GOOGLE_CLIENT_ID`, `GOOGLE_CL
 `GOOGLE_REDIRECT_URI` is optional and only needed when the public OAuth callback is exposed through a frontend proxy or rewrite instead of the API domain itself.
 `POST /api/trip-planner/suggestions` and `POST /api/trip-planner/search` are available whenever the app boots with a database, but both return `503` until `GEOAPIFY_API_KEY` is configured.
 Keep `GEOAPIFY_API_KEY` server-side only. The browser-facing UI should go through the frontend server proxy and the existing backend API-key boundary.
+For the current trip-planner search heuristics, start-zone behavior, and tuning definitions, see [docs/trip-planner.md](./trip-planner.md).
 
 Turso/Vercel deployment variables should use the same names where possible:
 
@@ -157,7 +158,7 @@ For faster local iteration when adding only a few curated parks, pass one or mor
 npm run import:special-parks -- loviisan-alakaupunki turunmaan-kalkkilouhokset
 ```
 
-For the reproducible contributor workflow for curated special imports, source-family selection, and when to prefer local `special://...` GeoJSON, see [docs/IMPORTING.md](./IMPORTING.md).
+For the reproducible contributor workflow for curated special imports, source-family selection, and when to prefer local `special://...` GeoJSON, see [docs/importing.md](./importing.md).
 
 ### Park Logos
 
@@ -248,7 +249,7 @@ Key route behavior:
 - `GET /api/public/home-summary` returns frontend-public home-page summary data including seasonal visit counts, `progressByType` with a `visible` flag, and `progressByCategory`, without visit notes, routes, or images.
 - `GET /api/public/map-summary` returns lightweight frontend-public park map data plus per-park visited summaries.
 - `POST /api/trip-planner/suggestions` returns up to three Geoapify-backed place suggestions with labels and coordinates for origin/destination selection.
-- `POST /api/trip-planner/search` geocodes origin and destination, fetches a real Geoapify driving route, filters visible parks by a configurable corridor distance, and returns list-ready results with visited summaries plus a map-ready route `LineString` and backend-provided route and park bounding boxes.
+- `POST /api/trip-planner/search` geocodes origin and destination, fetches a real Geoapify driving route, filters visible parks by a configurable corridor distance, and returns list-ready results with visited summaries plus a map-ready route `LineString` and backend-provided route and park bounding boxes. On longer trips, the first 30 km from the origin uses a stricter start-zone filter so dense departure areas do not flood the list.
 - `GET /api/parks/:slug/visits` returns visit history plus a visited summary for one visible park.
 - `GET /api/visits` returns flat visit resources with their parent park reference.
 - `GET /api/visits/:id` returns one visit with its parent park reference.
