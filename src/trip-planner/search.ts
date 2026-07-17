@@ -16,7 +16,8 @@ import type {
   TripPlannerProvider,
   TripPlannerSearchInput,
   TripPlannerSearchResponse,
-  TripPlannerService
+  TripPlannerService,
+  TripPlannerSuggestion
 } from './types.js';
 
 export const DEFAULT_TRIP_PLANNER_MAX_DISTANCE_KM = 25;
@@ -107,11 +108,33 @@ const assertModeSupported = (mode: TripPlannerMode) => {
   }
 };
 
+const createProviderUnavailableError = () => {
+  return new TripPlannerError('provider_unavailable', 'Trip planner provider is unavailable.', 503);
+};
+
+const suggestLocations = async (
+  provider: TripPlannerProvider,
+  query: string
+): Promise<TripPlannerSuggestion[]> => {
+  try {
+    return await provider.suggest(query);
+  } catch (error) {
+    if (error instanceof TripPlannerError) {
+      throw error;
+    }
+
+    throw createProviderUnavailableError();
+  }
+};
+
 export const createTripPlannerService = ({
   database,
   provider
 }: CreateTripPlannerServiceOptions): TripPlannerService => {
   return {
+    suggest: async (query) => {
+      return suggestLocations(provider, query);
+    },
     search: async ({
       destinationQuery,
       maxDistanceKm = DEFAULT_TRIP_PLANNER_MAX_DISTANCE_KM,
@@ -196,11 +219,7 @@ export const createTripPlannerService = ({
           throw error;
         }
 
-        throw new TripPlannerError(
-          'provider_unavailable',
-          'Trip planner provider is unavailable.',
-          503
-        );
+        throw createProviderUnavailableError();
       }
     }
   };

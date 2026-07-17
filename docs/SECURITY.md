@@ -60,7 +60,7 @@ Rules:
   - failure behavior
   - test coverage for failure cases
 - Prefer local JWT verification against trusted signing keys over per-request token introspection endpoints when feasible.
-- `POST /api/trip-planner/search` may call Geoapify for geocoding and routing when `GEOAPIFY_API_KEY` is configured. Keep those calls behind the existing backend auth boundary, use short request timeouts, reuse identical requests through process-local in-memory caching and in-flight deduplication, and fail closed with `503` when the provider is unavailable.
+- `POST /api/trip-planner/suggestions` and `POST /api/trip-planner/search` may call Geoapify for autocomplete, geocoding, and routing when `GEOAPIFY_API_KEY` is configured. Keep those calls behind the existing backend auth boundary, use short request timeouts, reuse identical requests through process-local in-memory caching and in-flight deduplication, and fail closed with `503` when the provider is unavailable.
 
 ## Data Handling Rules
 

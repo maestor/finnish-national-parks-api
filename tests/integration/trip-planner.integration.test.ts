@@ -32,10 +32,29 @@ const createPolygon = (minLon: number, minLat: number, maxLon: number, maxLat: n
 const mockGeoapifyFetch = ({
   destinationFound = true,
   originFound = true,
+  suggestionStatus = 200,
+  suggestions = [
+    { formatted: 'Helsinki, Finland', lat: 60.1699, lon: 24.9384 },
+    { formatted: 'Helsingby, Finland', lat: 60.22, lon: 24.7 },
+    { formatted: 'Helsinge, Finland', lat: 60.3, lon: 25.01 },
+    { formatted: 'Ignored fourth', lat: 61, lon: 26 }
+  ],
   routeStatus = 200
 } = {}) => {
   return vi.fn().mockImplementation((input: string | URL) => {
     const url = new URL(String(input));
+
+    if (url.pathname === '/v1/geocode/autocomplete') {
+      return Promise.resolve(
+        new Response(
+          suggestionStatus === 200 ? JSON.stringify({ results: suggestions }) : 'provider down',
+          {
+            headers: { 'content-type': 'application/json' },
+            status: suggestionStatus
+          }
+        )
+      );
+    }
 
     if (url.pathname === '/v1/geocode/search') {
       const text = url.searchParams.get('text');
@@ -226,6 +245,56 @@ describe('trip planner route', () => {
     });
   };
 
+  const requestSuggestionsAsRemote = (
+    app: ReturnType<typeof createApp>,
+    body: Record<string, unknown>,
+    headers: Record<string, string> = {}
+  ) => {
+    return app.request('/api/trip-planner/suggestions', {
+      body: JSON.stringify(body),
+      headers: {
+        authorization: 'Bearer test-api-key',
+        'content-type': 'application/json',
+        host: 'parks.example.com',
+        'x-forwarded-for': '203.0.113.1',
+        ...headers
+      },
+      method: 'POST'
+    });
+  };
+
+  it('returns the top three trip planner suggestions', async () => {
+    const app = createTripPlannerApp(mockGeoapifyFetch() as typeof fetch);
+    const response = await requestSuggestionsAsRemote(app, {
+      query: 'He'
+    });
+    const body = (await response.json()) as {
+      suggestions: Array<{
+        coordinate: { lat: number; lon: number };
+        label: string;
+      }>;
+    };
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('cache-control')).toBe('private, no-store');
+    expect(body).toEqual({
+      suggestions: [
+        {
+          coordinate: { lat: 60.1699, lon: 24.9384 },
+          label: 'Helsinki, Finland'
+        },
+        {
+          coordinate: { lat: 60.22, lon: 24.7 },
+          label: 'Helsingby, Finland'
+        },
+        {
+          coordinate: { lat: 60.3, lon: 25.01 },
+          label: 'Helsinge, Finland'
+        }
+      ]
+    });
+  });
+
   it('returns unvisited areas first, then unvisited trails, then visited results', async () => {
     const app = createTripPlannerApp(mockGeoapifyFetch() as typeof fetch);
     const response = await requestAsRemote(app, {
@@ -322,6 +391,21 @@ describe('trip planner route', () => {
     const response = await app.request('/openapi.json');
     const body = (await response.json()) as {
       paths?: {
+        '/api/trip-planner/suggestions'?: {
+          post?: {
+            responses?: {
+              '200'?: {
+                content?: {
+                  'application/json'?: {
+                    schema?: {
+                      properties?: Record<string, unknown>;
+                    };
+                  };
+                };
+              };
+            };
+          };
+        };
         '/api/trip-planner/search'?: {
           post?: {
             responses?: {
@@ -350,6 +434,13 @@ describe('trip planner route', () => {
     };
 
     expect(response.status).toBe(200);
+    expect(
+      body.paths?.['/api/trip-planner/suggestions']?.post?.responses?.['200']?.content?.[
+        'application/json'
+      ]?.schema?.properties
+    ).toMatchObject({
+      suggestions: expect.any(Object)
+    });
     expect(
       body.paths?.['/api/trip-planner/search']?.post?.responses?.['200']?.content?.[
         'application/json'
@@ -405,6 +496,27 @@ describe('trip planner route', () => {
     });
   });
 
+  it('returns 503 when Geoapify autocomplete is unavailable', async () => {
+    const app = createTripPlannerApp(
+      mockGeoapifyFetch({
+        suggestionStatus: 503
+      }) as typeof fetch
+    );
+    const response = await requestSuggestionsAsRemote(app, {
+      query: 'He'
+    });
+    const body = (await response.json()) as {
+      error: string;
+      errorCode: string;
+    };
+
+    expect(response.status).toBe(503);
+    expect(body).toEqual({
+      error: 'Trip planner provider is unavailable.',
+      errorCode: 'provider_unavailable'
+    });
+  });
+
   it('requires bearer auth for remote requests', async () => {
     const app = createTripPlannerApp(mockGeoapifyFetch() as typeof fetch);
     const response = await app.request('/api/trip-planner/search', {
@@ -412,6 +524,25 @@ describe('trip planner route', () => {
         destinationQuery: 'Destination',
         mode: 'drive',
         originQuery: 'Origin'
+      }),
+      headers: {
+        'content-type': 'application/json',
+        host: 'parks.example.com',
+        'x-forwarded-for': '203.0.113.1'
+      },
+      method: 'POST'
+    });
+    const body = (await response.json()) as { error: string };
+
+    expect(response.status).toBe(401);
+    expect(body.error).toBe('Unauthorized');
+  });
+
+  it('requires bearer auth for remote suggestion requests', async () => {
+    const app = createTripPlannerApp(mockGeoapifyFetch() as typeof fetch);
+    const response = await app.request('/api/trip-planner/suggestions', {
+      body: JSON.stringify({
+        query: 'He'
       }),
       headers: {
         'content-type': 'application/json',
@@ -448,12 +579,35 @@ describe('trip planner route', () => {
     });
   });
 
+  it('returns 503 for suggestions when trip planner is not configured', async () => {
+    const app = createApp({
+      apiKey: 'test-api-key',
+      database: testDatabase.database
+    });
+    const response = await requestSuggestionsAsRemote(app, {
+      query: 'He'
+    });
+    const body = (await response.json()) as {
+      error: string;
+      errorCode: string;
+    };
+
+    expect(response.status).toBe(503);
+    expect(body).toEqual({
+      error: 'Trip planner is not configured.',
+      errorCode: 'trip_planner_not_configured'
+    });
+  });
+
   it('returns 500 when the trip planner throws an unexpected error', async () => {
     const app = createApp({
       apiKey: 'test-api-key',
       database: testDatabase.database,
       tripPlanner: {
         search: async () => {
+          throw new Error('unexpected');
+        },
+        suggest: async () => {
           throw new Error('unexpected');
         }
       }
@@ -462,6 +616,56 @@ describe('trip planner route', () => {
       destinationQuery: 'Destination',
       mode: 'drive',
       originQuery: 'Origin'
+    });
+    const body = (await response.json()) as { error: string };
+
+    expect(response.status).toBe(500);
+    expect(body).toEqual({
+      error: 'Internal server error.'
+    });
+  });
+
+  it('returns 500 when suggestions throw an unexpected error', async () => {
+    const app = createApp({
+      apiKey: 'test-api-key',
+      database: testDatabase.database,
+      tripPlanner: {
+        search: async () => ({
+          destination: {
+            coordinate: { lat: 60, lon: 24.3 },
+            label: 'Destination'
+          },
+          origin: {
+            coordinate: { lat: 60, lon: 24 },
+            label: 'Origin'
+          },
+          parks: [],
+          route: {
+            boundingBox: {
+              maxLat: 60,
+              maxLon: 24.3,
+              minLat: 60,
+              minLon: 24
+            },
+            distanceMeters: 20_000,
+            durationSeconds: 1_200,
+            geometry: {
+              coordinates: [
+                [24, 60],
+                [24.3, 60]
+              ],
+              type: 'LineString'
+            },
+            mode: 'drive'
+          }
+        }),
+        suggest: async () => {
+          throw new Error('unexpected');
+        }
+      }
+    });
+    const response = await requestSuggestionsAsRemote(app, {
+      query: 'He'
     });
     const body = (await response.json()) as { error: string };
 

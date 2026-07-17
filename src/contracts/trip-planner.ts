@@ -12,6 +12,10 @@ import {
 
 export const tripPlannerModeSchema = z.enum(['drive']);
 
+export const tripPlannerSuggestionsRequestSchema = z.object({
+  query: z.string().trim().min(2).max(200)
+});
+
 export const tripPlannerSearchRequestSchema = z.object({
   destinationQuery: z.string().trim().min(1).max(200),
   maxDistanceKm: z.number().min(1).max(100).optional(),
@@ -22,6 +26,10 @@ export const tripPlannerSearchRequestSchema = z.object({
 export const tripPlannerLocationSchema = z.object({
   coordinate: pointSchema,
   label: z.string()
+});
+
+export const tripPlannerSuggestionsResponseSchema = z.object({
+  suggestions: z.array(tripPlannerLocationSchema)
 });
 
 export const tripPlannerRouteSchema = z.object({
