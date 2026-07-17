@@ -6,7 +6,8 @@ import type {
   TripPlannerMode,
   TripPlannerProvider,
   TripPlannerResolvedLocation,
-  TripPlannerRoute
+  TripPlannerRoute,
+  TripPlannerSuggestion
 } from './types.js';
 
 type GeoapifyClientOptions = {
@@ -44,10 +45,13 @@ type GeoapifyRoutingFeature = {
 };
 
 const GEOAPIFY_GEOCODE_URL = 'https://api.geoapify.com/v1/geocode/search';
+const GEOAPIFY_AUTOCOMPLETE_URL = 'https://api.geoapify.com/v1/geocode/autocomplete';
 const GEOAPIFY_ROUTING_URL = 'https://api.geoapify.com/v1/routing';
 const DEFAULT_GEOAPIFY_REQUEST_TIMEOUT_MS = 8_000;
 const DEFAULT_GEOCODE_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
 const DEFAULT_ROUTE_CACHE_TTL_MS = 30 * 60 * 1000;
+const DEFAULT_SUGGESTION_CACHE_TTL_MS = 60 * 60 * 1000;
+const DEFAULT_SUGGESTION_LIMIT = 3;
 
 type CacheEntry<T> = {
   expiresAt: number;
@@ -65,6 +69,19 @@ const buildGeocodeUrl = (apiKey: string, query: string) => {
   });
 
   return `${GEOAPIFY_GEOCODE_URL}?${params.toString()}`;
+};
+
+const buildAutocompleteUrl = (apiKey: string, query: string) => {
+  const params = new URLSearchParams({
+    apiKey,
+    filter: 'countrycode:fi',
+    format: 'json',
+    lang: 'fi',
+    limit: String(DEFAULT_SUGGESTION_LIMIT),
+    text: query
+  });
+
+  return `${GEOAPIFY_AUTOCOMPLETE_URL}?${params.toString()}`;
 };
 
 const buildRouteUrl = (
@@ -96,6 +113,13 @@ const normalizeGeocodedLocation = (
     },
     label: result.formatted
   };
+};
+
+const normalizeSuggestions = (results?: GeoapifyGeocodeResult[]): TripPlannerSuggestion[] => {
+  return (results ?? [])
+    .map((result) => normalizeGeocodedLocation(result))
+    .filter((result): result is TripPlannerSuggestion => result !== null)
+    .slice(0, DEFAULT_SUGGESTION_LIMIT);
 };
 
 const normalizeGeocodeCacheKey = (query: string) => {
@@ -279,6 +303,8 @@ export const createGeoapifyClient = ({
   const geocodeInFlight = new Map<string, Promise<TripPlannerResolvedLocation | null>>();
   const routeCache = new Map<string, CacheEntry<TripPlannerRoute | null>>();
   const routeInFlight = new Map<string, Promise<TripPlannerRoute | null>>();
+  const suggestionCache = new Map<string, CacheEntry<TripPlannerSuggestion[]>>();
+  const suggestionInFlight = new Map<string, Promise<TripPlannerSuggestion[]>>();
 
   return {
     geocode: async (query) => {
@@ -297,6 +323,24 @@ export const createGeoapifyClient = ({
         },
         now,
         ttlMs: geocodeCacheTtlMs
+      });
+    },
+    suggest: async (query) => {
+      return loadWithCache({
+        cache: suggestionCache,
+        inFlight: suggestionInFlight,
+        key: normalizeGeocodeCacheKey(query),
+        load: async () => {
+          const response = await fetchJson<GeoapifyGeocodeResponse>(
+            fetchFn,
+            buildAutocompleteUrl(apiKey, query.trim()),
+            requestTimeoutMs
+          );
+
+          return normalizeSuggestions(response?.results);
+        },
+        now,
+        ttlMs: DEFAULT_SUGGESTION_CACHE_TTL_MS
       });
     },
     route: async ({ destination, mode, origin }) => {

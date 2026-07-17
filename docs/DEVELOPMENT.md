@@ -90,7 +90,7 @@ The importer's LIPAS source URL and supported type-code list are internal config
 
 OAuth routes (`/auth/*`) are only registered when `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, and `AUTH_JWT_SECRET` are all provided.
 `GOOGLE_REDIRECT_URI` is optional and only needed when the public OAuth callback is exposed through a frontend proxy or rewrite instead of the API domain itself.
-`POST /api/trip-planner/search` is available whenever the app boots with a database, but it returns `503` until `GEOAPIFY_API_KEY` is configured.
+`POST /api/trip-planner/suggestions` and `POST /api/trip-planner/search` are available whenever the app boots with a database, but both return `503` until `GEOAPIFY_API_KEY` is configured.
 Keep `GEOAPIFY_API_KEY` server-side only. The browser-facing UI should go through the frontend server proxy and the existing backend API-key boundary.
 
 Turso/Vercel deployment variables should use the same names where possible:
@@ -247,6 +247,7 @@ Key route behavior:
 - Park responses expose raw `locationLabel`, `postalCode`, and `postalOffice` fields from the database, plus a derived `address` string for display use.
 - `GET /api/public/home-summary` returns frontend-public home-page summary data including seasonal visit counts, `progressByType` with a `visible` flag, and `progressByCategory`, without visit notes, routes, or images.
 - `GET /api/public/map-summary` returns lightweight frontend-public park map data plus per-park visited summaries.
+- `POST /api/trip-planner/suggestions` returns up to three Geoapify-backed place suggestions with labels and coordinates for origin/destination selection.
 - `POST /api/trip-planner/search` geocodes origin and destination, fetches a real Geoapify driving route, filters visible parks by a configurable corridor distance, and returns list-ready results with visited summaries plus a map-ready route `LineString` and backend-provided route and park bounding boxes.
 - `GET /api/parks/:slug/visits` returns visit history plus a visited summary for one visible park.
 - `GET /api/visits` returns flat visit resources with their parent park reference.
@@ -254,7 +255,7 @@ Key route behavior:
 - Catalog and public summary routes emit deterministic `ETag` headers and support `304 Not Modified`.
 - Public summary routes use shared-cache headers and expose a public visit-data `version` / `updatedAt` signal that changes on visit create/update/delete and visit image upload/delete/reorder.
 - Visit and management routes use `private, no-store`.
-- Trip planner search also uses `private, no-store` and keeps the provider key server-side.
+- Trip planner suggestion and search routes both use `private, no-store` and keep the provider key server-side.
 - All write routes and `GET /api/admin/parks/visibility` require a valid admin session cookie.
 - `PATCH /api/parks/:slug` updates the admin-editable park fields and auto-generates a slug from `name` when no explicit `slug` is provided.
 - `PATCH /api/parks/:slug/removed` toggles whether a park is hidden from catalog and visit responses.

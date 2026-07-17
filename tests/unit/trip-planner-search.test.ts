@@ -123,6 +123,12 @@ const createProvider = (overrides: Partial<TripPlannerProvider> = {}): TripPlann
     geometry: routeGeometry,
     mode: 'drive' as const
   })),
+  suggest: vi.fn(async (query: string) => [
+    {
+      coordinate: { lat: 60.1699, lon: 24.9384 },
+      label: `${query} label`
+    }
+  ]),
   ...overrides
 });
 
@@ -144,6 +150,75 @@ const createDeferred = <T>() => {
 describe('trip planner service', () => {
   beforeEach(() => {
     listTripPlannerCandidateParks.mockReset();
+  });
+
+  it('returns provider suggestions unchanged for valid suggestion queries', async () => {
+    const suggest = vi.fn(async () => [
+      {
+        coordinate: { lat: 60.1699, lon: 24.9384 },
+        label: 'Helsinki, Finland'
+      },
+      {
+        coordinate: { lat: 60.2055, lon: 24.6559 },
+        label: 'Espoo, Finland'
+      }
+    ]);
+    const service = createTripPlannerService({
+      database: {} as Database,
+      provider: createProvider({
+        suggest
+      })
+    });
+
+    await expect(service.suggest('He')).resolves.toEqual([
+      {
+        coordinate: { lat: 60.1699, lon: 24.9384 },
+        label: 'Helsinki, Finland'
+      },
+      {
+        coordinate: { lat: 60.2055, lon: 24.6559 },
+        label: 'Espoo, Finland'
+      }
+    ]);
+    expect(suggest).toHaveBeenCalledWith('He');
+  });
+
+  it('wraps provider failures from suggestions as provider_unavailable errors', async () => {
+    const service = createTripPlannerService({
+      database: {} as Database,
+      provider: createProvider({
+        suggest: vi.fn(async () => {
+          throw new Error('provider down');
+        })
+      })
+    });
+
+    await expect(service.suggest('He')).rejects.toMatchObject({
+      code: 'provider_unavailable',
+      message: 'Trip planner provider is unavailable.',
+      status: 503
+    });
+  });
+
+  it('rethrows existing trip planner errors from suggestions unchanged', async () => {
+    const service = createTripPlannerService({
+      database: {} as Database,
+      provider: createProvider({
+        suggest: vi.fn(async () => {
+          throw new TripPlannerError(
+            'trip_planner_not_configured',
+            'Trip planner is not configured.',
+            503
+          );
+        })
+      })
+    });
+
+    await expect(service.suggest('He')).rejects.toMatchObject({
+      code: 'trip_planner_not_configured',
+      message: 'Trip planner is not configured.',
+      status: 503
+    });
   });
 
   it('starts origin and destination geocoding in parallel', async () => {

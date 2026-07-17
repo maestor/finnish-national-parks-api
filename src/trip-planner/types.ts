@@ -24,6 +24,8 @@ export type TripPlannerResolvedLocation = {
   label: string;
 };
 
+export type TripPlannerSuggestion = TripPlannerResolvedLocation;
+
 export type TripPlannerRoute = {
   boundingBox: BoundingBox;
   distanceMeters: number;
@@ -90,8 +92,10 @@ export type TripPlannerProvider = {
     mode: TripPlannerMode;
     origin: TripPlannerCoordinate;
   }) => Promise<TripPlannerRoute | null>;
+  suggest: (query: string) => Promise<TripPlannerSuggestion[]>;
 };
 
 export type TripPlannerService = {
   search: (input: TripPlannerSearchInput) => Promise<TripPlannerSearchResponse>;
+  suggest: (query: string) => Promise<TripPlannerSuggestion[]>;
 };

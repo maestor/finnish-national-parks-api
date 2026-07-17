@@ -42,6 +42,77 @@ describe('geoapify client', () => {
     });
   });
 
+  it('autocompletes with a Finland filter and returns the best three matches', async () => {
+    const fetchFn = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          results: [
+            {
+              formatted: 'Helsinki, Finland',
+              lat: 60.1699,
+              lon: 24.9384
+            },
+            {
+              formatted: 'Helsingby, Finland',
+              lat: 60.22,
+              lon: 24.7
+            },
+            {
+              formatted: 'Helsinge, Finland',
+              lat: 60.3,
+              lon: 25.01
+            },
+            {
+              formatted: 'Ignored fourth',
+              lat: 61,
+              lon: 26
+            }
+          ]
+        }),
+        {
+          headers: { 'content-type': 'application/json' },
+          status: 200
+        }
+      )
+    );
+    const client = createGeoapifyClient({
+      apiKey: 'geoapify-test',
+      fetchFn: fetchFn as typeof fetch
+    });
+
+    const result = await client.suggest('He');
+    const requestUrl = new URL(String(fetchFn.mock.calls[0]?.[0]));
+
+    expect(requestUrl.pathname).toBe('/v1/geocode/autocomplete');
+    expect(requestUrl.searchParams.get('text')).toBe('He');
+    expect(requestUrl.searchParams.get('filter')).toBe('countrycode:fi');
+    expect(requestUrl.searchParams.get('lang')).toBe('fi');
+    expect(requestUrl.searchParams.get('limit')).toBe('3');
+    expect(result).toEqual([
+      {
+        coordinate: {
+          lat: 60.1699,
+          lon: 24.9384
+        },
+        label: 'Helsinki, Finland'
+      },
+      {
+        coordinate: {
+          lat: 60.22,
+          lon: 24.7
+        },
+        label: 'Helsingby, Finland'
+      },
+      {
+        coordinate: {
+          lat: 60.3,
+          lon: 25.01
+        },
+        label: 'Helsinge, Finland'
+      }
+    ]);
+  });
+
   it('normalizes routing geometry into repo-owned GeoJSON', async () => {
     const fetchFn = vi.fn().mockResolvedValue(
       new Response(
@@ -133,6 +204,20 @@ describe('geoapify client', () => {
     await expect(client.geocode('Missing place')).resolves.toBeNull();
   });
 
+  it('returns an empty list when autocomplete responds without results', async () => {
+    const client = createGeoapifyClient({
+      apiKey: 'geoapify-test',
+      fetchFn: vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({}), {
+          headers: { 'content-type': 'application/json' },
+          status: 200
+        })
+      ) as typeof fetch
+    });
+
+    await expect(client.suggest('He')).resolves.toEqual([]);
+  });
+
   it('returns null when Geoapify responds with 404', async () => {
     const client = createGeoapifyClient({
       apiKey: 'geoapify-test',
@@ -171,6 +256,38 @@ describe('geoapify client', () => {
       client.geocode('helsinki')
     ]);
     const third = await client.geocode('  Helsinki  ');
+
+    expect(first).toEqual(second);
+    expect(second).toEqual(third);
+    expect(fetchFn).toHaveBeenCalledTimes(1);
+  });
+
+  it('caches and deduplicates repeated autocomplete lookups', async () => {
+    const fetchFn = vi.fn().mockImplementation(
+      async () =>
+        new Response(
+          JSON.stringify({
+            results: [
+              {
+                formatted: 'Helsinki, Finland',
+                lat: 60.1699,
+                lon: 24.9384
+              }
+            ]
+          }),
+          {
+            headers: { 'content-type': 'application/json' },
+            status: 200
+          }
+        )
+    );
+    const client = createGeoapifyClient({
+      apiKey: 'geoapify-test',
+      fetchFn: fetchFn as typeof fetch
+    });
+
+    const [first, second] = await Promise.all([client.suggest('He'), client.suggest('he')]);
+    const third = await client.suggest('  He  ');
 
     expect(first).toEqual(second);
     expect(second).toEqual(third);

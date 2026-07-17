@@ -3,8 +3,52 @@ import { errorSchema } from '../contracts/common.js';
 import {
   tripPlannerErrorSchema,
   tripPlannerSearchRequestSchema,
-  tripPlannerSearchResponseSchema
+  tripPlannerSearchResponseSchema,
+  tripPlannerSuggestionsRequestSchema,
+  tripPlannerSuggestionsResponseSchema
 } from '../contracts/trip-planner.js';
+
+export const suggestTripPlannerRoute = createRoute({
+  method: 'post',
+  path: '/api/trip-planner/suggestions',
+  request: {
+    body: {
+      content: {
+        'application/json': {
+          schema: tripPlannerSuggestionsRequestSchema
+        }
+      }
+    }
+  },
+  responses: {
+    200: {
+      content: {
+        'application/json': {
+          schema: tripPlannerSuggestionsResponseSchema
+        }
+      },
+      description: 'Trip planner place suggestions'
+    },
+    401: {
+      content: {
+        'application/json': {
+          schema: errorSchema
+        }
+      },
+      description: 'Bearer token required outside localhost'
+    },
+    503: {
+      content: {
+        'application/json': {
+          schema: tripPlannerErrorSchema
+        }
+      },
+      description: 'Trip planner provider is unavailable or not configured'
+    }
+  },
+  security: [{ bearerAuth: [] }],
+  tags: ['Trip planner']
+});
 
 export const searchTripPlannerRoute = createRoute({
   method: 'post',

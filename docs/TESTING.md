@@ -82,6 +82,7 @@ If an upload limit exists, at least one test should cover the real stored-object
 - Park responses expose raw `locationLabel`, `postalCode`, and `postalOffice` fields from the database, plus a derived `address` string for display use.
 - `GET /api/public/home-summary` returns cache-friendly frontend-public summary data including seasonal visit counts, `progressByType` visibility flags, and aggregated `progressByCategory`, without notes, routes, or images.
 - `GET /api/public/map-summary` returns lightweight frontend-public map data plus per-park visited summaries.
+- `POST /api/trip-planner/suggestions` returns up to three Geoapify-backed place suggestions with labels and coordinates for origin/destination pickers.
 - `POST /api/trip-planner/search` geocodes endpoints server-side, filters parks against the real routed path, excludes parks outside the corridor, preserves the documented unvisited-first ordering, and now returns map-ready route geometry plus route and park bounding boxes.
 - `GET /api/parks/:slug/visits` returns park-scoped visit history and visited summary.
 - `GET /api/visits` and `GET /api/visits/:id` expose visit resources with parent park references.
