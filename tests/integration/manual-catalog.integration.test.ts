@@ -55,7 +55,7 @@ describe('manual catalog imports', () => {
       now: () => '2026-05-27T08:00:00.000Z'
     });
 
-    expect(result.results).toHaveLength(140);
+    expect(result.results).toHaveLength(141);
 
     const merenkurkku = await getParkBySlug(
       testDatabase.database,
@@ -479,6 +479,16 @@ describe('manual catalog imports', () => {
         typeSlug: 'outdoor-recreation-area'
       },
       {
+        lipasId: 9002040,
+        locationLabel: 'Somerikkotie',
+        name: 'Slåttmossen',
+        parkUrl: null,
+        postalCode: null,
+        postalOffice: 'Helsinki',
+        slug: 'slattmossen',
+        typeSlug: 'nature-reserve-area'
+      },
+      {
         lipasId: 9002039,
         locationLabel: 'Hiidenkirnujentie',
         name: 'Askolan hiidenkirnut',
@@ -530,6 +540,21 @@ describe('manual catalog imports', () => {
         park?.boundaryGeoJson?.features.every((feature) => feature.geometry.type === 'Polygon')
       ).toBe(true);
     }
+
+    const slattmossen = await getParkBySlug(testDatabase.database, 'slattmossen');
+    expect(slattmossen).toMatchObject({
+      address: 'Somerikkotie, Helsinki',
+      areaKm2: 0.07,
+      lipasId: 9002040,
+      locationLabel: 'Somerikkotie',
+      parkUrl: null,
+      name: 'Slåttmossen',
+      postalCode: null,
+      postalOffice: 'Helsinki',
+      type: { slug: 'nature-reserve-area' }
+    });
+    expect(slattmossen?.boundaryGeoJson?.features).toHaveLength(1);
+    expect(slattmossen?.boundaryGeoJson?.features[0]?.geometry.type).toBe('Polygon');
 
     const expectedLuontoonDestinationImports: ExpectedLuontoonDestinationImport[] = [
       {
@@ -996,7 +1021,7 @@ describe('manual catalog imports', () => {
     );
     const kevo = await getParkBySlug(testDatabase.database, 'kevon-luonnonpuisto');
 
-    expect(allParks).toHaveLength(140);
+    expect(allParks).toHaveLength(141);
     expect(merenkurkku).toMatchObject({ catalogStatus: 'active' });
     expect(kevo).toMatchObject({ catalogStatus: 'active' });
   });
@@ -1073,7 +1098,7 @@ describe('manual catalog imports', () => {
       database: testDatabase.database
     });
 
-    expect(result.results).toHaveLength(140);
+    expect(result.results).toHaveLength(141);
 
     const merenkurkku = await getParkBySlug(
       testDatabase.database,
@@ -1187,7 +1212,7 @@ describe('manual catalog imports', () => {
       now: () => '2026-05-27T08:00:00.000Z'
     });
 
-    expect(result.results).toHaveLength(140);
+    expect(result.results).toHaveLength(141);
   });
 
   it('fails clearly when a selected special-park slug is unknown', async () => {
