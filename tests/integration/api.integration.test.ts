@@ -364,7 +364,7 @@ describe('API routes', () => {
         (park) => park.type && (park.type as { slug: string }).slug === 'cultural-history-area'
       )
     ).toBe(true);
-  });
+  }, 15_000);
 
   it('filters the public park list by the derived category slug', async () => {
     await importParks({

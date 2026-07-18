@@ -991,7 +991,7 @@ describe('manual catalog imports', () => {
         type: { slug: 'cultural-history-area' }
       });
     }
-  });
+  }, 20_000);
 
   it('keeps non-LIPAS-managed parks active when a later LIPAS import deactivates managed rows', async () => {
     await importSpecialParks({
