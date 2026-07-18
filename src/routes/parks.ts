@@ -21,6 +21,7 @@ import {
   visitImageSchema,
   visitListResponseSchema,
   visitSchema,
+  visitTimelineResponseSchema,
   visitWithParkSchema
 } from '../contracts/parks.js';
 import { supportedParkCategorySlugs, supportedParkTypeSlugs } from '../parks/park-types.js';
@@ -247,12 +248,12 @@ export const getParkVisitsRoute = createRoute({
 
 export const getPublicHomeSummaryRoute = createRoute({
   method: 'get',
-  path: '/api/public/home-summary',
-  tags: ['Public'],
+  path: '/api/home-summary',
+  tags: ['Frontend'],
   security: [{ bearerAuth: [] }],
   responses: {
     200: {
-      description: 'Public visit summary for the home page',
+      description: 'Frontend visit summary for the home page',
       content: {
         'application/json': {
           schema: publicHomeSummaryResponseSchema
@@ -260,19 +261,19 @@ export const getPublicHomeSummaryRoute = createRoute({
       }
     },
     304: {
-      description: 'Public home summary not modified'
+      description: 'Home summary not modified'
     }
   }
 });
 
 export const getPublicMapSummaryRoute = createRoute({
   method: 'get',
-  path: '/api/public/map-summary',
-  tags: ['Public'],
+  path: '/api/map-summary',
+  tags: ['Frontend'],
   security: [{ bearerAuth: [] }],
   responses: {
     200: {
-      description: 'Public park and visit summary for the map page',
+      description: 'Frontend park and visit summary for the map page',
       content: {
         'application/json': {
           schema: publicMapSummaryResponseSchema
@@ -280,7 +281,27 @@ export const getPublicMapSummaryRoute = createRoute({
       }
     },
     304: {
-      description: 'Public map summary not modified'
+      description: 'Map summary not modified'
+    }
+  }
+});
+
+export const listVisitsTimelineRoute = createRoute({
+  method: 'get',
+  path: '/api/visits-timeline',
+  tags: ['Frontend'],
+  security: [{ bearerAuth: [] }],
+  responses: {
+    200: {
+      description: 'Frontend visits timeline dataset',
+      content: {
+        'application/json': {
+          schema: visitTimelineResponseSchema
+        }
+      }
+    },
+    304: {
+      description: 'Visits timeline not modified'
     }
   }
 });

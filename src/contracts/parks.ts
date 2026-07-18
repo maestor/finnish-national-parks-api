@@ -246,6 +246,23 @@ export const publicMapSummaryResponseSchema = publicVisitVersionSchema.extend({
   parks: z.array(publicMapParkSchema)
 });
 
+export const visitTimelineParkSchema = visitParkSchema.extend({
+  typeLabel: z.string()
+});
+
+export const visitTimelineEntrySchema = z.object({
+  createdAt: z.string().datetime(),
+  id: z.number().int(),
+  imageCount: z.number().int(),
+  park: visitTimelineParkSchema,
+  route: z.string().nullable(),
+  visitedOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/)
+});
+
+export const visitTimelineResponseSchema = z.object({
+  visits: z.array(visitTimelineEntrySchema)
+});
+
 export const parkListResponseSchema = z.object({
   parks: z.array(parkListItemSchema)
 });

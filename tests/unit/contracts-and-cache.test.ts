@@ -41,7 +41,7 @@ describe('contracts and cache helpers', () => {
     });
     const publicSummaryEtag = createPublicSummaryEtag({
       activeCount: 3,
-      kind: 'map',
+      kind: 'timeline',
       latestCatalogImportRunId: 42,
       latestCatalogUpdatedAt: '2026-05-01T00:00:00.000Z',
       publicUpdatedAt: '2026-05-02T00:00:00.000Z',
@@ -51,7 +51,7 @@ describe('contracts and cache helpers', () => {
     expect(emptyListEtag).toContain('none');
     expect(emptyListEtag).toContain('all');
     expect(detailEtag).toContain('summary');
-    expect(publicSummaryEtag).toContain('map');
+    expect(publicSummaryEtag).toContain('timeline');
     expect(publicSummaryEtag).toContain(':7:');
     expect(hasMatchingEtag(undefined, emptyListEtag)).toBe(false);
     expect(hasMatchingEtag(`W/ignored, ${detailEtag}`, detailEtag)).toBe(true);

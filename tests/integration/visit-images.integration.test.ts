@@ -319,7 +319,7 @@ describe('Visit image routes', () => {
     expect(parkVisitsBody.visits[0]!.images[1]!.id).toBe(uploadBody.images[0]!.id);
   });
 
-  it('bumps the public summary version when visit images change', async () => {
+  it('bumps the frontend summary version when visit images change', async () => {
     const visitId = await createVisit();
     const file = new File([await createTestImageBuffer()], 'first.jpg', { type: 'image/jpeg' });
     const secondFile = new File([await createTestImageBuffer()], 'second.jpg', {
@@ -327,7 +327,7 @@ describe('Visit image routes', () => {
     });
     const app = createAuthedApp({ storage });
 
-    const firstSummaryResponse = await app.request('/api/public/home-summary');
+    const firstSummaryResponse = await app.request('/api/home-summary');
     const firstSummaryBody = (await firstSummaryResponse.json()) as {
       version: number;
     };
@@ -336,7 +336,7 @@ describe('Visit image routes', () => {
     const uploadBody = (await uploadResponse.json()) as {
       images: Array<{ id: number }>;
     };
-    const secondSummaryResponse = await app.request('/api/public/home-summary');
+    const secondSummaryResponse = await app.request('/api/home-summary');
     const secondSummaryBody = (await secondSummaryResponse.json()) as {
       version: number;
     };
@@ -353,7 +353,7 @@ describe('Visit image routes', () => {
 
     expect(reorderResponse.status).toBe(204);
 
-    const thirdSummaryResponse = await app.request('/api/public/home-summary');
+    const thirdSummaryResponse = await app.request('/api/home-summary');
     const thirdSummaryBody = (await thirdSummaryResponse.json()) as {
       version: number;
     };
@@ -370,7 +370,7 @@ describe('Visit image routes', () => {
 
     expect(deleteResponse.status).toBe(204);
 
-    const fourthSummaryResponse = await app.request('/api/public/home-summary');
+    const fourthSummaryResponse = await app.request('/api/home-summary');
     const fourthSummaryBody = (await fourthSummaryResponse.json()) as {
       version: number;
     };

@@ -96,8 +96,9 @@ The importer's LIPAS source URL and supported type-code list are internal config
 - `GET /api/admin/parks/visibility`
 - `GET /api/parks/:slug`
 - `PATCH /api/parks/:slug`
-- `GET /api/public/home-summary`
-- `GET /api/public/map-summary`
+- `GET /api/home-summary`
+- `GET /api/map-summary`
+- `GET /api/visits-timeline`
 - `POST /api/trip-planner/suggestions`
 - `POST /api/trip-planner/search`
 - `POST /api/trip-planner/nearby`
@@ -131,11 +132,12 @@ Catalog endpoints stay cache-friendly and database-backed:
 - `GET /api/parks?category=trails-and-routes` filters by a derived API category while park responses still preserve the original imported `type`.
 - `GET /api/parks/:slug?includeBoundary=true` includes stored boundary geometry.
 - `GET /api/parks/:slug` still returns `404` for removed parks publicly, but when a valid admin session cookie is present it also serves removed-park detail for control-panel workflows.
-- Park list, detail, removed, and public map responses include both the source `type` and a derived `category`.
-- Park list, detail, removed, and public map responses include `logo: { key, updatedAt, url } | null` when a logo has been linked to the park.
+- Park list, detail, removed, and map summary responses include both the source `type` and a derived `category`.
+- Park list, detail, removed, and map summary responses include `logo: { key, updatedAt, url } | null` when a logo has been linked to the park.
 - Park responses expose raw `locationLabel`, `postalCode`, and `postalOffice` fields from the database, plus a derived `address` string for display use.
-- `GET /api/public/home-summary` returns cache-friendly frontend-public visit totals, seasonal visit counts, type progress with a `visible` flag, category progress, recent activity, and a public data `version` / `updatedAt` signal without notes, routes, or images.
-- `GET /api/public/map-summary` returns cache-friendly frontend-public park map data plus per-park visited summaries and the same public data version signal.
+- `GET /api/home-summary` returns cache-friendly home-page visit totals, seasonal visit counts, type progress with a `visible` flag, category progress, recent activity, and a visit-data `version` / `updatedAt` signal without notes, routes, or images.
+- `GET /api/map-summary` returns cache-friendly park map data plus per-park visited summaries and the same visit data version signal.
+- `GET /api/visits-timeline` returns the lightweight timeline dataset for `/kaynnit`, with each visit including `id`, `visitedOn`, `createdAt`, `route`, `imageCount`, and a resolved park `typeLabel`.
 - `POST /api/trip-planner/suggestions` returns up to three Geoapify-backed place suggestions with labels and coordinates for origin/destination pickers.
 - `POST /api/trip-planner/search` geocodes origin and destination server-side, fetches a real driving route from Geoapify, and returns visible catalog parks within a route corridor using stored park geometry plus visited summaries, route `LineString` geometry, backend-provided route and park bounding boxes for map rendering, and top-level `maxDistanceKm` / `defaultDistanceKm` filter metadata. On longer trips, the first 30 km from the origin is treated as a stricter start zone so dense departure-area clusters do not dominate the results.
 - `POST /api/trip-planner/nearby` geocodes only the origin server-side, filters visible catalog parks by straight-line proximity to that point, and returns visited summaries plus a backend-provided `searchArea` bounding box and top-level `maxDistanceKm` / `defaultDistanceKm` filter metadata for map rendering without route geometry.
@@ -143,9 +145,9 @@ Catalog endpoints stay cache-friendly and database-backed:
 - `GET /api/parks/:slug/visits` returns visit history plus a visited summary for one park.
 - `GET /api/visits` returns flat visit resources with their parent park reference.
 - `GET /api/visits/:id` returns one visit with its parent park reference.
-- Catalog and public summary `GET` endpoints emit deterministic `ETag` headers and support `304 Not Modified`.
-- Public summary endpoints use `Cache-Control: public, max-age=0, s-maxage=600`.
-- Public summary versions bump when public visit data changes, including visit create/update/delete and visit image upload/delete/reorder.
+- Catalog, home summary, map summary, and visits timeline `GET` endpoints emit deterministic `ETag` headers and support `304 Not Modified`.
+- Home summary, map summary, and visits timeline endpoints use `Cache-Control: public, max-age=0, s-maxage=600`.
+- Their visit-data version signal bumps when visit data changes, including visit create/update/delete and visit image upload/delete/reorder.
 - Visit and management endpoints use `Cache-Control: private, no-store`.
 - Trip planner suggestion, route-search, and nearby-origin responses also use `Cache-Control: private, no-store`.
 - All write routes and `GET /api/admin/parks/visibility` require a valid admin session cookie.
@@ -157,7 +159,7 @@ Catalog endpoints stay cache-friendly and database-backed:
 - `POST /api/visits/:id/images` remains available for localhost-style server uploads, but Vercel runtime disables that Sharp-based path so uploads do not pass through the function body limit.
 - `GET /health` and `GET /openapi.json` are the only anonymous data endpoints today.
 - `/auth/*` routes are anonymous login-control endpoints, not public data endpoints.
-- `/api/public/*` names frontend-facing payloads, but those routes are still API-key-protected when `API_KEY` is configured.
+- There are no anonymous site data endpoints in this API. Frontend-facing `GET` routes such as `/api/home-summary`, `/api/map-summary`, and `/api/visits-timeline` still require the API key outside localhost when `API_KEY` is configured.
 
 ## Data Source
 

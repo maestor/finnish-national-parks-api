@@ -28,7 +28,7 @@ Every route must fit one explicit access class:
 Rules:
 
 - Do not describe a route as public unless it is anonymously accessible over the network.
-- `/api/public/*` naming refers to frontend-facing payload shape, not anonymous access.
+- There are no anonymous site data endpoints. Frontend-facing `GET` routes still require the API key outside localhost, while admin routes require a valid admin session.
 - New anonymously accessible routes must define cache policy, abuse controls, and the reason they are safe to expose.
 - Removing an unused admin endpoint is preferred over leaving it available behind auth.
 

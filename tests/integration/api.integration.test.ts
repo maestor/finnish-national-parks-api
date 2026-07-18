@@ -10,7 +10,7 @@ const authConfig = {
 };
 
 import { createApp } from '../../src/app.js';
-import { getParkBySlug } from '../../src/db/repositories.js';
+import { createVisitImage, getParkBySlug } from '../../src/db/repositories.js';
 import { parks } from '../../src/db/schema.js';
 import { createSessionToken } from '../../src/http/session.js';
 import { importParks } from '../../src/importer/import-parks.js';
@@ -986,12 +986,12 @@ describe('API routes', () => {
     expect(response.headers.get('etag')).toContain(parkTypeFixtures.outdoorRecreationArea.slug);
   });
 
-  it('serves lightweight public home summary data with shared-cache validators', async () => {
+  it('serves lightweight frontend home summary data with shared-cache validators', async () => {
     const app = createAuthedApp();
 
     await createVisit(app, 'akasmannyn-kansallispuisto', {
       author: 'Hiker One',
-      note: 'Keep private note out of public summary.',
+      note: 'Keep private note out of the home summary response.',
       route: 'North trail',
       visitedOn: '2026-04-20'
     });
@@ -1002,7 +1002,7 @@ describe('API routes', () => {
       visitedOn: '2026-04-21'
     });
 
-    const response = await app.request('/api/public/home-summary');
+    const response = await app.request('/api/home-summary');
     const body = (await response.json()) as {
       latestVisitEntries: Array<{
         id: number;
@@ -1121,7 +1121,7 @@ describe('API routes', () => {
       visitedOn: '2026-04-10'
     });
 
-    const response = await app.request('/api/public/home-summary');
+    const response = await app.request('/api/home-summary');
     const body = (await response.json()) as {
       latestVisitEntries: Array<{
         park: { slug: string };
@@ -1177,7 +1177,7 @@ describe('API routes', () => {
       visitedOn: '2026-05-01'
     });
 
-    const response = await app.request('/api/public/home-summary');
+    const response = await app.request('/api/home-summary');
     const body = (await response.json()) as {
       progressByCategory: Array<{
         category: { slug: string };
@@ -1210,7 +1210,7 @@ describe('API routes', () => {
     });
   });
 
-  it('aggregates hiking and wilderness parks under one public category while keeping separate types', async () => {
+  it('aggregates hiking and wilderness parks under one frontend category while keeping separate types', async () => {
     await importParks({
       database: testDatabase.database,
       expectedActiveCount: 2,
@@ -1246,7 +1246,7 @@ describe('API routes', () => {
       visitedOn: '2026-05-02'
     });
 
-    const response = await app.request('/api/public/home-summary');
+    const response = await app.request('/api/home-summary');
     const body = (await response.json()) as {
       progressByCategory: Array<{
         category: { slug: string };
@@ -1292,14 +1292,14 @@ describe('API routes', () => {
     ]);
   });
 
-  it('serves lightweight public map summary data with per-park visited summaries', async () => {
+  it('serves lightweight frontend map summary data with per-park visited summaries', async () => {
     const app = createAuthedApp();
 
     await createVisit(app, 'akasmannyn-kansallispuisto', {
       visitedOn: '2026-04-20'
     });
 
-    const response = await app.request('/api/public/map-summary');
+    const response = await app.request('/api/map-summary');
     const body = (await response.json()) as {
       parks: Array<{
         slug: string;
@@ -1336,14 +1336,14 @@ describe('API routes', () => {
     expect(akasmanty).not.toHaveProperty('note');
   });
 
-  it('returns 304 for matching public map summary ETags', async () => {
+  it('returns 304 for matching map summary ETags', async () => {
     const app = createAuthedApp();
-    const firstResponse = await app.request('/api/public/map-summary');
+    const firstResponse = await app.request('/api/map-summary');
     const etag = firstResponse.headers.get('etag');
 
     expect(etag).toBeTruthy();
 
-    const cachedResponse = await app.request('/api/public/map-summary', {
+    const cachedResponse = await app.request('/api/map-summary', {
       headers: {
         'if-none-match': etag ?? ''
       }
@@ -1352,15 +1352,15 @@ describe('API routes', () => {
     expect(cachedResponse.status).toBe(304);
   });
 
-  it('returns 304 for matching public summary ETags and changes them when public visit data changes', async () => {
+  it('returns 304 for matching home summary ETags and changes them when visit data changes', async () => {
     const app = createAuthedApp();
 
-    const firstResponse = await app.request('/api/public/home-summary');
+    const firstResponse = await app.request('/api/home-summary');
     const firstEtag = firstResponse.headers.get('etag');
     const firstBody = (await firstResponse.json()) as {
       version: number;
     };
-    const cachedResponse = await app.request('/api/public/home-summary', {
+    const cachedResponse = await app.request('/api/home-summary', {
       headers: {
         'if-none-match': firstEtag ?? ''
       }
@@ -1374,7 +1374,7 @@ describe('API routes', () => {
       visitedOn: '2026-04-20'
     });
 
-    const secondResponse = await app.request('/api/public/home-summary');
+    const secondResponse = await app.request('/api/home-summary');
     const secondEtag = secondResponse.headers.get('etag');
     const secondBody = (await secondResponse.json()) as {
       version: number;
@@ -1394,7 +1394,7 @@ describe('API routes', () => {
       }
     });
 
-    const thirdResponse = await app.request('/api/public/home-summary');
+    const thirdResponse = await app.request('/api/home-summary');
     const thirdEtag = thirdResponse.headers.get('etag');
     const thirdBody = (await thirdResponse.json()) as {
       version: number;
@@ -1408,7 +1408,7 @@ describe('API routes', () => {
       method: 'DELETE'
     });
 
-    const fourthResponse = await app.request('/api/public/home-summary');
+    const fourthResponse = await app.request('/api/home-summary');
     const fourthEtag = fourthResponse.headers.get('etag');
     const fourthBody = (await fourthResponse.json()) as {
       totalVisits: number;
@@ -1419,6 +1419,148 @@ describe('API routes', () => {
     expect(fourthEtag).not.toBe(thirdEtag);
     expect(fourthBody.totalVisits).toBe(0);
     expect(fourthBody.version).toBeGreaterThan(thirdBody.version);
+  });
+
+  it('serves a lightweight visits timeline with resolved type labels and image counts', async () => {
+    const app = createAuthedApp();
+    const { body: firstVisit } = await createVisit(app, 'akasmannyn-kansallispuisto', {
+      note: 'Keep note out of the timeline response.',
+      route: 'North trail',
+      visitedOn: '2026-06-07'
+    });
+    const { body: secondVisit } = await createVisit(app, 'seitsemisen-kansallispuisto', {
+      route: 'Haltian polku',
+      visitedOn: '2026-06-07'
+    });
+    const { body: thirdVisit } = await createVisit(app, 'kaupunkilaakson-ulkoilualue', {
+      visitedOn: '2026-05-01'
+    });
+
+    await testDatabase.database
+      .update(parks)
+      .set({
+        displayTypeName: 'Erityiskohde',
+        updatedAt: '2026-05-03T08:00:00.000Z'
+      })
+      .where(eq(parks.slug, 'seitsemisen-kansallispuisto'));
+
+    await createVisitImage(testDatabase.database, {
+      createdAt: '2026-06-08T09:00:00.000Z',
+      displayOrder: 0,
+      fullKey: 'visits/second/full-1.jpg',
+      mimeType: 'image/jpeg',
+      originalName: 'first.jpg',
+      thumbKey: 'visits/second/thumb-1.jpg',
+      updatedAt: '2026-06-08T09:00:00.000Z',
+      visitId: secondVisit.id
+    });
+    await createVisitImage(testDatabase.database, {
+      createdAt: '2026-06-08T09:01:00.000Z',
+      displayOrder: 1,
+      fullKey: 'visits/second/full-2.jpg',
+      mimeType: 'image/jpeg',
+      originalName: 'second.jpg',
+      thumbKey: 'visits/second/thumb-2.jpg',
+      updatedAt: '2026-06-08T09:01:00.000Z',
+      visitId: secondVisit.id
+    });
+
+    const response = await app.request('/api/visits-timeline');
+    const body = (await response.json()) as {
+      visits: Array<{
+        createdAt: string;
+        id: number;
+        imageCount: number;
+        park: {
+          name: string;
+          slug: string;
+          typeLabel: string;
+        };
+        route: string | null;
+        visitedOn: string;
+      }>;
+    };
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('cache-control')).toBe('public, max-age=0, s-maxage=600');
+    expect(response.headers.get('etag')).toBeTruthy();
+    expect(body.visits.map((visit) => visit.id)).toEqual([
+      secondVisit.id,
+      firstVisit.id,
+      thirdVisit.id
+    ]);
+    expect(body.visits[0]).toEqual(
+      expect.objectContaining({
+        id: secondVisit.id,
+        imageCount: 2,
+        park: {
+          name: 'Seitsemisen kansallispuisto',
+          slug: 'seitsemisen-kansallispuisto',
+          typeLabel: 'Erityiskohde'
+        },
+        route: 'Haltian polku',
+        visitedOn: '2026-06-07'
+      })
+    );
+    expect(body.visits[1]?.park.typeLabel).toBe(parkTypeFixtures.nationalPark.name);
+    expect(body.visits[2]).toEqual(
+      expect.objectContaining({
+        id: thirdVisit.id,
+        imageCount: 0,
+        park: expect.objectContaining({
+          slug: 'kaupunkilaakson-ulkoilualue',
+          typeLabel: parkTypeFixtures.outdoorRecreationArea.name
+        }),
+        route: null
+      })
+    );
+    expect(body.visits[0]).not.toHaveProperty('author');
+    expect(body.visits[0]).not.toHaveProperty('images');
+    expect(body.visits[0]).not.toHaveProperty('note');
+    expect(body.visits[0]).not.toHaveProperty('updatedAt');
+  });
+
+  it('returns 304 for matching visits timeline ETags and changes them when park labels change', async () => {
+    const app = createAuthedApp();
+
+    await createVisit(app, 'akasmannyn-kansallispuisto', {
+      visitedOn: '2026-06-07'
+    });
+
+    const firstResponse = await app.request('/api/visits-timeline');
+    const firstEtag = firstResponse.headers.get('etag');
+    const cachedResponse = await app.request('/api/visits-timeline', {
+      headers: {
+        'if-none-match': firstEtag ?? ''
+      }
+    });
+
+    expect(firstEtag).toBeTruthy();
+    expect(cachedResponse.status).toBe(304);
+
+    await requestAsAdmin(app, '/api/parks/akasmannyn-kansallispuisto', {
+      method: 'PATCH',
+      body: JSON.stringify({
+        displayTypeName: 'Oma kansallispuisto'
+      }),
+      headers: {
+        'content-type': 'application/json'
+      }
+    });
+
+    const secondResponse = await app.request('/api/visits-timeline');
+    const secondEtag = secondResponse.headers.get('etag');
+    const secondBody = (await secondResponse.json()) as {
+      visits: Array<{
+        park: {
+          typeLabel: string;
+        };
+      }>;
+    };
+
+    expect(secondEtag).toBeTruthy();
+    expect(secondEtag).not.toBe(firstEtag);
+    expect(secondBody.visits[0]?.park.typeLabel).toBe('Oma kansallispuisto');
   });
 
   it('supports visit workflows with private cache policy', async () => {
