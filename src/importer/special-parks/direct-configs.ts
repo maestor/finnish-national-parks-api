@@ -408,6 +408,20 @@ export const baseSpecialParkConfigs: SpecialParkConfig[] = [
   },
   {
     displayTypeName: null,
+    extractMetadata: extractGeoJsonAreaM2Metadata,
+    locationLabel: 'Somerikkotie',
+    parkUrl: null,
+    name: 'Slåttmossen',
+    parkTypeSlug: 'nature-reserve-area',
+    postalCode: null,
+    postalOffice: 'Helsinki',
+    responseShapeVersion: 'manual-helsinki-ylre-viheralue-v1',
+    slug: 'slattmossen',
+    sourceUrl: 'special://slattmossen',
+    syntheticLipasId: 9_002_040
+  },
+  {
+    displayTypeName: null,
     locationLabel: 'Seili',
     parkUrl: 'https://www.luontoon.fi/fi/kohteet/seili',
     name: 'Seili',
