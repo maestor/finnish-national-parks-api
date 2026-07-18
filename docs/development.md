@@ -28,7 +28,7 @@ The deployment guardrail test for this lives in `tests/integration/vercel-entry.
 
 ## Security And Sustainability Baseline
 
-- Route naming is not the auth policy. `/api/public/*` names frontend-facing payloads, not anonymous access.
+- Route naming is not the auth policy. There are no anonymous site data endpoints here; frontend-facing `GET` routes still require the API key outside localhost when `API_KEY` is configured.
 - Do not expose the shared `API_KEY` in browser-delivered code.
 - All write routes and `GET /api/admin/parks/visibility` should stay admin-session protected.
 - When adding or changing an env var, update `src/env.ts`, `.env.example`, `README.md`, and the relevant docs in the same change.
@@ -243,19 +243,20 @@ Key route behavior:
 - `GET /api/parks?category=trails-and-routes` filters by a derived API category while preserving the original imported `type` in responses.
 - `GET /api/parks/:slug?includeBoundary=true` returns the stored boundary GeoJSON.
 - `GET /api/parks/:slug` still hides removed parks publicly, but returns removed-park detail to a request carrying a valid admin session cookie when OAuth is enabled.
-- Park list, detail, removed, and public map responses expose both the source `type` and a derived `category`.
-- Park list, detail, removed, and public map responses expose `logo: { key, updatedAt, url } | null` when one has been linked to the park.
+- Park list, detail, removed, and map summary responses expose both the source `type` and a derived `category`.
+- Park list, detail, removed, and map summary responses expose `logo: { key, updatedAt, url } | null` when one has been linked to the park.
 - Park responses expose raw `locationLabel`, `postalCode`, and `postalOffice` fields from the database, plus a derived `address` string for display use.
-- `GET /api/public/home-summary` returns frontend-public home-page summary data including seasonal visit counts, `progressByType` with a `visible` flag, and `progressByCategory`, without visit notes, routes, or images.
-- `GET /api/public/map-summary` returns lightweight frontend-public park map data plus per-park visited summaries.
+- `GET /api/home-summary` returns home-page summary data including seasonal visit counts, `progressByType` with a `visible` flag, and `progressByCategory`, without visit notes, routes, or images.
+- `GET /api/map-summary` returns lightweight park map data plus per-park visited summaries.
+- `GET /api/visits-timeline` returns the lightweight visits timeline dataset for the public `/kaynnit` screen, including `imageCount` and a resolved park `typeLabel`.
 - `POST /api/trip-planner/suggestions` returns up to three Geoapify-backed place suggestions with labels and coordinates for origin/destination selection.
 - `POST /api/trip-planner/search` geocodes origin and destination, fetches a real Geoapify driving route, filters visible parks by a configurable corridor distance, and returns list-ready results with visited summaries plus a map-ready route `LineString`, backend-provided route and park bounding boxes, and top-level `maxDistanceKm` / `defaultDistanceKm` filter metadata. On longer trips, the first 30 km from the origin uses a stricter start-zone filter so dense departure areas do not flood the list.
 - `POST /api/trip-planner/nearby` geocodes only the origin, filters visible parks by straight-line proximity to that point, and returns list-ready results with visited summaries plus a backend-provided `searchArea` bounding box and top-level `maxDistanceKm` / `defaultDistanceKm` filter metadata for map rendering without route geometry.
 - `GET /api/parks/:slug/visits` returns visit history plus a visited summary for one visible park.
 - `GET /api/visits` returns flat visit resources with their parent park reference.
 - `GET /api/visits/:id` returns one visit with its parent park reference.
-- Catalog and public summary routes emit deterministic `ETag` headers and support `304 Not Modified`.
-- Public summary routes use shared-cache headers and expose a public visit-data `version` / `updatedAt` signal that changes on visit create/update/delete and visit image upload/delete/reorder.
+- Catalog, home summary, map summary, and visits timeline routes emit deterministic `ETag` headers and support `304 Not Modified`.
+- Home summary, map summary, and visits timeline routes use shared-cache headers and expose a visit-data `version` / `updatedAt` signal that changes on visit create/update/delete and visit image upload/delete/reorder.
 - Visit and management routes use `private, no-store`.
 - Trip planner suggestion, route-search, and nearby-origin routes all use `private, no-store` and keep the provider key server-side.
 - All write routes and `GET /api/admin/parks/visibility` require a valid admin session cookie.
@@ -264,7 +265,7 @@ Key route behavior:
 - Auth routes (`/auth/*`) bypass API key authentication so the OAuth flow can complete without a bearer token.
 - `GET /health` and `GET /openapi.json` are the only anonymous data endpoints.
 - `/auth/*` routes are anonymous control-flow endpoints for login, not anonymous data endpoints.
-- All `/api/*` endpoints, including `/api/public/*`, currently require the API key outside localhost.
+- All `/api/*` endpoints currently require the API key outside localhost unless they use admin-session auth instead.
 - Image routes are only registered when R2 credentials (or `MEMORY_STORAGE=true`) are configured.
 - Localhost-style server uploads still use `POST /api/visits/:id/images`, which accepts multipart/form-data, resizes images with Sharp, and stores derived JPEGs in R2 or memory storage.
 - Deployed clients should use the Vercel-safe direct flow instead: `POST /api/visits/:id/images/upload-url`, upload the file to the returned presigned `PUT` URL, then call `POST /api/visits/:id/images/complete`.

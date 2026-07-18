@@ -144,22 +144,48 @@ describe('auth middleware', () => {
     expect(openApiResponse.status).toBe(200);
   });
 
-  it('protects public summary endpoints', async () => {
+  it('protects frontend summary and timeline endpoints', async () => {
     const app = createApp({ apiKey, database: testDatabase.database });
 
-    const unauthorizedResponse = await app.request('/api/public/home-summary', {
+    const unauthorizedHomeResponse = await app.request('/api/home-summary', {
       headers: {
         'x-forwarded-for': '203.0.113.1'
       }
     });
-    const authorizedResponse = await app.request('/api/public/home-summary', {
+    const authorizedHomeResponse = await app.request('/api/home-summary', {
+      headers: {
+        authorization: `Bearer ${apiKey}`,
+        'x-forwarded-for': '203.0.113.1'
+      }
+    });
+    const unauthorizedMapResponse = await app.request('/api/map-summary', {
+      headers: {
+        'x-forwarded-for': '203.0.113.1'
+      }
+    });
+    const authorizedMapResponse = await app.request('/api/map-summary', {
+      headers: {
+        authorization: `Bearer ${apiKey}`,
+        'x-forwarded-for': '203.0.113.1'
+      }
+    });
+    const unauthorizedTimelineResponse = await app.request('/api/visits-timeline', {
+      headers: {
+        'x-forwarded-for': '203.0.113.1'
+      }
+    });
+    const authorizedTimelineResponse = await app.request('/api/visits-timeline', {
       headers: {
         authorization: `Bearer ${apiKey}`,
         'x-forwarded-for': '203.0.113.1'
       }
     });
 
-    expect(unauthorizedResponse.status).toBe(401);
-    expect(authorizedResponse.status).toBe(200);
+    expect(unauthorizedHomeResponse.status).toBe(401);
+    expect(authorizedHomeResponse.status).toBe(200);
+    expect(unauthorizedMapResponse.status).toBe(401);
+    expect(authorizedMapResponse.status).toBe(200);
+    expect(unauthorizedTimelineResponse.status).toBe(401);
+    expect(authorizedTimelineResponse.status).toBe(200);
   });
 });

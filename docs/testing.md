@@ -80,15 +80,16 @@ If an upload limit exists, at least one test should cover the real stored-object
 - Park catalog responses expose both the source `type` and a derived `category`.
 - Park catalog responses expose linked logo metadata and stable logo URLs when a park logo has been configured.
 - Park responses expose raw `locationLabel`, `postalCode`, and `postalOffice` fields from the database, plus a derived `address` string for display use.
-- `GET /api/public/home-summary` returns cache-friendly frontend-public summary data including seasonal visit counts, `progressByType` visibility flags, and aggregated `progressByCategory`, without notes, routes, or images.
-- `GET /api/public/map-summary` returns lightweight frontend-public map data plus per-park visited summaries.
+- `GET /api/home-summary` returns cache-friendly home summary data including seasonal visit counts, `progressByType` visibility flags, and aggregated `progressByCategory`, without notes, routes, or images.
+- `GET /api/map-summary` returns lightweight map data plus per-park visited summaries.
+- `GET /api/visits-timeline` returns the lightweight `/kaynnit` timeline dataset with `imageCount` and pre-resolved park `typeLabel` values.
 - `POST /api/trip-planner/suggestions` returns up to three Geoapify-backed place suggestions with labels and coordinates for origin/destination pickers.
 - `POST /api/trip-planner/search` geocodes endpoints server-side, filters parks against the real routed path, excludes parks outside the corridor, preserves the documented unvisited-first ordering, suppresses overly broad matches from the first 30 km of long trips, and returns map-ready route geometry plus route and park bounding boxes.
 - `GET /api/parks/:slug/visits` returns park-scoped visit history and visited summary.
 - `GET /api/visits` and `GET /api/visits/:id` expose visit resources with parent park references.
-- Catalog and public summary `GET` endpoints emit ETags and return `304 Not Modified` for matching `If-None-Match`.
+- Catalog, home summary, map summary, and visits timeline `GET` endpoints emit ETags and return `304 Not Modified` for matching `If-None-Match`.
 - Catalog `GET` endpoints are safe for public caching.
-- Public summary endpoints use shared-cache headers and bump their version signal when visit or visit-image public data changes.
+- Home summary, map summary, and visits timeline endpoints use shared-cache headers and bump their version signal when visit or visit-image data changes.
 - Visit and management endpoints are private or no-store.
 - Trip planner provider failures surface as stable app errors instead of raw Geoapify responses.
 - All write routes and admin-only visibility reads require an admin session and fail closed when OAuth session auth is unavailable.

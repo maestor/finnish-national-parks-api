@@ -19,11 +19,13 @@ import {
   getParkVisitsBySlug,
   getPublicHomeSummary,
   getPublicMapSummary,
+  getPublicVisitDataVersion,
   getVisitById,
   listAdminParkVisibility,
   listParkSearchEntries,
   listParks,
   listVisits,
+  listVisitsTimeline,
   reorderVisitImages,
   updateParkDetails,
   updateParkRemoved,
@@ -83,6 +85,7 @@ import {
   listParkSearchRoute,
   listParksRoute,
   listVisitsRoute,
+  listVisitsTimelineRoute,
   reorderVisitImagesRoute,
   updateParkRemovedRoute,
   updateParkRoute,
@@ -649,6 +652,33 @@ export const createApp = ({
       }
 
       return context.json(summary, 200);
+    });
+
+    app.openapi(listVisitsTimelineRoute, async (context) => {
+      const [catalogSeed, version, visits] = await Promise.all([
+        getCatalogListEtagSeed(database),
+        getPublicVisitDataVersion(database),
+        listVisitsTimeline(database)
+      ]);
+      const etag = createPublicSummaryEtag({
+        activeCount: catalogSeed.activeCount,
+        kind: 'timeline',
+        latestCatalogImportRunId: catalogSeed.latestImportRunId,
+        latestCatalogUpdatedAt: catalogSeed.latestUpdatedAt,
+        publicUpdatedAt: version.updatedAt,
+        publicVersion: version.version
+      });
+      context.header('Cache-Control', PUBLIC_SUMMARY_CACHE_CONTROL);
+      context.header('ETag', etag);
+
+      if (hasMatchingEtag(context.req.header('if-none-match'), etag)) {
+        return new Response(null, {
+          headers: context.res.headers,
+          status: 304
+        });
+      }
+
+      return context.json({ visits }, 200);
     });
 
     app.openapi(suggestTripPlannerRoute, async (context) => {

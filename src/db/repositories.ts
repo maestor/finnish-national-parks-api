@@ -173,6 +173,18 @@ type PublicVisitRow = {
   visitedOn: string;
 };
 
+type VisitTimelineRow = {
+  createdAt: string;
+  displayTypeName: string | null;
+  id: number;
+  imageCount: number;
+  parkName: string;
+  parkSlug: string;
+  route: string | null;
+  typeName: string;
+  visitedOn: string;
+};
+
 type PublicVisitVersion = {
   updatedAt: string | null;
   version: number;
@@ -232,6 +244,10 @@ const toParkType = (row: typeof parkTypes.$inferSelect) => {
 };
 
 const toParkCategory = (typeSlug: SupportedParkTypeSlug) => getParkCategoryByTypeSlug(typeSlug);
+
+const resolveTypeLabel = (park: { displayTypeName: string | null; typeName: string }) => {
+  return park.displayTypeName ?? park.typeName;
+};
 
 const toLogo = async (
   logoKey: string | null,
@@ -795,6 +811,37 @@ const listPublicVisitRows = async (database: Database) => {
     .orderBy(desc(parkVisits.createdAt), desc(parkVisits.id));
 };
 
+const listVisitTimelineRows = async (database: Database): Promise<VisitTimelineRow[]> => {
+  return database
+    .select({
+      createdAt: parkVisits.createdAt,
+      displayTypeName: parks.displayTypeName,
+      id: parkVisits.id,
+      imageCount: sql<number>`COUNT(${visitImages.id})`,
+      parkName: parks.name,
+      parkSlug: parks.slug,
+      route: parkVisits.route,
+      typeName: parkTypes.name,
+      visitedOn: parkVisits.visitedOn
+    })
+    .from(parkVisits)
+    .innerJoin(parks, eq(parkVisits.parkId, parks.id))
+    .innerJoin(parkTypes, eq(parks.typeId, parkTypes.id))
+    .leftJoin(visitImages, eq(visitImages.visitId, parkVisits.id))
+    .where(visibleCatalogWhere())
+    .groupBy(
+      parkVisits.id,
+      parkVisits.createdAt,
+      parkVisits.route,
+      parkVisits.visitedOn,
+      parks.displayTypeName,
+      parks.name,
+      parks.slug,
+      parkTypes.name
+    )
+    .orderBy(desc(parkVisits.visitedOn), desc(parkVisits.createdAt), desc(parkVisits.id));
+};
+
 const bumpPublicVisitDataVersion = async (database: DbClient, updatedAt: string) => {
   await database
     .insert(publicDataVersions)
@@ -1211,6 +1258,23 @@ export const getPublicMapSummary = async (
     updatedAt: version.updatedAt,
     version: version.version
   };
+};
+
+export const listVisitsTimeline = async (database: Database) => {
+  const visitRows = await listVisitTimelineRows(database);
+
+  return visitRows.map((visit) => ({
+    createdAt: visit.createdAt,
+    id: visit.id,
+    imageCount: visit.imageCount,
+    park: {
+      name: visit.parkName,
+      slug: visit.parkSlug,
+      typeLabel: resolveTypeLabel(visit)
+    },
+    route: visit.route,
+    visitedOn: visit.visitedOn
+  }));
 };
 
 export const listTripPlannerCandidateParks = async (database: Database) => {

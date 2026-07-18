@@ -861,7 +861,7 @@ describe('repositories', () => {
     ).rejects.toThrow('Target park "vallisaari" is removed and cannot receive visits.');
   });
 
-  it('builds public home summary ordering from lightweight public visit data', async () => {
+  it('builds home summary ordering from lightweight visit data', async () => {
     await importParks({
       database: testDatabase.database,
       expectedActiveCount: 4,
