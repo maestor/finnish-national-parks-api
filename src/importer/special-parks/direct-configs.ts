@@ -422,6 +422,35 @@ export const baseSpecialParkConfigs: SpecialParkConfig[] = [
   },
   {
     displayTypeName: null,
+    extractMetadata: extractGeoJsonAreaM2Metadata,
+    locationLabel: 'Hopeakaivoksentie 34',
+    parkUrl:
+      'https://www.hel.fi/fi/kulttuuri-ja-vapaa-aika/ulkoilu-puistot-ja-luontokohteet/ulkoilualueet/kruunuvuori-ja-kruunuvuorenlampi',
+    name: 'Kruunuvuori ja Kruunuvuorenlampi',
+    parkTypeSlug: 'outdoor-recreation-area',
+    postalCode: '00590',
+    postalOffice: 'Helsinki',
+    responseShapeVersion: 'manual-helsinki-ylre-viheralue-v1',
+    slug: 'kruunuvuoren-lahivirkistysalue',
+    sourceUrl: 'special://kruunuvuoren-lahivirkistysalue',
+    syntheticLipasId: 9_002_041
+  },
+  {
+    displayTypeName: null,
+    extractMetadata: extractGeoJsonAreaM2Metadata,
+    locationLabel: 'Kaivoshuvilankuja 10',
+    parkUrl: null,
+    name: 'Stansvikin lehto- ja kaivosalue',
+    parkTypeSlug: 'nature-reserve-area',
+    postalCode: '00590',
+    postalOffice: 'Helsinki',
+    responseShapeVersion: 'manual-helsinki-ltj-luonnonsuojelualue-v1',
+    slug: 'stansvikin-lehto-ja-kaivosalue',
+    sourceUrl: 'special://stansvikin-lehto-ja-kaivosalue',
+    syntheticLipasId: 9_002_042
+  },
+  {
+    displayTypeName: null,
     locationLabel: 'Seili',
     parkUrl: 'https://www.luontoon.fi/fi/kohteet/seili',
     name: 'Seili',
