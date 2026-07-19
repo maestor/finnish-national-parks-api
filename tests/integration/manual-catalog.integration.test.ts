@@ -55,7 +55,7 @@ describe('manual catalog imports', () => {
       now: () => '2026-05-27T08:00:00.000Z'
     });
 
-    expect(result.results).toHaveLength(141);
+    expect(result.results).toHaveLength(143);
 
     const merenkurkku = await getParkBySlug(
       testDatabase.database,
@@ -489,6 +489,27 @@ describe('manual catalog imports', () => {
         typeSlug: 'nature-reserve-area'
       },
       {
+        lipasId: 9002041,
+        locationLabel: 'Hopeakaivoksentie 34',
+        name: 'Kruunuvuori ja Kruunuvuorenlampi',
+        parkUrl:
+          'https://www.hel.fi/fi/kulttuuri-ja-vapaa-aika/ulkoilu-puistot-ja-luontokohteet/ulkoilualueet/kruunuvuori-ja-kruunuvuorenlampi',
+        postalCode: '00590',
+        postalOffice: 'Helsinki',
+        slug: 'kruunuvuoren-lahivirkistysalue',
+        typeSlug: 'outdoor-recreation-area'
+      },
+      {
+        lipasId: 9002042,
+        locationLabel: 'Kaivoshuvilankuja 10',
+        name: 'Stansvikin lehto- ja kaivosalue',
+        parkUrl: null,
+        postalCode: '00590',
+        postalOffice: 'Helsinki',
+        slug: 'stansvikin-lehto-ja-kaivosalue',
+        typeSlug: 'nature-reserve-area'
+      },
+      {
         lipasId: 9002039,
         locationLabel: 'Hiidenkirnujentie',
         name: 'Askolan hiidenkirnut',
@@ -555,6 +576,46 @@ describe('manual catalog imports', () => {
     });
     expect(slattmossen?.boundaryGeoJson?.features).toHaveLength(1);
     expect(slattmossen?.boundaryGeoJson?.features[0]?.geometry.type).toBe('Polygon');
+
+    const kruunuvuori = await getParkBySlug(
+      testDatabase.database,
+      'kruunuvuoren-lahivirkistysalue'
+    );
+    expect(kruunuvuori).toMatchObject({
+      address: 'Hopeakaivoksentie 34, 00590 Helsinki',
+      lipasId: 9002041,
+      locationLabel: 'Hopeakaivoksentie 34',
+      parkUrl:
+        'https://www.hel.fi/fi/kulttuuri-ja-vapaa-aika/ulkoilu-puistot-ja-luontokohteet/ulkoilualueet/kruunuvuori-ja-kruunuvuorenlampi',
+      name: 'Kruunuvuori ja Kruunuvuorenlampi',
+      postalCode: '00590',
+      postalOffice: 'Helsinki',
+      type: { slug: 'outdoor-recreation-area' }
+    });
+    expect(kruunuvuori?.areaKm2).toBeCloseTo(0.19, 2);
+    expect(kruunuvuori?.boundaryGeoJson?.features).toHaveLength(1);
+    expect(
+      kruunuvuori?.boundaryGeoJson?.features.every((feature) => feature.geometry.type === 'Polygon')
+    ).toBe(true);
+    const kruunuvuoriFeature = kruunuvuori?.boundaryGeoJson?.features[0];
+    if (kruunuvuoriFeature?.geometry.type === 'Polygon') {
+      expect(kruunuvuoriFeature.geometry.coordinates).toHaveLength(1);
+    }
+
+    const stansviki = await getParkBySlug(testDatabase.database, 'stansvikin-lehto-ja-kaivosalue');
+    expect(stansviki).toMatchObject({
+      address: 'Kaivoshuvilankuja 10, 00590 Helsinki',
+      lipasId: 9002042,
+      locationLabel: 'Kaivoshuvilankuja 10',
+      parkUrl: null,
+      name: 'Stansvikin lehto- ja kaivosalue',
+      postalCode: '00590',
+      postalOffice: 'Helsinki',
+      type: { slug: 'nature-reserve-area' }
+    });
+    expect(stansviki?.areaKm2).toBeCloseTo(0.05, 2);
+    expect(stansviki?.boundaryGeoJson?.features).toHaveLength(1);
+    expect(stansviki?.boundaryGeoJson?.features[0]?.geometry.type).toBe('Polygon');
 
     const expectedLuontoonDestinationImports: ExpectedLuontoonDestinationImport[] = [
       {
@@ -1021,7 +1082,7 @@ describe('manual catalog imports', () => {
     );
     const kevo = await getParkBySlug(testDatabase.database, 'kevon-luonnonpuisto');
 
-    expect(allParks).toHaveLength(141);
+    expect(allParks).toHaveLength(143);
     expect(merenkurkku).toMatchObject({ catalogStatus: 'active' });
     expect(kevo).toMatchObject({ catalogStatus: 'active' });
   });
@@ -1098,7 +1159,7 @@ describe('manual catalog imports', () => {
       database: testDatabase.database
     });
 
-    expect(result.results).toHaveLength(141);
+    expect(result.results).toHaveLength(143);
 
     const merenkurkku = await getParkBySlug(
       testDatabase.database,
@@ -1212,7 +1273,7 @@ describe('manual catalog imports', () => {
       now: () => '2026-05-27T08:00:00.000Z'
     });
 
-    expect(result.results).toHaveLength(141);
+    expect(result.results).toHaveLength(143);
   });
 
   it('fails clearly when a selected special-park slug is unknown', async () => {
