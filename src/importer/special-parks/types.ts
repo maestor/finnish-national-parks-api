@@ -12,6 +12,10 @@ export type SpecialParkConfig = {
   ) => SpecialParkMetadata;
   filterFeatures?: (feature: { properties: { ely?: string | undefined; nimi: string } }) => boolean;
   locationLabel: string;
+  markerPoint?: {
+    lat: number;
+    lon: number;
+  };
   parkUrl: string | null;
   name: string;
   parkTypeSlug: SupportedParkTypeSlug;
