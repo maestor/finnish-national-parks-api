@@ -437,7 +437,7 @@ describe('trip planner route', () => {
     expect(response.status).toBe(200);
     expect(response.headers.get('cache-control')).toBe('private, no-store');
     expect(body.maxDistanceKm).toBe(25);
-    expect(body.defaultDistanceKm).toBe(25);
+    expect(body.defaultDistanceKm).toBe(10);
     expect(body.origin.label).toBe('Origin label');
     expect(body.searchArea.center).toEqual({ lat: 60, lon: 24 });
     expect(body.searchArea.maxDistanceKm).toBe(25);

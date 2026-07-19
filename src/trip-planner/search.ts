@@ -27,6 +27,7 @@ import type {
 } from './types.js';
 
 export const DEFAULT_TRIP_PLANNER_MAX_DISTANCE_KM = 25;
+export const DEFAULT_TRIP_PLANNER_NEARBY_DISTANCE_KM = 10;
 
 type TripPlannerErrorCode =
   | 'destination_not_found'
@@ -392,7 +393,7 @@ export const createTripPlannerService = ({
           .filter((park) => park.distanceMeters <= maxDistanceMeters);
 
         return {
-          defaultDistanceKm: maxDistanceKm,
+          defaultDistanceKm: Math.min(maxDistanceKm, DEFAULT_TRIP_PLANNER_NEARBY_DISTANCE_KM),
           maxDistanceKm,
           origin,
           parks: orderResults(parks, {
