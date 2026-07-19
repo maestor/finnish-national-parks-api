@@ -221,7 +221,7 @@ The main quality gate is:
 npm run verify
 ```
 
-It runs typecheck, lint, and coverage tests with 100 percent thresholds for first-party application code. This must pass before any change is considered ready, unless the change is entirely outside what `verify` validates — for example, pure documentation updates.
+It runs typecheck, lint, and coverage tests with 100 percent thresholds for first-party application code. The lint step fails on any Biome diagnostics, including config info and warning-level findings. This must pass before any change is considered ready, unless the change is entirely outside what `verify` validates — for example, pure documentation updates.
 
 ## Documentation
 
