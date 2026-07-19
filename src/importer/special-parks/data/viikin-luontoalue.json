@@ -1,0 +1,30 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "area_m2": 499566,
+        "name": "Viikin luontoalue",
+        "source": "Manual polygon traced from Helsinki viikkikartta.pdf dark green visitor area around Keinumaki and Hakalanniemi"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [25.0041, 60.2211],
+            [25.0083, 60.2218],
+            [25.0124, 60.2207],
+            [25.0139, 60.217],
+            [25.0134, 60.2126],
+            [25.0104, 60.2114],
+            [25.0067, 60.2122],
+            [25.0045, 60.2151],
+            [25.0041, 60.2211],
+            [25.0041, 60.2211]
+          ]
+        ]
+      }
+    }
+  ]
+}

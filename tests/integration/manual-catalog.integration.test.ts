@@ -55,7 +55,7 @@ describe('manual catalog imports', () => {
       now: () => '2026-05-27T08:00:00.000Z'
     });
 
-    expect(result.results).toHaveLength(144);
+    expect(result.results).toHaveLength(148);
 
     const merenkurkku = await getParkBySlug(
       testDatabase.database,
@@ -521,6 +521,49 @@ describe('manual catalog imports', () => {
         typeSlug: 'outdoor-recreation-area'
       },
       {
+        lipasId: 9002044,
+        locationLabel: 'Kivinokantie 93',
+        name: 'Kivinokan ulkoilualue',
+        parkUrl:
+          'https://www.hel.fi/fi/kulttuuri-ja-vapaa-aika/ulkoilu-puistot-ja-luontokohteet/ulkoilualueet/kivinokan-ulkoilualue',
+        postalCode: '00810',
+        postalOffice: 'Helsinki',
+        slug: 'kivinokan-ulkoilualue',
+        typeSlug: 'outdoor-recreation-area'
+      },
+      {
+        lipasId: 9002045,
+        locationLabel: 'Metsäläntie 9',
+        name: 'Maunulan ulkoilualue',
+        parkUrl:
+          'https://www.hel.fi/fi/kulttuuri-ja-vapaa-aika/ulkoilu-puistot-ja-luontokohteet/ulkoilualueet/maunulan-ulkoilualue',
+        postalCode: '00620',
+        postalOffice: 'Helsinki',
+        slug: 'maunulan-ulkoilualue',
+        typeSlug: 'outdoor-recreation-area'
+      },
+      {
+        lipasId: 9002046,
+        locationLabel: 'Hakalantie 1',
+        name: 'Viikin luontoalue',
+        parkUrl:
+          'https://www.hel.fi/fi/kulttuuri-ja-vapaa-aika/ulkoilu-puistot-ja-luontokohteet/ulkoilualueet/viikin-luontoalue',
+        postalCode: '00790',
+        postalOffice: 'Helsinki',
+        slug: 'viikin-luontoalue',
+        typeSlug: 'outdoor-recreation-area'
+      },
+      {
+        lipasId: 9002047,
+        locationLabel: 'Viikintie',
+        name: 'Hallainvuoren luonnonsuojelualue',
+        parkUrl: null,
+        postalCode: '00920',
+        postalOffice: 'Helsinki',
+        slug: 'hallainvuoren-luonnonsuojelualue',
+        typeSlug: 'nature-reserve-area'
+      },
+      {
         lipasId: 9002039,
         locationLabel: 'Hiidenkirnujentie',
         name: 'Askolan hiidenkirnut',
@@ -664,6 +707,80 @@ describe('manual catalog imports', () => {
     expect(
       pornaistenniemi?.boundaryGeoJson?.features.every(
         (feature) => feature.geometry.type === 'Polygon' || feature.geometry.type === 'LineString'
+      )
+    ).toBe(true);
+
+    const kivinokka = await getParkBySlug(testDatabase.database, 'kivinokan-ulkoilualue');
+    expect(kivinokka).toMatchObject({
+      address: 'Kivinokantie 93, 00810 Helsinki',
+      areaKm2: 0.49,
+      lipasId: 9002044,
+      locationLabel: 'Kivinokantie 93',
+      parkUrl:
+        'https://www.hel.fi/fi/kulttuuri-ja-vapaa-aika/ulkoilu-puistot-ja-luontokohteet/ulkoilualueet/kivinokan-ulkoilualue',
+      name: 'Kivinokan ulkoilualue',
+      postalCode: '00810',
+      postalOffice: 'Helsinki',
+      type: { slug: 'outdoor-recreation-area' }
+    });
+    expect(kivinokka?.boundaryGeoJson?.features).toHaveLength(17);
+    expect(
+      kivinokka?.boundaryGeoJson?.features.every((feature) => feature.geometry.type === 'Polygon')
+    ).toBe(true);
+
+    const maunula = await getParkBySlug(testDatabase.database, 'maunulan-ulkoilualue');
+    expect(maunula).toMatchObject({
+      address: 'Metsäläntie 9, 00620 Helsinki',
+      areaKm2: 0.74,
+      lipasId: 9002045,
+      locationLabel: 'Metsäläntie 9',
+      parkUrl:
+        'https://www.hel.fi/fi/kulttuuri-ja-vapaa-aika/ulkoilu-puistot-ja-luontokohteet/ulkoilualueet/maunulan-ulkoilualue',
+      name: 'Maunulan ulkoilualue',
+      postalCode: '00620',
+      postalOffice: 'Helsinki',
+      type: { slug: 'outdoor-recreation-area' }
+    });
+    expect(maunula?.boundaryGeoJson?.features).toHaveLength(1);
+    expect(maunula?.boundaryGeoJson?.features[0]?.geometry.type).toBe('Polygon');
+
+    const viikki = await getParkBySlug(testDatabase.database, 'viikin-luontoalue');
+    expect(viikki).toMatchObject({
+      address: 'Hakalantie 1, 00790 Helsinki',
+      areaKm2: 0.5,
+      lipasId: 9002046,
+      locationLabel: 'Hakalantie 1',
+      parkUrl:
+        'https://www.hel.fi/fi/kulttuuri-ja-vapaa-aika/ulkoilu-puistot-ja-luontokohteet/ulkoilualueet/viikin-luontoalue',
+      name: 'Viikin luontoalue',
+      postalCode: '00790',
+      postalOffice: 'Helsinki',
+      type: { slug: 'outdoor-recreation-area' }
+    });
+    expect(viikki?.boundaryGeoJson?.features).toHaveLength(1);
+    expect(
+      viikki?.boundaryGeoJson?.features.every((feature) => feature.geometry.type === 'Polygon')
+    ).toBe(true);
+
+    const hallainvuori = await getParkBySlug(
+      testDatabase.database,
+      'hallainvuoren-luonnonsuojelualue'
+    );
+    expect(hallainvuori).toMatchObject({
+      address: 'Viikintie, 00920 Helsinki',
+      areaKm2: 0.53,
+      lipasId: 9002047,
+      locationLabel: 'Viikintie',
+      parkUrl: null,
+      name: 'Hallainvuoren luonnonsuojelualue',
+      postalCode: '00920',
+      postalOffice: 'Helsinki',
+      type: { slug: 'nature-reserve-area' }
+    });
+    expect(hallainvuori?.boundaryGeoJson?.features).toHaveLength(3);
+    expect(
+      hallainvuori?.boundaryGeoJson?.features.every(
+        (feature) => feature.geometry.type === 'Polygon'
       )
     ).toBe(true);
 
@@ -1132,7 +1249,7 @@ describe('manual catalog imports', () => {
     );
     const kevo = await getParkBySlug(testDatabase.database, 'kevon-luonnonpuisto');
 
-    expect(allParks).toHaveLength(144);
+    expect(allParks).toHaveLength(148);
     expect(merenkurkku).toMatchObject({ catalogStatus: 'active' });
     expect(kevo).toMatchObject({ catalogStatus: 'active' });
   });
@@ -1209,7 +1326,7 @@ describe('manual catalog imports', () => {
       database: testDatabase.database
     });
 
-    expect(result.results).toHaveLength(144);
+    expect(result.results).toHaveLength(148);
 
     const merenkurkku = await getParkBySlug(
       testDatabase.database,
@@ -1269,6 +1386,12 @@ describe('manual catalog imports', () => {
       name: 'Kallahden ulkoilualue',
       type: { slug: 'outdoor-recreation-area' }
     });
+
+    const kivinokka = await getParkBySlug(testDatabase.database, 'kivinokan-ulkoilualue');
+    expect(kivinokka).toMatchObject({
+      name: 'Kivinokan ulkoilualue',
+      type: { slug: 'outdoor-recreation-area' }
+    });
   });
 
   it('can import only selected special parks by slug', async () => {
@@ -1315,6 +1438,119 @@ describe('manual catalog imports', () => {
     });
   });
 
+  it('re-imports Viikin luontoalue in place when stale imported metadata exists', async () => {
+    await importSpecialParks({
+      database: testDatabase.database,
+      fetchSource: createSpecialParksSource(),
+      includeSlugs: ['viikin-luontoalue'],
+      now: () => '2026-05-27T08:00:00.000Z'
+    });
+
+    await testDatabase.database
+      .update(parks)
+      .set({
+        importedLocationLabel: 'Viikintie',
+        importedName: 'Vanhentunut Viikki-kohde',
+        importedParkUrl: 'https://example.invalid/vanhentunut-viikki-kohde',
+        importedSlug: 'vanhentunut-viikki-kohde',
+        locationLabel: 'Viikintie',
+        name: 'Vanhentunut Viikki-kohde',
+        parkUrl: 'https://example.invalid/vanhentunut-viikki-kohde',
+        slug: 'vanhentunut-viikki-kohde',
+        updatedAt: '2026-05-27T08:30:00.000Z'
+      })
+      .where(eq(parks.lipasId, 9002046));
+
+    expect(await getParkBySlug(testDatabase.database, 'vanhentunut-viikki-kohde')).toMatchObject({
+      lipasId: 9002046,
+      name: 'Vanhentunut Viikki-kohde',
+      type: { slug: 'outdoor-recreation-area' }
+    });
+
+    await importSpecialParks({
+      database: testDatabase.database,
+      fetchSource: createSpecialParksSource(),
+      includeSlugs: ['viikin-luontoalue'],
+      now: () => '2026-05-27T09:00:00.000Z'
+    });
+
+    const allParks = await listParks(testDatabase.database);
+    expect(allParks).toHaveLength(1);
+    expect(await getParkBySlug(testDatabase.database, 'vanhentunut-viikki-kohde')).toBeNull();
+
+    const viikki = await getParkBySlug(testDatabase.database, 'viikin-luontoalue');
+    expect(viikki).toMatchObject({
+      lipasId: 9002046,
+      locationLabel: 'Hakalantie 1',
+      name: 'Viikin luontoalue',
+      parkUrl:
+        'https://www.hel.fi/fi/kulttuuri-ja-vapaa-aika/ulkoilu-puistot-ja-luontokohteet/ulkoilualueet/viikin-luontoalue',
+      type: { slug: 'outdoor-recreation-area' }
+    });
+  });
+
+  it('re-imports Hallainvuori in place when stale imported metadata exists', async () => {
+    await importSpecialParks({
+      database: testDatabase.database,
+      fetchSource: createSpecialParksSource(),
+      includeSlugs: ['hallainvuoren-luonnonsuojelualue'],
+      now: () => '2026-05-27T08:00:00.000Z'
+    });
+
+    const outdoorType = await testDatabase.database.query.parkTypes.findFirst({
+      where: (parkType, { eq }) => eq(parkType.slug, 'outdoor-recreation-area')
+    });
+
+    if (!outdoorType) {
+      throw new Error('Outdoor recreation area park type should exist after special import.');
+    }
+
+    await testDatabase.database
+      .update(parks)
+      .set({
+        importedLocationLabel: 'Viikintie',
+        importedName: 'Vanha Hallainvuori-kohde',
+        importedParkUrl: 'https://example.invalid/vanha-hallainvuori-kohde',
+        importedSlug: 'vanha-hallainvuori-kohde',
+        locationLabel: 'Viikintie',
+        name: 'Vanha Hallainvuori-kohde',
+        parkUrl: 'https://example.invalid/vanha-hallainvuori-kohde',
+        slug: 'vanha-hallainvuori-kohde',
+        typeId: outdoorType.id,
+        updatedAt: '2026-05-27T08:30:00.000Z'
+      })
+      .where(eq(parks.lipasId, 9002047));
+
+    expect(await getParkBySlug(testDatabase.database, 'vanha-hallainvuori-kohde')).toMatchObject({
+      lipasId: 9002047,
+      name: 'Vanha Hallainvuori-kohde',
+      type: { slug: 'outdoor-recreation-area' }
+    });
+
+    await importSpecialParks({
+      database: testDatabase.database,
+      fetchSource: createSpecialParksSource(),
+      includeSlugs: ['hallainvuoren-luonnonsuojelualue'],
+      now: () => '2026-05-27T09:00:00.000Z'
+    });
+
+    const allParks = await listParks(testDatabase.database);
+    expect(allParks).toHaveLength(1);
+    expect(await getParkBySlug(testDatabase.database, 'vanha-hallainvuori-kohde')).toBeNull();
+
+    const hallainvuori = await getParkBySlug(
+      testDatabase.database,
+      'hallainvuoren-luonnonsuojelualue'
+    );
+    expect(hallainvuori).toMatchObject({
+      lipasId: 9002047,
+      locationLabel: 'Viikintie',
+      name: 'Hallainvuoren luonnonsuojelualue',
+      parkUrl: null,
+      type: { slug: 'nature-reserve-area' }
+    });
+  });
+
   it('treats an empty selected-slug list like a full special import', async () => {
     const result = await importSpecialParks({
       database: testDatabase.database,
@@ -1323,7 +1559,7 @@ describe('manual catalog imports', () => {
       now: () => '2026-05-27T08:00:00.000Z'
     });
 
-    expect(result.results).toHaveLength(144);
+    expect(result.results).toHaveLength(148);
   });
 
   it('fails clearly when a selected special-park slug is unknown', async () => {
