@@ -470,6 +470,69 @@ export const baseSpecialParkConfigs: SpecialParkConfig[] = [
   },
   {
     displayTypeName: null,
+    extractMetadata: extractGeoJsonAreaM2Metadata,
+    locationLabel: 'Kivinokantie 93',
+    parkUrl:
+      'https://www.hel.fi/fi/kulttuuri-ja-vapaa-aika/ulkoilu-puistot-ja-luontokohteet/ulkoilualueet/kivinokan-ulkoilualue',
+    name: 'Kivinokan ulkoilualue',
+    parkTypeSlug: 'outdoor-recreation-area',
+    postalCode: '00810',
+    postalOffice: 'Helsinki',
+    responseShapeVersion: 'manual-helsinki-ylre-viheralue-v1',
+    slug: 'kivinokan-ulkoilualue',
+    sourceUrl: 'special://kivinokan-ulkoilualue',
+    syntheticLipasId: 9_002_044
+  },
+  {
+    displayTypeName: null,
+    extractMetadata: extractGeoJsonAreaM2Metadata,
+    locationLabel: 'Metsäläntie 9',
+    parkUrl:
+      'https://www.hel.fi/fi/kulttuuri-ja-vapaa-aika/ulkoilu-puistot-ja-luontokohteet/ulkoilualueet/maunulan-ulkoilualue',
+    name: 'Maunulan ulkoilualue',
+    parkTypeSlug: 'outdoor-recreation-area',
+    postalCode: '00620',
+    postalOffice: 'Helsinki',
+    responseShapeVersion: 'manual-helsinki-ylre-viheralue-v1',
+    slug: 'maunulan-ulkoilualue',
+    sourceUrl: 'special://maunulan-ulkoilualue',
+    syntheticLipasId: 9_002_045
+  },
+  {
+    displayTypeName: null,
+    extractMetadata: extractGeoJsonAreaM2Metadata,
+    locationLabel: 'Viikintie',
+    markerPoint: {
+      lat: 60.21872,
+      lon: 25.008066
+    },
+    parkUrl:
+      'https://www.hel.fi/fi/kulttuuri-ja-vapaa-aika/ulkoilu-puistot-ja-luontokohteet/ulkoilualueet/viikin-luontoalue',
+    name: 'Viikin luontoalue',
+    parkTypeSlug: 'outdoor-recreation-area',
+    postalCode: '00790',
+    postalOffice: 'Helsinki',
+    responseShapeVersion: 'manual-helsinki-viikkikartta-visitor-area-v2',
+    slug: 'viikin-luontoalue',
+    sourceUrl: 'special://viikin-luontoalue',
+    syntheticLipasId: 9_002_046
+  },
+  {
+    displayTypeName: null,
+    extractMetadata: extractGeoJsonAreaM2Metadata,
+    locationLabel: 'Viikintie',
+    parkUrl: null,
+    name: 'Hallainvuoren luonnonsuojelualue',
+    parkTypeSlug: 'nature-reserve-area',
+    postalCode: '00920',
+    postalOffice: 'Helsinki',
+    responseShapeVersion: 'manual-helsinki-ylre-viheralue-v1',
+    slug: 'hallainvuoren-luonnonsuojelualue',
+    sourceUrl: 'special://hallainvuoren-luonnonsuojelualue',
+    syntheticLipasId: 9_002_047
+  },
+  {
+    displayTypeName: null,
     locationLabel: 'Seili',
     parkUrl: 'https://www.luontoon.fi/fi/kohteet/seili',
     name: 'Seili',
