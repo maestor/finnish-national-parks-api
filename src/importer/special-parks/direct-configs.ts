@@ -451,6 +451,25 @@ export const baseSpecialParkConfigs: SpecialParkConfig[] = [
   },
   {
     displayTypeName: null,
+    extractMetadata: extractGeoJsonAreaM2Metadata,
+    locationLabel: 'Katariina Saksilaisen katu 11',
+    markerPoint: {
+      lat: 60.21340418,
+      lon: 24.98656493
+    },
+    parkUrl:
+      'https://www.hel.fi/fi/kulttuuri-ja-vapaa-aika/ulkoilu-puistot-ja-luontokohteet/ulkoilualueet/pornaistenniemi-ja-lammassaari',
+    name: 'Pornaistenniemi ja Lammassaari',
+    parkTypeSlug: 'outdoor-recreation-area',
+    postalCode: '00560',
+    postalOffice: 'Helsinki',
+    responseShapeVersion: 'manual-helsinki-ylre-viheralue-v1',
+    slug: 'pornaistenniemi-ja-lammassaari',
+    sourceUrl: 'special://pornaistenniemi-ja-lammassaari',
+    syntheticLipasId: 9_002_043
+  },
+  {
+    displayTypeName: null,
     locationLabel: 'Seili',
     parkUrl: 'https://www.luontoon.fi/fi/kohteet/seili',
     name: 'Seili',
