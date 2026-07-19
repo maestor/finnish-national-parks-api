@@ -544,7 +544,7 @@ describe('manual catalog imports', () => {
       },
       {
         lipasId: 9002046,
-        locationLabel: 'Viikintie',
+        locationLabel: 'Hakalantie 1',
         name: 'Viikin luontoalue',
         parkUrl:
           'https://www.hel.fi/fi/kulttuuri-ja-vapaa-aika/ulkoilu-puistot-ja-luontokohteet/ulkoilualueet/viikin-luontoalue',
@@ -746,10 +746,10 @@ describe('manual catalog imports', () => {
 
     const viikki = await getParkBySlug(testDatabase.database, 'viikin-luontoalue');
     expect(viikki).toMatchObject({
-      address: 'Viikintie, 00790 Helsinki',
+      address: 'Hakalantie 1, 00790 Helsinki',
       areaKm2: 0.5,
       lipasId: 9002046,
-      locationLabel: 'Viikintie',
+      locationLabel: 'Hakalantie 1',
       parkUrl:
         'https://www.hel.fi/fi/kulttuuri-ja-vapaa-aika/ulkoilu-puistot-ja-luontokohteet/ulkoilualueet/viikin-luontoalue',
       name: 'Viikin luontoalue',
@@ -1481,7 +1481,7 @@ describe('manual catalog imports', () => {
     const viikki = await getParkBySlug(testDatabase.database, 'viikin-luontoalue');
     expect(viikki).toMatchObject({
       lipasId: 9002046,
-      locationLabel: 'Viikintie',
+      locationLabel: 'Hakalantie 1',
       name: 'Viikin luontoalue',
       parkUrl:
         'https://www.hel.fi/fi/kulttuuri-ja-vapaa-aika/ulkoilu-puistot-ja-luontokohteet/ulkoilualueet/viikin-luontoalue',

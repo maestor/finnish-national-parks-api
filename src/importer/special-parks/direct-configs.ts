@@ -501,7 +501,7 @@ export const baseSpecialParkConfigs: SpecialParkConfig[] = [
   {
     displayTypeName: null,
     extractMetadata: extractGeoJsonAreaM2Metadata,
-    locationLabel: 'Viikintie',
+    locationLabel: 'Hakalantie 1',
     markerPoint: {
       lat: 60.21872,
       lon: 25.008066
