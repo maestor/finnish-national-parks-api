@@ -394,7 +394,7 @@ describe('trip planner service', () => {
       coordinate: { lat: 60, lon: 24 },
       label: 'Origin label'
     });
-    expect(result.defaultDistanceKm).toBe(25);
+    expect(result.defaultDistanceKm).toBe(10);
     expect(result.maxDistanceKm).toBe(25);
     expect(result.searchArea.center).toEqual({ lat: 60, lon: 24 });
     expect(result.searchArea.maxDistanceKm).toBe(25);
