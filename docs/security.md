@@ -36,6 +36,9 @@ Rules:
 
 - Never expose the shared `API_KEY` in browser-delivered code.
 - Browser-facing admin or mutation flows must use Google-backed admin sessions.
+- Session JWTs are HS256, 24h expiry, and always carry `iss: "reissuvihko-api"`, `aud: "reissuvihko-ui"`, and `role: "admin"` claims. Issuance and verification both bind issuer and audience; allowlisted Google users are issued the `admin` role.
+- The `__session` cookie is `HttpOnly`, `SameSite=Lax`, `Path=/`, and `Secure` in production. SameSite=Lax is the CSRF baseline; the frontend additionally rejects cross-origin non-GET requests.
+- Frontend callers that verify the session JWT (for example the `/hallinta` proxy and `POST /api/revalidate-public-cache`) must bind `issuer`/`audience` and require `role === "admin"`.
 - If OAuth/session auth is unavailable, admin-session routes should fail closed rather than silently downgrading to weaker auth.
 - When auth policy changes, update runtime enforcement, route contracts, integration tests, `README.md`, `docs/development.md`, and this file in the same change.
 - When a route mixes API-key and session requirements, document both clearly in contract and contributor docs.

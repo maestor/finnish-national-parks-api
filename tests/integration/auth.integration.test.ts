@@ -18,6 +18,7 @@ const createAdminSessionCookie = async () => {
       email: 'admin@example.com',
       name: 'Admin User',
       picture: 'https://example.com/photo.jpg',
+      role: 'admin',
       sub: 'google-user-id'
     },
     new TextEncoder().encode(authConfig.jwtSecret)

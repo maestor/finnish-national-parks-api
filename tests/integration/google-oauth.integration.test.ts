@@ -205,6 +205,23 @@ describe('google oauth', () => {
 
     const sessionCookies = extractCookies(callbackResponse);
     expect(sessionCookies.__session).toBeDefined();
+
+    const setCookieHeader = callbackResponse.headers
+      .getSetCookie()
+      .find((cookie) => cookie.startsWith('__session='));
+    expect(setCookieHeader).toContain('HttpOnly');
+    expect(setCookieHeader).toContain('SameSite=Lax');
+    expect(setCookieHeader).toContain('Path=/');
+
+    const [, payloadSegment] = (sessionCookies.__session ?? '').split('.');
+    const claims = JSON.parse(Buffer.from(payloadSegment ?? '', 'base64url').toString()) as {
+      aud?: string;
+      iss?: string;
+      role?: string;
+    };
+    expect(claims.iss).toBe('reissuvihko-api');
+    expect(claims.aud).toBe('reissuvihko-ui');
+    expect(claims.role).toBe('admin');
   });
 
   it('redirects to access_denied for non-admin email', async () => {

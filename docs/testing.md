@@ -140,3 +140,5 @@ When a production platform behavior cannot be reproduced locally, add the smalle
 ## CI
 
 Pull requests against `main` trigger a GitHub Actions workflow that runs `npm run verify`. The build must pass before review and merge.
+
+The Vitest `testTimeout` is raised to 20 seconds because full-catalog importer integration tests insert 148 fixture records per test and can exceed the 5-second default on constrained CI runners even though they finish in well under a second locally.
