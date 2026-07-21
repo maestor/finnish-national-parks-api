@@ -370,6 +370,7 @@ export const createApp = ({
             email: googleUser.email,
             name: googleUser.name ?? '',
             picture: googleUser.picture ?? '',
+            role: 'admin',
             sub: googleUser.sub
           },
           new TextEncoder().encode(auth.jwtSecret)
