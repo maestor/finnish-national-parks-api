@@ -26,7 +26,7 @@ import {
   updateTrip,
   updateVisit
 } from '../../src/db/repositories.js';
-import { parks } from '../../src/db/schema.js';
+import { parks, parkVisits } from '../../src/db/schema.js';
 import { importParks } from '../../src/importer/import-parks.js';
 import { createLipasPark } from '../fixtures/lipas.js';
 import { createTestDatabase } from '../helpers/test-db.js';
@@ -449,6 +449,276 @@ describe('repositories', () => {
     ).rejects.toThrow('Trip not found.');
   });
 
+  it('assigns and reorders explicit stop order inside a trip', async () => {
+    const trip = await createTrip(testDatabase.database, {
+      name: 'Kesäreissu 2026'
+    });
+    const firstVisit = await createVisit(testDatabase.database, 'akasmannyn-kansallispuisto', {
+      tripId: trip.id,
+      visitedOn: '2026-04-13'
+    });
+    const secondVisit = await createVisit(testDatabase.database, 'akasmannyn-kansallispuisto', {
+      tripId: trip.id,
+      visitedOn: '2026-04-13'
+    });
+
+    expect(firstVisit.tripStopOrder).toBe(1);
+    expect(secondVisit.tripStopOrder).toBe(2);
+
+    const movedSecondVisit = await updateVisit(testDatabase.database, secondVisit.id, {
+      tripStopOrder: 1
+    });
+    const firstVisitAfterMove = await getVisitById(
+      testDatabase.database,
+      firstVisit.id,
+      async () => ''
+    );
+
+    expect(movedSecondVisit).toMatchObject({
+      trip: {
+        id: trip.id,
+        name: 'Kesäreissu 2026'
+      },
+      tripStopOrder: 1
+    });
+    expect(firstVisitAfterMove).toMatchObject({
+      tripStopOrder: 2
+    });
+
+    const clearedVisit = await updateVisit(testDatabase.database, secondVisit.id, {
+      tripId: null
+    });
+
+    expect(clearedVisit).toMatchObject({
+      trip: null,
+      tripStopOrder: null
+    });
+  });
+
+  it('keeps order stable when re-saving the same stop and closes gaps after delete', async () => {
+    const trip = await createTrip(testDatabase.database, {
+      name: 'Kesäreissu 2026'
+    });
+    const firstVisit = await createVisit(testDatabase.database, 'akasmannyn-kansallispuisto', {
+      tripId: trip.id,
+      visitedOn: '2026-04-13'
+    });
+    const secondVisit = await createVisit(testDatabase.database, 'akasmannyn-kansallispuisto', {
+      tripId: trip.id,
+      visitedOn: '2026-04-13'
+    });
+    const thirdVisit = await createVisit(testDatabase.database, 'akasmannyn-kansallispuisto', {
+      tripId: trip.id,
+      visitedOn: '2026-04-13'
+    });
+
+    const unchangedSecondVisit = await updateVisit(testDatabase.database, secondVisit.id, {
+      tripStopOrder: 2
+    });
+    const movedFirstVisit = await updateVisit(testDatabase.database, firstVisit.id, {
+      tripStopOrder: 3
+    });
+    const secondVisitAfterMove = await getVisitById(
+      testDatabase.database,
+      secondVisit.id,
+      async () => ''
+    );
+    const thirdVisitAfterMove = await getVisitById(
+      testDatabase.database,
+      thirdVisit.id,
+      async () => ''
+    );
+
+    expect(unchangedSecondVisit).toMatchObject({
+      tripStopOrder: 2
+    });
+    expect(movedFirstVisit).toMatchObject({
+      tripStopOrder: 3
+    });
+    expect(secondVisitAfterMove).toMatchObject({
+      tripStopOrder: 1
+    });
+    expect(thirdVisitAfterMove).toMatchObject({
+      tripStopOrder: 2
+    });
+
+    await expect(deleteVisit(testDatabase.database, thirdVisit.id)).resolves.toBe(true);
+    await expect(
+      getVisitById(testDatabase.database, firstVisit.id, async () => '')
+    ).resolves.toMatchObject({
+      tripStopOrder: 2
+    });
+  });
+
+  it('rejects stop order changes without an assigned trip', async () => {
+    await expect(
+      createVisit(testDatabase.database, 'akasmannyn-kansallispuisto', {
+        tripStopOrder: 1,
+        visitedOn: '2026-04-13'
+      })
+    ).rejects.toThrow('Trip stop order requires an assigned trip.');
+
+    const visit = await createVisit(testDatabase.database, 'akasmannyn-kansallispuisto', {
+      visitedOn: '2026-04-13'
+    });
+
+    await expect(
+      updateVisit(testDatabase.database, visit.id, {
+        tripStopOrder: 1
+      })
+    ).rejects.toThrow('Trip stop order requires an assigned trip.');
+  });
+
+  it('repairs legacy trip visits that are missing stop order values', async () => {
+    const trip = await createTrip(testDatabase.database, {
+      name: 'Kesäreissu 2026'
+    });
+    const firstVisit = await createVisit(testDatabase.database, 'akasmannyn-kansallispuisto', {
+      tripId: trip.id,
+      visitedOn: '2026-04-13'
+    });
+    const secondVisit = await createVisit(testDatabase.database, 'akasmannyn-kansallispuisto', {
+      tripId: trip.id,
+      visitedOn: '2026-04-13'
+    });
+
+    await testDatabase.database
+      .update(parkVisits)
+      .set({
+        tripStopOrder: null
+      })
+      .where(eq(parkVisits.id, secondVisit.id));
+
+    const repairedVisit = await updateVisit(testDatabase.database, secondVisit.id, {
+      note: 'Recovered stop order'
+    });
+
+    expect(repairedVisit).toMatchObject({
+      note: 'Recovered stop order',
+      tripStopOrder: 2
+    });
+
+    await testDatabase.database
+      .update(parkVisits)
+      .set({
+        tripStopOrder: null
+      })
+      .where(eq(parkVisits.id, firstVisit.id));
+
+    const insertedVisit = await updateVisit(testDatabase.database, firstVisit.id, {
+      tripStopOrder: 1
+    });
+    const secondVisitAfterInsert = await getVisitById(
+      testDatabase.database,
+      secondVisit.id,
+      async () => ''
+    );
+
+    expect(insertedVisit).toMatchObject({
+      tripStopOrder: 1
+    });
+    expect(secondVisitAfterInsert).toMatchObject({
+      tripStopOrder: 3
+    });
+  });
+
+  it('resequences both trips when moving a visit between trips and keeps order on plain updates', async () => {
+    const originTrip = await createTrip(testDatabase.database, {
+      name: 'Kesäreissu 2026'
+    });
+    const destinationTrip = await createTrip(testDatabase.database, {
+      name: 'Syysreissu 2026'
+    });
+    const originFirstVisit = await createVisit(
+      testDatabase.database,
+      'akasmannyn-kansallispuisto',
+      {
+        tripId: originTrip.id,
+        visitedOn: '2026-04-13'
+      }
+    );
+    const originSecondVisit = await createVisit(
+      testDatabase.database,
+      'akasmannyn-kansallispuisto',
+      {
+        tripId: originTrip.id,
+        visitedOn: '2026-04-13'
+      }
+    );
+    const destinationVisit = await createVisit(
+      testDatabase.database,
+      'akasmannyn-kansallispuisto',
+      {
+        tripId: destinationTrip.id,
+        visitedOn: '2026-04-13'
+      }
+    );
+
+    const movedVisit = await updateVisit(testDatabase.database, originFirstVisit.id, {
+      tripId: destinationTrip.id,
+      tripStopOrder: 1
+    });
+    const originSecondVisitAfterMove = await getVisitById(
+      testDatabase.database,
+      originSecondVisit.id,
+      async () => ''
+    );
+    const destinationVisitAfterMove = await getVisitById(
+      testDatabase.database,
+      destinationVisit.id,
+      async () => ''
+    );
+    const unchangedOrderVisit = await updateVisit(testDatabase.database, originFirstVisit.id, {
+      note: 'Still first stop in the new trip'
+    });
+
+    expect(movedVisit).toMatchObject({
+      trip: {
+        id: destinationTrip.id,
+        name: 'Syysreissu 2026'
+      },
+      tripStopOrder: 1
+    });
+    expect(originSecondVisitAfterMove).toMatchObject({
+      tripStopOrder: 1
+    });
+    expect(destinationVisitAfterMove).toMatchObject({
+      tripStopOrder: 2
+    });
+    expect(unchangedOrderVisit).toMatchObject({
+      note: 'Still first stop in the new trip',
+      tripStopOrder: 1
+    });
+  });
+
+  it('inserts a created visit into the requested trip stop order', async () => {
+    const trip = await createTrip(testDatabase.database, {
+      name: 'Kesäreissu 2026'
+    });
+    const firstVisit = await createVisit(testDatabase.database, 'akasmannyn-kansallispuisto', {
+      tripId: trip.id,
+      visitedOn: '2026-04-13'
+    });
+
+    const insertedVisit = await createVisit(testDatabase.database, 'akasmannyn-kansallispuisto', {
+      tripId: trip.id,
+      tripStopOrder: 1,
+      visitedOn: '2026-04-13'
+    });
+    const firstVisitAfterInsert = await getVisitById(
+      testDatabase.database,
+      firstVisit.id,
+      async () => ''
+    );
+
+    expect(insertedVisit).toMatchObject({
+      tripStopOrder: 1
+    });
+    expect(firstVisitAfterInsert).toMatchObject({
+      tripStopOrder: 2
+    });
+  });
+
   it('returns an empty catalog etag seed when no active parks remain', async () => {
     await importParks({
       database: testDatabase.database,
@@ -629,6 +899,41 @@ describe('repositories', () => {
       route: null,
       visitedOn: '2026-03-20'
     });
+  });
+
+  it('falls back to descending ids when same-day visits share the same created timestamp', async () => {
+    const trip = await createTrip(testDatabase.database, {
+      name: 'Kesareissu 2026'
+    });
+    const firstVisit = await createVisit(testDatabase.database, 'akasmannyn-kansallispuisto', {
+      note: 'First visit',
+      tripId: trip.id,
+      visitedOn: '2026-04-13'
+    });
+    const secondVisit = await createVisit(testDatabase.database, 'akasmannyn-kansallispuisto', {
+      note: 'Second visit',
+      tripId: trip.id,
+      visitedOn: '2026-04-13'
+    });
+    const sharedTimestamp = '2026-05-01T10:00:00.000Z';
+
+    await testDatabase.database
+      .update(parkVisits)
+      .set({
+        createdAt: sharedTimestamp
+      })
+      .where(eq(parkVisits.id, firstVisit.id));
+    await testDatabase.database
+      .update(parkVisits)
+      .set({
+        createdAt: sharedTimestamp,
+        tripStopOrder: 1
+      })
+      .where(eq(parkVisits.id, secondVisit.id));
+
+    const visits = await listVisits(testDatabase.database, async () => '');
+
+    expect(visits.slice(0, 2).map((visit) => visit.id)).toEqual([secondVisit.id, firstVisit.id]);
   });
 
   it('includes empty images array for visits without images', async () => {

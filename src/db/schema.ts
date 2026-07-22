@@ -106,6 +106,7 @@ export const parkVisits = sqliteTable(
       .notNull()
       .references(() => parks.id),
     tripId: integer('trip_id').references(() => trips.id, { onDelete: 'set null' }),
+    tripStopOrder: integer('trip_stop_order'),
     visitedOn: text('visited_on').notNull(),
     note: text('note'),
     route: text('route'),
@@ -116,6 +117,10 @@ export const parkVisits = sqliteTable(
   (table) => ({
     parkIdIndex: index('park_visits_park_id_idx').on(table.parkId),
     tripIdIndex: index('park_visits_trip_id_idx').on(table.tripId),
+    tripStopOrderIndex: index('park_visits_trip_stop_order_idx').on(
+      table.tripId,
+      table.tripStopOrder
+    ),
     visitedOnIndex: index('park_visits_visited_on_idx').on(table.visitedOn)
   })
 );

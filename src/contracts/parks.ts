@@ -174,6 +174,7 @@ export const visitSchema = z.object({
   note: z.string().nullable(),
   route: z.string().nullable(),
   trip: visitTripSchema.nullable(),
+  tripStopOrder: z.number().int().positive().nullable(),
   updatedAt: z.string(),
   visitedOn: visitDateSchema
 });
@@ -280,6 +281,7 @@ export const visitTimelineEntrySchema = z.object({
   park: visitTimelineParkSchema,
   route: z.string().nullable(),
   trip: visitTripSchema.nullable(),
+  tripStopOrder: z.number().int().positive().nullable(),
   visitedOn: visitDateSchema
 });
 
@@ -313,6 +315,7 @@ export const createVisitRequestSchema = z.object({
   note: z.string().max(5000).nullable().optional(),
   route: z.string().max(80).nullable().optional(),
   tripId: z.number().int().nullable().optional(),
+  tripStopOrder: z.number().int().positive().optional(),
   visitedOn: visitDateSchema
 });
 
@@ -361,6 +364,7 @@ export const updateVisitRequestSchema = createVisitRequestSchema
       input.note !== undefined ||
       input.route !== undefined ||
       input.tripId !== undefined ||
+      input.tripStopOrder !== undefined ||
       input.visitedOn !== undefined,
     {
       message: 'Provide at least one field to update.'

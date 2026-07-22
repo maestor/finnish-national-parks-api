@@ -395,6 +395,14 @@ export const createVisitRoute = createRoute({
         }
       }
     },
+    422: {
+      description: 'Visit payload is invalid for the requested trip ordering',
+      content: {
+        'application/json': {
+          schema: errorSchema
+        }
+      }
+    },
     503: {
       description: 'OAuth not configured',
       content: {
@@ -490,6 +498,14 @@ export const updateVisitRoute = createRoute({
     },
     404: {
       description: 'Visit was not found',
+      content: {
+        'application/json': {
+          schema: errorSchema
+        }
+      }
+    },
+    422: {
+      description: 'Visit payload is invalid for the requested trip ordering',
       content: {
         'application/json': {
           schema: errorSchema

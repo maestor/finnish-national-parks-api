@@ -20,6 +20,9 @@ describe('contracts and cache helpers', () => {
     expect(updateVisitRequestSchema.parse({ note: 'Updated note' })).toEqual({
       note: 'Updated note'
     });
+    expect(updateVisitRequestSchema.parse({ tripStopOrder: 2 })).toEqual({
+      tripStopOrder: 2
+    });
     expect(updateVisitRequestSchema.parse({ tripId: null })).toEqual({
       tripId: null
     });

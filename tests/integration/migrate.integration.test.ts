@@ -53,7 +53,8 @@ describe('migrateDatabase', () => {
       '0013_park_imported_editable_fields.sql',
       '0014_cultural_history_area_type.sql',
       '0015_rename_park_urls.sql',
-      '0016_trips.sql'
+      '0016_trips.sql',
+      '0017_trip_stop_order.sql'
     ]);
     expect(parkTypes.rows.map((row) => String(row.slug))).toEqual([
       'outdoor-recreation-area',
@@ -87,6 +88,7 @@ describe('migrateDatabase', () => {
     expect(tripColumns.rows.some((row) => String(row.name) === 'name')).toBe(true);
     expect(tripColumns.rows.some((row) => String(row.name) === 'description')).toBe(true);
     expect(tripVisitColumns.rows.some((row) => String(row.name) === 'trip_id')).toBe(true);
+    expect(tripVisitColumns.rows.some((row) => String(row.name) === 'trip_stop_order')).toBe(true);
     expect(publicDataVersionColumns.rows.some((row) => String(row.name) === 'version')).toBe(true);
   });
 
@@ -119,7 +121,8 @@ describe('migrateDatabase', () => {
       '0013_park_imported_editable_fields.sql',
       '0014_cultural_history_area_type.sql',
       '0015_rename_park_urls.sql',
-      '0016_trips.sql'
+      '0016_trips.sql',
+      '0017_trip_stop_order.sql'
     ]);
     expect(schemaMigrationTableBeforeApply.rows).toEqual([]);
     expect(pendingAfterApply).toEqual([]);
