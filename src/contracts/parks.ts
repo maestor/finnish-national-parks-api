@@ -19,6 +19,8 @@ export const pointSchema = z.object({
   lon: z.number()
 });
 
+export const visitDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+
 export const geoJsonCoordinateSchema = z.tuple([z.number(), z.number()]).rest(z.number());
 
 export const boundingBoxSchema = z.object({
@@ -117,6 +119,26 @@ export const visitImageSchema = z.object({
   createdAt: z.string()
 });
 
+export const visitTripSchema = z.object({
+  id: z.number().int(),
+  name: z.string()
+});
+
+export const tripDateRangeSchema = z.object({
+  end: visitDateSchema,
+  start: visitDateSchema
+});
+
+export const tripSchema = z.object({
+  createdAt: z.string().datetime(),
+  dateRange: tripDateRangeSchema.nullable(),
+  description: z.string().nullable(),
+  id: z.number().int(),
+  name: z.string(),
+  updatedAt: z.string().datetime(),
+  visitCount: z.number().int()
+});
+
 export const directVisitImageUploadRequestSchema = z.object({
   contentType: z.enum(['image/jpeg', 'image/png', 'image/webp']),
   fileSizeBytes: z.number().int().positive(),
@@ -151,8 +173,9 @@ export const visitSchema = z.object({
   images: z.array(visitImageSchema),
   note: z.string().nullable(),
   route: z.string().nullable(),
+  trip: visitTripSchema.nullable(),
   updatedAt: z.string(),
-  visitedOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/)
+  visitedOn: visitDateSchema
 });
 
 export const visitedSummarySchema = z.object({
@@ -217,7 +240,7 @@ export const publicVisitEntrySchema = z.object({
   id: z.number().int(),
   park: visitParkSchema,
   updatedAt: z.string().datetime(),
-  visitedOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/)
+  visitedOn: visitDateSchema
 });
 
 export const seasonalVisitCountsSchema = z.object({
@@ -256,11 +279,16 @@ export const visitTimelineEntrySchema = z.object({
   imageCount: z.number().int(),
   park: visitTimelineParkSchema,
   route: z.string().nullable(),
-  visitedOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/)
+  trip: visitTripSchema.nullable(),
+  visitedOn: visitDateSchema
 });
 
 export const visitTimelineResponseSchema = z.object({
   visits: z.array(visitTimelineEntrySchema)
+});
+
+export const tripListResponseSchema = z.object({
+  trips: z.array(tripSchema)
 });
 
 export const parkListResponseSchema = z.object({
@@ -284,7 +312,13 @@ export const createVisitRequestSchema = z.object({
   author: z.string().max(50).nullable().optional(),
   note: z.string().max(5000).nullable().optional(),
   route: z.string().max(80).nullable().optional(),
-  visitedOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/)
+  tripId: z.number().int().nullable().optional(),
+  visitedOn: visitDateSchema
+});
+
+export const createTripRequestSchema = z.object({
+  description: z.string().max(5000).nullable().optional(),
+  name: z.string().trim().min(1).max(120)
 });
 
 export const updateParkRemovedRequestSchema = z.object({
@@ -326,11 +360,18 @@ export const updateVisitRequestSchema = createVisitRequestSchema
       input.author !== undefined ||
       input.note !== undefined ||
       input.route !== undefined ||
+      input.tripId !== undefined ||
       input.visitedOn !== undefined,
     {
       message: 'Provide at least one field to update.'
     }
   );
+
+export const updateTripRequestSchema = createTripRequestSchema
+  .partial()
+  .refine((input) => input.description !== undefined || input.name !== undefined, {
+    message: 'Provide at least one field to update.'
+  });
 
 export const reorderVisitImagesRequestSchema = z.object({
   imageIds: z.array(z.number().int()).min(1)

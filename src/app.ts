@@ -5,8 +5,10 @@ import { cors } from 'hono/cors';
 
 import type { Database } from './db/database.js';
 import {
+  createTrip,
   createVisit,
   createVisitImage,
+  deleteTrip,
   deleteVisit,
   deleteVisitImage,
   findAdminByEmail,
@@ -24,11 +26,14 @@ import {
   listAdminParkVisibility,
   listParkSearchEntries,
   listParks,
+  listTrips,
   listVisits,
   listVisitsTimeline,
+  RepositoryNotFoundError,
   reorderVisitImages,
   updateParkDetails,
   updateParkRemoved,
+  updateTrip,
   updateVisit
 } from './db/repositories.js';
 import { createAuthMiddleware } from './http/auth.js';
@@ -97,6 +102,12 @@ import {
   searchTripPlannerRoute,
   suggestTripPlannerRoute
 } from './routes/trip-planner.js';
+import {
+  createTripRoute,
+  deleteTripRoute,
+  listTripsRoute,
+  updateTripRoute
+} from './routes/trips.js';
 import type { StorageClient } from './storage/types.js';
 import { TripPlannerError } from './trip-planner/search.js';
 import type { TripPlannerService } from './trip-planner/types.js';
@@ -682,6 +693,33 @@ export const createApp = ({
       return context.json({ visits }, 200);
     });
 
+    app.openapi(listTripsRoute, async (context) => {
+      const [catalogSeed, version, trips] = await Promise.all([
+        getCatalogListEtagSeed(database),
+        getPublicVisitDataVersion(database),
+        listTrips(database)
+      ]);
+      const etag = createPublicSummaryEtag({
+        activeCount: catalogSeed.activeCount,
+        kind: 'trips',
+        latestCatalogImportRunId: catalogSeed.latestImportRunId,
+        latestCatalogUpdatedAt: catalogSeed.latestUpdatedAt,
+        publicUpdatedAt: version.updatedAt,
+        publicVersion: version.version
+      });
+      context.header('Cache-Control', PUBLIC_SUMMARY_CACHE_CONTROL);
+      context.header('ETag', etag);
+
+      if (hasMatchingEtag(context.req.header('if-none-match'), etag)) {
+        return new Response(null, {
+          headers: context.res.headers,
+          status: 304
+        });
+      }
+
+      return context.json({ trips }, 200);
+    });
+
     app.openapi(suggestTripPlannerRoute, async (context) => {
       context.header('Cache-Control', PRIVATE_CACHE_CONTROL);
 
@@ -825,8 +863,26 @@ export const createApp = ({
         const visit = await createVisit(database, slug, body);
         return context.json(visit, 201);
       } catch (error) {
-        return context.json(jsonNotFound((error as Error).message), 404);
+        if (error instanceof RepositoryNotFoundError) {
+          return context.json(jsonNotFound(error.message), 404);
+        }
+
+        throw error;
       }
+    });
+
+    app.openapi(createTripRoute, async (context) => {
+      context.header('Cache-Control', PRIVATE_CACHE_CONTROL);
+      const authFailure = await requireAdminSession(context, auth);
+
+      if (authFailure) {
+        return authFailure;
+      }
+
+      const body = context.req.valid('json');
+      const trip = await createTrip(database, body);
+
+      return context.json(trip, 201);
     });
 
     app.openapi(updateParkRemovedRoute, async (context) => {
@@ -861,13 +917,63 @@ export const createApp = ({
 
       const { id } = context.req.valid('param');
       const body = context.req.valid('json');
-      const visit = await updateVisit(database, id, body);
+      let visit: Awaited<ReturnType<typeof updateVisit>> = null;
+
+      try {
+        visit = await updateVisit(database, id, body);
+      } catch (error) {
+        if (error instanceof RepositoryNotFoundError) {
+          return context.json(jsonNotFound(error.message), 404);
+        }
+
+        throw error;
+      }
 
       if (!visit) {
         return context.json(jsonNotFound('Visit not found.'), 404);
       }
 
       return context.json(visit, 200);
+    });
+
+    app.openapi(updateTripRoute, async (context) => {
+      context.header('Cache-Control', PRIVATE_CACHE_CONTROL);
+      const authFailure = await requireAdminSession(context, auth);
+
+      if (authFailure) {
+        return authFailure;
+      }
+
+      const { id } = context.req.valid('param');
+      const body = context.req.valid('json');
+      const trip = await updateTrip(database, id, body);
+
+      if (!trip) {
+        return context.json(jsonNotFound('Trip not found.'), 404);
+      }
+
+      return context.json(trip, 200);
+    });
+
+    app.openapi(deleteTripRoute, async (context) => {
+      context.header('Cache-Control', PRIVATE_CACHE_CONTROL);
+      const authFailure = await requireAdminSession(context, auth);
+
+      if (authFailure) {
+        return authFailure;
+      }
+
+      const { id } = context.req.valid('param');
+      const deleted = await deleteTrip(database, id);
+
+      if (!deleted) {
+        return context.json(jsonNotFound('Trip not found.'), 404);
+      }
+
+      return new Response(null, {
+        headers: context.res.headers,
+        status: 204
+      });
     });
 
     app.openapi(deleteVisitRoute, async (context) => {

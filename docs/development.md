@@ -248,20 +248,23 @@ Key route behavior:
 - Park responses expose raw `locationLabel`, `postalCode`, and `postalOffice` fields from the database, plus a derived `address` string for display use.
 - `GET /api/home-summary` returns home-page summary data including seasonal visit counts, `progressByType` with a `visible` flag, and `progressByCategory`, without visit notes, routes, or images.
 - `GET /api/map-summary` returns lightweight park map data plus per-park visited summaries.
-- `GET /api/visits-timeline` returns the lightweight visits timeline dataset for the public `/kaynnit` screen, including `imageCount` and a resolved park `typeLabel`.
+- `GET /api/trips` returns named trips with derived `dateRange`, `visitCount`, and the same shared-cache behavior as the other public summary datasets.
+- `GET /api/visits-timeline` returns the lightweight visits timeline dataset for the public `/kaynnit` screen, including `imageCount`, `trip: { id, name } | null`, and a resolved park `typeLabel`.
 - `POST /api/trip-planner/suggestions` returns up to three Geoapify-backed place suggestions with labels and coordinates for origin/destination selection.
 - `POST /api/trip-planner/search` geocodes origin and destination, fetches a real Geoapify driving route, filters visible parks by a configurable corridor distance, and returns list-ready results with visited summaries plus a map-ready route `LineString`, backend-provided route and park bounding boxes, and top-level `maxDistanceKm` / `defaultDistanceKm` filter metadata. On longer trips, the first 30 km from the origin uses a stricter start-zone filter so dense departure areas do not flood the list.
 - `POST /api/trip-planner/nearby` geocodes only the origin, filters visible parks by straight-line proximity to that point, and returns list-ready results with visited summaries plus a backend-provided `searchArea` bounding box and top-level `maxDistanceKm` / `defaultDistanceKm` filter metadata for map rendering without route geometry.
 - `GET /api/parks/:slug/visits` returns visit history plus a visited summary for one visible park.
-- `GET /api/visits` returns flat visit resources with their parent park reference.
-- `GET /api/visits/:id` returns one visit with its parent park reference.
-- Catalog, home summary, map summary, and visits timeline routes emit deterministic `ETag` headers and support `304 Not Modified`.
-- Home summary, map summary, and visits timeline routes use shared-cache headers and expose a visit-data `version` / `updatedAt` signal that changes on visit create/update/delete and visit image upload/delete/reorder.
+- `GET /api/visits` returns flat visit resources with their parent park reference and `trip: { id, name } | null`.
+- `GET /api/visits/:id` returns one visit with its parent park reference and `trip: { id, name } | null`.
+- Catalog, home summary, map summary, trip list, and visits timeline routes emit deterministic `ETag` headers and support `304 Not Modified`.
+- Home summary, map summary, trip list, and visits timeline routes use shared-cache headers and expose a visit-data `version` / `updatedAt` signal that changes on trip create/update/delete, visit create/update/delete, and visit image upload/delete/reorder.
 - Visit and management routes use `private, no-store`.
 - Trip planner suggestion, route-search, and nearby-origin routes all use `private, no-store` and keep the provider key server-side.
 - All write routes and `GET /api/admin/parks/visibility` require a valid admin session cookie.
 - `PATCH /api/parks/:slug` updates the admin-editable park fields and auto-generates a slug from `name` when no explicit `slug` is provided.
 - `PATCH /api/parks/:slug/removed` toggles whether a park is hidden from catalog and visit responses.
+- `POST /api/trips`, `PATCH /api/trips/:id`, and `DELETE /api/trips/:id` are admin-session write routes for named trips.
+- `POST /api/parks/:slug/visits` and `PATCH /api/visits/:id` accept `tripId`, with `null` clearing an existing trip assignment.
 - Auth routes (`/auth/*`) bypass API key authentication so the OAuth flow can complete without a bearer token.
 - `GET /health` and `GET /openapi.json` are the only anonymous data endpoints.
 - `/auth/*` routes are anonymous control-flow endpoints for login, not anonymous data endpoints.

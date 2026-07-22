@@ -30,6 +30,8 @@ describe('migrateDatabase', () => {
     const migrations = await client.execute('SELECT name FROM schema_migrations ORDER BY name');
     const parkTypes = await client.execute('SELECT slug FROM park_types ORDER BY id');
     const parkColumns = await client.execute('PRAGMA table_info(parks)');
+    const tripColumns = await client.execute('PRAGMA table_info(trips)');
+    const tripVisitColumns = await client.execute('PRAGMA table_info(park_visits)');
     const publicDataVersionColumns = await client.execute(
       'PRAGMA table_info(public_data_versions)'
     );
@@ -50,7 +52,8 @@ describe('migrateDatabase', () => {
       '0012_supported_catalog_types.sql',
       '0013_park_imported_editable_fields.sql',
       '0014_cultural_history_area_type.sql',
-      '0015_rename_park_urls.sql'
+      '0015_rename_park_urls.sql',
+      '0016_trips.sql'
     ]);
     expect(parkTypes.rows.map((row) => String(row.slug))).toEqual([
       'outdoor-recreation-area',
@@ -81,6 +84,9 @@ describe('migrateDatabase', () => {
     expect(parkColumns.rows.some((row) => String(row.name) === 'imported_display_type_name')).toBe(
       true
     );
+    expect(tripColumns.rows.some((row) => String(row.name) === 'name')).toBe(true);
+    expect(tripColumns.rows.some((row) => String(row.name) === 'description')).toBe(true);
+    expect(tripVisitColumns.rows.some((row) => String(row.name) === 'trip_id')).toBe(true);
     expect(publicDataVersionColumns.rows.some((row) => String(row.name) === 'version')).toBe(true);
   });
 

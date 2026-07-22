@@ -19,6 +19,7 @@ import {
   parkTypes,
   parkVisits,
   publicDataVersions,
+  trips,
   visitImages
 } from './schema.js';
 
@@ -26,6 +27,7 @@ type PutVisitInput = {
   author?: string | null | undefined;
   note?: string | null | undefined;
   route?: string | null | undefined;
+  tripId?: number | null | undefined;
   visitedOn: string;
 };
 
@@ -33,7 +35,18 @@ type UpdateVisitInput = {
   author?: string | null | undefined;
   note?: string | null | undefined;
   route?: string | null | undefined;
+  tripId?: number | null | undefined;
   visitedOn?: string | undefined;
+};
+
+type PutTripInput = {
+  description?: string | null | undefined;
+  name: string;
+};
+
+type UpdateTripInput = {
+  description?: string | null | undefined;
+  name?: string | undefined;
 };
 
 type UpdateParkDetailsInput = {
@@ -91,9 +104,25 @@ type TypedParkRow = {
   parkType: typeof parkTypes.$inferSelect;
 };
 
+type TripReference = {
+  id: number;
+  name: string;
+};
+
 type VisitRowWithPark = {
   park: typeof parks.$inferSelect;
   visit: typeof parkVisits.$inferSelect;
+};
+
+type TripRow = {
+  createdAt: string;
+  description: string | null;
+  endVisitedOn: string | null;
+  id: number;
+  name: string;
+  startVisitedOn: string | null;
+  updatedAt: string;
+  visitCount: number;
 };
 
 type PublicParkRow = {
@@ -181,6 +210,8 @@ type VisitTimelineRow = {
   parkName: string;
   parkSlug: string;
   route: string | null;
+  tripId: number | null;
+  tripName: string | null;
   typeName: string;
   visitedOn: string;
 };
@@ -205,6 +236,8 @@ type UpsertCatalogParkInput = Omit<
 >;
 
 const PUBLIC_VISIT_DATA_VERSION_KEY = 'public-visits';
+
+export class RepositoryNotFoundError extends Error {}
 
 const normalizeOptionalText = (value?: string | null) => value?.trim() || null;
 
@@ -517,7 +550,36 @@ const toVisitImage = async (
   createdAt: row.createdAt
 });
 
-const toVisit = (row: typeof parkVisits.$inferSelect, images: VisitImage[] = []) => {
+const toTripReference = (row: typeof trips.$inferSelect): TripReference => {
+  return {
+    id: row.id,
+    name: row.name
+  };
+};
+
+const toTrip = (row: TripRow) => {
+  return {
+    createdAt: row.createdAt,
+    dateRange:
+      row.startVisitedOn && row.endVisitedOn
+        ? {
+            end: row.endVisitedOn,
+            start: row.startVisitedOn
+          }
+        : null,
+    description: row.description,
+    id: row.id,
+    name: row.name,
+    updatedAt: row.updatedAt,
+    visitCount: row.visitCount
+  };
+};
+
+const toVisit = (
+  row: typeof parkVisits.$inferSelect,
+  images: VisitImage[] = [],
+  trip: TripReference | null = null
+) => {
   return {
     author: row.author,
     createdAt: row.createdAt,
@@ -525,6 +587,7 @@ const toVisit = (row: typeof parkVisits.$inferSelect, images: VisitImage[] = [])
     images,
     note: row.note,
     route: row.route,
+    trip,
     updatedAt: row.updatedAt,
     visitedOn: row.visitedOn
   };
@@ -534,6 +597,30 @@ const getParkRecordBySlug = async (database: Database, slug: string) => {
   return database.query.parks.findFirst({
     where: visibleParkBySlugWhere(slug)
   });
+};
+
+const getTripRecordById = async (database: Database, tripId: number) => {
+  return database.query.trips.findFirst({
+    where: eq(trips.id, tripId)
+  });
+};
+
+const resolveTripId = async (database: Database, tripId?: number | null) => {
+  if (tripId === undefined) {
+    return undefined;
+  }
+
+  if (tripId === null) {
+    return null;
+  }
+
+  const trip = await getTripRecordById(database, tripId);
+
+  if (!trip) {
+    throw new RepositoryNotFoundError('Trip not found.');
+  }
+
+  return trip.id;
 };
 
 export const findParkRecordBySlugIncludingRemoved = async (database: Database, slug: string) => {
@@ -731,6 +818,27 @@ const buildVisitImagesByVisitId = async (
   return visitImagesByVisitId;
 };
 
+const buildVisitTripsByTripId = async (
+  database: Database,
+  visitRows: (typeof parkVisits.$inferSelect)[]
+) => {
+  const tripIds = [
+    ...new Set(
+      visitRows.map((visit) => visit.tripId).filter((tripId): tripId is number => tripId !== null)
+    )
+  ];
+
+  if (tripIds.length === 0) {
+    return new Map<number, TripReference>();
+  }
+
+  const tripRows = await database.query.trips.findMany({
+    where: inArray(trips.id, tripIds)
+  });
+
+  return new Map(tripRows.map((trip) => [trip.id, toTripReference(trip)]));
+};
+
 const buildVisits = async (
   database: Database,
   visitRows: (typeof parkVisits.$inferSelect)[],
@@ -742,8 +850,15 @@ const buildVisits = async (
     visitIds,
     getImagePublicUrl
   );
+  const visitTripsByTripId = await buildVisitTripsByTripId(database, visitRows);
 
-  return visitRows.map((visit) => toVisit(visit, visitImagesByVisitId.get(visit.id)!));
+  return visitRows.map((visit) =>
+    toVisit(
+      visit,
+      visitImagesByVisitId.get(visit.id)!,
+      visit.tripId === null ? null : visitTripsByTripId.get(visit.tripId)!
+    )
+  );
 };
 
 const toVisitedSummary = (visits: Array<{ visitedOn: string }>) => {
@@ -811,6 +926,29 @@ const listPublicVisitRows = async (database: Database) => {
     .orderBy(desc(parkVisits.createdAt), desc(parkVisits.id));
 };
 
+const listTripRows = async (database: Database): Promise<TripRow[]> => {
+  return database
+    .select({
+      createdAt: trips.createdAt,
+      description: trips.description,
+      endVisitedOn: sql<
+        string | null
+      >`MAX(CASE WHEN ${parks.removed} = 0 THEN ${parkVisits.visitedOn} END)`,
+      id: trips.id,
+      name: trips.name,
+      startVisitedOn: sql<
+        string | null
+      >`MIN(CASE WHEN ${parks.removed} = 0 THEN ${parkVisits.visitedOn} END)`,
+      updatedAt: trips.updatedAt,
+      visitCount: sql<number>`COUNT(CASE WHEN ${parks.removed} = 0 THEN ${parkVisits.id} END)`
+    })
+    .from(trips)
+    .leftJoin(parkVisits, eq(parkVisits.tripId, trips.id))
+    .leftJoin(parks, eq(parkVisits.parkId, parks.id))
+    .groupBy(trips.id, trips.createdAt, trips.description, trips.name, trips.updatedAt)
+    .orderBy(asc(trips.name), asc(trips.id));
+};
+
 const listVisitTimelineRows = async (database: Database): Promise<VisitTimelineRow[]> => {
   return database
     .select({
@@ -821,22 +959,28 @@ const listVisitTimelineRows = async (database: Database): Promise<VisitTimelineR
       parkName: parks.name,
       parkSlug: parks.slug,
       route: parkVisits.route,
+      tripId: trips.id,
+      tripName: trips.name,
       typeName: parkTypes.name,
       visitedOn: parkVisits.visitedOn
     })
     .from(parkVisits)
     .innerJoin(parks, eq(parkVisits.parkId, parks.id))
     .innerJoin(parkTypes, eq(parks.typeId, parkTypes.id))
+    .leftJoin(trips, eq(parkVisits.tripId, trips.id))
     .leftJoin(visitImages, eq(visitImages.visitId, parkVisits.id))
     .where(visibleCatalogWhere())
     .groupBy(
       parkVisits.id,
       parkVisits.createdAt,
       parkVisits.route,
+      parkVisits.tripId,
       parkVisits.visitedOn,
       parks.displayTypeName,
       parks.name,
       parks.slug,
+      trips.id,
+      trips.name,
       parkTypes.name
     )
     .orderBy(desc(parkVisits.visitedOn), desc(parkVisits.createdAt), desc(parkVisits.id));
@@ -1062,6 +1206,11 @@ export const listVisits = async (
   return Promise.all(rows.map((row) => buildVisitWithPark(database, row, getImagePublicUrl)));
 };
 
+export const listTrips = async (database: Database) => {
+  const rows = await listTripRows(database);
+  return rows.map((row) => toTrip(row));
+};
+
 export const getVisitById = async (
   database: Database,
   visitId: number,
@@ -1273,6 +1422,13 @@ export const listVisitsTimeline = async (database: Database) => {
       typeLabel: resolveTypeLabel(visit)
     },
     route: visit.route,
+    trip:
+      visit.tripId === null || !visit.tripName
+        ? null
+        : {
+            id: visit.tripId,
+            name: visit.tripName
+          },
     visitedOn: visit.visitedOn
   }));
 };
@@ -1295,12 +1451,42 @@ export const listTripPlannerCandidateParks = async (database: Database) => {
   );
 };
 
+export const createTrip = async (database: Database, input: PutTripInput) => {
+  const timestamp = new Date().toISOString();
+  const row = (
+    await database
+      .insert(trips)
+      .values({
+        createdAt: timestamp,
+        description: normalizeOptionalText(input.description),
+        name: normalizeRequiredText(input.name, 'Trip name'),
+        updatedAt: timestamp
+      })
+      .returning()
+  )[0]!;
+
+  await bumpPublicVisitDataVersion(database, timestamp);
+
+  return toTrip({
+    createdAt: row.createdAt,
+    description: row.description,
+    endVisitedOn: null,
+    id: row.id,
+    name: row.name,
+    startVisitedOn: null,
+    updatedAt: row.updatedAt,
+    visitCount: 0
+  });
+};
+
 export const createVisit = async (database: Database, slug: string, input: PutVisitInput) => {
   const park = await getParkRecordBySlug(database, slug);
 
   if (!park) {
-    throw new Error(`Park not found for slug "${slug}".`);
+    throw new RepositoryNotFoundError(`Park not found for slug "${slug}".`);
   }
+
+  const tripId = await resolveTripId(database, input.tripId);
 
   const timestamp = new Date().toISOString();
   const row = (
@@ -1312,6 +1498,7 @@ export const createVisit = async (database: Database, slug: string, input: PutVi
         note: input.note?.trim() || null,
         parkId: park.id,
         route: input.route?.trim() || null,
+        tripId: tripId ?? null,
         updatedAt: timestamp,
         visitedOn: input.visitedOn
       })
@@ -1320,7 +1507,10 @@ export const createVisit = async (database: Database, slug: string, input: PutVi
 
   await bumpPublicVisitDataVersion(database, timestamp);
 
-  return toVisit(row);
+  const trip =
+    row.tripId === null ? null : toTripReference((await getTripRecordById(database, row.tripId))!);
+
+  return toVisit(row, [], trip);
 };
 
 export const reassignParkVisits = async (
@@ -1557,6 +1747,37 @@ export const updateParkMap = async (
   };
 };
 
+export const updateTrip = async (database: Database, tripId: number, input: UpdateTripInput) => {
+  const existingTrip = await getTripRecordById(database, tripId);
+
+  if (!existingTrip) {
+    return null;
+  }
+
+  const timestamp = new Date().toISOString();
+
+  await database
+    .update(trips)
+    .set({
+      description:
+        input.description === undefined
+          ? existingTrip.description
+          : normalizeOptionalText(input.description),
+      name:
+        input.name === undefined
+          ? existingTrip.name
+          : normalizeRequiredText(input.name, 'Trip name'),
+      updatedAt: timestamp
+    })
+    .where(eq(trips.id, tripId));
+
+  await bumpPublicVisitDataVersion(database, timestamp);
+
+  const row = (await listTripRows(database)).find((trip) => trip.id === tripId)!;
+
+  return toTrip(row);
+};
+
 export const updateVisit = async (database: Database, visitId: number, input: UpdateVisitInput) => {
   const [existingVisit] = await database
     .select()
@@ -1567,6 +1788,8 @@ export const updateVisit = async (database: Database, visitId: number, input: Up
     return null;
   }
 
+  const nextTripId = await resolveTripId(database, input.tripId);
+
   const timestamp = new Date().toISOString();
 
   await database
@@ -1575,6 +1798,7 @@ export const updateVisit = async (database: Database, visitId: number, input: Up
       author: input.author === undefined ? existingVisit.author : input.author?.trim() || null,
       note: input.note === undefined ? existingVisit.note : input.note?.trim() || null,
       route: input.route === undefined ? existingVisit.route : input.route?.trim() || null,
+      tripId: nextTripId === undefined ? existingVisit.tripId : nextTripId,
       updatedAt: timestamp,
       visitedOn: input.visitedOn ?? existingVisit.visitedOn
     })
@@ -1586,7 +1810,23 @@ export const updateVisit = async (database: Database, visitId: number, input: Up
 
   await bumpPublicVisitDataVersion(database, timestamp);
 
-  return toVisit(updatedVisit);
+  const trip =
+    updatedVisit.tripId === null
+      ? null
+      : toTripReference((await getTripRecordById(database, updatedVisit.tripId))!);
+
+  return toVisit(updatedVisit, [], trip);
+};
+
+export const deleteTrip = async (database: Database, tripId: number) => {
+  const timestamp = new Date().toISOString();
+  const result = await database.delete(trips).where(eq(trips.id, tripId));
+
+  if (Number(result.rowsAffected) > 0) {
+    await bumpPublicVisitDataVersion(database, timestamp);
+  }
+
+  return Number(result.rowsAffected) > 0;
 };
 
 export const deleteVisit = async (database: Database, visitId: number) => {
