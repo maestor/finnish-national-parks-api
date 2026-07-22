@@ -81,7 +81,10 @@ Production notes:
 - If `/auth/*` is exposed through a frontend proxy or rewrite, set `GOOGLE_REDIRECT_URI=https://your-frontend-domain/auth/google/callback`, register that exact URI in Google Cloud, and start the login flow through that same public domain so the OAuth cookies stay on the right host.
 - `GEOAPIFY_API_KEY` enables `POST /api/trip-planner/suggestions`, `POST /api/trip-planner/search`, and `POST /api/trip-planner/nearby`. Keep it server-side only; the UI should call the backend through its existing server proxy layer.
 - `MEMORY_STORAGE=true` is for tests and local-only development, not Vercel.
+- Production merges to `main` should run the GitHub Actions `Production Migration` workflow against Turso before Vercel promotes the new production build.
+- Store production `DATABASE_URL` and `DATABASE_AUTH_TOKEN` in the GitHub `production` environment for that workflow, and configure Vercel Deployment Checks to require the GitHub check named `Migrate production database`.
 - `npm run db:backup` reads the current remote `DATABASE_URL` and `DATABASE_AUTH_TOKEN`, then writes a timestamped SQLite backup under `data/backups/`. You can append an optional label with `npm run db:backup -- before-import`.
+- `npm run db:migrate` remains available as the manual fallback or recovery path if the production workflow is unavailable.
 - `npm run park:move-visits -- --from <source-slug> --to <target-slug> [--dry-run]` reassigns all visits for one park slug to another. Visit images stay attached automatically because they belong to the visit rows.
 - `npm run park:logo -- <park-slug>` uploads either `data/logos/<park-slug>.png` or, when multiple parks share one `displayTypeName`, `data/logos/display-types/<normalized-display-type>.png`. Shared display-type logos are stored once under `logos/display-types/` in R2 and linked from every matching park row. Park APIs currently expose presigned logo URLs instead of a configurable public base URL.
 

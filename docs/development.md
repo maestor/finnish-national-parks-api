@@ -283,41 +283,48 @@ This is intentionally a narrow contract: `src/index.ts` is the one place that sh
 ### Vercel Deployment Checklist
 
 1. Create a Turso database for the deployed environment and copy its `libsql://...` URL plus auth token.
-2. In Vercel, create a new project from this repository.
-3. Keep the framework/build settings on auto-detect unless you have a repo-specific reason to override them.
-4. Set at least these environment variables in Vercel:
+2. In GitHub, create a `production` environment for this repository.
+3. Store these GitHub environment secrets for the `Production Migration` workflow:
+   - `DATABASE_URL`
+   - `DATABASE_AUTH_TOKEN`
+4. In Vercel, create a new project from this repository.
+5. Keep the framework/build settings on auto-detect unless you have a repo-specific reason to override them.
+6. Set at least these environment variables in Vercel:
    - `API_KEY`
    - `DATABASE_URL`
    - `DATABASE_AUTH_TOKEN`
-5. If you will use Google OAuth for a frontend control panel, also set:
+7. If you will use Google OAuth for a frontend control panel, also set:
    - `GOOGLE_CLIENT_ID`
    - `GOOGLE_CLIENT_SECRET`
    - `GOOGLE_REDIRECT_URI` only when `/auth/*` is served through a frontend proxy or rewrite
    - `AUTH_JWT_SECRET`
    - `AUTH_COOKIE_NAME`
    - `FRONTEND_URL`
-6. If you will use visit image uploads or park logo uploads, also set the R2 variables:
+8. If you will use visit image uploads or park logo uploads, also set the R2 variables:
    - `R2_BUCKET_NAME`
    - `R2_ENDPOINT`
    - `R2_ACCESS_KEY_ID`
    - `R2_SECRET_ACCESS_KEY`
-7. Frontends deployed against Vercel should call the direct upload endpoints instead of posting image bytes to `POST /api/visits/:id/images`.
-8. Add the deployed Google OAuth callback URL to Google OAuth credentials if auth is enabled:
+9. Frontends deployed against Vercel should call the direct upload endpoints instead of posting image bytes to `POST /api/visits/:id/images`.
+10. Add the deployed Google OAuth callback URL to Google OAuth credentials if auth is enabled:
    - Direct API callback: `https://<your-api-domain>/auth/google/callback`
    - Frontend proxy/rewrite callback: `https://<your-frontend-domain>/auth/google/callback`
    - If you use `GOOGLE_REDIRECT_URI`, it must exactly match the URI registered in Google Cloud.
-9. Start the login flow through the same public domain that owns the callback URI so the OAuth state/session cookies stay on the correct host.
-10. Run database migrations against the production Turso database before relying on the deployment.
-11. Import catalog data into the production database after migrations.
-12. Verify `GET /health`, `GET /openapi.json`, and one real catalog endpoint on the deployed URL.
+11. Start the login flow through the same public domain that owns the callback URI so the OAuth state/session cookies stay on the correct host.
+12. In Vercel project settings, add a Deployment Check that requires the GitHub check `Migrate production database` before promoting production deployments.
+13. Merge changes to `main` to let GitHub Actions back up and migrate the production Turso database before Vercel promotes the new production build.
+14. Import catalog data into the production database after the first schema bootstrap or whenever importer changes require a fresh production import.
+15. Verify `GET /health`, `GET /openapi.json`, and one real catalog endpoint on the deployed URL.
 
 ### Production Data Operations
 
-Vercel only serves the HTTP API. Database migrations and park imports are still operational commands you run against the target Turso database:
+Vercel only serves the HTTP API. Production schema migrations now belong in the GitHub Actions `Production Migration` workflow that runs on pushes to `main`, while catalog imports remain operator-run commands.
+
+The workflow takes a fresh Turso backup artifact first, then runs `npm run db:migrate` with the GitHub `production` environment secrets. Keep the manual commands below as the fallback path for recovery, first-time setup, or exceptional maintenance:
 
 ```sh
 DATABASE_URL=libsql://... DATABASE_AUTH_TOKEN=... npm run db:migrate
 DATABASE_URL=libsql://... DATABASE_AUTH_TOKEN=... npm run import:parks
 ```
 
-Run those from your machine or CI with the production credentials before expecting the deployed API to serve real catalog data.
+Run those from your machine or CI with the production credentials when you intentionally need to bypass or recover around the GitHub workflow.

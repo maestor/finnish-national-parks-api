@@ -77,6 +77,8 @@ Rules:
 
 - Vercel deployments must not run against local `file:` databases.
 - Vercel deployments must not use `MEMORY_STORAGE=true`.
+- Production Turso credentials for automated migrations must live in GitHub Actions environment secrets, not in committed files or browser-reachable config.
+- Production deployment promotion should stay gated on the GitHub migration check so schema updates complete before merged code is served.
 - Shared cache headers and `ETag` behavior must be deliberate for catalog and summary routes.
 - Shared cache headers and `ETag` behavior for trip and visit summary datasets must stay tied to the owned visit-data version signal so trip rename/delete and visit reassignment invalidate cached timeline reads predictably.
 - Private or admin responses must use non-cacheable headers.
