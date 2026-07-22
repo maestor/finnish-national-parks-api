@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray, notInArray, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, gte, inArray, lt, lte, notInArray, sql } from 'drizzle-orm';
 
 import type { GeoJsonFeatureCollection } from '../importer/geometry.js';
 import { createParkSlug, normalizeParkUrl } from '../parks/park-normalization.js';
@@ -28,6 +28,7 @@ type PutVisitInput = {
   note?: string | null | undefined;
   route?: string | null | undefined;
   tripId?: number | null | undefined;
+  tripStopOrder?: number | undefined;
   visitedOn: string;
 };
 
@@ -36,6 +37,7 @@ type UpdateVisitInput = {
   note?: string | null | undefined;
   route?: string | null | undefined;
   tripId?: number | null | undefined;
+  tripStopOrder?: number | undefined;
   visitedOn?: string | undefined;
 };
 
@@ -198,6 +200,8 @@ type PublicVisitRow = {
   parkId: number;
   parkName: string;
   parkSlug: string;
+  tripId: number | null;
+  tripStopOrder: number | null;
   updatedAt: string;
   visitedOn: string;
 };
@@ -212,6 +216,7 @@ type VisitTimelineRow = {
   route: string | null;
   tripId: number | null;
   tripName: string | null;
+  tripStopOrder: number | null;
   typeName: string;
   visitedOn: string;
 };
@@ -238,6 +243,7 @@ type UpsertCatalogParkInput = Omit<
 const PUBLIC_VISIT_DATA_VERSION_KEY = 'public-visits';
 
 export class RepositoryNotFoundError extends Error {}
+export class RepositoryValidationError extends Error {}
 
 const normalizeOptionalText = (value?: string | null) => value?.trim() || null;
 
@@ -249,6 +255,38 @@ const normalizeRequiredText = (value: string, fieldName: string) => {
   }
 
   return normalized;
+};
+
+type TripAwareVisitOrder = {
+  createdAt: string;
+  id: number;
+  tripId: number | null;
+  tripStopOrder: number | null;
+  visitedOn: string;
+};
+
+const compareTripAwareVisitOrder = (a: TripAwareVisitOrder, b: TripAwareVisitOrder) => {
+  if (b.visitedOn !== a.visitedOn) {
+    return b.visitedOn.localeCompare(a.visitedOn);
+  }
+
+  const sameTrip = a.tripId !== null && a.tripId === b.tripId;
+
+  if (sameTrip && a.tripStopOrder !== null && b.tripStopOrder !== null) {
+    if (a.tripStopOrder !== b.tripStopOrder) {
+      return a.tripStopOrder - b.tripStopOrder;
+    }
+  }
+
+  if (b.createdAt !== a.createdAt) {
+    return b.createdAt.localeCompare(a.createdAt);
+  }
+
+  return b.id - a.id;
+};
+
+const sortTripAwareVisitRows = <T extends TripAwareVisitOrder>(visitRows: T[]) => {
+  return [...visitRows].sort(compareTripAwareVisitOrder);
 };
 
 const toBoundingBox = (row: typeof parks.$inferSelect): BoundingBox => {
@@ -588,6 +626,7 @@ const toVisit = (
     note: row.note,
     route: row.route,
     trip,
+    tripStopOrder: row.tripStopOrder,
     updatedAt: row.updatedAt,
     visitedOn: row.visitedOn
   };
@@ -599,7 +638,7 @@ const getParkRecordBySlug = async (database: Database, slug: string) => {
   });
 };
 
-const getTripRecordById = async (database: Database, tripId: number) => {
+const getTripRecordById = async (database: DbClient, tripId: number) => {
   return database.query.trips.findFirst({
     where: eq(trips.id, tripId)
   });
@@ -776,10 +815,12 @@ const listLightweightParkRows = async (
 };
 
 const getVisitsForPark = async (database: Database, parkId: number) => {
-  return database.query.parkVisits.findMany({
+  const visitRows = await database.query.parkVisits.findMany({
     orderBy: [desc(parkVisits.visitedOn), desc(parkVisits.id)],
     where: eq(parkVisits.parkId, parkId)
   });
+
+  return sortTripAwareVisitRows(visitRows);
 };
 
 const getImagesForVisitIds = async (database: Database, visitIds: number[]) => {
@@ -898,7 +939,7 @@ const countVisitsBySeason = (visits: Array<{ visitedOn: string }>) => {
 };
 
 const listVisitRowsWithPark = async (database: Database) => {
-  return database
+  const visitRows = await database
     .select({
       park: parks,
       visit: parkVisits
@@ -907,6 +948,10 @@ const listVisitRowsWithPark = async (database: Database) => {
     .innerJoin(parks, eq(parkVisits.parkId, parks.id))
     .where(eq(parks.removed, false))
     .orderBy(desc(parkVisits.visitedOn), desc(parkVisits.id));
+
+  return sortTripAwareVisitRows(visitRows.map((row) => row.visit)).map(
+    (visit) => visitRows.find((row) => row.visit.id === visit.id)!
+  );
 };
 
 const listPublicVisitRows = async (database: Database) => {
@@ -917,6 +962,8 @@ const listPublicVisitRows = async (database: Database) => {
       parkId: parkVisits.parkId,
       parkName: parks.name,
       parkSlug: parks.slug,
+      tripId: parkVisits.tripId,
+      tripStopOrder: parkVisits.tripStopOrder,
       updatedAt: parkVisits.updatedAt,
       visitedOn: parkVisits.visitedOn
     })
@@ -961,6 +1008,7 @@ const listVisitTimelineRows = async (database: Database): Promise<VisitTimelineR
       route: parkVisits.route,
       tripId: trips.id,
       tripName: trips.name,
+      tripStopOrder: parkVisits.tripStopOrder,
       typeName: parkTypes.name,
       visitedOn: parkVisits.visitedOn
     })
@@ -975,6 +1023,7 @@ const listVisitTimelineRows = async (database: Database): Promise<VisitTimelineR
       parkVisits.createdAt,
       parkVisits.route,
       parkVisits.tripId,
+      parkVisits.tripStopOrder,
       parkVisits.visitedOn,
       parks.displayTypeName,
       parks.name,
@@ -984,6 +1033,177 @@ const listVisitTimelineRows = async (database: Database): Promise<VisitTimelineR
       parkTypes.name
     )
     .orderBy(desc(parkVisits.visitedOn), desc(parkVisits.createdAt), desc(parkVisits.id));
+};
+
+const getTripVisitCount = async (database: DbClient, tripId: number, excludeVisitId?: number) => {
+  const where =
+    excludeVisitId === undefined
+      ? eq(parkVisits.tripId, tripId)
+      : and(eq(parkVisits.tripId, tripId), sql`${parkVisits.id} <> ${excludeVisitId}`);
+
+  const rows = await database
+    .select({
+      count: sql<number>`COUNT(*)`
+    })
+    .from(parkVisits)
+    .where(where);
+
+  const [row] = rows;
+
+  return Number(row!.count);
+};
+
+const normalizeTripStopOrder = (requestedOrder: number | undefined, maxOrder: number) => {
+  if (requestedOrder === undefined) {
+    return maxOrder;
+  }
+
+  return Math.min(Math.max(requestedOrder, 1), maxOrder);
+};
+
+const shiftTripStopOrdersUpFrom = async (
+  database: DbClient,
+  tripId: number,
+  fromOrder: number,
+  timestamp: string
+) => {
+  await database
+    .update(parkVisits)
+    .set({
+      tripStopOrder: sql`${parkVisits.tripStopOrder} + 1`,
+      updatedAt: timestamp
+    })
+    .where(and(eq(parkVisits.tripId, tripId), gte(parkVisits.tripStopOrder, fromOrder)));
+};
+
+const closeTripStopOrderGap = async (
+  database: DbClient,
+  tripId: number,
+  removedOrder: number,
+  timestamp: string
+) => {
+  await database
+    .update(parkVisits)
+    .set({
+      tripStopOrder: sql`${parkVisits.tripStopOrder} - 1`,
+      updatedAt: timestamp
+    })
+    .where(and(eq(parkVisits.tripId, tripId), gt(parkVisits.tripStopOrder, removedOrder)));
+};
+
+const resolveCreateTripStopOrder = async (
+  database: DbClient,
+  tripId: number | null,
+  requestedOrder: number | undefined,
+  timestamp: string
+) => {
+  if (tripId === null) {
+    if (requestedOrder !== undefined) {
+      throw new RepositoryValidationError('Trip stop order requires an assigned trip.');
+    }
+
+    return null;
+  }
+
+  const tripVisitCount = await getTripVisitCount(database, tripId);
+  const nextOrder = normalizeTripStopOrder(requestedOrder, tripVisitCount + 1);
+
+  if (nextOrder <= tripVisitCount) {
+    await shiftTripStopOrdersUpFrom(database, tripId, nextOrder, timestamp);
+  }
+
+  return nextOrder;
+};
+
+const resolveUpdatedTripStopOrder = async (
+  database: DbClient,
+  existingVisit: typeof parkVisits.$inferSelect,
+  nextTripId: number | null,
+  requestedOrder: number | undefined,
+  timestamp: string
+) => {
+  const currentTripId = existingVisit.tripId;
+  const currentOrder = existingVisit.tripStopOrder;
+
+  if (nextTripId === null) {
+    if (requestedOrder !== undefined) {
+      throw new RepositoryValidationError('Trip stop order requires an assigned trip.');
+    }
+
+    if (currentTripId !== null && currentOrder !== null) {
+      await closeTripStopOrderGap(database, currentTripId, currentOrder, timestamp);
+    }
+
+    return null;
+  }
+
+  if (currentTripId === null || currentTripId !== nextTripId) {
+    if (currentTripId !== null && currentOrder !== null) {
+      await closeTripStopOrderGap(database, currentTripId, currentOrder, timestamp);
+    }
+
+    const nextTripVisitCount = await getTripVisitCount(database, nextTripId);
+    const nextOrder = normalizeTripStopOrder(requestedOrder, nextTripVisitCount + 1);
+
+    if (nextOrder <= nextTripVisitCount) {
+      await shiftTripStopOrdersUpFrom(database, nextTripId, nextOrder, timestamp);
+    }
+
+    return nextOrder;
+  }
+
+  if (requestedOrder === undefined) {
+    if (currentOrder !== null) {
+      return currentOrder;
+    }
+
+    const nextTripVisitCount = await getTripVisitCount(database, nextTripId, existingVisit.id);
+    return nextTripVisitCount + 1;
+  }
+
+  const tripVisitCount = await getTripVisitCount(database, nextTripId);
+  const nextOrder = normalizeTripStopOrder(requestedOrder, tripVisitCount);
+
+  if (currentOrder === null) {
+    await shiftTripStopOrdersUpFrom(database, nextTripId, nextOrder, timestamp);
+    return nextOrder;
+  }
+
+  if (nextOrder === currentOrder) {
+    return currentOrder;
+  }
+
+  if (nextOrder < currentOrder) {
+    await database
+      .update(parkVisits)
+      .set({
+        tripStopOrder: sql`${parkVisits.tripStopOrder} + 1`,
+        updatedAt: timestamp
+      })
+      .where(
+        and(
+          eq(parkVisits.tripId, nextTripId),
+          gte(parkVisits.tripStopOrder, nextOrder),
+          lt(parkVisits.tripStopOrder, currentOrder)
+        )
+      );
+  } else {
+    await database
+      .update(parkVisits)
+      .set({
+        tripStopOrder: sql`${parkVisits.tripStopOrder} - 1`,
+        updatedAt: timestamp
+      })
+      .where(
+        and(
+          eq(parkVisits.tripId, nextTripId),
+          gt(parkVisits.tripStopOrder, currentOrder),
+          lte(parkVisits.tripStopOrder, nextOrder)
+        )
+      );
+  }
+
+  return nextOrder;
 };
 
 const bumpPublicVisitDataVersion = async (database: DbClient, updatedAt: string) => {
@@ -1410,7 +1630,7 @@ export const getPublicMapSummary = async (
 };
 
 export const listVisitsTimeline = async (database: Database) => {
-  const visitRows = await listVisitTimelineRows(database);
+  const visitRows = sortTripAwareVisitRows(await listVisitTimelineRows(database));
 
   return visitRows.map((visit) => ({
     createdAt: visit.createdAt,
@@ -1429,6 +1649,7 @@ export const listVisitsTimeline = async (database: Database) => {
             id: visit.tripId,
             name: visit.tripName
           },
+    tripStopOrder: visit.tripStopOrder,
     visitedOn: visit.visitedOn
   }));
 };
@@ -1487,30 +1708,39 @@ export const createVisit = async (database: Database, slug: string, input: PutVi
   }
 
   const tripId = await resolveTripId(database, input.tripId);
-
   const timestamp = new Date().toISOString();
-  const row = (
-    await database
-      .insert(parkVisits)
-      .values({
-        author: input.author?.trim() || null,
-        createdAt: timestamp,
-        note: input.note?.trim() || null,
-        parkId: park.id,
-        route: input.route?.trim() || null,
-        tripId: tripId ?? null,
-        updatedAt: timestamp,
-        visitedOn: input.visitedOn
-      })
-      .returning()
-  )[0]!;
 
-  await bumpPublicVisitDataVersion(database, timestamp);
+  return database.transaction(async (tx) => {
+    const tripStopOrder = await resolveCreateTripStopOrder(
+      tx,
+      tripId ?? null,
+      input.tripStopOrder,
+      timestamp
+    );
+    const row = (
+      await tx
+        .insert(parkVisits)
+        .values({
+          author: input.author?.trim() || null,
+          createdAt: timestamp,
+          note: input.note?.trim() || null,
+          parkId: park.id,
+          route: input.route?.trim() || null,
+          tripId: tripId ?? null,
+          tripStopOrder,
+          updatedAt: timestamp,
+          visitedOn: input.visitedOn
+        })
+        .returning()
+    )[0]!;
 
-  const trip =
-    row.tripId === null ? null : toTripReference((await getTripRecordById(database, row.tripId))!);
+    await bumpPublicVisitDataVersion(tx, timestamp);
 
-  return toVisit(row, [], trip);
+    const trip =
+      row.tripId === null ? null : toTripReference((await getTripRecordById(tx, row.tripId))!);
+
+    return toVisit(row, [], trip);
+  });
 };
 
 export const reassignParkVisits = async (
@@ -1789,54 +2019,86 @@ export const updateVisit = async (database: Database, visitId: number, input: Up
   }
 
   const nextTripId = await resolveTripId(database, input.tripId);
-
   const timestamp = new Date().toISOString();
 
-  await database
-    .update(parkVisits)
-    .set({
-      author: input.author === undefined ? existingVisit.author : input.author?.trim() || null,
-      note: input.note === undefined ? existingVisit.note : input.note?.trim() || null,
-      route: input.route === undefined ? existingVisit.route : input.route?.trim() || null,
-      tripId: nextTripId === undefined ? existingVisit.tripId : nextTripId,
-      updatedAt: timestamp,
-      visitedOn: input.visitedOn ?? existingVisit.visitedOn
-    })
-    .where(eq(parkVisits.id, visitId));
+  return database.transaction(async (tx) => {
+    const resolvedTripId = nextTripId === undefined ? existingVisit.tripId : nextTripId;
+    const tripStopOrder = await resolveUpdatedTripStopOrder(
+      tx,
+      existingVisit,
+      resolvedTripId,
+      input.tripStopOrder,
+      timestamp
+    );
 
-  const updatedVisit = (
-    await database.select().from(parkVisits).where(eq(parkVisits.id, visitId))
-  )[0]!;
+    await tx
+      .update(parkVisits)
+      .set({
+        author: input.author === undefined ? existingVisit.author : input.author?.trim() || null,
+        note: input.note === undefined ? existingVisit.note : input.note?.trim() || null,
+        route: input.route === undefined ? existingVisit.route : input.route?.trim() || null,
+        tripId: resolvedTripId,
+        tripStopOrder,
+        updatedAt: timestamp,
+        visitedOn: input.visitedOn ?? existingVisit.visitedOn
+      })
+      .where(eq(parkVisits.id, visitId));
 
-  await bumpPublicVisitDataVersion(database, timestamp);
+    const updatedVisit = (await tx.select().from(parkVisits).where(eq(parkVisits.id, visitId)))[0]!;
 
-  const trip =
-    updatedVisit.tripId === null
-      ? null
-      : toTripReference((await getTripRecordById(database, updatedVisit.tripId))!);
+    await bumpPublicVisitDataVersion(tx, timestamp);
 
-  return toVisit(updatedVisit, [], trip);
+    const trip =
+      updatedVisit.tripId === null
+        ? null
+        : toTripReference((await getTripRecordById(tx, updatedVisit.tripId))!);
+
+    return toVisit(updatedVisit, [], trip);
+  });
 };
 
 export const deleteTrip = async (database: Database, tripId: number) => {
   const timestamp = new Date().toISOString();
-  const result = await database.delete(trips).where(eq(trips.id, tripId));
 
-  if (Number(result.rowsAffected) > 0) {
-    await bumpPublicVisitDataVersion(database, timestamp);
-  }
+  return database.transaction(async (tx) => {
+    await tx
+      .update(parkVisits)
+      .set({
+        tripStopOrder: null,
+        updatedAt: timestamp
+      })
+      .where(eq(parkVisits.tripId, tripId));
 
-  return Number(result.rowsAffected) > 0;
+    const result = await tx.delete(trips).where(eq(trips.id, tripId));
+
+    if (Number(result.rowsAffected) > 0) {
+      await bumpPublicVisitDataVersion(tx, timestamp);
+    }
+
+    return Number(result.rowsAffected) > 0;
+  });
 };
 
 export const deleteVisit = async (database: Database, visitId: number) => {
-  const result = await database.delete(parkVisits).where(eq(parkVisits.id, visitId));
+  const existingVisit = await findVisitRecordById(database, visitId);
 
-  if (Number(result.rowsAffected) > 0) {
-    await bumpPublicVisitDataVersion(database, new Date().toISOString());
+  if (!existingVisit) {
+    return false;
   }
 
-  return Number(result.rowsAffected) > 0;
+  const timestamp = new Date().toISOString();
+
+  return database.transaction(async (tx) => {
+    const result = await tx.delete(parkVisits).where(eq(parkVisits.id, visitId));
+
+    if (existingVisit.tripId !== null && existingVisit.tripStopOrder !== null) {
+      await closeTripStopOrderGap(tx, existingVisit.tripId, existingVisit.tripStopOrder, timestamp);
+    }
+
+    await bumpPublicVisitDataVersion(tx, timestamp);
+
+    return Number(result.rowsAffected) > 0;
+  });
 };
 
 export const createVisitImage = async (

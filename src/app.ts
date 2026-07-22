@@ -30,6 +30,7 @@ import {
   listVisits,
   listVisitsTimeline,
   RepositoryNotFoundError,
+  RepositoryValidationError,
   reorderVisitImages,
   updateParkDetails,
   updateParkRemoved,
@@ -867,6 +868,10 @@ export const createApp = ({
           return context.json(jsonNotFound(error.message), 404);
         }
 
+        if (error instanceof RepositoryValidationError) {
+          return context.json({ error: error.message }, 422);
+        }
+
         throw error;
       }
     });
@@ -924,6 +929,10 @@ export const createApp = ({
       } catch (error) {
         if (error instanceof RepositoryNotFoundError) {
           return context.json(jsonNotFound(error.message), 404);
+        }
+
+        if (error instanceof RepositoryValidationError) {
+          return context.json({ error: error.message }, 422);
         }
 
         throw error;

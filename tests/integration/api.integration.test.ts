@@ -131,6 +131,7 @@ describe('API routes', () => {
       note?: string;
       route?: string;
       tripId?: number | null;
+      tripStopOrder?: number;
       visitedOn: string;
     }
   ) => {
@@ -1601,10 +1602,11 @@ describe('API routes', () => {
     const { body: firstVisit } = await createVisit(app, 'akasmannyn-kansallispuisto', {
       route: 'North trail',
       tripId: createdTrip.id,
+      tripStopOrder: 1,
       visitedOn: '2026-06-07'
     });
     const { body: secondVisit } = await createVisit(app, 'seitsemisen-kansallispuisto', {
-      visitedOn: '2026-06-10'
+      visitedOn: '2026-06-07'
     });
 
     expect(createTripResponse.status).toBe(201);
@@ -1619,13 +1621,15 @@ describe('API routes', () => {
     const assignTripResponse = await requestAsAdmin(app, `/api/visits/${secondVisit.id}`, {
       method: 'PATCH',
       body: JSON.stringify({
-        tripId: createdTrip.id
+        tripId: createdTrip.id,
+        tripStopOrder: 2
       }),
       headers: {
         'content-type': 'application/json'
       }
     });
     const assignTripBody = (await assignTripResponse.json()) as {
+      tripStopOrder: number | null;
       trip: {
         id: number;
         name: string;
@@ -1637,6 +1641,7 @@ describe('API routes', () => {
       id: createdTrip.id,
       name: 'Kesäreissu 2026'
     });
+    expect(assignTripBody.tripStopOrder).toBe(2);
 
     const tripsResponse = await app.request('/api/trips');
     const tripsBody = (await tripsResponse.json()) as {
@@ -1661,7 +1666,7 @@ describe('API routes', () => {
     expect(tripsBody.trips).toContainEqual(
       expect.objectContaining({
         dateRange: {
-          end: '2026-06-10',
+          end: '2026-06-07',
           start: '2026-06-07'
         },
         description: 'Lapin puistoja ja yksi yllätys.',
@@ -1675,6 +1680,7 @@ describe('API routes', () => {
     const timelineBody = (await timelineResponse.json()) as {
       visits: Array<{
         id: number;
+        tripStopOrder: number | null;
         trip: {
           id: number;
           name: string;
@@ -1685,6 +1691,7 @@ describe('API routes', () => {
     const visitsBody = (await visitsResponse.json()) as {
       visits: Array<{
         id: number;
+        tripStopOrder: number | null;
         trip: {
           id: number;
           name: string;
@@ -1693,6 +1700,7 @@ describe('API routes', () => {
     };
     const visitDetailResponse = await app.request(`/api/visits/${firstVisit.id}`);
     const visitDetailBody = (await visitDetailResponse.json()) as {
+      tripStopOrder: number | null;
       trip: {
         id: number;
         name: string;
@@ -1700,24 +1708,32 @@ describe('API routes', () => {
     };
 
     expect(timelineResponse.status).toBe(200);
+    expect(timelineBody.visits.slice(0, 2).map((visit) => visit.id)).toEqual([
+      firstVisit.id,
+      secondVisit.id
+    ]);
     expect(timelineBody.visits.find((visit) => visit.id === firstVisit.id)?.trip).toEqual({
       id: createdTrip.id,
       name: 'Kesäreissu 2026'
     });
+    expect(timelineBody.visits.find((visit) => visit.id === firstVisit.id)?.tripStopOrder).toBe(1);
     expect(timelineBody.visits.find((visit) => visit.id === secondVisit.id)?.trip).toEqual({
       id: createdTrip.id,
       name: 'Kesäreissu 2026'
     });
+    expect(timelineBody.visits.find((visit) => visit.id === secondVisit.id)?.tripStopOrder).toBe(2);
     expect(visitsResponse.status).toBe(200);
     expect(visitsBody.visits.find((visit) => visit.id === firstVisit.id)?.trip).toEqual({
       id: createdTrip.id,
       name: 'Kesäreissu 2026'
     });
+    expect(visitsBody.visits.find((visit) => visit.id === firstVisit.id)?.tripStopOrder).toBe(1);
     expect(visitDetailResponse.status).toBe(200);
     expect(visitDetailBody.trip).toEqual({
       id: createdTrip.id,
       name: 'Kesäreissu 2026'
     });
+    expect(visitDetailBody.tripStopOrder).toBe(1);
 
     const renameTripResponse = await requestAsAdmin(app, `/api/trips/${createdTrip.id}`, {
       method: 'PATCH',
@@ -1752,6 +1768,7 @@ describe('API routes', () => {
       }
     });
     const clearTripBody = (await clearTripResponse.json()) as {
+      tripStopOrder: number | null;
       trip: {
         id: number;
         name: string;
@@ -1760,6 +1777,7 @@ describe('API routes', () => {
 
     expect(clearTripResponse.status).toBe(200);
     expect(clearTripBody.trip).toBeNull();
+    expect(clearTripBody.tripStopOrder).toBeNull();
 
     const renamedTimelineResponse = await app.request('/api/visits-timeline');
     const renamedTimelineBody = (await renamedTimelineResponse.json()) as {
@@ -1813,6 +1831,50 @@ describe('API routes', () => {
     expect(clearedVisitsBody.visits.find((visit) => visit.id === firstVisit.id)?.trip).toBeNull();
     expect(clearedTripsResponse.status).toBe(200);
     expect(clearedTripsBody.trips).toEqual([]);
+  });
+
+  it('rejects trip stop order changes when no trip is assigned', async () => {
+    const app = createAuthedApp();
+
+    const createResponse = await requestAsAdmin(
+      app,
+      '/api/parks/akasmannyn-kansallispuisto/visits',
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          tripStopOrder: 1,
+          visitedOn: '2026-06-07'
+        }),
+        headers: {
+          'content-type': 'application/json'
+        }
+      }
+    );
+    const createBody = (await createResponse.json()) as {
+      error: string;
+    };
+
+    expect(createResponse.status).toBe(422);
+    expect(createBody.error).toBe('Trip stop order requires an assigned trip.');
+
+    const { body: visit } = await createVisit(app, 'akasmannyn-kansallispuisto', {
+      visitedOn: '2026-06-07'
+    });
+    const updateResponse = await requestAsAdmin(app, `/api/visits/${visit.id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({
+        tripStopOrder: 1
+      }),
+      headers: {
+        'content-type': 'application/json'
+      }
+    });
+    const updateBody = (await updateResponse.json()) as {
+      error: string;
+    };
+
+    expect(updateResponse.status).toBe(422);
+    expect(updateBody.error).toBe('Trip stop order requires an assigned trip.');
   });
 
   it('returns 500 for unexpected visit write failures', async () => {
