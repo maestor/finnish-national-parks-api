@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { createClient } from '@libsql/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { migrateDatabase } from '../../src/db/migrate.js';
+import { getPendingMigrationNames, migrateDatabase } from '../../src/db/migrate.js';
 
 describe('migrateDatabase', () => {
   let directory: string;
@@ -30,6 +30,8 @@ describe('migrateDatabase', () => {
     const migrations = await client.execute('SELECT name FROM schema_migrations ORDER BY name');
     const parkTypes = await client.execute('SELECT slug FROM park_types ORDER BY id');
     const parkColumns = await client.execute('PRAGMA table_info(parks)');
+    const tripColumns = await client.execute('PRAGMA table_info(trips)');
+    const tripVisitColumns = await client.execute('PRAGMA table_info(park_visits)');
     const publicDataVersionColumns = await client.execute(
       'PRAGMA table_info(public_data_versions)'
     );
@@ -50,7 +52,8 @@ describe('migrateDatabase', () => {
       '0012_supported_catalog_types.sql',
       '0013_park_imported_editable_fields.sql',
       '0014_cultural_history_area_type.sql',
-      '0015_rename_park_urls.sql'
+      '0015_rename_park_urls.sql',
+      '0016_trips.sql'
     ]);
     expect(parkTypes.rows.map((row) => String(row.slug))).toEqual([
       'outdoor-recreation-area',
@@ -81,7 +84,45 @@ describe('migrateDatabase', () => {
     expect(parkColumns.rows.some((row) => String(row.name) === 'imported_display_type_name')).toBe(
       true
     );
+    expect(tripColumns.rows.some((row) => String(row.name) === 'name')).toBe(true);
+    expect(tripColumns.rows.some((row) => String(row.name) === 'description')).toBe(true);
+    expect(tripVisitColumns.rows.some((row) => String(row.name) === 'trip_id')).toBe(true);
     expect(publicDataVersionColumns.rows.some((row) => String(row.name) === 'version')).toBe(true);
+  });
+
+  it('reports pending migrations without mutating a fresh database', async () => {
+    const pendingBeforeApply = await getPendingMigrationNames(client);
+    const schemaMigrationTableBeforeApply = await client.execute(`
+      SELECT name
+      FROM sqlite_master
+      WHERE type = 'table' AND name = 'schema_migrations'
+    `);
+
+    await migrateDatabase(client);
+
+    const pendingAfterApply = await getPendingMigrationNames(client);
+
+    expect(pendingBeforeApply).toEqual([
+      '0000_init.sql',
+      '0001_park_types.sql',
+      '0002_admins.sql',
+      '0003_visit_details.sql',
+      '0004_visit_images.sql',
+      '0005_removed_parks.sql',
+      '0006_public_data_versions.sql',
+      '0007_postal_code_and_nature_trails.sql',
+      '0008_manual_catalog_parks.sql',
+      '0009_park_logos.sql',
+      '0010_park_maps.sql',
+      '0011_refresh_park_type_slugs.sql',
+      '0012_supported_catalog_types.sql',
+      '0013_park_imported_editable_fields.sql',
+      '0014_cultural_history_area_type.sql',
+      '0015_rename_park_urls.sql',
+      '0016_trips.sql'
+    ]);
+    expect(schemaMigrationTableBeforeApply.rows).toEqual([]);
+    expect(pendingAfterApply).toEqual([]);
   });
 
   it('renames the cultural history type and retags existing manual rows', async () => {

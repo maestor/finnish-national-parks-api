@@ -2,8 +2,10 @@ import { eq } from 'drizzle-orm';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import {
+  createTrip,
   createVisit,
   createVisitImage,
+  deleteTrip,
   deleteVisit,
   deleteVisitImage,
   getCatalogListEtagSeed,
@@ -14,12 +16,14 @@ import {
   getVisitById,
   listParkRecordsIncludingRemoved,
   listRemovedParks,
+  listTrips,
   listVisits,
   reassignParkVisits,
   reorderVisitImages,
   updateParkDetails,
   updateParkLogo,
   updateParkMap,
+  updateTrip,
   updateVisit
 } from '../../src/db/repositories.js';
 import { parks } from '../../src/db/schema.js';
@@ -326,6 +330,123 @@ describe('repositories', () => {
       route: null,
       visitedOn: '2026-04-13'
     });
+  });
+
+  it('creates, updates, lists, and deletes trips while clearing assigned visits', async () => {
+    const trip = await createTrip(testDatabase.database, {
+      description: 'Lapin kansallispuistoja.',
+      name: 'Kesäreissu 2026'
+    });
+    const assignedVisit = await createVisit(testDatabase.database, 'akasmannyn-kansallispuisto', {
+      tripId: trip.id,
+      visitedOn: '2026-04-13'
+    });
+    const looseVisit = await createVisit(testDatabase.database, 'akasmannyn-kansallispuisto', {
+      visitedOn: '2026-04-14'
+    });
+
+    expect(trip).toMatchObject({
+      dateRange: null,
+      description: 'Lapin kansallispuistoja.',
+      name: 'Kesäreissu 2026',
+      visitCount: 0
+    });
+
+    const updatedVisit = await updateVisit(testDatabase.database, looseVisit.id, {
+      tripId: trip.id
+    });
+    const listedTrips = await listTrips(testDatabase.database);
+    const listedVisits = await listVisits(testDatabase.database, async () => '');
+    const visitDetail = await getVisitById(testDatabase.database, assignedVisit.id, async () => '');
+
+    expect(updatedVisit?.trip).toEqual({
+      id: trip.id,
+      name: 'Kesäreissu 2026'
+    });
+    expect(listedTrips).toEqual([
+      expect.objectContaining({
+        dateRange: {
+          end: '2026-04-14',
+          start: '2026-04-13'
+        },
+        description: 'Lapin kansallispuistoja.',
+        id: trip.id,
+        name: 'Kesäreissu 2026',
+        visitCount: 2
+      })
+    ]);
+    expect(listedVisits.find((visit) => visit.id === assignedVisit.id)?.trip).toEqual({
+      id: trip.id,
+      name: 'Kesäreissu 2026'
+    });
+    expect(visitDetail?.trip).toEqual({
+      id: trip.id,
+      name: 'Kesäreissu 2026'
+    });
+
+    const renamedTrip = await updateTrip(testDatabase.database, trip.id, {
+      description: 'Päivitetty kuvaus.',
+      name: 'Kesäreissu 2026 v2'
+    });
+
+    expect(renamedTrip).toMatchObject({
+      description: 'Päivitetty kuvaus.',
+      id: trip.id,
+      name: 'Kesäreissu 2026 v2'
+    });
+
+    const descriptionOnlyTrip = await updateTrip(testDatabase.database, trip.id, {
+      description: 'Vain kuvaus muuttui.'
+    });
+
+    expect(descriptionOnlyTrip).toMatchObject({
+      description: 'Vain kuvaus muuttui.',
+      id: trip.id,
+      name: 'Kesäreissu 2026 v2'
+    });
+
+    const nameOnlyTrip = await updateTrip(testDatabase.database, trip.id, {
+      name: 'Kesäreissu 2026 v3'
+    });
+
+    expect(nameOnlyTrip).toMatchObject({
+      description: 'Vain kuvaus muuttui.',
+      id: trip.id,
+      name: 'Kesäreissu 2026 v3'
+    });
+
+    await expect(deleteTrip(testDatabase.database, trip.id)).resolves.toBe(true);
+    await expect(deleteTrip(testDatabase.database, 99999)).resolves.toBe(false);
+    await expect(listTrips(testDatabase.database)).resolves.toEqual([]);
+    await expect(
+      getVisitById(testDatabase.database, assignedVisit.id, async () => '')
+    ).resolves.toMatchObject({
+      trip: null
+    });
+    await expect(
+      getVisitById(testDatabase.database, looseVisit.id, async () => '')
+    ).resolves.toMatchObject({
+      trip: null
+    });
+  });
+
+  it('rejects missing trip assignments when creating or updating visits', async () => {
+    await expect(
+      createVisit(testDatabase.database, 'akasmannyn-kansallispuisto', {
+        tripId: 99999,
+        visitedOn: '2026-04-13'
+      })
+    ).rejects.toThrow('Trip not found.');
+
+    const visit = await createVisit(testDatabase.database, 'akasmannyn-kansallispuisto', {
+      visitedOn: '2026-04-13'
+    });
+
+    await expect(
+      updateVisit(testDatabase.database, visit.id, {
+        tripId: 99999
+      })
+    ).rejects.toThrow('Trip not found.');
   });
 
   it('returns an empty catalog etag seed when no active parks remain', async () => {

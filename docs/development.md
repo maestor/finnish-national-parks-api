@@ -248,20 +248,23 @@ Key route behavior:
 - Park responses expose raw `locationLabel`, `postalCode`, and `postalOffice` fields from the database, plus a derived `address` string for display use.
 - `GET /api/home-summary` returns home-page summary data including seasonal visit counts, `progressByType` with a `visible` flag, and `progressByCategory`, without visit notes, routes, or images.
 - `GET /api/map-summary` returns lightweight park map data plus per-park visited summaries.
-- `GET /api/visits-timeline` returns the lightweight visits timeline dataset for the public `/kaynnit` screen, including `imageCount` and a resolved park `typeLabel`.
+- `GET /api/trips` returns named trips with derived `dateRange`, `visitCount`, and the same shared-cache behavior as the other public summary datasets.
+- `GET /api/visits-timeline` returns the lightweight visits timeline dataset for the public `/kaynnit` screen, including `imageCount`, `trip: { id, name } | null`, and a resolved park `typeLabel`.
 - `POST /api/trip-planner/suggestions` returns up to three Geoapify-backed place suggestions with labels and coordinates for origin/destination selection.
 - `POST /api/trip-planner/search` geocodes origin and destination, fetches a real Geoapify driving route, filters visible parks by a configurable corridor distance, and returns list-ready results with visited summaries plus a map-ready route `LineString`, backend-provided route and park bounding boxes, and top-level `maxDistanceKm` / `defaultDistanceKm` filter metadata. On longer trips, the first 30 km from the origin uses a stricter start-zone filter so dense departure areas do not flood the list.
 - `POST /api/trip-planner/nearby` geocodes only the origin, filters visible parks by straight-line proximity to that point, and returns list-ready results with visited summaries plus a backend-provided `searchArea` bounding box and top-level `maxDistanceKm` / `defaultDistanceKm` filter metadata for map rendering without route geometry.
 - `GET /api/parks/:slug/visits` returns visit history plus a visited summary for one visible park.
-- `GET /api/visits` returns flat visit resources with their parent park reference.
-- `GET /api/visits/:id` returns one visit with its parent park reference.
-- Catalog, home summary, map summary, and visits timeline routes emit deterministic `ETag` headers and support `304 Not Modified`.
-- Home summary, map summary, and visits timeline routes use shared-cache headers and expose a visit-data `version` / `updatedAt` signal that changes on visit create/update/delete and visit image upload/delete/reorder.
+- `GET /api/visits` returns flat visit resources with their parent park reference and `trip: { id, name } | null`.
+- `GET /api/visits/:id` returns one visit with its parent park reference and `trip: { id, name } | null`.
+- Catalog, home summary, map summary, trip list, and visits timeline routes emit deterministic `ETag` headers and support `304 Not Modified`.
+- Home summary, map summary, trip list, and visits timeline routes use shared-cache headers and expose a visit-data `version` / `updatedAt` signal that changes on trip create/update/delete, visit create/update/delete, and visit image upload/delete/reorder.
 - Visit and management routes use `private, no-store`.
 - Trip planner suggestion, route-search, and nearby-origin routes all use `private, no-store` and keep the provider key server-side.
 - All write routes and `GET /api/admin/parks/visibility` require a valid admin session cookie.
 - `PATCH /api/parks/:slug` updates the admin-editable park fields and auto-generates a slug from `name` when no explicit `slug` is provided.
 - `PATCH /api/parks/:slug/removed` toggles whether a park is hidden from catalog and visit responses.
+- `POST /api/trips`, `PATCH /api/trips/:id`, and `DELETE /api/trips/:id` are admin-session write routes for named trips.
+- `POST /api/parks/:slug/visits` and `PATCH /api/visits/:id` accept `tripId`, with `null` clearing an existing trip assignment.
 - Auth routes (`/auth/*`) bypass API key authentication so the OAuth flow can complete without a bearer token.
 - `GET /health` and `GET /openapi.json` are the only anonymous data endpoints.
 - `/auth/*` routes are anonymous control-flow endpoints for login, not anonymous data endpoints.
@@ -280,41 +283,48 @@ This is intentionally a narrow contract: `src/index.ts` is the one place that sh
 ### Vercel Deployment Checklist
 
 1. Create a Turso database for the deployed environment and copy its `libsql://...` URL plus auth token.
-2. In Vercel, create a new project from this repository.
-3. Keep the framework/build settings on auto-detect unless you have a repo-specific reason to override them.
-4. Set at least these environment variables in Vercel:
+2. In GitHub, create a `production` environment for this repository.
+3. Store these GitHub environment secrets for the `Production Migration` workflow:
+   - `DATABASE_URL`
+   - `DATABASE_AUTH_TOKEN`
+4. In Vercel, create a new project from this repository.
+5. Keep the framework/build settings on auto-detect unless you have a repo-specific reason to override them.
+6. Set at least these environment variables in Vercel:
    - `API_KEY`
    - `DATABASE_URL`
    - `DATABASE_AUTH_TOKEN`
-5. If you will use Google OAuth for a frontend control panel, also set:
+7. If you will use Google OAuth for a frontend control panel, also set:
    - `GOOGLE_CLIENT_ID`
    - `GOOGLE_CLIENT_SECRET`
    - `GOOGLE_REDIRECT_URI` only when `/auth/*` is served through a frontend proxy or rewrite
    - `AUTH_JWT_SECRET`
    - `AUTH_COOKIE_NAME`
    - `FRONTEND_URL`
-6. If you will use visit image uploads or park logo uploads, also set the R2 variables:
+8. If you will use visit image uploads or park logo uploads, also set the R2 variables:
    - `R2_BUCKET_NAME`
    - `R2_ENDPOINT`
    - `R2_ACCESS_KEY_ID`
    - `R2_SECRET_ACCESS_KEY`
-7. Frontends deployed against Vercel should call the direct upload endpoints instead of posting image bytes to `POST /api/visits/:id/images`.
-8. Add the deployed Google OAuth callback URL to Google OAuth credentials if auth is enabled:
+9. Frontends deployed against Vercel should call the direct upload endpoints instead of posting image bytes to `POST /api/visits/:id/images`.
+10. Add the deployed Google OAuth callback URL to Google OAuth credentials if auth is enabled:
    - Direct API callback: `https://<your-api-domain>/auth/google/callback`
    - Frontend proxy/rewrite callback: `https://<your-frontend-domain>/auth/google/callback`
    - If you use `GOOGLE_REDIRECT_URI`, it must exactly match the URI registered in Google Cloud.
-9. Start the login flow through the same public domain that owns the callback URI so the OAuth state/session cookies stay on the correct host.
-10. Run database migrations against the production Turso database before relying on the deployment.
-11. Import catalog data into the production database after migrations.
-12. Verify `GET /health`, `GET /openapi.json`, and one real catalog endpoint on the deployed URL.
+11. Start the login flow through the same public domain that owns the callback URI so the OAuth state/session cookies stay on the correct host.
+12. In Vercel project settings, add a Deployment Check that requires the GitHub check `Migrate production database` before promoting production deployments.
+13. Merge changes to `main` to let GitHub Actions back up and migrate the production Turso database before Vercel promotes the new production build.
+14. Import catalog data into the production database after the first schema bootstrap or whenever importer changes require a fresh production import.
+15. Verify `GET /health`, `GET /openapi.json`, and one real catalog endpoint on the deployed URL.
 
 ### Production Data Operations
 
-Vercel only serves the HTTP API. Database migrations and park imports are still operational commands you run against the target Turso database:
+Vercel only serves the HTTP API. Production schema migrations now belong in the GitHub Actions `Production Migration` workflow that runs on pushes to `main`, while catalog imports remain operator-run commands.
+
+The workflow first checks whether production has any unapplied SQL migration files. It only takes a fresh Turso backup artifact and runs `npm run db:migrate` when pending migrations exist. Keep the manual commands below as the fallback path for recovery, first-time setup, or exceptional maintenance:
 
 ```sh
 DATABASE_URL=libsql://... DATABASE_AUTH_TOKEN=... npm run db:migrate
 DATABASE_URL=libsql://... DATABASE_AUTH_TOKEN=... npm run import:parks
 ```
 
-Run those from your machine or CI with the production credentials before expecting the deployed API to serve real catalog data.
+Run those from your machine or CI with the production credentials when you intentionally need to bypass or recover around the GitHub workflow.

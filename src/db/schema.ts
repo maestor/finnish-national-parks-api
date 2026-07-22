@@ -84,6 +84,20 @@ export const parks = sqliteTable(
   })
 );
 
+export const trips = sqliteTable(
+  'trips',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    name: text('name').notNull(),
+    description: text('description'),
+    createdAt: text('created_at').notNull(),
+    updatedAt: text('updated_at').notNull()
+  },
+  (table) => ({
+    nameIndex: index('trips_name_idx').on(table.name)
+  })
+);
+
 export const parkVisits = sqliteTable(
   'park_visits',
   {
@@ -91,6 +105,7 @@ export const parkVisits = sqliteTable(
     parkId: integer('park_id')
       .notNull()
       .references(() => parks.id),
+    tripId: integer('trip_id').references(() => trips.id, { onDelete: 'set null' }),
     visitedOn: text('visited_on').notNull(),
     note: text('note'),
     route: text('route'),
@@ -100,6 +115,7 @@ export const parkVisits = sqliteTable(
   },
   (table) => ({
     parkIdIndex: index('park_visits_park_id_idx').on(table.parkId),
+    tripIdIndex: index('park_visits_trip_id_idx').on(table.tripId),
     visitedOnIndex: index('park_visits_visited_on_idx').on(table.visitedOn)
   })
 );

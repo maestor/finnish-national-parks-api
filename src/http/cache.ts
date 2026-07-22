@@ -25,7 +25,7 @@ export const createCatalogDetailEtag = (input: {
 
 export const createPublicSummaryEtag = (input: {
   activeCount?: number;
-  kind: 'home' | 'map' | 'timeline';
+  kind: 'home' | 'map' | 'timeline' | 'trips';
   latestCatalogImportRunId?: number | null;
   latestCatalogUpdatedAt?: string | null;
   publicUpdatedAt: string | null;

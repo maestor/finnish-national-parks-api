@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import { updateParkRequestSchema, updateVisitRequestSchema } from '../../src/contracts/parks.js';
+import {
+  updateParkRequestSchema,
+  updateTripRequestSchema,
+  updateVisitRequestSchema
+} from '../../src/contracts/parks.js';
 import {
   createCatalogDetailEtag,
   createCatalogListEtag,
@@ -16,6 +20,9 @@ describe('contracts and cache helpers', () => {
     expect(updateVisitRequestSchema.parse({ note: 'Updated note' })).toEqual({
       note: 'Updated note'
     });
+    expect(updateVisitRequestSchema.parse({ tripId: null })).toEqual({
+      tripId: null
+    });
   });
 
   it('requires at least one field when patching a park', () => {
@@ -24,6 +31,15 @@ describe('contracts and cache helpers', () => {
     );
     expect(updateParkRequestSchema.parse({ name: 'Updated park' })).toEqual({
       name: 'Updated park'
+    });
+  });
+
+  it('requires at least one field when patching a trip', () => {
+    expect(() => updateTripRequestSchema.parse({})).toThrow(
+      'Provide at least one field to update.'
+    );
+    expect(updateTripRequestSchema.parse({ name: 'Updated trip' })).toEqual({
+      name: 'Updated trip'
     });
   });
 

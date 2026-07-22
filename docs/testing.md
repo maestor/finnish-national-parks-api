@@ -82,19 +82,21 @@ If an upload limit exists, at least one test should cover the real stored-object
 - Park responses expose raw `locationLabel`, `postalCode`, and `postalOffice` fields from the database, plus a derived `address` string for display use.
 - `GET /api/home-summary` returns cache-friendly home summary data including seasonal visit counts, `progressByType` visibility flags, and aggregated `progressByCategory`, without notes, routes, or images.
 - `GET /api/map-summary` returns lightweight map data plus per-park visited summaries.
-- `GET /api/visits-timeline` returns the lightweight `/kaynnit` timeline dataset with `imageCount` and pre-resolved park `typeLabel` values.
+- `GET /api/trips` returns named trips with derived `dateRange` and `visitCount`.
+- `GET /api/visits-timeline` returns the lightweight `/kaynnit` timeline dataset with `imageCount`, `trip: { id, name } | null`, and pre-resolved park `typeLabel` values.
 - `POST /api/trip-planner/suggestions` returns up to three Geoapify-backed place suggestions with labels and coordinates for origin/destination pickers.
 - `POST /api/trip-planner/search` geocodes endpoints server-side, filters parks against the real routed path, excludes parks outside the corridor, preserves the documented unvisited-first ordering, suppresses overly broad matches from the first 30 km of long trips, and returns map-ready route geometry plus route and park bounding boxes.
 - `GET /api/parks/:slug/visits` returns park-scoped visit history and visited summary.
-- `GET /api/visits` and `GET /api/visits/:id` expose visit resources with parent park references.
-- Catalog, home summary, map summary, and visits timeline `GET` endpoints emit ETags and return `304 Not Modified` for matching `If-None-Match`.
+- `GET /api/visits` and `GET /api/visits/:id` expose visit resources with parent park references and `trip: { id, name } | null`.
+- Catalog, home summary, map summary, trip list, and visits timeline `GET` endpoints emit ETags and return `304 Not Modified` for matching `If-None-Match`.
 - Catalog `GET` endpoints are safe for public caching.
-- Home summary, map summary, and visits timeline endpoints use shared-cache headers and bump their version signal when visit or visit-image data changes.
+- Home summary, map summary, trip list, and visits timeline endpoints use shared-cache headers and bump their version signal when trip, visit, or visit-image data changes.
 - Visit and management endpoints are private or no-store.
 - Trip planner provider failures surface as stable app errors instead of raw Geoapify responses.
 - All write routes and admin-only visibility reads require an admin session and fail closed when OAuth session auth is unavailable.
 - Park removal toggle can hide and restore a park through the authenticated park-management API.
-- Visit create/edit/delete supports optional route and author fields.
+- Trip create/edit/delete supports named-trip CRUD and clears visit assignments on delete.
+- Visit create/edit/delete supports optional route, author, and `tripId` assignment fields.
 - Visit create/edit/delete works against a real temporary database.
 - Park logo upload logic verifies the park slug, prefers `data/logos/<slug>.png`, falls back to `data/logos/display-types/<normalized-display-type>.png` when a park shares a display type, uploads the resolved file once to the matching R2 key, and persists the logo reference in the database.
 - Auth routes bypass bearer-token middleware.
@@ -140,5 +142,6 @@ When a production platform behavior cannot be reproduced locally, add the smalle
 ## CI
 
 Pull requests against `main` trigger a GitHub Actions workflow that runs `npm run verify`. The build must pass before review and merge.
+Pushes to `main` trigger the `Production Migration` workflow, which first checks whether production has pending SQL migrations, then backs up and migrates only when needed. That job is intended to be selected as a Vercel Deployment Check before production auto-promotion.
 
 The Vitest `testTimeout` is raised to 20 seconds because full-catalog importer integration tests insert 148 fixture records per test and can exceed the 5-second default on constrained CI runners even though they finish in well under a second locally.

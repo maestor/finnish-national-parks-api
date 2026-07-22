@@ -28,7 +28,7 @@ Every route must fit one explicit access class:
 Rules:
 
 - Do not describe a route as public unless it is anonymously accessible over the network.
-- There are no anonymous site data endpoints. Frontend-facing `GET` routes still require the API key outside localhost, while admin routes require a valid admin session.
+- There are no anonymous site data endpoints. Frontend-facing `GET` routes such as `/api/home-summary`, `/api/map-summary`, `/api/trips`, and `/api/visits-timeline` still require the API key outside localhost, while admin routes require a valid admin session.
 - New anonymously accessible routes must define cache policy, abuse controls, and the reason they are safe to expose.
 - Removing an unused admin endpoint is preferred over leaving it available behind auth.
 
@@ -42,6 +42,7 @@ Rules:
 - If OAuth/session auth is unavailable, admin-session routes should fail closed rather than silently downgrading to weaker auth.
 - When auth policy changes, update runtime enforcement, route contracts, integration tests, `README.md`, `docs/development.md`, and this file in the same change.
 - When a route mixes API-key and session requirements, document both clearly in contract and contributor docs.
+- Named-trip writes (`POST /api/trips`, `PATCH /api/trips/:id`, `DELETE /api/trips/:id`) stay on the admin-session side, while trip reads (`GET /api/trips`) stay read-only and API-key protected like the other frontend summary endpoints.
 
 ## Storage And Upload Rules
 
@@ -76,7 +77,10 @@ Rules:
 
 - Vercel deployments must not run against local `file:` databases.
 - Vercel deployments must not use `MEMORY_STORAGE=true`.
+- Production Turso credentials for automated migrations must live in GitHub Actions environment secrets, not in committed files or browser-reachable config.
+- Production deployment promotion should stay gated on the GitHub migration check so schema updates complete before merged code is served.
 - Shared cache headers and `ETag` behavior must be deliberate for catalog and summary routes.
+- Shared cache headers and `ETag` behavior for trip and visit summary datasets must stay tied to the owned visit-data version signal so trip rename/delete and visit reassignment invalidate cached timeline reads predictably.
 - Private or admin responses must use non-cacheable headers.
 - New rate-sensitive anonymous flows should add edge or app-layer rate limiting before exposure.
 - Add a minimal API-focused security header set when platform defaults do not already provide it.

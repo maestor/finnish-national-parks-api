@@ -130,6 +130,7 @@ describe('API routes', () => {
       author?: string;
       note?: string;
       route?: string;
+      tripId?: number | null;
       visitedOn: string;
     }
   ) => {
@@ -143,6 +144,33 @@ describe('API routes', () => {
 
     return {
       body: (await response.json()) as { id: number },
+      response
+    };
+  };
+
+  const createTrip = async (
+    app: ReturnType<typeof createApp>,
+    body: {
+      description?: string | null;
+      name: string;
+    }
+  ) => {
+    const response = await requestAsAdmin(app, '/api/trips', {
+      method: 'POST',
+      body: JSON.stringify(body),
+      headers: {
+        'content-type': 'application/json'
+      }
+    });
+
+    return {
+      body: (await response.json()) as {
+        dateRange: { end: string; start: string } | null;
+        description: string | null;
+        id: number;
+        name: string;
+        visitCount: number;
+      },
       response
     };
   };
@@ -1564,6 +1592,304 @@ describe('API routes', () => {
     expect(secondBody.visits[0]?.park.typeLabel).toBe('Oma kansallispuisto');
   });
 
+  it('supports trip CRUD and exposes visit trip assignments in public and admin payloads', async () => {
+    const app = createAuthedApp();
+    const { body: createdTrip, response: createTripResponse } = await createTrip(app, {
+      description: 'Lapin puistoja ja yksi yllätys.',
+      name: 'Kesäreissu 2026'
+    });
+    const { body: firstVisit } = await createVisit(app, 'akasmannyn-kansallispuisto', {
+      route: 'North trail',
+      tripId: createdTrip.id,
+      visitedOn: '2026-06-07'
+    });
+    const { body: secondVisit } = await createVisit(app, 'seitsemisen-kansallispuisto', {
+      visitedOn: '2026-06-10'
+    });
+
+    expect(createTripResponse.status).toBe(201);
+    expect(createTripResponse.headers.get('cache-control')).toBe('private, no-store');
+    expect(createdTrip).toMatchObject({
+      dateRange: null,
+      description: 'Lapin puistoja ja yksi yllätys.',
+      name: 'Kesäreissu 2026',
+      visitCount: 0
+    });
+
+    const assignTripResponse = await requestAsAdmin(app, `/api/visits/${secondVisit.id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({
+        tripId: createdTrip.id
+      }),
+      headers: {
+        'content-type': 'application/json'
+      }
+    });
+    const assignTripBody = (await assignTripResponse.json()) as {
+      trip: {
+        id: number;
+        name: string;
+      } | null;
+    };
+
+    expect(assignTripResponse.status).toBe(200);
+    expect(assignTripBody.trip).toEqual({
+      id: createdTrip.id,
+      name: 'Kesäreissu 2026'
+    });
+
+    const tripsResponse = await app.request('/api/trips');
+    const tripsBody = (await tripsResponse.json()) as {
+      trips: Array<{
+        dateRange: { end: string; start: string } | null;
+        description: string | null;
+        id: number;
+        name: string;
+        visitCount: number;
+      }>;
+    };
+
+    expect(tripsResponse.status).toBe(200);
+    expect(tripsResponse.headers.get('cache-control')).toBe('public, max-age=0, s-maxage=600');
+    expect(tripsResponse.headers.get('etag')).toBeTruthy();
+    const cachedTripsResponse = await app.request('/api/trips', {
+      headers: {
+        'if-none-match': tripsResponse.headers.get('etag') ?? ''
+      }
+    });
+    expect(cachedTripsResponse.status).toBe(304);
+    expect(tripsBody.trips).toContainEqual(
+      expect.objectContaining({
+        dateRange: {
+          end: '2026-06-10',
+          start: '2026-06-07'
+        },
+        description: 'Lapin puistoja ja yksi yllätys.',
+        id: createdTrip.id,
+        name: 'Kesäreissu 2026',
+        visitCount: 2
+      })
+    );
+
+    const timelineResponse = await app.request('/api/visits-timeline');
+    const timelineBody = (await timelineResponse.json()) as {
+      visits: Array<{
+        id: number;
+        trip: {
+          id: number;
+          name: string;
+        } | null;
+      }>;
+    };
+    const visitsResponse = await app.request('/api/visits');
+    const visitsBody = (await visitsResponse.json()) as {
+      visits: Array<{
+        id: number;
+        trip: {
+          id: number;
+          name: string;
+        } | null;
+      }>;
+    };
+    const visitDetailResponse = await app.request(`/api/visits/${firstVisit.id}`);
+    const visitDetailBody = (await visitDetailResponse.json()) as {
+      trip: {
+        id: number;
+        name: string;
+      } | null;
+    };
+
+    expect(timelineResponse.status).toBe(200);
+    expect(timelineBody.visits.find((visit) => visit.id === firstVisit.id)?.trip).toEqual({
+      id: createdTrip.id,
+      name: 'Kesäreissu 2026'
+    });
+    expect(timelineBody.visits.find((visit) => visit.id === secondVisit.id)?.trip).toEqual({
+      id: createdTrip.id,
+      name: 'Kesäreissu 2026'
+    });
+    expect(visitsResponse.status).toBe(200);
+    expect(visitsBody.visits.find((visit) => visit.id === firstVisit.id)?.trip).toEqual({
+      id: createdTrip.id,
+      name: 'Kesäreissu 2026'
+    });
+    expect(visitDetailResponse.status).toBe(200);
+    expect(visitDetailBody.trip).toEqual({
+      id: createdTrip.id,
+      name: 'Kesäreissu 2026'
+    });
+
+    const renameTripResponse = await requestAsAdmin(app, `/api/trips/${createdTrip.id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({
+        description: 'Päivitetty kuvaus.',
+        name: 'Kesäreissu 2026 v2'
+      }),
+      headers: {
+        'content-type': 'application/json'
+      }
+    });
+    const renameTripBody = (await renameTripResponse.json()) as {
+      description: string | null;
+      id: number;
+      name: string;
+    };
+
+    expect(renameTripResponse.status).toBe(200);
+    expect(renameTripBody).toMatchObject({
+      description: 'Päivitetty kuvaus.',
+      id: createdTrip.id,
+      name: 'Kesäreissu 2026 v2'
+    });
+
+    const clearTripResponse = await requestAsAdmin(app, `/api/visits/${secondVisit.id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({
+        tripId: null
+      }),
+      headers: {
+        'content-type': 'application/json'
+      }
+    });
+    const clearTripBody = (await clearTripResponse.json()) as {
+      trip: {
+        id: number;
+        name: string;
+      } | null;
+    };
+
+    expect(clearTripResponse.status).toBe(200);
+    expect(clearTripBody.trip).toBeNull();
+
+    const renamedTimelineResponse = await app.request('/api/visits-timeline');
+    const renamedTimelineBody = (await renamedTimelineResponse.json()) as {
+      visits: Array<{
+        id: number;
+        trip: {
+          id: number;
+          name: string;
+        } | null;
+      }>;
+    };
+
+    expect(renamedTimelineBody.visits.find((visit) => visit.id === firstVisit.id)?.trip?.name).toBe(
+      'Kesäreissu 2026 v2'
+    );
+    expect(
+      renamedTimelineBody.visits.find((visit) => visit.id === secondVisit.id)?.trip
+    ).toBeNull();
+
+    const deleteTripResponse = await requestAsAdmin(app, `/api/trips/${createdTrip.id}`, {
+      method: 'DELETE'
+    });
+    const clearedTimelineResponse = await app.request('/api/visits-timeline');
+    const clearedTimelineBody = (await clearedTimelineResponse.json()) as {
+      visits: Array<{
+        id: number;
+        trip: {
+          id: number;
+          name: string;
+        } | null;
+      }>;
+    };
+    const clearedVisitsResponse = await app.request('/api/visits');
+    const clearedVisitsBody = (await clearedVisitsResponse.json()) as {
+      visits: Array<{
+        id: number;
+        trip: {
+          id: number;
+          name: string;
+        } | null;
+      }>;
+    };
+    const clearedTripsResponse = await app.request('/api/trips');
+    const clearedTripsBody = (await clearedTripsResponse.json()) as {
+      trips: unknown[];
+    };
+
+    expect(deleteTripResponse.status).toBe(204);
+    expect(clearedTimelineBody.visits.find((visit) => visit.id === firstVisit.id)?.trip).toBeNull();
+    expect(clearedVisitsResponse.status).toBe(200);
+    expect(clearedVisitsBody.visits.find((visit) => visit.id === firstVisit.id)?.trip).toBeNull();
+    expect(clearedTripsResponse.status).toBe(200);
+    expect(clearedTripsBody.trips).toEqual([]);
+  });
+
+  it('returns 500 for unexpected visit write failures', async () => {
+    const brokenCreateDatabase = await createTestDatabase();
+
+    await importParks({
+      database: brokenCreateDatabase.database,
+      expectedActiveCount: 1,
+      now: () => '2026-05-01T09:00:00.000Z',
+      sourceUrl: 'https://example.test/lipas-broken-create',
+      fetchSource: async () => ({
+        items: [createLipasPark()]
+      })
+    });
+
+    const brokenCreateApp = createApp({
+      auth: authConfig,
+      database: brokenCreateDatabase.database
+    });
+
+    await brokenCreateDatabase.dispose();
+
+    const createResponse = await requestAsAdmin(
+      brokenCreateApp,
+      '/api/parks/akasmannyn-kansallispuisto/visits',
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          visitedOn: '2026-04-20'
+        }),
+        headers: {
+          'content-type': 'application/json'
+        }
+      }
+    );
+
+    expect(createResponse.status).toBe(500);
+
+    const brokenUpdateDatabase = await createTestDatabase();
+
+    await importParks({
+      database: brokenUpdateDatabase.database,
+      expectedActiveCount: 1,
+      now: () => '2026-05-01T09:00:00.000Z',
+      sourceUrl: 'https://example.test/lipas-broken-update',
+      fetchSource: async () => ({
+        items: [createLipasPark()]
+      })
+    });
+
+    const brokenUpdateApp = createApp({
+      auth: authConfig,
+      database: brokenUpdateDatabase.database
+    });
+    const { body: createdVisit } = await createVisit(
+      brokenUpdateApp,
+      'akasmannyn-kansallispuisto',
+      {
+        visitedOn: '2026-04-20'
+      }
+    );
+
+    await brokenUpdateDatabase.dispose();
+
+    const updateResponse = await requestAsAdmin(brokenUpdateApp, `/api/visits/${createdVisit.id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({
+        note: 'Should fail'
+      }),
+      headers: {
+        'content-type': 'application/json'
+      }
+    });
+
+    expect(updateResponse.status).toBe(500);
+  });
+
   it('supports visit workflows with private cache policy', async () => {
     const app = createAuthedApp();
 
@@ -1720,6 +2046,61 @@ describe('API routes', () => {
     const missingVisitDelete = await requestAsAdmin(app, '/api/visits/99999', {
       method: 'DELETE'
     });
+    const missingTripCreate = await requestAsAdmin(app, '/api/trips/99999', {
+      method: 'PATCH',
+      body: JSON.stringify({
+        name: 'Missing trip'
+      }),
+      headers: {
+        'content-type': 'application/json'
+      }
+    });
+    const missingTripDelete = await requestAsAdmin(app, '/api/trips/99999', {
+      method: 'DELETE'
+    });
+    const missingTripAssignment = await requestAsAdmin(
+      app,
+      '/api/parks/akasmannyn-kansallispuisto/visits',
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          tripId: 99999,
+          visitedOn: '2026-04-20'
+        }),
+        headers: {
+          'content-type': 'application/json'
+        }
+      }
+    );
+    const { body: visitForMissingTripUpdate } = await createVisit(
+      app,
+      'akasmannyn-kansallispuisto',
+      {
+        visitedOn: '2026-04-22'
+      }
+    );
+    const missingTripUpdateAssignment = await requestAsAdmin(app, '/api/visits/99999', {
+      method: 'PATCH',
+      body: JSON.stringify({
+        tripId: 99999
+      }),
+      headers: {
+        'content-type': 'application/json'
+      }
+    });
+    const missingTripUpdateOnExistingVisit = await requestAsAdmin(
+      app,
+      `/api/visits/${visitForMissingTripUpdate.id}`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify({
+          tripId: 99999
+        }),
+        headers: {
+          'content-type': 'application/json'
+        }
+      }
+    );
 
     expect(missingCatalog.status).toBe(404);
     expect(missingParkVisits.status).toBe(404);
@@ -1727,6 +2108,11 @@ describe('API routes', () => {
     expect(missingVisitGet.status).toBe(404);
     expect(missingVisitPatch.status).toBe(404);
     expect(missingVisitDelete.status).toBe(404);
+    expect(missingTripCreate.status).toBe(404);
+    expect(missingTripDelete.status).toBe(404);
+    expect(missingTripAssignment.status).toBe(404);
+    expect(missingTripUpdateAssignment.status).toBe(404);
+    expect(missingTripUpdateOnExistingVisit.status).toBe(404);
   });
 
   it('hides removed parks from catalog and visit responses', async () => {
@@ -1887,6 +2273,9 @@ describe('API routes', () => {
     const { body: createdVisit } = await createVisit(app, 'akasmannyn-kansallispuisto', {
       visitedOn: '2026-04-20'
     });
+    const { body: createdTrip } = await createTrip(app, {
+      name: 'Valvottu retki'
+    });
 
     const removeParkResponse = await app.request('/api/parks/akasmannyn-kansallispuisto/removed', {
       method: 'PATCH',
@@ -1909,9 +2298,33 @@ describe('API routes', () => {
     const deleteVisitResponse = await app.request(`/api/visits/${createdVisit.id}`, {
       method: 'DELETE'
     });
+    const createTripResponse = await app.request('/api/trips', {
+      method: 'POST',
+      body: JSON.stringify({
+        name: 'Luvaton retki'
+      }),
+      headers: {
+        'content-type': 'application/json'
+      }
+    });
+    const updateTripResponse = await app.request(`/api/trips/${createdTrip.id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({
+        name: 'Unauthorized rename'
+      }),
+      headers: {
+        'content-type': 'application/json'
+      }
+    });
+    const deleteTripResponse = await app.request(`/api/trips/${createdTrip.id}`, {
+      method: 'DELETE'
+    });
     const removeParkBody = (await removeParkResponse.json()) as { error: string };
     const updateVisitBody = (await updateVisitResponse.json()) as { error: string };
     const deleteVisitBody = (await deleteVisitResponse.json()) as { error: string };
+    const createTripBody = (await createTripResponse.json()) as { error: string };
+    const updateTripBody = (await updateTripResponse.json()) as { error: string };
+    const deleteTripBody = (await deleteTripResponse.json()) as { error: string };
 
     expect(removeParkResponse.status).toBe(401);
     expect(removeParkBody.error).toBe('Unauthorized');
@@ -1919,6 +2332,12 @@ describe('API routes', () => {
     expect(updateVisitBody.error).toBe('Unauthorized');
     expect(deleteVisitResponse.status).toBe(401);
     expect(deleteVisitBody.error).toBe('Unauthorized');
+    expect(createTripResponse.status).toBe(401);
+    expect(createTripBody.error).toBe('Unauthorized');
+    expect(updateTripResponse.status).toBe(401);
+    expect(updateTripBody.error).toBe('Unauthorized');
+    expect(deleteTripResponse.status).toBe(401);
+    expect(deleteTripBody.error).toBe('Unauthorized');
   });
 
   it('serves lightweight admin park visibility data for visible and removed parks', async () => {
