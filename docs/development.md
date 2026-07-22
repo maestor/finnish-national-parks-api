@@ -320,7 +320,7 @@ This is intentionally a narrow contract: `src/index.ts` is the one place that sh
 
 Vercel only serves the HTTP API. Production schema migrations now belong in the GitHub Actions `Production Migration` workflow that runs on pushes to `main`, while catalog imports remain operator-run commands.
 
-The workflow takes a fresh Turso backup artifact first, then runs `npm run db:migrate` with the GitHub `production` environment secrets. Keep the manual commands below as the fallback path for recovery, first-time setup, or exceptional maintenance:
+The workflow first checks whether production has any unapplied SQL migration files. It only takes a fresh Turso backup artifact and runs `npm run db:migrate` when pending migrations exist. Keep the manual commands below as the fallback path for recovery, first-time setup, or exceptional maintenance:
 
 ```sh
 DATABASE_URL=libsql://... DATABASE_AUTH_TOKEN=... npm run db:migrate

@@ -83,6 +83,7 @@ Production notes:
 - `MEMORY_STORAGE=true` is for tests and local-only development, not Vercel.
 - Production merges to `main` should run the GitHub Actions `Production Migration` workflow against Turso before Vercel promotes the new production build.
 - Store production `DATABASE_URL` and `DATABASE_AUTH_TOKEN` in the GitHub `production` environment for that workflow, and configure Vercel Deployment Checks to require the GitHub check named `Migrate production database`.
+- That workflow now checks production first and only takes a backup plus runs `npm run db:migrate` when unapplied SQL migration files actually exist.
 - `npm run db:backup` reads the current remote `DATABASE_URL` and `DATABASE_AUTH_TOKEN`, then writes a timestamped SQLite backup under `data/backups/`. You can append an optional label with `npm run db:backup -- before-import`.
 - `npm run db:migrate` remains available as the manual fallback or recovery path if the production workflow is unavailable.
 - `npm run park:move-visits -- --from <source-slug> --to <target-slug> [--dry-run]` reassigns all visits for one park slug to another. Visit images stay attached automatically because they belong to the visit rows.

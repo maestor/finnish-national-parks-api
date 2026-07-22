@@ -32,13 +32,22 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Check for pending production migrations
+        id: pending-migrations
+        env:
+          DATABASE_AUTH_TOKEN: ${{ secrets.DATABASE_AUTH_TOKEN }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: npm run db:migrate:pending
+
       - name: Backup production database
+        if: steps.pending-migrations.outputs.has_pending == 'true'
         env:
           DATABASE_AUTH_TOKEN: ${{ secrets.DATABASE_AUTH_TOKEN }}
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: npm run db:backup -- before-production-migrate
 
       - name: Upload backup artifact
+        if: steps.pending-migrations.outputs.has_pending == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: production-db-backup-${{ github.run_id }}
@@ -47,7 +56,12 @@ jobs:
           retention-days: 14
 
       - name: Run production migrations
+        if: steps.pending-migrations.outputs.has_pending == 'true'
         env:
           DATABASE_AUTH_TOKEN: ${{ secrets.DATABASE_AUTH_TOKEN }}
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: npm run db:migrate
+
+      - name: Skip backup and migrate when schema is current
+        if: steps.pending-migrations.outputs.has_pending != 'true'
+        run: echo "Production database is already up to date."
