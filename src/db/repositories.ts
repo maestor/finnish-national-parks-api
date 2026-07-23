@@ -19,6 +19,7 @@ import {
   parkTypes,
   parkVisits,
   publicDataVersions,
+  tripStops,
   trips,
   visitImages
 } from './schema.js';
@@ -73,6 +74,32 @@ type UpdateTripInput = {
     | undefined;
 };
 
+type PutTripStopInput = {
+  location: {
+    coordinate: {
+      lat: number;
+      lon: number;
+    };
+    label: string;
+  };
+  note?: string | null | undefined;
+  tripStopOrder?: number | undefined;
+};
+
+type UpdateTripStopInput = {
+  location?:
+    | {
+        coordinate: {
+          lat: number;
+          lon: number;
+        };
+        label: string;
+      }
+    | undefined;
+  note?: string | null | undefined;
+  tripStopOrder?: number | undefined;
+};
+
 type UpdateParkDetailsInput = {
   areaKm2?: number | null | undefined;
   displayTypeName?: string | null | undefined;
@@ -125,6 +152,11 @@ type TripStartingPoint = {
   label: string;
 };
 
+type TripStopLocation = {
+  coordinate: MarkerPoint;
+  label: string;
+};
+
 type GetLogoPublicUrl = (key: string, updatedAt: string) => string | Promise<string>;
 type GetMapPublicUrl = (key: string, updatedAt: string) => string | Promise<string>;
 
@@ -157,6 +189,21 @@ type TripRow = {
   startVisitedOn: string | null;
   updatedAt: string;
   visitCount: number;
+};
+
+type TripStopRow = typeof tripStops.$inferSelect;
+
+type TripDetailVisitRow = {
+  author: string | null;
+  createdAt: string;
+  id: number;
+  note: string | null;
+  parkName: string;
+  parkSlug: string;
+  route: string | null;
+  tripStopOrder: number;
+  updatedAt: string;
+  visitedOn: string;
 };
 
 type PublicParkRow = {
@@ -336,6 +383,30 @@ const normalizeTripStartingPoint = (
     label: startingPoint.label.trim(),
     lat: startingPoint.coordinate.lat,
     lon: startingPoint.coordinate.lon
+  };
+};
+
+const toTripStopLocation = (row: { label: string; lat: number; lon: number }): TripStopLocation => {
+  return {
+    coordinate: {
+      lat: row.lat,
+      lon: row.lon
+    },
+    label: row.label
+  };
+};
+
+const normalizeTripStopLocation = (location: {
+  coordinate: {
+    lat: number;
+    lon: number;
+  };
+  label: string;
+}) => {
+  return {
+    label: location.label.trim(),
+    lat: location.coordinate.lat,
+    lon: location.coordinate.lon
   };
 };
 
@@ -698,6 +769,45 @@ const toTrip = (row: TripRow) => {
   };
 };
 
+const toTripStop = (row: TripStopRow) => {
+  return {
+    createdAt: row.createdAt,
+    id: row.id,
+    location: toTripStopLocation(row),
+    note: row.note,
+    tripStopOrder: row.tripStopOrder,
+    updatedAt: row.updatedAt
+  };
+};
+
+const toTripItineraryVisitEntry = (row: TripDetailVisitRow) => {
+  return {
+    kind: 'visit' as const,
+    tripStopOrder: row.tripStopOrder,
+    visit: {
+      author: row.author,
+      createdAt: row.createdAt,
+      id: row.id,
+      note: row.note,
+      park: {
+        name: row.parkName,
+        slug: row.parkSlug
+      },
+      route: row.route,
+      updatedAt: row.updatedAt,
+      visitedOn: row.visitedOn
+    }
+  };
+};
+
+const toTripItineraryStopEntry = (row: TripStopRow) => {
+  return {
+    kind: 'stop' as const,
+    tripStopOrder: row.tripStopOrder,
+    stop: toTripStop(row)
+  };
+};
+
 const toVisit = (
   row: typeof parkVisits.$inferSelect,
   images: VisitImage[] = [],
@@ -726,6 +836,12 @@ const getParkRecordBySlug = async (database: Database, slug: string) => {
 const getTripRecordById = async (database: DbClient, tripId: number) => {
   return database.query.trips.findFirst({
     where: eq(trips.id, tripId)
+  });
+};
+
+const getTripStopRecordById = async (database: DbClient, tripStopId: number) => {
+  return database.query.tripStops.findFirst({
+    where: eq(tripStops.id, tripStopId)
   });
 };
 
@@ -1118,6 +1234,36 @@ const listTripRows = async (database: Database): Promise<TripRow[]> => {
     .orderBy(asc(trips.name), asc(trips.id));
 };
 
+const listTripStopRowsByTripId = async (database: Database, tripId: number) => {
+  return database.query.tripStops.findMany({
+    orderBy: [asc(tripStops.tripStopOrder), asc(tripStops.id)],
+    where: eq(tripStops.tripId, tripId)
+  });
+};
+
+const listTripDetailVisitRowsByTripId = async (
+  database: Database,
+  tripId: number
+): Promise<TripDetailVisitRow[]> => {
+  return database
+    .select({
+      author: parkVisits.author,
+      createdAt: parkVisits.createdAt,
+      id: parkVisits.id,
+      note: parkVisits.note,
+      parkName: parks.name,
+      parkSlug: parks.slug,
+      route: parkVisits.route,
+      tripStopOrder: parkVisits.tripStopOrder,
+      updatedAt: parkVisits.updatedAt,
+      visitedOn: parkVisits.visitedOn
+    })
+    .from(parkVisits)
+    .innerJoin(parks, eq(parkVisits.parkId, parks.id))
+    .where(and(eq(parkVisits.tripId, tripId), eq(parks.removed, false)))
+    .orderBy(asc(parkVisits.tripStopOrder), asc(parkVisits.id)) as Promise<TripDetailVisitRow[]>;
+};
+
 const listVisitTimelineRows = async (database: Database): Promise<VisitTimelineRow[]> => {
   return database
     .select({
@@ -1159,22 +1305,38 @@ const listVisitTimelineRows = async (database: Database): Promise<VisitTimelineR
     .orderBy(desc(parkVisits.visitedOn), desc(parkVisits.createdAt), desc(parkVisits.id));
 };
 
-const getTripVisitCount = async (database: DbClient, tripId: number, excludeVisitId?: number) => {
-  const where =
-    excludeVisitId === undefined
-      ? eq(parkVisits.tripId, tripId)
-      : and(eq(parkVisits.tripId, tripId), sql`${parkVisits.id} <> ${excludeVisitId}`);
+type TripOrderedItemRef = {
+  id: number;
+  kind: 'stop' | 'visit';
+};
 
-  const rows = await database
-    .select({
-      count: sql<number>`COUNT(*)`
-    })
-    .from(parkVisits)
-    .where(where);
+type TripOrderedItemRecord = {
+  tripId: number | null;
+  tripStopOrder: number | null;
+} & TripOrderedItemRef;
 
-  const [row] = rows;
+const getTripItemCount = async (database: DbClient, tripId: number, excludeVisitId?: number) => {
+  const visitWhere =
+    excludeVisitId !== undefined
+      ? and(eq(parkVisits.tripId, tripId), sql`${parkVisits.id} <> ${excludeVisitId}`)
+      : eq(parkVisits.tripId, tripId);
 
-  return Number(row!.count);
+  const [visitRows, tripStopRows] = await Promise.all([
+    database
+      .select({
+        count: sql<number>`COUNT(*)`
+      })
+      .from(parkVisits)
+      .where(visitWhere),
+    database
+      .select({
+        count: sql<number>`COUNT(*)`
+      })
+      .from(tripStops)
+      .where(eq(tripStops.tripId, tripId))
+  ]);
+
+  return Number(visitRows[0]!.count) + Number(tripStopRows[0]!.count);
 };
 
 const normalizeTripStopOrder = (requestedOrder: number | undefined, maxOrder: number) => {
@@ -1191,13 +1353,22 @@ const shiftTripStopOrdersUpFrom = async (
   fromOrder: number,
   timestamp: string
 ) => {
-  await database
-    .update(parkVisits)
-    .set({
-      tripStopOrder: sql`${parkVisits.tripStopOrder} + 1`,
-      updatedAt: timestamp
-    })
-    .where(and(eq(parkVisits.tripId, tripId), gte(parkVisits.tripStopOrder, fromOrder)));
+  await Promise.all([
+    database
+      .update(parkVisits)
+      .set({
+        tripStopOrder: sql`${parkVisits.tripStopOrder} + 1`,
+        updatedAt: timestamp
+      })
+      .where(and(eq(parkVisits.tripId, tripId), gte(parkVisits.tripStopOrder, fromOrder))),
+    database
+      .update(tripStops)
+      .set({
+        tripStopOrder: sql`${tripStops.tripStopOrder} + 1`,
+        updatedAt: timestamp
+      })
+      .where(and(eq(tripStops.tripId, tripId), gte(tripStops.tripStopOrder, fromOrder)))
+  ]);
 };
 
 const closeTripStopOrderGap = async (
@@ -1206,13 +1377,22 @@ const closeTripStopOrderGap = async (
   removedOrder: number,
   timestamp: string
 ) => {
-  await database
-    .update(parkVisits)
-    .set({
-      tripStopOrder: sql`${parkVisits.tripStopOrder} - 1`,
-      updatedAt: timestamp
-    })
-    .where(and(eq(parkVisits.tripId, tripId), gt(parkVisits.tripStopOrder, removedOrder)));
+  await Promise.all([
+    database
+      .update(parkVisits)
+      .set({
+        tripStopOrder: sql`${parkVisits.tripStopOrder} - 1`,
+        updatedAt: timestamp
+      })
+      .where(and(eq(parkVisits.tripId, tripId), gt(parkVisits.tripStopOrder, removedOrder))),
+    database
+      .update(tripStops)
+      .set({
+        tripStopOrder: sql`${tripStops.tripStopOrder} - 1`,
+        updatedAt: timestamp
+      })
+      .where(and(eq(tripStops.tripId, tripId), gt(tripStops.tripStopOrder, removedOrder)))
+  ]);
 };
 
 const resolveCreateTripStopOrder = async (
@@ -1229,10 +1409,10 @@ const resolveCreateTripStopOrder = async (
     return null;
   }
 
-  const tripVisitCount = await getTripVisitCount(database, tripId);
-  const nextOrder = normalizeTripStopOrder(requestedOrder, tripVisitCount + 1);
+  const tripItemCount = await getTripItemCount(database, tripId);
+  const nextOrder = normalizeTripStopOrder(requestedOrder, tripItemCount + 1);
 
-  if (nextOrder <= tripVisitCount) {
+  if (nextOrder <= tripItemCount) {
     await shiftTripStopOrdersUpFrom(database, tripId, nextOrder, timestamp);
   }
 
@@ -1241,13 +1421,14 @@ const resolveCreateTripStopOrder = async (
 
 const resolveUpdatedTripStopOrder = async (
   database: DbClient,
-  existingVisit: typeof parkVisits.$inferSelect,
+  existingItem: TripOrderedItemRecord,
   nextTripId: number | null,
   requestedOrder: number | undefined,
-  timestamp: string
+  timestamp: string,
+  existingVisitId?: number
 ) => {
-  const currentTripId = existingVisit.tripId;
-  const currentOrder = existingVisit.tripStopOrder;
+  const currentTripId = existingItem.tripId;
+  const currentOrder = existingItem.tripStopOrder;
 
   if (nextTripId === null) {
     if (requestedOrder !== undefined) {
@@ -1266,10 +1447,10 @@ const resolveUpdatedTripStopOrder = async (
       await closeTripStopOrderGap(database, currentTripId, currentOrder, timestamp);
     }
 
-    const nextTripVisitCount = await getTripVisitCount(database, nextTripId);
-    const nextOrder = normalizeTripStopOrder(requestedOrder, nextTripVisitCount + 1);
+    const nextTripItemCount = await getTripItemCount(database, nextTripId);
+    const nextOrder = normalizeTripStopOrder(requestedOrder, nextTripItemCount + 1);
 
-    if (nextOrder <= nextTripVisitCount) {
+    if (nextOrder <= nextTripItemCount) {
       await shiftTripStopOrdersUpFrom(database, nextTripId, nextOrder, timestamp);
     }
 
@@ -1281,12 +1462,12 @@ const resolveUpdatedTripStopOrder = async (
       return currentOrder;
     }
 
-    const nextTripVisitCount = await getTripVisitCount(database, nextTripId, existingVisit.id);
-    return nextTripVisitCount + 1;
+    const nextTripItemCount = await getTripItemCount(database, nextTripId, existingVisitId);
+    return nextTripItemCount + 1;
   }
 
-  const tripVisitCount = await getTripVisitCount(database, nextTripId);
-  const nextOrder = normalizeTripStopOrder(requestedOrder, tripVisitCount);
+  const tripItemCount = await getTripItemCount(database, nextTripId);
+  const nextOrder = normalizeTripStopOrder(requestedOrder, tripItemCount);
 
   if (currentOrder === null) {
     await shiftTripStopOrdersUpFrom(database, nextTripId, nextOrder, timestamp);
@@ -1298,33 +1479,63 @@ const resolveUpdatedTripStopOrder = async (
   }
 
   if (nextOrder < currentOrder) {
-    await database
-      .update(parkVisits)
-      .set({
-        tripStopOrder: sql`${parkVisits.tripStopOrder} + 1`,
-        updatedAt: timestamp
-      })
-      .where(
-        and(
-          eq(parkVisits.tripId, nextTripId),
-          gte(parkVisits.tripStopOrder, nextOrder),
-          lt(parkVisits.tripStopOrder, currentOrder)
+    await Promise.all([
+      database
+        .update(parkVisits)
+        .set({
+          tripStopOrder: sql`${parkVisits.tripStopOrder} + 1`,
+          updatedAt: timestamp
+        })
+        .where(
+          and(
+            eq(parkVisits.tripId, nextTripId),
+            gte(parkVisits.tripStopOrder, nextOrder),
+            lt(parkVisits.tripStopOrder, currentOrder)
+          )
+        ),
+      database
+        .update(tripStops)
+        .set({
+          tripStopOrder: sql`${tripStops.tripStopOrder} + 1`,
+          updatedAt: timestamp
+        })
+        .where(
+          and(
+            eq(tripStops.tripId, nextTripId),
+            gte(tripStops.tripStopOrder, nextOrder),
+            lt(tripStops.tripStopOrder, currentOrder)
+          )
         )
-      );
+    ]);
   } else {
-    await database
-      .update(parkVisits)
-      .set({
-        tripStopOrder: sql`${parkVisits.tripStopOrder} - 1`,
-        updatedAt: timestamp
-      })
-      .where(
-        and(
-          eq(parkVisits.tripId, nextTripId),
-          gt(parkVisits.tripStopOrder, currentOrder),
-          lte(parkVisits.tripStopOrder, nextOrder)
+    await Promise.all([
+      database
+        .update(parkVisits)
+        .set({
+          tripStopOrder: sql`${parkVisits.tripStopOrder} - 1`,
+          updatedAt: timestamp
+        })
+        .where(
+          and(
+            eq(parkVisits.tripId, nextTripId),
+            gt(parkVisits.tripStopOrder, currentOrder),
+            lte(parkVisits.tripStopOrder, nextOrder)
+          )
+        ),
+      database
+        .update(tripStops)
+        .set({
+          tripStopOrder: sql`${tripStops.tripStopOrder} - 1`,
+          updatedAt: timestamp
+        })
+        .where(
+          and(
+            eq(tripStops.tripId, nextTripId),
+            gt(tripStops.tripStopOrder, currentOrder),
+            lte(tripStops.tripStopOrder, nextOrder)
+          )
         )
-      );
+    ]);
   }
 
   return nextOrder;
@@ -1553,6 +1764,29 @@ export const listVisits = async (
 export const listTrips = async (database: Database) => {
   const rows = await listTripRows(database);
   return rows.map((row) => toTrip(row));
+};
+
+export const getTripById = async (database: Database, tripId: number) => {
+  const [tripRows, tripStopRows, tripVisitRows] = await Promise.all([
+    listTripRows(database),
+    listTripStopRowsByTripId(database, tripId),
+    listTripDetailVisitRowsByTripId(database, tripId)
+  ]);
+  const trip = tripRows.find((row) => row.id === tripId);
+
+  if (!trip) {
+    return null;
+  }
+
+  const itinerary = [
+    ...tripVisitRows.map((row) => toTripItineraryVisitEntry(row)),
+    ...tripStopRows.map((row) => toTripItineraryStopEntry(row))
+  ].sort((a, b) => a.tripStopOrder - b.tripStopOrder);
+
+  return {
+    ...toTrip(trip),
+    itinerary
+  };
 };
 
 export const getVisitById = async (
@@ -1836,6 +2070,49 @@ export const createTrip = async (database: Database, input: PutTripInput) => {
     startVisitedOn: null,
     updatedAt: row.updatedAt,
     visitCount: 0
+  });
+};
+
+export const createTripStop = async (
+  database: Database,
+  tripId: number,
+  input: PutTripStopInput
+) => {
+  const trip = await getTripRecordById(database, tripId);
+
+  if (!trip) {
+    throw new RepositoryNotFoundError('Trip not found.');
+  }
+
+  const location = normalizeTripStopLocation(input.location);
+  const timestamp = new Date().toISOString();
+
+  return database.transaction(async (tx) => {
+    const tripStopOrder = (await resolveCreateTripStopOrder(
+      tx,
+      tripId,
+      input.tripStopOrder,
+      timestamp
+    ))!;
+    const row = (
+      await tx
+        .insert(tripStops)
+        .values({
+          createdAt: timestamp,
+          label: location.label,
+          lat: location.lat,
+          lon: location.lon,
+          note: normalizeOptionalText(input.note),
+          tripId,
+          tripStopOrder,
+          updatedAt: timestamp
+        })
+        .returning()
+    )[0]!;
+
+    await bumpPublicVisitDataVersion(tx, timestamp);
+
+    return toTripStop(row);
   });
 };
 
@@ -2169,6 +2446,57 @@ export const updateTrip = async (database: Database, tripId: number, input: Upda
   return toTrip(row);
 };
 
+export const updateTripStop = async (
+  database: Database,
+  tripStopId: number,
+  input: UpdateTripStopInput
+) => {
+  const existingTripStop = await getTripStopRecordById(database, tripStopId);
+
+  if (!existingTripStop) {
+    return null;
+  }
+
+  const nextLocation =
+    input.location === undefined ? undefined : normalizeTripStopLocation(input.location);
+  const timestamp = new Date().toISOString();
+
+  return database.transaction(async (tx) => {
+    const tripStopOrder = await resolveUpdatedTripStopOrder(
+      tx,
+      {
+        id: existingTripStop.id,
+        kind: 'stop',
+        tripId: existingTripStop.tripId,
+        tripStopOrder: existingTripStop.tripStopOrder
+      },
+      existingTripStop.tripId,
+      input.tripStopOrder,
+      timestamp
+    );
+
+    await tx
+      .update(tripStops)
+      .set({
+        label: nextLocation?.label ?? existingTripStop.label,
+        lat: nextLocation?.lat ?? existingTripStop.lat,
+        lon: nextLocation?.lon ?? existingTripStop.lon,
+        note: input.note === undefined ? existingTripStop.note : normalizeOptionalText(input.note),
+        tripStopOrder: tripStopOrder!,
+        updatedAt: timestamp
+      })
+      .where(eq(tripStops.id, tripStopId));
+
+    const updatedTripStop = (
+      await tx.select().from(tripStops).where(eq(tripStops.id, tripStopId))
+    )[0]!;
+
+    await bumpPublicVisitDataVersion(tx, timestamp);
+
+    return toTripStop(updatedTripStop);
+  });
+};
+
 export const updateVisit = async (database: Database, visitId: number, input: UpdateVisitInput) => {
   const [existingVisit] = await database
     .select()
@@ -2186,10 +2514,16 @@ export const updateVisit = async (database: Database, visitId: number, input: Up
     const resolvedTripId = nextTripId === undefined ? existingVisit.tripId : nextTripId;
     const tripStopOrder = await resolveUpdatedTripStopOrder(
       tx,
-      existingVisit,
+      {
+        id: existingVisit.id,
+        kind: 'visit',
+        tripId: existingVisit.tripId,
+        tripStopOrder: existingVisit.tripStopOrder
+      },
       resolvedTripId,
       input.tripStopOrder,
-      timestamp
+      timestamp,
+      existingVisit.id
     );
 
     await tx
@@ -2235,6 +2569,30 @@ export const deleteTrip = async (database: Database, tripId: number) => {
     if (Number(result.rowsAffected) > 0) {
       await bumpPublicVisitDataVersion(tx, timestamp);
     }
+
+    return Number(result.rowsAffected) > 0;
+  });
+};
+
+export const deleteTripStop = async (database: Database, tripStopId: number) => {
+  const existingTripStop = await getTripStopRecordById(database, tripStopId);
+
+  if (!existingTripStop) {
+    return false;
+  }
+
+  const timestamp = new Date().toISOString();
+
+  return database.transaction(async (tx) => {
+    const result = await tx.delete(tripStops).where(eq(tripStops.id, tripStopId));
+
+    await closeTripStopOrderGap(
+      tx,
+      existingTripStop.tripId,
+      existingTripStop.tripStopOrder,
+      timestamp
+    );
+    await bumpPublicVisitDataVersion(tx, timestamp);
 
     return Number(result.rowsAffected) > 0;
   });

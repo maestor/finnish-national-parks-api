@@ -3,9 +3,11 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import {
   createTrip,
+  createTripStop,
   createVisit,
   createVisitImage,
   deleteTrip,
+  deleteTripStop,
   deleteVisit,
   deleteVisitImage,
   getCatalogListEtagSeed,
@@ -13,6 +15,7 @@ import {
   getParkBySlugIncludingRemoved,
   getParkVisitsBySlug,
   getPublicHomeSummary,
+  getTripById,
   getVisitById,
   listParkRecordsIncludingRemoved,
   listRemovedParks,
@@ -24,6 +27,7 @@ import {
   updateParkLogo,
   updateParkMap,
   updateTrip,
+  updateTripStop,
   updateVisit
 } from '../../src/db/repositories.js';
 import { parks, parkVisits } from '../../src/db/schema.js';
@@ -510,6 +514,140 @@ describe('repositories', () => {
     expect(renamedSecondTrip).toMatchObject({
       id: secondTrip.id,
       slug: 'kesareissu-2026-2'
+    });
+  });
+
+  it('stores trip stops in the shared itinerary order between visits', async () => {
+    const trip = await createTrip(testDatabase.database, {
+      name: 'Kesäreissu 2026',
+      startingPoint: {
+        coordinate: {
+          lat: 60.1699,
+          lon: 24.9384
+        },
+        label: 'Helsinki'
+      }
+    });
+    const firstVisit = await createVisit(testDatabase.database, 'akasmannyn-kansallispuisto', {
+      tripId: trip.id,
+      tripStopOrder: 1,
+      visitedOn: '2026-04-13'
+    });
+    const secondVisit = await createVisit(testDatabase.database, 'akasmannyn-kansallispuisto', {
+      tripId: trip.id,
+      tripStopOrder: 2,
+      visitedOn: '2026-04-13'
+    });
+
+    const stop = await createTripStop(testDatabase.database, trip.id, {
+      location: {
+        coordinate: {
+          lat: 61.3167,
+          lon: 22.1333
+        },
+        label: 'ABC Huittinen'
+      },
+      note: 'Lunch break',
+      tripStopOrder: 2
+    });
+    const tripDetail = await getTripById(testDatabase.database, trip.id);
+
+    expect(stop).toMatchObject({
+      location: {
+        coordinate: {
+          lat: 61.3167,
+          lon: 22.1333
+        },
+        label: 'ABC Huittinen'
+      },
+      note: 'Lunch break',
+      tripStopOrder: 2
+    });
+    expect(tripDetail).toMatchObject({
+      id: trip.id,
+      itinerary: [
+        {
+          kind: 'visit',
+          tripStopOrder: 1,
+          visit: {
+            id: firstVisit.id
+          }
+        },
+        {
+          kind: 'stop',
+          tripStopOrder: 2,
+          stop: {
+            id: stop.id,
+            note: 'Lunch break'
+          }
+        },
+        {
+          kind: 'visit',
+          tripStopOrder: 3,
+          visit: {
+            id: secondVisit.id
+          }
+        }
+      ]
+    });
+
+    const relocatedStop = await updateTripStop(testDatabase.database, stop.id, {
+      location: {
+        coordinate: {
+          lat: 61.451,
+          lon: 23.856
+        },
+        label: 'Yöpyminen Tampereella'
+      }
+    });
+
+    expect(relocatedStop).toMatchObject({
+      location: {
+        coordinate: {
+          lat: 61.451,
+          lon: 23.856
+        },
+        label: 'Yöpyminen Tampereella'
+      },
+      note: 'Lunch break',
+      tripStopOrder: 2
+    });
+
+    const movedStop = await updateTripStop(testDatabase.database, stop.id, {
+      note: 'Coffee break',
+      tripStopOrder: 1
+    });
+    const movedTripDetail = await getTripById(testDatabase.database, trip.id);
+
+    expect(movedStop).toMatchObject({
+      note: 'Coffee break',
+      tripStopOrder: 1
+    });
+    expect(movedTripDetail?.itinerary.map((entry) => entry.tripStopOrder)).toEqual([1, 2, 3]);
+    expect(movedTripDetail?.itinerary[0]).toMatchObject({
+      kind: 'stop',
+      tripStopOrder: 1
+    });
+
+    await expect(deleteTripStop(testDatabase.database, stop.id)).resolves.toBe(true);
+    await expect(deleteTripStop(testDatabase.database, 99999)).resolves.toBe(false);
+    await expect(getTripById(testDatabase.database, trip.id)).resolves.toMatchObject({
+      itinerary: [
+        {
+          kind: 'visit',
+          tripStopOrder: 1,
+          visit: {
+            id: firstVisit.id
+          }
+        },
+        {
+          kind: 'visit',
+          tripStopOrder: 2,
+          visit: {
+            id: secondVisit.id
+          }
+        }
+      ]
     });
   });
 

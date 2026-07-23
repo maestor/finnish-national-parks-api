@@ -103,6 +103,7 @@ The importer's LIPAS source URL and supported type-code list are internal config
 - `GET /api/home-summary`
 - `GET /api/map-summary`
 - `GET /api/trips`
+- `GET /api/trips/:id`
 - `GET /api/visits-timeline`
 - `POST /api/trip-planner/suggestions`
 - `POST /api/trip-planner/search`
@@ -115,6 +116,9 @@ The importer's LIPAS source URL and supported type-code list are internal config
 - `POST /api/trips`
 - `PATCH /api/trips/:id`
 - `DELETE /api/trips/:id`
+- `POST /api/trips/:id/stops`
+- `PATCH /api/trip-stops/:id`
+- `DELETE /api/trip-stops/:id`
 - `PATCH /api/visits/:id`
 - `DELETE /api/visits/:id`
 - `POST /api/visits/:id/images/upload-url`
@@ -146,6 +150,7 @@ Catalog endpoints stay cache-friendly and database-backed:
 - `GET /api/home-summary` returns cache-friendly home-page visit totals, seasonal visit counts, type progress with a `visible` flag, category progress, recent activity, and a visit-data `version` / `updatedAt` signal without notes, routes, or images.
 - `GET /api/map-summary` returns cache-friendly park map data plus per-park visited summaries and the same visit data version signal.
 - `GET /api/trips` returns named trips with derived `dateRange`, `visitCount`, persisted `slug`, optional `startingPoint`, and the same visit-data version-backed cache behavior as the other public summary endpoints.
+- `GET /api/trips/:id` returns one trip with a merged itinerary ordered by `tripStopOrder`, combining park visits and non-park trip stops. This detail route uses `Cache-Control: private, no-store`.
 - `GET /api/visits-timeline` returns the lightweight timeline dataset for `/kaynnit`, with each visit including `id`, `visitedOn`, `createdAt`, `route`, `imageCount`, `trip: { id, name, slug } | null`, `tripStopOrder: number | null`, and a resolved park `typeLabel`. When two visits belong to the same trip on the same day, the timeline uses `tripStopOrder` instead of falling back to entry creation time.
 - `POST /api/trip-planner/suggestions` returns up to three Geoapify-backed place suggestions with labels and coordinates for origin/destination pickers.
 - `POST /api/trip-planner/search` geocodes origin and destination server-side, fetches a real driving route from Geoapify, and returns visible catalog parks within a route corridor using stored park geometry plus visited summaries, route `LineString` geometry, backend-provided route and park bounding boxes for map rendering, and top-level `maxDistanceKm` / `defaultDistanceKm` filter metadata. On longer trips, the first 30 km from the origin is treated as a stricter start zone so dense departure-area clusters do not dominate the results.
@@ -156,13 +161,14 @@ Catalog endpoints stay cache-friendly and database-backed:
 - `GET /api/visits/:id` returns one visit with its parent park reference, `trip: { id, name, slug } | null`, and `tripStopOrder: number | null`.
 - Catalog, home summary, map summary, trip list, and visits timeline `GET` endpoints emit deterministic `ETag` headers and support `304 Not Modified`.
 - Home summary, map summary, trip list, and visits timeline endpoints use `Cache-Control: public, max-age=0, s-maxage=600`.
-- Their visit-data version signal bumps when visit data changes, including trip create/update/delete, visit create/update/delete, and visit image upload/delete/reorder.
+- Their visit-data version signal bumps when visit data changes, including trip create/update/delete, trip-stop create/update/delete, visit create/update/delete, and visit image upload/delete/reorder.
 - Visit and management endpoints use `Cache-Control: private, no-store`.
 - Trip planner suggestion, route-search, and nearby-origin responses also use `Cache-Control: private, no-store`.
 - All write routes and `GET /api/admin/parks/visibility` require a valid admin session cookie.
 - `PATCH /api/parks/:slug` updates the admin-editable park fields (`name`, `slug`, `locationLabel`, `postalOffice`, `postalCode`, `areaKm2`, `establishmentYear`, `parkUrl`, `displayTypeName`) and auto-generates a slug from `name` when `slug` is omitted.
 - `PATCH /api/parks/:slug/removed` lets the admin UI hide or restore a park by toggling its persisted `removed` flag.
 - `POST /api/trips`, `PATCH /api/trips/:id`, and `DELETE /api/trips/:id` are admin-session write routes for named trip management. Trip create/update accepts optional `slug` and optional nullable `startingPoint`, and auto-generates the slug from `name` when `slug` is omitted.
+- `POST /api/trips/:id/stops`, `PATCH /api/trip-stops/:id`, and `DELETE /api/trip-stops/:id` are admin-session write routes for non-park trip stops. Stops use the same labeled coordinate shape as trip `startingPoint`, can include an optional note, and share the same `tripStopOrder` sequence as park visits so route-relevant stops can sit between visits.
 - `POST /api/parks/:slug/visits`, `PATCH /api/visits/:id`, and `DELETE /api/visits/:id` are admin-session write routes for owned visit data. Visit create/update accepts `tripId`, with `null` clearing an assignment, plus optional `tripStopOrder` for explicit within-trip stop sequencing.
 - Deployed clients should use the two-step direct upload flow: `POST /api/visits/:id/images/upload-url`, upload the file to R2 with the returned `PUT` URL, then call `POST /api/visits/:id/images/complete`.
 - `POST /api/visits/:id/images`, `DELETE /api/visits/:visitId/images/:imageId`, and `PATCH /api/visits/:id/images/reorder` are also admin-session write routes.

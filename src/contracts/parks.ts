@@ -152,6 +152,15 @@ export const tripSchema = z.object({
   visitCount: z.number().int()
 });
 
+export const tripStopSchema = z.object({
+  createdAt: z.string().datetime(),
+  id: z.number().int(),
+  location: labeledPointSchema,
+  note: z.string().nullable(),
+  tripStopOrder: z.number().int().positive(),
+  updatedAt: z.string().datetime()
+});
+
 export const directVisitImageUploadRequestSchema = z.object({
   contentType: z.enum(['image/jpeg', 'image/png', 'image/webp']),
   fileSizeBytes: z.number().int().positive(),
@@ -209,6 +218,38 @@ export const parkVisitsResponseSchema = z.object({
 export const visitParkSchema = z.object({
   name: z.string(),
   slug: z.string()
+});
+
+export const tripItineraryVisitSchema = z.object({
+  author: z.string().nullable(),
+  createdAt: z.string().datetime(),
+  id: z.number().int(),
+  note: z.string().nullable(),
+  park: visitParkSchema,
+  route: z.string().nullable(),
+  updatedAt: z.string().datetime(),
+  visitedOn: visitDateSchema
+});
+
+export const tripItineraryVisitEntrySchema = z.object({
+  kind: z.literal('visit'),
+  tripStopOrder: z.number().int().positive(),
+  visit: tripItineraryVisitSchema
+});
+
+export const tripItineraryStopEntrySchema = z.object({
+  kind: z.literal('stop'),
+  tripStopOrder: z.number().int().positive(),
+  stop: tripStopSchema
+});
+
+export const tripItineraryEntrySchema = z.union([
+  tripItineraryVisitEntrySchema,
+  tripItineraryStopEntrySchema
+]);
+
+export const tripDetailSchema = tripSchema.extend({
+  itinerary: z.array(tripItineraryEntrySchema)
 });
 
 export const visitWithParkSchema = visitSchema.extend({
@@ -339,6 +380,12 @@ export const createTripRequestSchema = z.object({
   startingPoint: labeledPointInputSchema.nullable().optional()
 });
 
+export const createTripStopRequestSchema = z.object({
+  location: labeledPointInputSchema,
+  note: z.string().max(5000).nullable().optional(),
+  tripStopOrder: z.number().int().positive().optional()
+});
+
 export const updateParkRemovedRequestSchema = z.object({
   removed: z.boolean()
 });
@@ -394,6 +441,16 @@ export const updateTripRequestSchema = createTripRequestSchema
       input.name !== undefined ||
       input.slug !== undefined ||
       input.startingPoint !== undefined,
+    {
+      message: 'Provide at least one field to update.'
+    }
+  );
+
+export const updateTripStopRequestSchema = createTripStopRequestSchema
+  .partial()
+  .refine(
+    (input) =>
+      input.location !== undefined || input.note !== undefined || input.tripStopOrder !== undefined,
     {
       message: 'Provide at least one field to update.'
     }

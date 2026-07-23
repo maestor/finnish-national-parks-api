@@ -2,8 +2,10 @@ import { describe, expect, it } from 'vitest';
 
 import {
   createTripRequestSchema,
+  createTripStopRequestSchema,
   updateParkRequestSchema,
   updateTripRequestSchema,
+  updateTripStopRequestSchema,
   updateVisitRequestSchema
 } from '../../src/contracts/parks.js';
 import {
@@ -96,6 +98,39 @@ describe('contracts and cache helpers', () => {
         label: 'Helsinki'
       }
     });
+  });
+
+  it('accepts trip stop create and update payloads', () => {
+    expect(
+      createTripStopRequestSchema.parse({
+        location: {
+          coordinate: {
+            lat: 60.1699,
+            lon: 24.9384
+          },
+          label: 'ABC Huittinen'
+        },
+        note: 'Lunch break',
+        tripStopOrder: 2
+      })
+    ).toEqual({
+      location: {
+        coordinate: {
+          lat: 60.1699,
+          lon: 24.9384
+        },
+        label: 'ABC Huittinen'
+      },
+      note: 'Lunch break',
+      tripStopOrder: 2
+    });
+
+    expect(updateTripStopRequestSchema.parse({ note: 'Coffee break' })).toEqual({
+      note: 'Coffee break'
+    });
+    expect(() => updateTripStopRequestSchema.parse({})).toThrow(
+      'Provide at least one field to update.'
+    );
   });
 
   it('builds deterministic cache helpers for empty and populated states', () => {

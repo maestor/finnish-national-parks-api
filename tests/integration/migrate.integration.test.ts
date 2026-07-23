@@ -31,6 +31,7 @@ describe('migrateDatabase', () => {
     const parkTypes = await client.execute('SELECT slug FROM park_types ORDER BY id');
     const parkColumns = await client.execute('PRAGMA table_info(parks)');
     const tripColumns = await client.execute('PRAGMA table_info(trips)');
+    const tripStopColumns = await client.execute('PRAGMA table_info(trip_stops)');
     const tripVisitColumns = await client.execute('PRAGMA table_info(park_visits)');
     const publicDataVersionColumns = await client.execute(
       'PRAGMA table_info(public_data_versions)'
@@ -55,7 +56,8 @@ describe('migrateDatabase', () => {
       '0015_rename_park_urls.sql',
       '0016_trips.sql',
       '0017_trip_stop_order.sql',
-      '0018_trip_slug_and_starting_point.sql'
+      '0018_trip_slug_and_starting_point.sql',
+      '0019_trip_stops.sql'
     ]);
     expect(parkTypes.rows.map((row) => String(row.slug))).toEqual([
       'outdoor-recreation-area',
@@ -92,6 +94,12 @@ describe('migrateDatabase', () => {
     expect(tripColumns.rows.some((row) => String(row.name) === 'starting_point_label')).toBe(true);
     expect(tripColumns.rows.some((row) => String(row.name) === 'starting_point_lat')).toBe(true);
     expect(tripColumns.rows.some((row) => String(row.name) === 'starting_point_lon')).toBe(true);
+    expect(tripStopColumns.rows.some((row) => String(row.name) === 'trip_id')).toBe(true);
+    expect(tripStopColumns.rows.some((row) => String(row.name) === 'trip_stop_order')).toBe(true);
+    expect(tripStopColumns.rows.some((row) => String(row.name) === 'label')).toBe(true);
+    expect(tripStopColumns.rows.some((row) => String(row.name) === 'lat')).toBe(true);
+    expect(tripStopColumns.rows.some((row) => String(row.name) === 'lon')).toBe(true);
+    expect(tripStopColumns.rows.some((row) => String(row.name) === 'note')).toBe(true);
     expect(tripVisitColumns.rows.some((row) => String(row.name) === 'trip_id')).toBe(true);
     expect(tripVisitColumns.rows.some((row) => String(row.name) === 'trip_stop_order')).toBe(true);
     expect(publicDataVersionColumns.rows.some((row) => String(row.name) === 'version')).toBe(true);
@@ -128,7 +136,8 @@ describe('migrateDatabase', () => {
       '0015_rename_park_urls.sql',
       '0016_trips.sql',
       '0017_trip_stop_order.sql',
-      '0018_trip_slug_and_starting_point.sql'
+      '0018_trip_slug_and_starting_point.sql',
+      '0019_trip_stops.sql'
     ]);
     expect(schemaMigrationTableBeforeApply.rows).toEqual([]);
     expect(pendingAfterApply).toEqual([]);

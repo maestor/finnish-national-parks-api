@@ -83,6 +83,7 @@ If an upload limit exists, at least one test should cover the real stored-object
 - `GET /api/home-summary` returns cache-friendly home summary data including seasonal visit counts, `progressByType` visibility flags, and aggregated `progressByCategory`, without notes, routes, or images.
 - `GET /api/map-summary` returns lightweight map data plus per-park visited summaries.
 - `GET /api/trips` returns named trips with derived `dateRange`, `visitCount`, persisted `slug`, and optional `startingPoint`.
+- `GET /api/trips/:id` returns one trip with a merged itinerary that includes both park visits and non-park trip stops in shared `tripStopOrder`.
 - `GET /api/visits-timeline` returns the lightweight `/kaynnit` timeline dataset with `imageCount`, `trip: { id, name, slug } | null`, `tripStopOrder: number | null`, and pre-resolved park `typeLabel` values.
 - `POST /api/trip-planner/suggestions` returns up to three Geoapify-backed place suggestions with labels and coordinates for origin/destination pickers.
 - `POST /api/trip-planner/search` geocodes endpoints server-side, filters parks against the real routed path, excludes parks outside the corridor, preserves the documented unvisited-first ordering, suppresses overly broad matches from the first 30 km of long trips, and returns map-ready route geometry plus route and park bounding boxes.
@@ -90,12 +91,13 @@ If an upload limit exists, at least one test should cover the real stored-object
 - `GET /api/visits` and `GET /api/visits/:id` expose visit resources with parent park references and `trip: { id, name, slug } | null`.
 - Catalog, home summary, map summary, trip list, and visits timeline `GET` endpoints emit ETags and return `304 Not Modified` for matching `If-None-Match`.
 - Catalog `GET` endpoints are safe for public caching.
-- Home summary, map summary, trip list, and visits timeline endpoints use shared-cache headers and bump their version signal when trip, visit, or visit-image data changes.
+- Home summary, map summary, trip list, and visits timeline endpoints use shared-cache headers and bump their version signal when trip, trip-stop, visit, or visit-image data changes.
 - Visit and management endpoints are private or no-store.
 - Trip planner provider failures surface as stable app errors instead of raw Geoapify responses.
 - All write routes and admin-only visibility reads require an admin session and fail closed when OAuth session auth is unavailable.
 - Park removal toggle can hide and restore a park through the authenticated park-management API.
 - Trip create/edit/delete supports named-trip CRUD, persisted trip slugs, optional starting points, and clears visit assignments on delete.
+- Trip-stop create/edit/delete supports non-park itinerary stops with labeled coordinates, optional notes, and shared ordering between stops and park visits.
 - Visit create/edit/delete supports optional route, author, `tripId`, and `tripStopOrder` fields, including same-day ordering inside a named trip.
 - Visit create/edit/delete works against a real temporary database.
 - Park logo upload logic verifies the park slug, prefers `data/logos/<slug>.png`, falls back to `data/logos/display-types/<normalized-display-type>.png` when a park shares a display type, uploads the resolved file once to the matching R2 key, and persists the logo reference in the database.

@@ -6,9 +6,11 @@ import { cors } from 'hono/cors';
 import type { Database } from './db/database.js';
 import {
   createTrip,
+  createTripStop,
   createVisit,
   createVisitImage,
   deleteTrip,
+  deleteTripStop,
   deleteVisit,
   deleteVisitImage,
   findAdminByEmail,
@@ -22,6 +24,7 @@ import {
   getPublicHomeSummary,
   getPublicMapSummary,
   getPublicVisitDataVersion,
+  getTripById,
   getVisitById,
   listAdminParkVisibility,
   listParkSearchEntries,
@@ -35,6 +38,7 @@ import {
   updateParkDetails,
   updateParkRemoved,
   updateTrip,
+  updateTripStop,
   updateVisit
 } from './db/repositories.js';
 import { createAuthMiddleware } from './http/auth.js';
@@ -105,9 +109,13 @@ import {
 } from './routes/trip-planner.js';
 import {
   createTripRoute,
+  createTripStopRoute,
   deleteTripRoute,
+  deleteTripStopRoute,
+  getTripRoute,
   listTripsRoute,
-  updateTripRoute
+  updateTripRoute,
+  updateTripStopRoute
 } from './routes/trips.js';
 import type { StorageClient } from './storage/types.js';
 import { TripPlannerError } from './trip-planner/search.js';
@@ -721,6 +729,19 @@ export const createApp = ({
       return context.json({ trips }, 200);
     });
 
+    app.openapi(getTripRoute, async (context) => {
+      context.header('Cache-Control', PRIVATE_CACHE_CONTROL);
+
+      const { id } = context.req.valid('param');
+      const trip = await getTripById(database, id);
+
+      if (!trip) {
+        return context.json(jsonNotFound('Trip not found.'), 404);
+      }
+
+      return context.json(trip, 200);
+    });
+
     app.openapi(suggestTripPlannerRoute, async (context) => {
       context.header('Cache-Control', PRIVATE_CACHE_CONTROL);
 
@@ -890,6 +911,29 @@ export const createApp = ({
       return context.json(trip, 201);
     });
 
+    app.openapi(createTripStopRoute, async (context) => {
+      context.header('Cache-Control', PRIVATE_CACHE_CONTROL);
+      const authFailure = await requireAdminSession(context, auth);
+
+      if (authFailure) {
+        return authFailure;
+      }
+
+      const { id } = context.req.valid('param');
+      const body = context.req.valid('json');
+
+      try {
+        const tripStop = await createTripStop(database, id, body);
+        return context.json(tripStop, 201);
+      } catch (error) {
+        if (error instanceof RepositoryNotFoundError) {
+          return context.json(jsonNotFound(error.message), 404);
+        }
+
+        throw error;
+      }
+    });
+
     app.openapi(updateParkRemovedRoute, async (context) => {
       context.header('Cache-Control', PRIVATE_CACHE_CONTROL);
       const authFailure = await requireAdminSession(context, auth);
@@ -964,6 +1008,25 @@ export const createApp = ({
       return context.json(trip, 200);
     });
 
+    app.openapi(updateTripStopRoute, async (context) => {
+      context.header('Cache-Control', PRIVATE_CACHE_CONTROL);
+      const authFailure = await requireAdminSession(context, auth);
+
+      if (authFailure) {
+        return authFailure;
+      }
+
+      const { id } = context.req.valid('param');
+      const body = context.req.valid('json');
+      const tripStop = await updateTripStop(database, id, body);
+
+      if (!tripStop) {
+        return context.json(jsonNotFound('Trip stop not found.'), 404);
+      }
+
+      return context.json(tripStop, 200);
+    });
+
     app.openapi(deleteTripRoute, async (context) => {
       context.header('Cache-Control', PRIVATE_CACHE_CONTROL);
       const authFailure = await requireAdminSession(context, auth);
@@ -977,6 +1040,27 @@ export const createApp = ({
 
       if (!deleted) {
         return context.json(jsonNotFound('Trip not found.'), 404);
+      }
+
+      return new Response(null, {
+        headers: context.res.headers,
+        status: 204
+      });
+    });
+
+    app.openapi(deleteTripStopRoute, async (context) => {
+      context.header('Cache-Control', PRIVATE_CACHE_CONTROL);
+      const authFailure = await requireAdminSession(context, auth);
+
+      if (authFailure) {
+        return authFailure;
+      }
+
+      const { id } = context.req.valid('param');
+      const deleted = await deleteTripStop(database, id);
+
+      if (!deleted) {
+        return context.json(jsonNotFound('Trip stop not found.'), 404);
       }
 
       return new Response(null, {

@@ -103,6 +103,30 @@ export const trips = sqliteTable(
   })
 );
 
+export const tripStops = sqliteTable(
+  'trip_stops',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    tripId: integer('trip_id')
+      .notNull()
+      .references(() => trips.id, { onDelete: 'cascade' }),
+    tripStopOrder: integer('trip_stop_order').notNull(),
+    label: text('label').notNull(),
+    lat: real('lat').notNull(),
+    lon: real('lon').notNull(),
+    note: text('note'),
+    createdAt: text('created_at').notNull(),
+    updatedAt: text('updated_at').notNull()
+  },
+  (table) => ({
+    tripIdIndex: index('trip_stops_trip_id_idx').on(table.tripId),
+    tripStopOrderIndex: index('trip_stops_trip_stop_order_idx').on(
+      table.tripId,
+      table.tripStopOrder
+    )
+  })
+);
+
 export const parkVisits = sqliteTable(
   'park_visits',
   {
