@@ -24,11 +24,12 @@ import {
   getPublicHomeSummary,
   getPublicMapSummary,
   getPublicVisitDataVersion,
+  getPublicVisitSummaryEtagSeed,
   getTripById,
   getVisitById,
   listAdminParkVisibility,
   listParkSearchEntries,
-  listParks,
+  listPublicParks,
   listTrips,
   listVisits,
   listVisitsTimeline,
@@ -462,24 +463,9 @@ export const createApp = ({
         });
       }
 
-      const parks = await listParks(database, filter, logoPublicUrl, mapPublicUrl);
+      const parks = await listPublicParks(database, filter, logoPublicUrl, mapPublicUrl);
 
-      return context.json(
-        {
-          parks: parks.map(
-            ({
-              boundaryGeoJson: _boundaryGeoJson,
-              catalogStatus: _catalogStatus,
-              lipasId: _lipasId,
-              municipalityCode: _municipalityCode,
-              sourceEventDate: _sourceEventDate,
-              updatedAt: _updatedAt,
-              ...park
-            }) => park
-          )
-        },
-        200
-      );
+      return context.json({ parks }, 200);
     });
 
     app.openapi(listParkSearchRoute, async (context) => {
@@ -703,18 +689,14 @@ export const createApp = ({
     });
 
     app.openapi(listTripsRoute, async (context) => {
-      const [catalogSeed, version, trips] = await Promise.all([
-        getCatalogListEtagSeed(database),
-        getPublicVisitDataVersion(database),
-        listTrips(database)
-      ]);
+      const seed = await getPublicVisitSummaryEtagSeed(database);
       const etag = createPublicSummaryEtag({
-        activeCount: catalogSeed.activeCount,
+        activeCount: seed.activeCount,
         kind: 'trips',
-        latestCatalogImportRunId: catalogSeed.latestImportRunId,
-        latestCatalogUpdatedAt: catalogSeed.latestUpdatedAt,
-        publicUpdatedAt: version.updatedAt,
-        publicVersion: version.version
+        latestCatalogImportRunId: seed.latestCatalogImportRunId,
+        latestCatalogUpdatedAt: seed.latestCatalogUpdatedAt,
+        publicUpdatedAt: seed.publicUpdatedAt,
+        publicVersion: seed.publicVersion
       });
       context.header('Cache-Control', PUBLIC_SUMMARY_CACHE_CONTROL);
       context.header('ETag', etag);
@@ -725,6 +707,8 @@ export const createApp = ({
           status: 304
         });
       }
+
+      const trips = await listTrips(database);
 
       return context.json({ trips }, 200);
     });

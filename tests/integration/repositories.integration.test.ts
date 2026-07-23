@@ -15,9 +15,11 @@ import {
   getParkBySlugIncludingRemoved,
   getParkVisitsBySlug,
   getPublicHomeSummary,
+  getPublicVisitSummaryEtagSeed,
   getTripById,
   getVisitById,
   listParkRecordsIncludingRemoved,
+  listPublicParks,
   listRemovedParks,
   listTrips,
   listVisits,
@@ -1011,6 +1013,50 @@ describe('repositories', () => {
       filterKey: 'category:hiking-and-wilderness-areas',
       typeSlug: null
     });
+  });
+
+  it('lists public park summaries without detail-only fields', async () => {
+    const [park] = await listPublicParks(testDatabase.database);
+
+    expect(park).toMatchObject({
+      address: 'Puistotie 1, 00999 Testikylä',
+      areaKm2: 12.5,
+      category: {
+        slug: 'national-park'
+      },
+      name: 'Äkäsmännyn kansallispuisto',
+      parkUrl: 'https://www.luontoon.fi/testi-puisto?foo=bar',
+      slug: 'akasmannyn-kansallispuisto'
+    });
+    expect(park).not.toHaveProperty('boundaryGeoJson');
+    expect(park).not.toHaveProperty('lipasId');
+    expect(park).not.toHaveProperty('updatedAt');
+  });
+
+  it('builds a public visit summary etag seed before any visits exist', async () => {
+    await expect(getPublicVisitSummaryEtagSeed(testDatabase.database)).resolves.toMatchObject({
+      activeCount: 1,
+      latestCatalogImportRunId: 1,
+      latestCatalogUpdatedAt: '2026-05-01T10:00:00.000Z',
+      publicUpdatedAt: null,
+      publicVersion: 0
+    });
+  });
+
+  it('builds a public visit summary etag seed from catalog and visit metadata', async () => {
+    await createVisit(testDatabase.database, 'akasmannyn-kansallispuisto', {
+      visitedOn: '2026-05-03'
+    });
+
+    const seed = await getPublicVisitSummaryEtagSeed(testDatabase.database);
+
+    expect(seed).toMatchObject({
+      activeCount: 1,
+      latestCatalogImportRunId: 1,
+      latestCatalogUpdatedAt: '2026-05-01T10:00:00.000Z',
+      publicVersion: 1
+    });
+    expect(seed.publicUpdatedAt).toBeTruthy();
   });
 
   it('returns empty visit list when no active parks remain', async () => {

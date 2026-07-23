@@ -306,6 +306,14 @@ type PublicVisitVersion = {
   version: number;
 };
 
+type PublicVisitSummaryEtagSeed = {
+  activeCount: number;
+  latestCatalogImportRunId: number | null;
+  latestCatalogUpdatedAt: string | null;
+  publicUpdatedAt: string | null;
+  publicVersion: number;
+};
+
 type UpsertCatalogParkInput = Omit<
   typeof parks.$inferInsert,
   | 'id'
@@ -651,6 +659,18 @@ const toPublicPark = async (
   });
 };
 
+const toPublicVisitVersion = (
+  row:
+    | {
+        updatedAt: string;
+        version: number;
+      }
+    | null
+    | undefined
+): PublicVisitVersion => {
+  return row ?? { updatedAt: null, version: 0 };
+};
+
 const toSearchPark = (row: LightweightParkRow) => {
   return withOptionalDisplayTypeName(row, {
     address: toAddress(row.locationLabel, row.postalCode, row.postalOffice),
@@ -978,6 +998,43 @@ const listPublicParkRows = async (database: Database) => {
     .from(parks)
     .innerJoin(parkTypes, eq(parks.typeId, parkTypes.id))
     .where(visibleCatalogWhere())
+    .orderBy(parks.name);
+};
+
+const listPublicParkRowsByFilter = async (
+  database: Database,
+  options: { categorySlug?: SupportedParkCategorySlug; typeSlug?: SupportedParkTypeSlug } = {}
+) => {
+  return database
+    .select({
+      areaKm2: parks.areaKm2,
+      bboxMaxLat: parks.bboxMaxLat,
+      bboxMaxLon: parks.bboxMaxLon,
+      bboxMinLat: parks.bboxMinLat,
+      bboxMinLon: parks.bboxMinLon,
+      displayTypeName: parks.displayTypeName,
+      establishmentYear: parks.establishmentYear,
+      locationLabel: parks.locationLabel,
+      logoKey: parks.logoKey,
+      logoUpdatedAt: parks.logoUpdatedAt,
+      mapKey: parks.mapKey,
+      mapUpdatedAt: parks.mapUpdatedAt,
+      markerLat: parks.markerLat,
+      markerLon: parks.markerLon,
+      name: parks.name,
+      parkId: parks.id,
+      parkUrl: parks.parkUrl,
+      postalCode: parks.postalCode,
+      postalOffice: parks.postalOffice,
+      slug: parks.slug,
+      typeCode: parkTypes.code,
+      typeId: parkTypes.id,
+      typeName: parkTypes.name,
+      typeSlug: parkTypes.slug
+    })
+    .from(parks)
+    .innerJoin(parkTypes, eq(parks.typeId, parkTypes.id))
+    .where(visibleCatalogWhere(options))
     .orderBy(parks.name);
 };
 
@@ -1559,7 +1616,13 @@ const bumpPublicVisitDataVersion = async (database: DbClient, updatedAt: string)
 };
 
 const getPublicVisitDataVersionRecord = async (database: Database) => {
-  const rows = await database
+  const rows = await buildPublicVisitDataVersionRecordQuery(database);
+
+  return rows[0] ?? null;
+};
+
+const buildPublicVisitDataVersionRecordQuery = (database: Database) => {
+  return database
     .select({
       updatedAt: publicDataVersions.updatedAt,
       version: publicDataVersions.version
@@ -1567,8 +1630,6 @@ const getPublicVisitDataVersionRecord = async (database: Database) => {
     .from(publicDataVersions)
     .where(eq(publicDataVersions.key, PUBLIC_VISIT_DATA_VERSION_KEY))
     .limit(1);
-
-  return rows[0] ?? null;
 };
 
 const getVisitRowWithParkById = async (database: Database, visitId: number) => {
@@ -1668,6 +1729,19 @@ export const listParks = async (
   return Promise.all(
     (await listTypedParks(database, options)).map((row) =>
       toPark(row, getLogoPublicUrl, getMapPublicUrl)
+    )
+  );
+};
+
+export const listPublicParks = async (
+  database: Database,
+  options: { categorySlug?: SupportedParkCategorySlug; typeSlug?: SupportedParkTypeSlug } = {},
+  getLogoPublicUrl?: GetLogoPublicUrl,
+  getMapPublicUrl?: GetMapPublicUrl
+) => {
+  return Promise.all(
+    (await listPublicParkRowsByFilter(database, options)).map((row) =>
+      toPublicPark(row, getLogoPublicUrl, getMapPublicUrl)
     )
   );
 };
@@ -1801,9 +1875,7 @@ export const getVisitById = async (
 export const getPublicVisitDataVersion = async (
   database: Database
 ): Promise<PublicVisitVersion> => {
-  const version = await getPublicVisitDataVersionRecord(database);
-
-  return version ?? { updatedAt: null, version: 0 };
+  return toPublicVisitVersion(await getPublicVisitDataVersionRecord(database));
 };
 
 export const getPublicHomeSummary = async (database: Database) => {
@@ -2808,22 +2880,29 @@ export const markMissingParksInactive = async (
     );
 };
 
-export const getCatalogListEtagSeed = async (
+const buildCatalogListEtagSeedQuery = (
   database: Database,
   options: { categorySlug?: SupportedParkCategorySlug; typeSlug?: SupportedParkTypeSlug } = {}
 ) => {
-  const summary = (
-    await database
-      .select({
-        activeCount: sql<number>`COUNT(*)`,
-        latestImportRunId: sql<number | null>`MAX(${parks.lastImportRunId})`,
-        latestUpdatedAt: sql<string | null>`MAX(${parks.updatedAt})`
-      })
-      .from(parks)
-      .innerJoin(parkTypes, eq(parks.typeId, parkTypes.id))
-      .where(visibleCatalogWhere(options))
-  )[0]!;
+  return database
+    .select({
+      activeCount: sql<number>`COUNT(*)`,
+      latestImportRunId: sql<number | null>`MAX(${parks.lastImportRunId})`,
+      latestUpdatedAt: sql<string | null>`MAX(${parks.updatedAt})`
+    })
+    .from(parks)
+    .innerJoin(parkTypes, eq(parks.typeId, parkTypes.id))
+    .where(visibleCatalogWhere(options));
+};
 
+const toCatalogListEtagSeed = (
+  summary: {
+    activeCount: number;
+    latestImportRunId: number | null;
+    latestUpdatedAt: string | null;
+  },
+  options: { categorySlug?: SupportedParkCategorySlug; typeSlug?: SupportedParkTypeSlug } = {}
+) => {
   const filterKey =
     [
       options.typeSlug ? `type:${options.typeSlug}` : null,
@@ -2838,6 +2917,34 @@ export const getCatalogListEtagSeed = async (
     latestImportRunId: summary.latestImportRunId,
     latestUpdatedAt: summary.latestUpdatedAt,
     typeSlug: options.typeSlug ?? null
+  };
+};
+
+export const getCatalogListEtagSeed = async (
+  database: Database,
+  options: { categorySlug?: SupportedParkCategorySlug; typeSlug?: SupportedParkTypeSlug } = {}
+) => {
+  const summary = (await buildCatalogListEtagSeedQuery(database, options))[0]!;
+
+  return toCatalogListEtagSeed(summary, options);
+};
+
+export const getPublicVisitSummaryEtagSeed = async (
+  database: Database
+): Promise<PublicVisitSummaryEtagSeed> => {
+  const [catalogRows, versionRows] = await database.batch([
+    buildCatalogListEtagSeedQuery(database),
+    buildPublicVisitDataVersionRecordQuery(database)
+  ]);
+  const catalog = catalogRows[0]!;
+  const version = toPublicVisitVersion(versionRows[0] ?? null);
+
+  return {
+    activeCount: catalog.activeCount,
+    latestCatalogImportRunId: catalog.latestImportRunId,
+    latestCatalogUpdatedAt: catalog.latestUpdatedAt,
+    publicUpdatedAt: version.updatedAt,
+    publicVersion: version.version
   };
 };
 
