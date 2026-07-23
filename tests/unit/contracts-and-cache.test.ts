@@ -111,7 +111,8 @@ describe('contracts and cache helpers', () => {
           label: 'ABC Huittinen'
         },
         note: 'Lunch break',
-        tripStopOrder: 2
+        tripStopOrder: 2,
+        visitedOn: '2026-06-07'
       })
     ).toEqual({
       location: {
@@ -122,11 +123,18 @@ describe('contracts and cache helpers', () => {
         label: 'ABC Huittinen'
       },
       note: 'Lunch break',
-      tripStopOrder: 2
+      tripStopOrder: 2,
+      visitedOn: '2026-06-07'
     });
 
-    expect(updateTripStopRequestSchema.parse({ note: 'Coffee break' })).toEqual({
-      note: 'Coffee break'
+    expect(
+      updateTripStopRequestSchema.parse({
+        note: 'Coffee break',
+        visitedOn: '2026-06-08'
+      })
+    ).toEqual({
+      note: 'Coffee break',
+      visitedOn: '2026-06-08'
     });
     expect(() => updateTripStopRequestSchema.parse({})).toThrow(
       'Provide at least one field to update.'

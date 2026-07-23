@@ -158,7 +158,8 @@ export const tripStopSchema = z.object({
   location: labeledPointSchema,
   note: z.string().nullable(),
   tripStopOrder: z.number().int().positive(),
-  updatedAt: z.string().datetime()
+  updatedAt: z.string().datetime(),
+  visitedOn: visitDateSchema
 });
 
 export const directVisitImageUploadRequestSchema = z.object({
@@ -383,7 +384,8 @@ export const createTripRequestSchema = z.object({
 export const createTripStopRequestSchema = z.object({
   location: labeledPointInputSchema,
   note: z.string().max(5000).nullable().optional(),
-  tripStopOrder: z.number().int().positive().optional()
+  tripStopOrder: z.number().int().positive().optional(),
+  visitedOn: visitDateSchema
 });
 
 export const updateParkRemovedRequestSchema = z.object({
@@ -450,7 +452,10 @@ export const updateTripStopRequestSchema = createTripStopRequestSchema
   .partial()
   .refine(
     (input) =>
-      input.location !== undefined || input.note !== undefined || input.tripStopOrder !== undefined,
+      input.location !== undefined ||
+      input.note !== undefined ||
+      input.tripStopOrder !== undefined ||
+      input.visitedOn !== undefined,
     {
       message: 'Provide at least one field to update.'
     }

@@ -914,6 +914,10 @@ export const createApp = ({
           return context.json(jsonNotFound(error.message), 404);
         }
 
+        if (error instanceof RepositoryValidationError) {
+          return context.json({ error: error.message }, 422);
+        }
+
         throw error;
       }
     });
@@ -1002,7 +1006,17 @@ export const createApp = ({
 
       const { id } = context.req.valid('param');
       const body = context.req.valid('json');
-      const tripStop = await updateTripStop(database, id, body);
+      let tripStop: Awaited<ReturnType<typeof updateTripStop>> = null;
+
+      try {
+        tripStop = await updateTripStop(database, id, body);
+      } catch (error) {
+        if (error instanceof RepositoryValidationError) {
+          return context.json({ error: error.message }, 422);
+        }
+
+        throw error;
+      }
 
       if (!tripStop) {
         return context.json(jsonNotFound('Trip stop not found.'), 404);

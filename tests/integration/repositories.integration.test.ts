@@ -550,7 +550,8 @@ describe('repositories', () => {
         label: 'ABC Huittinen'
       },
       note: 'Lunch break',
-      tripStopOrder: 2
+      tripStopOrder: 2,
+      visitedOn: '2026-04-13'
     });
     const tripDetail = await getTripById(testDatabase.database, trip.id);
 
@@ -563,7 +564,8 @@ describe('repositories', () => {
         label: 'ABC Huittinen'
       },
       note: 'Lunch break',
-      tripStopOrder: 2
+      tripStopOrder: 2,
+      visitedOn: '2026-04-13'
     });
     expect(tripDetail).toMatchObject({
       id: trip.id,
@@ -651,6 +653,66 @@ describe('repositories', () => {
         }
       ]
     });
+  });
+
+  it('requires at least one trip visit and keeps stop dates inside the trip date range', async () => {
+    const trip = await createTrip(testDatabase.database, {
+      name: 'Kesäreissu 2026'
+    });
+
+    await expect(
+      createTripStop(testDatabase.database, trip.id, {
+        location: {
+          coordinate: {
+            lat: 61.3167,
+            lon: 22.1333
+          },
+          label: 'ABC Huittinen'
+        },
+        visitedOn: '2026-04-13'
+      })
+    ).rejects.toThrow('Trip stop requires at least one visit in the trip.');
+
+    await createVisit(testDatabase.database, 'akasmannyn-kansallispuisto', {
+      tripId: trip.id,
+      visitedOn: '2026-04-13'
+    });
+    await createVisit(testDatabase.database, 'akasmannyn-kansallispuisto', {
+      tripId: trip.id,
+      visitedOn: '2026-04-15'
+    });
+
+    await expect(
+      createTripStop(testDatabase.database, trip.id, {
+        location: {
+          coordinate: {
+            lat: 61.3167,
+            lon: 22.1333
+          },
+          label: 'ABC Huittinen'
+        },
+        visitedOn: '2026-04-12'
+      })
+    ).rejects.toThrow('Trip stop date must be within the trip date range.');
+
+    const stop = await createTripStop(testDatabase.database, trip.id, {
+      location: {
+        coordinate: {
+          lat: 61.3167,
+          lon: 22.1333
+        },
+        label: 'ABC Huittinen'
+      },
+      visitedOn: '2026-04-15'
+    });
+
+    expect(stop.visitedOn).toBe('2026-04-15');
+
+    await expect(
+      updateTripStop(testDatabase.database, stop.id, {
+        visitedOn: '2026-04-16'
+      })
+    ).rejects.toThrow('Trip stop date must be within the trip date range.');
   });
 
   it('rejects missing trip assignments when creating or updating visits', async () => {

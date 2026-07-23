@@ -57,7 +57,8 @@ describe('migrateDatabase', () => {
       '0016_trips.sql',
       '0017_trip_stop_order.sql',
       '0018_trip_slug_and_starting_point.sql',
-      '0019_trip_stops.sql'
+      '0019_trip_stops.sql',
+      '0020_trip_stop_visited_on.sql'
     ]);
     expect(parkTypes.rows.map((row) => String(row.slug))).toEqual([
       'outdoor-recreation-area',
@@ -96,6 +97,7 @@ describe('migrateDatabase', () => {
     expect(tripColumns.rows.some((row) => String(row.name) === 'starting_point_lon')).toBe(true);
     expect(tripStopColumns.rows.some((row) => String(row.name) === 'trip_id')).toBe(true);
     expect(tripStopColumns.rows.some((row) => String(row.name) === 'trip_stop_order')).toBe(true);
+    expect(tripStopColumns.rows.some((row) => String(row.name) === 'visited_on')).toBe(true);
     expect(tripStopColumns.rows.some((row) => String(row.name) === 'label')).toBe(true);
     expect(tripStopColumns.rows.some((row) => String(row.name) === 'lat')).toBe(true);
     expect(tripStopColumns.rows.some((row) => String(row.name) === 'lon')).toBe(true);
@@ -137,7 +139,8 @@ describe('migrateDatabase', () => {
       '0016_trips.sql',
       '0017_trip_stop_order.sql',
       '0018_trip_slug_and_starting_point.sql',
-      '0019_trip_stops.sql'
+      '0019_trip_stops.sql',
+      '0020_trip_stop_visited_on.sql'
     ]);
     expect(schemaMigrationTableBeforeApply.rows).toEqual([]);
     expect(pendingAfterApply).toEqual([]);

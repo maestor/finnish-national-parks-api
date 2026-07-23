@@ -111,6 +111,7 @@ export const tripStops = sqliteTable(
       .notNull()
       .references(() => trips.id, { onDelete: 'cascade' }),
     tripStopOrder: integer('trip_stop_order').notNull(),
+    visitedOn: text('visited_on').notNull(),
     label: text('label').notNull(),
     lat: real('lat').notNull(),
     lon: real('lon').notNull(),
