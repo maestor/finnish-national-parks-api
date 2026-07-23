@@ -19,6 +19,16 @@ export const pointSchema = z.object({
   lon: z.number()
 });
 
+export const labeledPointSchema = z.object({
+  coordinate: pointSchema,
+  label: z.string()
+});
+
+export const labeledPointInputSchema = z.object({
+  coordinate: pointSchema,
+  label: z.string().trim().min(1).max(255)
+});
+
 export const visitDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 
 export const geoJsonCoordinateSchema = z.tuple([z.number(), z.number()]).rest(z.number());
@@ -121,7 +131,8 @@ export const visitImageSchema = z.object({
 
 export const visitTripSchema = z.object({
   id: z.number().int(),
-  name: z.string()
+  name: z.string(),
+  slug: z.string()
 });
 
 export const tripDateRangeSchema = z.object({
@@ -135,8 +146,19 @@ export const tripSchema = z.object({
   description: z.string().nullable(),
   id: z.number().int(),
   name: z.string(),
+  slug: z.string(),
+  startingPoint: labeledPointSchema.nullable(),
   updatedAt: z.string().datetime(),
   visitCount: z.number().int()
+});
+
+export const tripStopSchema = z.object({
+  createdAt: z.string().datetime(),
+  id: z.number().int(),
+  location: labeledPointSchema,
+  note: z.string().nullable(),
+  tripStopOrder: z.number().int().positive(),
+  updatedAt: z.string().datetime()
 });
 
 export const directVisitImageUploadRequestSchema = z.object({
@@ -196,6 +218,38 @@ export const parkVisitsResponseSchema = z.object({
 export const visitParkSchema = z.object({
   name: z.string(),
   slug: z.string()
+});
+
+export const tripItineraryVisitSchema = z.object({
+  author: z.string().nullable(),
+  createdAt: z.string().datetime(),
+  id: z.number().int(),
+  note: z.string().nullable(),
+  park: visitParkSchema,
+  route: z.string().nullable(),
+  updatedAt: z.string().datetime(),
+  visitedOn: visitDateSchema
+});
+
+export const tripItineraryVisitEntrySchema = z.object({
+  kind: z.literal('visit'),
+  tripStopOrder: z.number().int().positive(),
+  visit: tripItineraryVisitSchema
+});
+
+export const tripItineraryStopEntrySchema = z.object({
+  kind: z.literal('stop'),
+  tripStopOrder: z.number().int().positive(),
+  stop: tripStopSchema
+});
+
+export const tripItineraryEntrySchema = z.union([
+  tripItineraryVisitEntrySchema,
+  tripItineraryStopEntrySchema
+]);
+
+export const tripDetailSchema = tripSchema.extend({
+  itinerary: z.array(tripItineraryEntrySchema)
 });
 
 export const visitWithParkSchema = visitSchema.extend({
@@ -321,7 +375,15 @@ export const createVisitRequestSchema = z.object({
 
 export const createTripRequestSchema = z.object({
   description: z.string().max(5000).nullable().optional(),
-  name: z.string().trim().min(1).max(120)
+  name: z.string().trim().min(1).max(120),
+  slug: z.string().trim().min(1).max(255).optional(),
+  startingPoint: labeledPointInputSchema.nullable().optional()
+});
+
+export const createTripStopRequestSchema = z.object({
+  location: labeledPointInputSchema,
+  note: z.string().max(5000).nullable().optional(),
+  tripStopOrder: z.number().int().positive().optional()
 });
 
 export const updateParkRemovedRequestSchema = z.object({
@@ -373,9 +435,26 @@ export const updateVisitRequestSchema = createVisitRequestSchema
 
 export const updateTripRequestSchema = createTripRequestSchema
   .partial()
-  .refine((input) => input.description !== undefined || input.name !== undefined, {
-    message: 'Provide at least one field to update.'
-  });
+  .refine(
+    (input) =>
+      input.description !== undefined ||
+      input.name !== undefined ||
+      input.slug !== undefined ||
+      input.startingPoint !== undefined,
+    {
+      message: 'Provide at least one field to update.'
+    }
+  );
+
+export const updateTripStopRequestSchema = createTripStopRequestSchema
+  .partial()
+  .refine(
+    (input) =>
+      input.location !== undefined || input.note !== undefined || input.tripStopOrder !== undefined,
+    {
+      message: 'Provide at least one field to update.'
+    }
+  );
 
 export const reorderVisitImagesRequestSchema = z.object({
   imageIds: z.array(z.number().int()).min(1)

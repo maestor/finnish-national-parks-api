@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  createTripRequestSchema,
+  createTripStopRequestSchema,
   updateParkRequestSchema,
   updateTripRequestSchema,
+  updateTripStopRequestSchema,
   updateVisitRequestSchema
 } from '../../src/contracts/parks.js';
 import {
@@ -44,6 +47,90 @@ describe('contracts and cache helpers', () => {
     expect(updateTripRequestSchema.parse({ name: 'Updated trip' })).toEqual({
       name: 'Updated trip'
     });
+    expect(updateTripRequestSchema.parse({ slug: 'updated-trip' })).toEqual({
+      slug: 'updated-trip'
+    });
+    expect(
+      updateTripRequestSchema.parse({
+        startingPoint: {
+          coordinate: {
+            lat: 60.1699,
+            lon: 24.9384
+          },
+          label: 'Helsinki'
+        }
+      })
+    ).toEqual({
+      startingPoint: {
+        coordinate: {
+          lat: 60.1699,
+          lon: 24.9384
+        },
+        label: 'Helsinki'
+      }
+    });
+    expect(updateTripRequestSchema.parse({ startingPoint: null })).toEqual({
+      startingPoint: null
+    });
+  });
+
+  it('accepts optional trip slug and starting point on create', () => {
+    expect(
+      createTripRequestSchema.parse({
+        name: 'Updated trip',
+        slug: 'updated-trip',
+        startingPoint: {
+          coordinate: {
+            lat: 60.1699,
+            lon: 24.9384
+          },
+          label: 'Helsinki'
+        }
+      })
+    ).toEqual({
+      name: 'Updated trip',
+      slug: 'updated-trip',
+      startingPoint: {
+        coordinate: {
+          lat: 60.1699,
+          lon: 24.9384
+        },
+        label: 'Helsinki'
+      }
+    });
+  });
+
+  it('accepts trip stop create and update payloads', () => {
+    expect(
+      createTripStopRequestSchema.parse({
+        location: {
+          coordinate: {
+            lat: 60.1699,
+            lon: 24.9384
+          },
+          label: 'ABC Huittinen'
+        },
+        note: 'Lunch break',
+        tripStopOrder: 2
+      })
+    ).toEqual({
+      location: {
+        coordinate: {
+          lat: 60.1699,
+          lon: 24.9384
+        },
+        label: 'ABC Huittinen'
+      },
+      note: 'Lunch break',
+      tripStopOrder: 2
+    });
+
+    expect(updateTripStopRequestSchema.parse({ note: 'Coffee break' })).toEqual({
+      note: 'Coffee break'
+    });
+    expect(() => updateTripStopRequestSchema.parse({})).toThrow(
+      'Provide at least one field to update.'
+    );
   });
 
   it('builds deterministic cache helpers for empty and populated states', () => {

@@ -154,6 +154,14 @@ describe('API routes', () => {
     body: {
       description?: string | null;
       name: string;
+      slug?: string;
+      startingPoint?: {
+        coordinate: {
+          lat: number;
+          lon: number;
+        };
+        label: string;
+      } | null;
     }
   ) => {
     const response = await requestAsAdmin(app, '/api/trips', {
@@ -170,7 +178,55 @@ describe('API routes', () => {
         description: string | null;
         id: number;
         name: string;
+        slug: string;
+        startingPoint: {
+          coordinate: {
+            lat: number;
+            lon: number;
+          };
+          label: string;
+        } | null;
         visitCount: number;
+      },
+      response
+    };
+  };
+
+  const createTripStop = async (
+    app: ReturnType<typeof createApp>,
+    tripId: number,
+    body: {
+      location: {
+        coordinate: {
+          lat: number;
+          lon: number;
+        };
+        label: string;
+      };
+      note?: string | null;
+      tripStopOrder?: number;
+    }
+  ) => {
+    const response = await requestAsAdmin(app, `/api/trips/${tripId}/stops`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+      headers: {
+        'content-type': 'application/json'
+      }
+    });
+
+    return {
+      body: (await response.json()) as {
+        id: number;
+        location: {
+          coordinate: {
+            lat: number;
+            lon: number;
+          };
+          label: string;
+        };
+        note: string | null;
+        tripStopOrder: number;
       },
       response
     };
@@ -1597,7 +1653,14 @@ describe('API routes', () => {
     const app = createAuthedApp();
     const { body: createdTrip, response: createTripResponse } = await createTrip(app, {
       description: 'Lapin puistoja ja yksi yllätys.',
-      name: 'Kesäreissu 2026'
+      name: 'Kesäreissu 2026',
+      startingPoint: {
+        coordinate: {
+          lat: 60.1699,
+          lon: 24.9384
+        },
+        label: 'Helsinki'
+      }
     });
     const { body: firstVisit } = await createVisit(app, 'akasmannyn-kansallispuisto', {
       route: 'North trail',
@@ -1615,6 +1678,14 @@ describe('API routes', () => {
       dateRange: null,
       description: 'Lapin puistoja ja yksi yllätys.',
       name: 'Kesäreissu 2026',
+      slug: 'kesareissu-2026',
+      startingPoint: {
+        coordinate: {
+          lat: 60.1699,
+          lon: 24.9384
+        },
+        label: 'Helsinki'
+      },
       visitCount: 0
     });
 
@@ -1633,13 +1704,15 @@ describe('API routes', () => {
       trip: {
         id: number;
         name: string;
+        slug: string;
       } | null;
     };
 
     expect(assignTripResponse.status).toBe(200);
     expect(assignTripBody.trip).toEqual({
       id: createdTrip.id,
-      name: 'Kesäreissu 2026'
+      name: 'Kesäreissu 2026',
+      slug: 'kesareissu-2026'
     });
     expect(assignTripBody.tripStopOrder).toBe(2);
 
@@ -1650,6 +1723,14 @@ describe('API routes', () => {
         description: string | null;
         id: number;
         name: string;
+        slug: string;
+        startingPoint: {
+          coordinate: {
+            lat: number;
+            lon: number;
+          };
+          label: string;
+        } | null;
         visitCount: number;
       }>;
     };
@@ -1672,6 +1753,14 @@ describe('API routes', () => {
         description: 'Lapin puistoja ja yksi yllätys.',
         id: createdTrip.id,
         name: 'Kesäreissu 2026',
+        slug: 'kesareissu-2026',
+        startingPoint: {
+          coordinate: {
+            lat: 60.1699,
+            lon: 24.9384
+          },
+          label: 'Helsinki'
+        },
         visitCount: 2
       })
     );
@@ -1684,6 +1773,7 @@ describe('API routes', () => {
         trip: {
           id: number;
           name: string;
+          slug: string;
         } | null;
       }>;
     };
@@ -1695,6 +1785,7 @@ describe('API routes', () => {
         trip: {
           id: number;
           name: string;
+          slug: string;
         } | null;
       }>;
     };
@@ -1704,6 +1795,7 @@ describe('API routes', () => {
       trip: {
         id: number;
         name: string;
+        slug: string;
       } | null;
     };
 
@@ -1714,24 +1806,28 @@ describe('API routes', () => {
     ]);
     expect(timelineBody.visits.find((visit) => visit.id === firstVisit.id)?.trip).toEqual({
       id: createdTrip.id,
-      name: 'Kesäreissu 2026'
+      name: 'Kesäreissu 2026',
+      slug: 'kesareissu-2026'
     });
     expect(timelineBody.visits.find((visit) => visit.id === firstVisit.id)?.tripStopOrder).toBe(1);
     expect(timelineBody.visits.find((visit) => visit.id === secondVisit.id)?.trip).toEqual({
       id: createdTrip.id,
-      name: 'Kesäreissu 2026'
+      name: 'Kesäreissu 2026',
+      slug: 'kesareissu-2026'
     });
     expect(timelineBody.visits.find((visit) => visit.id === secondVisit.id)?.tripStopOrder).toBe(2);
     expect(visitsResponse.status).toBe(200);
     expect(visitsBody.visits.find((visit) => visit.id === firstVisit.id)?.trip).toEqual({
       id: createdTrip.id,
-      name: 'Kesäreissu 2026'
+      name: 'Kesäreissu 2026',
+      slug: 'kesareissu-2026'
     });
     expect(visitsBody.visits.find((visit) => visit.id === firstVisit.id)?.tripStopOrder).toBe(1);
     expect(visitDetailResponse.status).toBe(200);
     expect(visitDetailBody.trip).toEqual({
       id: createdTrip.id,
-      name: 'Kesäreissu 2026'
+      name: 'Kesäreissu 2026',
+      slug: 'kesareissu-2026'
     });
     expect(visitDetailBody.tripStopOrder).toBe(1);
 
@@ -1739,7 +1835,14 @@ describe('API routes', () => {
       method: 'PATCH',
       body: JSON.stringify({
         description: 'Päivitetty kuvaus.',
-        name: 'Kesäreissu 2026 v2'
+        name: 'Kesäreissu 2026 v2',
+        startingPoint: {
+          coordinate: {
+            lat: 61.4978,
+            lon: 23.761
+          },
+          label: 'Tampere'
+        }
       }),
       headers: {
         'content-type': 'application/json'
@@ -1749,13 +1852,29 @@ describe('API routes', () => {
       description: string | null;
       id: number;
       name: string;
+      slug: string;
+      startingPoint: {
+        coordinate: {
+          lat: number;
+          lon: number;
+        };
+        label: string;
+      } | null;
     };
 
     expect(renameTripResponse.status).toBe(200);
     expect(renameTripBody).toMatchObject({
       description: 'Päivitetty kuvaus.',
       id: createdTrip.id,
-      name: 'Kesäreissu 2026 v2'
+      name: 'Kesäreissu 2026 v2',
+      slug: 'kesareissu-2026-v2',
+      startingPoint: {
+        coordinate: {
+          lat: 61.4978,
+          lon: 23.761
+        },
+        label: 'Tampere'
+      }
     });
 
     const clearTripResponse = await requestAsAdmin(app, `/api/visits/${secondVisit.id}`, {
@@ -1786,16 +1905,41 @@ describe('API routes', () => {
         trip: {
           id: number;
           name: string;
+          slug: string;
         } | null;
       }>;
     };
 
-    expect(renamedTimelineBody.visits.find((visit) => visit.id === firstVisit.id)?.trip?.name).toBe(
-      'Kesäreissu 2026 v2'
-    );
+    expect(renamedTimelineBody.visits.find((visit) => visit.id === firstVisit.id)?.trip).toEqual({
+      id: createdTrip.id,
+      name: 'Kesäreissu 2026 v2',
+      slug: 'kesareissu-2026-v2'
+    });
     expect(
       renamedTimelineBody.visits.find((visit) => visit.id === secondVisit.id)?.trip
     ).toBeNull();
+
+    const clearStartingPointResponse = await requestAsAdmin(app, `/api/trips/${createdTrip.id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({
+        startingPoint: null
+      }),
+      headers: {
+        'content-type': 'application/json'
+      }
+    });
+    const clearStartingPointBody = (await clearStartingPointResponse.json()) as {
+      startingPoint: {
+        coordinate: {
+          lat: number;
+          lon: number;
+        };
+        label: string;
+      } | null;
+    };
+
+    expect(clearStartingPointResponse.status).toBe(200);
+    expect(clearStartingPointBody.startingPoint).toBeNull();
 
     const deleteTripResponse = await requestAsAdmin(app, `/api/trips/${createdTrip.id}`, {
       method: 'DELETE'
@@ -1831,6 +1975,356 @@ describe('API routes', () => {
     expect(clearedVisitsBody.visits.find((visit) => visit.id === firstVisit.id)?.trip).toBeNull();
     expect(clearedTripsResponse.status).toBe(200);
     expect(clearedTripsBody.trips).toEqual([]);
+  });
+
+  it('suffixes duplicate trip slugs through the trip API', async () => {
+    const app = createAuthedApp();
+    const { body: firstTrip } = await createTrip(app, {
+      name: 'Kesäreissu 2026'
+    });
+    const { body: secondTrip, response: secondTripResponse } = await createTrip(app, {
+      slug: firstTrip.slug,
+      name: 'Talvireissu 2026'
+    });
+
+    expect(secondTripResponse.status).toBe(201);
+    expect(firstTrip.slug).toBe('kesareissu-2026');
+    expect(secondTrip.slug).toBe('kesareissu-2026-2');
+  });
+
+  it('supports trip stops between visits and exposes a merged trip itinerary', async () => {
+    const app = createAuthedApp();
+    const { body: trip } = await createTrip(app, {
+      name: 'Kesäreissu 2026',
+      startingPoint: {
+        coordinate: {
+          lat: 60.1699,
+          lon: 24.9384
+        },
+        label: 'Helsinki'
+      }
+    });
+    const { body: firstVisit } = await createVisit(app, 'akasmannyn-kansallispuisto', {
+      tripId: trip.id,
+      tripStopOrder: 1,
+      visitedOn: '2026-06-07'
+    });
+    const { body: secondVisit } = await createVisit(app, 'seitsemisen-kansallispuisto', {
+      tripId: trip.id,
+      tripStopOrder: 2,
+      visitedOn: '2026-06-07'
+    });
+    const { body: stop, response: createStopResponse } = await createTripStop(app, trip.id, {
+      location: {
+        coordinate: {
+          lat: 61.3167,
+          lon: 22.1333
+        },
+        label: 'ABC Huittinen'
+      },
+      note: 'Lunch break',
+      tripStopOrder: 2
+    });
+
+    expect(createStopResponse.status).toBe(201);
+    expect(stop.tripStopOrder).toBe(2);
+
+    const tripDetailResponse = await app.request(`/api/trips/${trip.id}`);
+    const tripDetailBody = (await tripDetailResponse.json()) as {
+      itinerary: Array<
+        | {
+            kind: 'stop';
+            tripStopOrder: number;
+            stop: {
+              id: number;
+              note: string | null;
+            };
+          }
+        | {
+            kind: 'visit';
+            tripStopOrder: number;
+            visit: {
+              id: number;
+            };
+          }
+      >;
+    };
+
+    expect(tripDetailResponse.status).toBe(200);
+    expect(tripDetailBody.itinerary).toEqual([
+      {
+        kind: 'visit',
+        tripStopOrder: 1,
+        visit: expect.objectContaining({
+          id: firstVisit.id
+        })
+      },
+      {
+        kind: 'stop',
+        tripStopOrder: 2,
+        stop: expect.objectContaining({
+          id: stop.id,
+          note: 'Lunch break'
+        })
+      },
+      {
+        kind: 'visit',
+        tripStopOrder: 3,
+        visit: expect.objectContaining({
+          id: secondVisit.id
+        })
+      }
+    ]);
+
+    const updateStopResponse = await requestAsAdmin(app, `/api/trip-stops/${stop.id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({
+        note: 'Coffee break',
+        tripStopOrder: 1
+      }),
+      headers: {
+        'content-type': 'application/json'
+      }
+    });
+    const updateStopBody = (await updateStopResponse.json()) as {
+      note: string | null;
+      tripStopOrder: number;
+    };
+    const visitsTimelineResponse = await app.request('/api/visits-timeline');
+    const visitsTimelineBody = (await visitsTimelineResponse.json()) as {
+      visits: Array<{
+        id: number;
+        tripStopOrder: number | null;
+      }>;
+    };
+
+    expect(updateStopResponse.status).toBe(200);
+    expect(updateStopBody).toMatchObject({
+      note: 'Coffee break',
+      tripStopOrder: 1
+    });
+    expect(
+      visitsTimelineBody.visits.find((visit) => visit.id === firstVisit.id)?.tripStopOrder
+    ).toBe(2);
+    expect(
+      visitsTimelineBody.visits.find((visit) => visit.id === secondVisit.id)?.tripStopOrder
+    ).toBe(3);
+
+    const deleteStopResponse = await requestAsAdmin(app, `/api/trip-stops/${stop.id}`, {
+      method: 'DELETE'
+    });
+    const clearedTripDetailResponse = await app.request(`/api/trips/${trip.id}`);
+    const clearedTripDetailBody = (await clearedTripDetailResponse.json()) as {
+      itinerary: Array<{
+        kind: 'visit' | 'stop';
+        tripStopOrder: number;
+      }>;
+    };
+
+    expect(deleteStopResponse.status).toBe(204);
+    expect(clearedTripDetailResponse.status).toBe(200);
+    expect(clearedTripDetailBody.itinerary).toEqual([
+      expect.objectContaining({
+        kind: 'visit',
+        tripStopOrder: 1
+      }),
+      expect.objectContaining({
+        kind: 'visit',
+        tripStopOrder: 2
+      })
+    ]);
+  });
+
+  it('handles trip stop not-found and unexpected failure paths', async () => {
+    const app = createAuthedApp();
+    const missingTripDetailResponse = await app.request('/api/trips/99999');
+    const missingTripDetailBody = (await missingTripDetailResponse.json()) as { error: string };
+    const missingTripStopCreateResponse = await requestAsAdmin(app, '/api/trips/99999/stops', {
+      method: 'POST',
+      body: JSON.stringify({
+        location: {
+          coordinate: {
+            lat: 61.3167,
+            lon: 22.1333
+          },
+          label: 'ABC Huittinen'
+        }
+      }),
+      headers: {
+        'content-type': 'application/json'
+      }
+    });
+    const missingTripStopCreateBody = (await missingTripStopCreateResponse.json()) as {
+      error: string;
+    };
+
+    expect(missingTripDetailResponse.status).toBe(404);
+    expect(missingTripDetailBody.error).toBe('Trip not found.');
+    expect(missingTripStopCreateResponse.status).toBe(404);
+    expect(missingTripStopCreateBody.error).toBe('Trip not found.');
+
+    const { body: trip } = await createTrip(app, {
+      name: 'Kesäreissu 2026'
+    });
+    const { body: stop } = await createTripStop(app, trip.id, {
+      location: {
+        coordinate: {
+          lat: 61.3167,
+          lon: 22.1333
+        },
+        label: 'ABC Huittinen'
+      }
+    });
+    const relocateTripStopResponse = await requestAsAdmin(app, `/api/trip-stops/${stop.id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({
+        location: {
+          coordinate: {
+            lat: 61.451,
+            lon: 23.856
+          },
+          label: 'Yöpyminen Tampereella'
+        }
+      }),
+      headers: {
+        'content-type': 'application/json'
+      }
+    });
+    const relocateTripStopBody = (await relocateTripStopResponse.json()) as {
+      location: {
+        coordinate: {
+          lat: number;
+          lon: number;
+        };
+        label: string;
+      };
+      note: string | null;
+    };
+    const missingTripStopUpdateResponse = await requestAsAdmin(app, '/api/trip-stops/99999', {
+      method: 'PATCH',
+      body: JSON.stringify({
+        note: 'Missing stop'
+      }),
+      headers: {
+        'content-type': 'application/json'
+      }
+    });
+    const missingTripStopUpdateBody = (await missingTripStopUpdateResponse.json()) as {
+      error: string;
+    };
+    const missingTripStopDeleteResponse = await requestAsAdmin(app, '/api/trip-stops/99999', {
+      method: 'DELETE'
+    });
+    const missingTripStopDeleteBody = (await missingTripStopDeleteResponse.json()) as {
+      error: string;
+    };
+
+    expect(relocateTripStopResponse.status).toBe(200);
+    expect(relocateTripStopBody).toMatchObject({
+      location: {
+        coordinate: {
+          lat: 61.451,
+          lon: 23.856
+        },
+        label: 'Yöpyminen Tampereella'
+      },
+      note: null
+    });
+    expect(missingTripStopUpdateResponse.status).toBe(404);
+    expect(missingTripStopUpdateBody.error).toBe('Trip stop not found.');
+    expect(missingTripStopDeleteResponse.status).toBe(404);
+    expect(missingTripStopDeleteBody.error).toBe('Trip stop not found.');
+
+    const brokenStopCreateDatabase = await createTestDatabase();
+
+    await importParks({
+      database: brokenStopCreateDatabase.database,
+      expectedActiveCount: 1,
+      now: () => '2026-05-01T09:00:00.000Z',
+      sourceUrl: 'https://example.test/lipas-broken-trip-stop-create',
+      fetchSource: async () => ({
+        items: [createLipasPark()]
+      })
+    });
+
+    const brokenStopCreateApp = createApp({
+      auth: authConfig,
+      database: brokenStopCreateDatabase.database
+    });
+    const { body: brokenCreateTrip } = await createTrip(brokenStopCreateApp, {
+      name: 'Rikkoutuva pysahdysreissu'
+    });
+
+    await brokenStopCreateDatabase.dispose();
+
+    const brokenTripStopCreateResponse = await requestAsAdmin(
+      brokenStopCreateApp,
+      `/api/trips/${brokenCreateTrip.id}/stops`,
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          location: {
+            coordinate: {
+              lat: 61.3167,
+              lon: 22.1333
+            },
+            label: 'ABC Huittinen'
+          }
+        }),
+        headers: {
+          'content-type': 'application/json'
+        }
+      }
+    );
+
+    const brokenStopUpdateDatabase = await createTestDatabase();
+
+    await importParks({
+      database: brokenStopUpdateDatabase.database,
+      expectedActiveCount: 1,
+      now: () => '2026-05-01T09:00:00.000Z',
+      sourceUrl: 'https://example.test/lipas-broken-trip-stop-update',
+      fetchSource: async () => ({
+        items: [createLipasPark()]
+      })
+    });
+
+    const brokenStopUpdateApp = createApp({
+      auth: authConfig,
+      database: brokenStopUpdateDatabase.database
+    });
+    const { body: brokenTrip } = await createTrip(brokenStopUpdateApp, {
+      name: 'Rikkoutuva kesäreissu'
+    });
+    const { body: brokenStop } = await createTripStop(brokenStopUpdateApp, brokenTrip.id, {
+      location: {
+        coordinate: {
+          lat: 61.3167,
+          lon: 22.1333
+        },
+        label: 'ABC Huittinen'
+      }
+    });
+
+    await brokenStopUpdateDatabase.dispose();
+
+    const brokenTripStopUpdateResponse = await requestAsAdmin(
+      brokenStopUpdateApp,
+      `/api/trip-stops/${brokenStop.id}`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify({
+          note: 'Should fail'
+        }),
+        headers: {
+          'content-type': 'application/json'
+        }
+      }
+    );
+
+    expect(stop.id).toBeGreaterThan(0);
+    expect(brokenTripStopCreateResponse.status).toBe(500);
+    expect(brokenTripStopUpdateResponse.status).toBe(500);
   });
 
   it('rejects trip stop order changes when no trip is assigned', async () => {
@@ -2338,6 +2832,15 @@ describe('API routes', () => {
     const { body: createdTrip } = await createTrip(app, {
       name: 'Valvottu retki'
     });
+    const { body: createdTripStop } = await createTripStop(app, createdTrip.id, {
+      location: {
+        coordinate: {
+          lat: 60.1699,
+          lon: 24.9384
+        },
+        label: 'Helsinki'
+      }
+    });
 
     const removeParkResponse = await app.request('/api/parks/akasmannyn-kansallispuisto/removed', {
       method: 'PATCH',
@@ -2381,12 +2884,42 @@ describe('API routes', () => {
     const deleteTripResponse = await app.request(`/api/trips/${createdTrip.id}`, {
       method: 'DELETE'
     });
+    const createTripStopResponse = await app.request(`/api/trips/${createdTrip.id}/stops`, {
+      method: 'POST',
+      body: JSON.stringify({
+        location: {
+          coordinate: {
+            lat: 61.3167,
+            lon: 22.1333
+          },
+          label: 'ABC Huittinen'
+        }
+      }),
+      headers: {
+        'content-type': 'application/json'
+      }
+    });
+    const updateTripStopResponse = await app.request(`/api/trip-stops/${createdTripStop.id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({
+        note: 'Unauthorized stop edit'
+      }),
+      headers: {
+        'content-type': 'application/json'
+      }
+    });
+    const deleteTripStopResponse = await app.request(`/api/trip-stops/${createdTripStop.id}`, {
+      method: 'DELETE'
+    });
     const removeParkBody = (await removeParkResponse.json()) as { error: string };
     const updateVisitBody = (await updateVisitResponse.json()) as { error: string };
     const deleteVisitBody = (await deleteVisitResponse.json()) as { error: string };
     const createTripBody = (await createTripResponse.json()) as { error: string };
     const updateTripBody = (await updateTripResponse.json()) as { error: string };
     const deleteTripBody = (await deleteTripResponse.json()) as { error: string };
+    const createTripStopBody = (await createTripStopResponse.json()) as { error: string };
+    const updateTripStopBody = (await updateTripStopResponse.json()) as { error: string };
+    const deleteTripStopBody = (await deleteTripStopResponse.json()) as { error: string };
 
     expect(removeParkResponse.status).toBe(401);
     expect(removeParkBody.error).toBe('Unauthorized');
@@ -2400,6 +2933,12 @@ describe('API routes', () => {
     expect(updateTripBody.error).toBe('Unauthorized');
     expect(deleteTripResponse.status).toBe(401);
     expect(deleteTripBody.error).toBe('Unauthorized');
+    expect(createTripStopResponse.status).toBe(401);
+    expect(createTripStopBody.error).toBe('Unauthorized');
+    expect(updateTripStopResponse.status).toBe(401);
+    expect(updateTripStopBody.error).toBe('Unauthorized');
+    expect(deleteTripStopResponse.status).toBe(401);
+    expect(deleteTripStopBody.error).toBe('Unauthorized');
   });
 
   it('serves lightweight admin park visibility data for visible and removed parks', async () => {

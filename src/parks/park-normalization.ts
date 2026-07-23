@@ -1,4 +1,4 @@
-export const createParkSlug = (value: string) => {
+export const createSlug = (value: string, fallback = 'park') => {
   const slug = value
     .normalize('NFKD')
     .replace(/[\u0300-\u036f]/g, '')
@@ -6,8 +6,10 @@ export const createParkSlug = (value: string) => {
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '');
 
-  return slug || 'park';
+  return slug || fallback;
 };
+
+export const createParkSlug = (value: string) => createSlug(value, 'park');
 
 export const normalizeParkUrl = (value?: string | null) => {
   if (!value) {

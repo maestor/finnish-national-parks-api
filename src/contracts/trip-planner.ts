@@ -4,6 +4,7 @@ import { errorSchema } from './common.js';
 import {
   boundingBoxSchema,
   geoJsonLineStringSchema,
+  labeledPointSchema,
   parkCategorySchema,
   parkTypeSchema,
   pointSchema,
@@ -28,10 +29,7 @@ export const tripPlannerNearbyRequestSchema = z.object({
   originQuery: z.string().trim().min(1).max(200)
 });
 
-export const tripPlannerLocationSchema = z.object({
-  coordinate: pointSchema,
-  label: z.string()
-});
+export const tripPlannerLocationSchema = labeledPointSchema;
 
 export const tripPlannerSuggestionsResponseSchema = z.object({
   suggestions: z.array(tripPlannerLocationSchema)

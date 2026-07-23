@@ -89,12 +89,41 @@ export const trips = sqliteTable(
   {
     id: integer('id').primaryKey({ autoIncrement: true }),
     name: text('name').notNull(),
+    slug: text('slug').notNull(),
     description: text('description'),
+    startingPointLabel: text('starting_point_label'),
+    startingPointLat: real('starting_point_lat'),
+    startingPointLon: real('starting_point_lon'),
     createdAt: text('created_at').notNull(),
     updatedAt: text('updated_at').notNull()
   },
   (table) => ({
-    nameIndex: index('trips_name_idx').on(table.name)
+    nameIndex: index('trips_name_idx').on(table.name),
+    slugIndex: uniqueIndex('trips_slug_idx').on(table.slug)
+  })
+);
+
+export const tripStops = sqliteTable(
+  'trip_stops',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    tripId: integer('trip_id')
+      .notNull()
+      .references(() => trips.id, { onDelete: 'cascade' }),
+    tripStopOrder: integer('trip_stop_order').notNull(),
+    label: text('label').notNull(),
+    lat: real('lat').notNull(),
+    lon: real('lon').notNull(),
+    note: text('note'),
+    createdAt: text('created_at').notNull(),
+    updatedAt: text('updated_at').notNull()
+  },
+  (table) => ({
+    tripIdIndex: index('trip_stops_trip_id_idx').on(table.tripId),
+    tripStopOrderIndex: index('trip_stops_trip_stop_order_idx').on(
+      table.tripId,
+      table.tripStopOrder
+    )
   })
 );
 
