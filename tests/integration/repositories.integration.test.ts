@@ -335,7 +335,14 @@ describe('repositories', () => {
   it('creates, updates, lists, and deletes trips while clearing assigned visits', async () => {
     const trip = await createTrip(testDatabase.database, {
       description: 'Lapin kansallispuistoja.',
-      name: 'Kesäreissu 2026'
+      name: 'Kesäreissu 2026',
+      startingPoint: {
+        coordinate: {
+          lat: 60.1699,
+          lon: 24.9384
+        },
+        label: 'Helsinki'
+      }
     });
     const assignedVisit = await createVisit(testDatabase.database, 'akasmannyn-kansallispuisto', {
       tripId: trip.id,
@@ -349,6 +356,14 @@ describe('repositories', () => {
       dateRange: null,
       description: 'Lapin kansallispuistoja.',
       name: 'Kesäreissu 2026',
+      slug: 'kesareissu-2026',
+      startingPoint: {
+        coordinate: {
+          lat: 60.1699,
+          lon: 24.9384
+        },
+        label: 'Helsinki'
+      },
       visitCount: 0
     });
 
@@ -361,7 +376,8 @@ describe('repositories', () => {
 
     expect(updatedVisit?.trip).toEqual({
       id: trip.id,
-      name: 'Kesäreissu 2026'
+      name: 'Kesäreissu 2026',
+      slug: 'kesareissu-2026'
     });
     expect(listedTrips).toEqual([
       expect.objectContaining({
@@ -372,27 +388,52 @@ describe('repositories', () => {
         description: 'Lapin kansallispuistoja.',
         id: trip.id,
         name: 'Kesäreissu 2026',
+        slug: 'kesareissu-2026',
+        startingPoint: {
+          coordinate: {
+            lat: 60.1699,
+            lon: 24.9384
+          },
+          label: 'Helsinki'
+        },
         visitCount: 2
       })
     ]);
     expect(listedVisits.find((visit) => visit.id === assignedVisit.id)?.trip).toEqual({
       id: trip.id,
-      name: 'Kesäreissu 2026'
+      name: 'Kesäreissu 2026',
+      slug: 'kesareissu-2026'
     });
     expect(visitDetail?.trip).toEqual({
       id: trip.id,
-      name: 'Kesäreissu 2026'
+      name: 'Kesäreissu 2026',
+      slug: 'kesareissu-2026'
     });
 
     const renamedTrip = await updateTrip(testDatabase.database, trip.id, {
       description: 'Päivitetty kuvaus.',
-      name: 'Kesäreissu 2026 v2'
+      name: 'Kesäreissu 2026 v2',
+      startingPoint: {
+        coordinate: {
+          lat: 61.4978,
+          lon: 23.761
+        },
+        label: 'Tampere'
+      }
     });
 
     expect(renamedTrip).toMatchObject({
       description: 'Päivitetty kuvaus.',
       id: trip.id,
-      name: 'Kesäreissu 2026 v2'
+      name: 'Kesäreissu 2026 v2',
+      slug: 'kesareissu-2026-v2',
+      startingPoint: {
+        coordinate: {
+          lat: 61.4978,
+          lon: 23.761
+        },
+        label: 'Tampere'
+      }
     });
 
     const descriptionOnlyTrip = await updateTrip(testDatabase.database, trip.id, {
@@ -402,7 +443,15 @@ describe('repositories', () => {
     expect(descriptionOnlyTrip).toMatchObject({
       description: 'Vain kuvaus muuttui.',
       id: trip.id,
-      name: 'Kesäreissu 2026 v2'
+      name: 'Kesäreissu 2026 v2',
+      slug: 'kesareissu-2026-v2',
+      startingPoint: {
+        coordinate: {
+          lat: 61.4978,
+          lon: 23.761
+        },
+        label: 'Tampere'
+      }
     });
 
     const nameOnlyTrip = await updateTrip(testDatabase.database, trip.id, {
@@ -412,7 +461,20 @@ describe('repositories', () => {
     expect(nameOnlyTrip).toMatchObject({
       description: 'Vain kuvaus muuttui.',
       id: trip.id,
-      name: 'Kesäreissu 2026 v3'
+      name: 'Kesäreissu 2026 v3',
+      slug: 'kesareissu-2026-v3'
+    });
+
+    const clearedStartingPointTrip = await updateTrip(testDatabase.database, trip.id, {
+      startingPoint: null
+    });
+
+    expect(clearedStartingPointTrip).toMatchObject({
+      description: 'Vain kuvaus muuttui.',
+      id: trip.id,
+      name: 'Kesäreissu 2026 v3',
+      slug: 'kesareissu-2026-v3',
+      startingPoint: null
     });
 
     await expect(deleteTrip(testDatabase.database, trip.id)).resolves.toBe(true);
@@ -427,6 +489,27 @@ describe('repositories', () => {
       getVisitById(testDatabase.database, looseVisit.id, async () => '')
     ).resolves.toMatchObject({
       trip: null
+    });
+  });
+
+  it('suffixes duplicate trip slugs on create and update', async () => {
+    const firstTrip = await createTrip(testDatabase.database, {
+      name: 'Kesäreissu 2026'
+    });
+    const secondTrip = await createTrip(testDatabase.database, {
+      name: 'Kesäreissu 2026'
+    });
+
+    expect(firstTrip.slug).toBe('kesareissu-2026');
+    expect(secondTrip.slug).toBe('kesareissu-2026-2');
+
+    const renamedSecondTrip = await updateTrip(testDatabase.database, secondTrip.id, {
+      slug: firstTrip.slug
+    });
+
+    expect(renamedSecondTrip).toMatchObject({
+      id: secondTrip.id,
+      slug: 'kesareissu-2026-2'
     });
   });
 

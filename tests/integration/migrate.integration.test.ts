@@ -54,7 +54,8 @@ describe('migrateDatabase', () => {
       '0014_cultural_history_area_type.sql',
       '0015_rename_park_urls.sql',
       '0016_trips.sql',
-      '0017_trip_stop_order.sql'
+      '0017_trip_stop_order.sql',
+      '0018_trip_slug_and_starting_point.sql'
     ]);
     expect(parkTypes.rows.map((row) => String(row.slug))).toEqual([
       'outdoor-recreation-area',
@@ -86,7 +87,11 @@ describe('migrateDatabase', () => {
       true
     );
     expect(tripColumns.rows.some((row) => String(row.name) === 'name')).toBe(true);
+    expect(tripColumns.rows.some((row) => String(row.name) === 'slug')).toBe(true);
     expect(tripColumns.rows.some((row) => String(row.name) === 'description')).toBe(true);
+    expect(tripColumns.rows.some((row) => String(row.name) === 'starting_point_label')).toBe(true);
+    expect(tripColumns.rows.some((row) => String(row.name) === 'starting_point_lat')).toBe(true);
+    expect(tripColumns.rows.some((row) => String(row.name) === 'starting_point_lon')).toBe(true);
     expect(tripVisitColumns.rows.some((row) => String(row.name) === 'trip_id')).toBe(true);
     expect(tripVisitColumns.rows.some((row) => String(row.name) === 'trip_stop_order')).toBe(true);
     expect(publicDataVersionColumns.rows.some((row) => String(row.name) === 'version')).toBe(true);
@@ -122,7 +127,8 @@ describe('migrateDatabase', () => {
       '0014_cultural_history_area_type.sql',
       '0015_rename_park_urls.sql',
       '0016_trips.sql',
-      '0017_trip_stop_order.sql'
+      '0017_trip_stop_order.sql',
+      '0018_trip_slug_and_starting_point.sql'
     ]);
     expect(schemaMigrationTableBeforeApply.rows).toEqual([]);
     expect(pendingAfterApply).toEqual([]);
@@ -208,6 +214,66 @@ describe('migrateDatabase', () => {
         id: 5,
         imported_display_type_name: 'Maailmanperintökohde',
         type_id: 9001
+      }
+    ]);
+  });
+
+  it('backfills trip slugs and starting point columns for existing trips', async () => {
+    await client.executeMultiple(`
+      CREATE TABLE trips (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        description TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+
+      INSERT INTO trips (id, name, description, created_at, updated_at)
+      VALUES
+        (1, 'Kesäreissu 2026', 'Lapin kansallispuistoja.', '2026-06-01T00:00:00.000Z', '2026-06-01T00:00:00.000Z'),
+        (2, 'Kesäreissu 2026', NULL, '2026-06-02T00:00:00.000Z', '2026-06-02T00:00:00.000Z'),
+        (3, 'Öinen retki / yö', NULL, '2026-06-03T00:00:00.000Z', '2026-06-03T00:00:00.000Z');
+    `);
+
+    const migrationSql = await readFile(
+      new URL('../../src/db/migrations/0018_trip_slug_and_starting_point.sql', import.meta.url),
+      'utf8'
+    );
+
+    await client.executeMultiple(migrationSql);
+
+    const trips = await client.execute(`
+      SELECT
+        id,
+        slug,
+        starting_point_label,
+        starting_point_lat,
+        starting_point_lon
+      FROM trips
+      ORDER BY id
+    `);
+
+    expect(trips.rows).toEqual([
+      {
+        id: 1,
+        slug: 'kesareissu-2026',
+        starting_point_label: null,
+        starting_point_lat: null,
+        starting_point_lon: null
+      },
+      {
+        id: 2,
+        slug: 'kesareissu-2026-2',
+        starting_point_label: null,
+        starting_point_lat: null,
+        starting_point_lon: null
+      },
+      {
+        id: 3,
+        slug: 'oinen-retki-yo',
+        starting_point_label: null,
+        starting_point_lat: null,
+        starting_point_lon: null
       }
     ]);
   });

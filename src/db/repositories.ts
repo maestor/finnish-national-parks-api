@@ -1,7 +1,7 @@
 import { and, asc, desc, eq, gt, gte, inArray, lt, lte, notInArray, sql } from 'drizzle-orm';
 
 import type { GeoJsonFeatureCollection } from '../importer/geometry.js';
-import { createParkSlug, normalizeParkUrl } from '../parks/park-normalization.js';
+import { createParkSlug, createSlug, normalizeParkUrl } from '../parks/park-normalization.js';
 import type { SupportedParkCategorySlug, SupportedParkTypeSlug } from '../parks/park-types.js';
 import {
   getParkCategoryByTypeSlug,
@@ -44,11 +44,33 @@ type UpdateVisitInput = {
 type PutTripInput = {
   description?: string | null | undefined;
   name: string;
+  slug?: string | undefined;
+  startingPoint?:
+    | {
+        coordinate: {
+          lat: number;
+          lon: number;
+        };
+        label: string;
+      }
+    | null
+    | undefined;
 };
 
 type UpdateTripInput = {
   description?: string | null | undefined;
   name?: string | undefined;
+  slug?: string | undefined;
+  startingPoint?:
+    | {
+        coordinate: {
+          lat: number;
+          lon: number;
+        };
+        label: string;
+      }
+    | null
+    | undefined;
 };
 
 type UpdateParkDetailsInput = {
@@ -98,6 +120,11 @@ type MarkerPoint = {
   lon: number;
 };
 
+type TripStartingPoint = {
+  coordinate: MarkerPoint;
+  label: string;
+};
+
 type GetLogoPublicUrl = (key: string, updatedAt: string) => string | Promise<string>;
 type GetMapPublicUrl = (key: string, updatedAt: string) => string | Promise<string>;
 
@@ -109,6 +136,7 @@ type TypedParkRow = {
 type TripReference = {
   id: number;
   name: string;
+  slug: string;
 };
 
 type VisitRowWithPark = {
@@ -122,6 +150,10 @@ type TripRow = {
   endVisitedOn: string | null;
   id: number;
   name: string;
+  slug: string;
+  startingPointLabel: string | null;
+  startingPointLat: number | null;
+  startingPointLon: number | null;
   startVisitedOn: string | null;
   updatedAt: string;
   visitCount: number;
@@ -216,6 +248,7 @@ type VisitTimelineRow = {
   route: string | null;
   tripId: number | null;
   tripName: string | null;
+  tripSlug: string | null;
   tripStopOrder: number | null;
   typeName: string;
   visitedOn: string;
@@ -255,6 +288,55 @@ const normalizeRequiredText = (value: string, fieldName: string) => {
   }
 
   return normalized;
+};
+
+const toTripStartingPoint = (row: {
+  startingPointLabel: string | null;
+  startingPointLat: number | null;
+  startingPointLon: number | null;
+}): TripStartingPoint | null => {
+  if (
+    row.startingPointLabel === null ||
+    row.startingPointLat === null ||
+    row.startingPointLon === null
+  ) {
+    return null;
+  }
+
+  return {
+    coordinate: {
+      lat: row.startingPointLat,
+      lon: row.startingPointLon
+    },
+    label: row.startingPointLabel
+  };
+};
+
+const normalizeTripStartingPoint = (
+  startingPoint?:
+    | {
+        coordinate: {
+          lat: number;
+          lon: number;
+        };
+        label: string;
+      }
+    | null
+    | undefined
+) => {
+  if (startingPoint === undefined) {
+    return undefined;
+  }
+
+  if (startingPoint === null) {
+    return null;
+  }
+
+  return {
+    label: startingPoint.label.trim(),
+    lat: startingPoint.coordinate.lat,
+    lon: startingPoint.coordinate.lon
+  };
 };
 
 type TripAwareVisitOrder = {
@@ -591,7 +673,8 @@ const toVisitImage = async (
 const toTripReference = (row: typeof trips.$inferSelect): TripReference => {
   return {
     id: row.id,
-    name: row.name
+    name: row.name,
+    slug: row.slug
   };
 };
 
@@ -608,6 +691,8 @@ const toTrip = (row: TripRow) => {
     description: row.description,
     id: row.id,
     name: row.name,
+    slug: row.slug,
+    startingPoint: toTripStartingPoint(row),
     updatedAt: row.updatedAt,
     visitCount: row.visitCount
   };
@@ -642,6 +727,29 @@ const getTripRecordById = async (database: DbClient, tripId: number) => {
   return database.query.trips.findFirst({
     where: eq(trips.id, tripId)
   });
+};
+
+const findTripRecordBySlug = async (database: DbClient, slug: string) => {
+  return database.query.trips.findFirst({
+    where: eq(trips.slug, slug)
+  });
+};
+
+const buildTripSlug = async (database: DbClient, value: string, excludeTripId?: number) => {
+  const baseSlug = createSlug(value, 'trip');
+  let nextSlug = baseSlug;
+  let suffix = 2;
+
+  while (true) {
+    const conflict = await findTripRecordBySlug(database, nextSlug);
+
+    if (!conflict || conflict.id === excludeTripId) {
+      return nextSlug;
+    }
+
+    nextSlug = `${baseSlug}-${suffix}`;
+    suffix += 1;
+  }
 };
 
 const resolveTripId = async (database: Database, tripId?: number | null) => {
@@ -983,6 +1091,10 @@ const listTripRows = async (database: Database): Promise<TripRow[]> => {
       >`MAX(CASE WHEN ${parks.removed} = 0 THEN ${parkVisits.visitedOn} END)`,
       id: trips.id,
       name: trips.name,
+      slug: trips.slug,
+      startingPointLabel: trips.startingPointLabel,
+      startingPointLat: trips.startingPointLat,
+      startingPointLon: trips.startingPointLon,
       startVisitedOn: sql<
         string | null
       >`MIN(CASE WHEN ${parks.removed} = 0 THEN ${parkVisits.visitedOn} END)`,
@@ -992,7 +1104,17 @@ const listTripRows = async (database: Database): Promise<TripRow[]> => {
     .from(trips)
     .leftJoin(parkVisits, eq(parkVisits.tripId, trips.id))
     .leftJoin(parks, eq(parkVisits.parkId, parks.id))
-    .groupBy(trips.id, trips.createdAt, trips.description, trips.name, trips.updatedAt)
+    .groupBy(
+      trips.id,
+      trips.createdAt,
+      trips.description,
+      trips.name,
+      trips.slug,
+      trips.startingPointLabel,
+      trips.startingPointLat,
+      trips.startingPointLon,
+      trips.updatedAt
+    )
     .orderBy(asc(trips.name), asc(trips.id));
 };
 
@@ -1008,6 +1130,7 @@ const listVisitTimelineRows = async (database: Database): Promise<VisitTimelineR
       route: parkVisits.route,
       tripId: trips.id,
       tripName: trips.name,
+      tripSlug: trips.slug,
       tripStopOrder: parkVisits.tripStopOrder,
       typeName: parkTypes.name,
       visitedOn: parkVisits.visitedOn
@@ -1030,6 +1153,7 @@ const listVisitTimelineRows = async (database: Database): Promise<VisitTimelineR
       parks.slug,
       trips.id,
       trips.name,
+      trips.slug,
       parkTypes.name
     )
     .orderBy(desc(parkVisits.visitedOn), desc(parkVisits.createdAt), desc(parkVisits.id));
@@ -1643,11 +1767,12 @@ export const listVisitsTimeline = async (database: Database) => {
     },
     route: visit.route,
     trip:
-      visit.tripId === null || !visit.tripName
+      visit.tripId === null || !visit.tripName || !visit.tripSlug
         ? null
         : {
             id: visit.tripId,
-            name: visit.tripName
+            name: visit.tripName,
+            slug: visit.tripSlug
           },
     tripStopOrder: visit.tripStopOrder,
     visitedOn: visit.visitedOn
@@ -1674,13 +1799,23 @@ export const listTripPlannerCandidateParks = async (database: Database) => {
 
 export const createTrip = async (database: Database, input: PutTripInput) => {
   const timestamp = new Date().toISOString();
+  const name = normalizeRequiredText(input.name, 'Trip name');
+  const slug = await buildTripSlug(
+    database,
+    input.slug === undefined ? name : normalizeRequiredText(input.slug, 'Trip slug')
+  );
+  const startingPoint = normalizeTripStartingPoint(input.startingPoint);
   const row = (
     await database
       .insert(trips)
       .values({
         createdAt: timestamp,
         description: normalizeOptionalText(input.description),
-        name: normalizeRequiredText(input.name, 'Trip name'),
+        name,
+        slug,
+        startingPointLabel: startingPoint?.label ?? null,
+        startingPointLat: startingPoint?.lat ?? null,
+        startingPointLon: startingPoint?.lon ?? null,
         updatedAt: timestamp
       })
       .returning()
@@ -1694,6 +1829,10 @@ export const createTrip = async (database: Database, input: PutTripInput) => {
     endVisitedOn: null,
     id: row.id,
     name: row.name,
+    slug: row.slug,
+    startingPointLabel: row.startingPointLabel,
+    startingPointLat: row.startingPointLat,
+    startingPointLon: row.startingPointLon,
     startVisitedOn: null,
     updatedAt: row.updatedAt,
     visitCount: 0
@@ -1984,6 +2123,18 @@ export const updateTrip = async (database: Database, tripId: number, input: Upda
     return null;
   }
 
+  const nextName =
+    input.name === undefined ? existingTrip.name : normalizeRequiredText(input.name, 'Trip name');
+  const nextSlug = await buildTripSlug(
+    database,
+    input.slug !== undefined
+      ? normalizeRequiredText(input.slug, 'Trip slug')
+      : input.name !== undefined
+        ? nextName
+        : existingTrip.slug,
+    tripId
+  );
+  const nextStartingPoint = normalizeTripStartingPoint(input.startingPoint);
   const timestamp = new Date().toISOString();
 
   await database
@@ -1993,10 +2144,20 @@ export const updateTrip = async (database: Database, tripId: number, input: Upda
         input.description === undefined
           ? existingTrip.description
           : normalizeOptionalText(input.description),
-      name:
-        input.name === undefined
-          ? existingTrip.name
-          : normalizeRequiredText(input.name, 'Trip name'),
+      name: nextName,
+      slug: nextSlug,
+      startingPointLabel:
+        nextStartingPoint === undefined
+          ? existingTrip.startingPointLabel
+          : (nextStartingPoint?.label ?? null),
+      startingPointLat:
+        nextStartingPoint === undefined
+          ? existingTrip.startingPointLat
+          : (nextStartingPoint?.lat ?? null),
+      startingPointLon:
+        nextStartingPoint === undefined
+          ? existingTrip.startingPointLon
+          : (nextStartingPoint?.lon ?? null),
       updatedAt: timestamp
     })
     .where(eq(trips.id, tripId));

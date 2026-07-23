@@ -89,12 +89,17 @@ export const trips = sqliteTable(
   {
     id: integer('id').primaryKey({ autoIncrement: true }),
     name: text('name').notNull(),
+    slug: text('slug').notNull(),
     description: text('description'),
+    startingPointLabel: text('starting_point_label'),
+    startingPointLat: real('starting_point_lat'),
+    startingPointLon: real('starting_point_lon'),
     createdAt: text('created_at').notNull(),
     updatedAt: text('updated_at').notNull()
   },
   (table) => ({
-    nameIndex: index('trips_name_idx').on(table.name)
+    nameIndex: index('trips_name_idx').on(table.name),
+    slugIndex: uniqueIndex('trips_slug_idx').on(table.slug)
   })
 );
 

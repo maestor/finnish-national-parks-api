@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  createTripRequestSchema,
   updateParkRequestSchema,
   updateTripRequestSchema,
   updateVisitRequestSchema
@@ -43,6 +44,57 @@ describe('contracts and cache helpers', () => {
     );
     expect(updateTripRequestSchema.parse({ name: 'Updated trip' })).toEqual({
       name: 'Updated trip'
+    });
+    expect(updateTripRequestSchema.parse({ slug: 'updated-trip' })).toEqual({
+      slug: 'updated-trip'
+    });
+    expect(
+      updateTripRequestSchema.parse({
+        startingPoint: {
+          coordinate: {
+            lat: 60.1699,
+            lon: 24.9384
+          },
+          label: 'Helsinki'
+        }
+      })
+    ).toEqual({
+      startingPoint: {
+        coordinate: {
+          lat: 60.1699,
+          lon: 24.9384
+        },
+        label: 'Helsinki'
+      }
+    });
+    expect(updateTripRequestSchema.parse({ startingPoint: null })).toEqual({
+      startingPoint: null
+    });
+  });
+
+  it('accepts optional trip slug and starting point on create', () => {
+    expect(
+      createTripRequestSchema.parse({
+        name: 'Updated trip',
+        slug: 'updated-trip',
+        startingPoint: {
+          coordinate: {
+            lat: 60.1699,
+            lon: 24.9384
+          },
+          label: 'Helsinki'
+        }
+      })
+    ).toEqual({
+      name: 'Updated trip',
+      slug: 'updated-trip',
+      startingPoint: {
+        coordinate: {
+          lat: 60.1699,
+          lon: 24.9384
+        },
+        label: 'Helsinki'
+      }
     });
   });
 
