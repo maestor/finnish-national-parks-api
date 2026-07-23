@@ -205,6 +205,7 @@ describe('API routes', () => {
       };
       note?: string | null;
       tripStopOrder?: number;
+      visitedOn: string;
     }
   ) => {
     const response = await requestAsAdmin(app, `/api/trips/${tripId}/stops`, {
@@ -227,6 +228,7 @@ describe('API routes', () => {
         };
         note: string | null;
         tripStopOrder: number;
+        visitedOn: string;
       },
       response
     };
@@ -2023,11 +2025,13 @@ describe('API routes', () => {
         label: 'ABC Huittinen'
       },
       note: 'Lunch break',
-      tripStopOrder: 2
+      tripStopOrder: 2,
+      visitedOn: '2026-06-07'
     });
 
     expect(createStopResponse.status).toBe(201);
     expect(stop.tripStopOrder).toBe(2);
+    expect(stop.visitedOn).toBe('2026-06-07');
 
     const tripDetailResponse = await app.request(`/api/trips/${trip.id}`);
     const tripDetailBody = (await tripDetailResponse.json()) as {
@@ -2064,7 +2068,8 @@ describe('API routes', () => {
         tripStopOrder: 2,
         stop: expect.objectContaining({
           id: stop.id,
-          note: 'Lunch break'
+          note: 'Lunch break',
+          visitedOn: '2026-06-07'
         })
       },
       {
@@ -2148,7 +2153,8 @@ describe('API routes', () => {
             lon: 22.1333
           },
           label: 'ABC Huittinen'
-        }
+        },
+        visitedOn: '2026-06-07'
       }),
       headers: {
         'content-type': 'application/json'
@@ -2166,6 +2172,10 @@ describe('API routes', () => {
     const { body: trip } = await createTrip(app, {
       name: 'Kesäreissu 2026'
     });
+    await createVisit(app, 'akasmannyn-kansallispuisto', {
+      tripId: trip.id,
+      visitedOn: '2026-06-07'
+    });
     const { body: stop } = await createTripStop(app, trip.id, {
       location: {
         coordinate: {
@@ -2173,7 +2183,8 @@ describe('API routes', () => {
           lon: 22.1333
         },
         label: 'ABC Huittinen'
-      }
+      },
+      visitedOn: '2026-06-07'
     });
     const relocateTripStopResponse = await requestAsAdmin(app, `/api/trip-stops/${stop.id}`, {
       method: 'PATCH',
@@ -2269,7 +2280,8 @@ describe('API routes', () => {
               lon: 22.1333
             },
             label: 'ABC Huittinen'
-          }
+          },
+          visitedOn: '2026-06-07'
         }),
         headers: {
           'content-type': 'application/json'
@@ -2296,6 +2308,10 @@ describe('API routes', () => {
     const { body: brokenTrip } = await createTrip(brokenStopUpdateApp, {
       name: 'Rikkoutuva kesäreissu'
     });
+    await createVisit(brokenStopUpdateApp, 'akasmannyn-kansallispuisto', {
+      tripId: brokenTrip.id,
+      visitedOn: '2026-06-07'
+    });
     const { body: brokenStop } = await createTripStop(brokenStopUpdateApp, brokenTrip.id, {
       location: {
         coordinate: {
@@ -2303,7 +2319,8 @@ describe('API routes', () => {
           lon: 22.1333
         },
         label: 'ABC Huittinen'
-      }
+      },
+      visitedOn: '2026-06-07'
     });
 
     await brokenStopUpdateDatabase.dispose();
@@ -2369,6 +2386,95 @@ describe('API routes', () => {
 
     expect(updateResponse.status).toBe(422);
     expect(updateBody.error).toBe('Trip stop order requires an assigned trip.');
+  });
+
+  it('rejects trip stops before the first trip visit and outside the trip date range', async () => {
+    const app = createAuthedApp();
+    const { body: trip } = await createTrip(app, {
+      name: 'Kesäreissu 2026'
+    });
+
+    const missingVisitResponse = await requestAsAdmin(app, `/api/trips/${trip.id}/stops`, {
+      method: 'POST',
+      body: JSON.stringify({
+        location: {
+          coordinate: {
+            lat: 61.3167,
+            lon: 22.1333
+          },
+          label: 'ABC Huittinen'
+        },
+        visitedOn: '2026-06-07'
+      }),
+      headers: {
+        'content-type': 'application/json'
+      }
+    });
+    const missingVisitBody = (await missingVisitResponse.json()) as {
+      error: string;
+    };
+
+    expect(missingVisitResponse.status).toBe(422);
+    expect(missingVisitBody.error).toBe('Trip stop requires at least one visit in the trip.');
+
+    await createVisit(app, 'akasmannyn-kansallispuisto', {
+      tripId: trip.id,
+      visitedOn: '2026-06-07'
+    });
+    await createVisit(app, 'seitsemisen-kansallispuisto', {
+      tripId: trip.id,
+      visitedOn: '2026-06-09'
+    });
+
+    const beforeRangeResponse = await requestAsAdmin(app, `/api/trips/${trip.id}/stops`, {
+      method: 'POST',
+      body: JSON.stringify({
+        location: {
+          coordinate: {
+            lat: 61.3167,
+            lon: 22.1333
+          },
+          label: 'ABC Huittinen'
+        },
+        visitedOn: '2026-06-06'
+      }),
+      headers: {
+        'content-type': 'application/json'
+      }
+    });
+    const beforeRangeBody = (await beforeRangeResponse.json()) as {
+      error: string;
+    };
+
+    expect(beforeRangeResponse.status).toBe(422);
+    expect(beforeRangeBody.error).toBe('Trip stop date must be within the trip date range.');
+
+    const { body: stop } = await createTripStop(app, trip.id, {
+      location: {
+        coordinate: {
+          lat: 61.3167,
+          lon: 22.1333
+        },
+        label: 'ABC Huittinen'
+      },
+      visitedOn: '2026-06-09'
+    });
+
+    const updateStopResponse = await requestAsAdmin(app, `/api/trip-stops/${stop.id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({
+        visitedOn: '2026-06-10'
+      }),
+      headers: {
+        'content-type': 'application/json'
+      }
+    });
+    const updateStopBody = (await updateStopResponse.json()) as {
+      error: string;
+    };
+
+    expect(updateStopResponse.status).toBe(422);
+    expect(updateStopBody.error).toBe('Trip stop date must be within the trip date range.');
   });
 
   it('returns 500 for unexpected visit write failures', async () => {
@@ -2832,6 +2938,10 @@ describe('API routes', () => {
     const { body: createdTrip } = await createTrip(app, {
       name: 'Valvottu retki'
     });
+    await createVisit(app, 'akasmannyn-kansallispuisto', {
+      tripId: createdTrip.id,
+      visitedOn: '2026-04-20'
+    });
     const { body: createdTripStop } = await createTripStop(app, createdTrip.id, {
       location: {
         coordinate: {
@@ -2839,7 +2949,8 @@ describe('API routes', () => {
           lon: 24.9384
         },
         label: 'Helsinki'
-      }
+      },
+      visitedOn: '2026-04-20'
     });
 
     const removeParkResponse = await app.request('/api/parks/akasmannyn-kansallispuisto/removed', {
@@ -2893,7 +3004,8 @@ describe('API routes', () => {
             lon: 22.1333
           },
           label: 'ABC Huittinen'
-        }
+        },
+        visitedOn: '2026-04-20'
       }),
       headers: {
         'content-type': 'application/json'

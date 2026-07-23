@@ -84,6 +84,7 @@ type PutTripStopInput = {
   };
   note?: string | null | undefined;
   tripStopOrder?: number | undefined;
+  visitedOn: string;
 };
 
 type UpdateTripStopInput = {
@@ -98,6 +99,7 @@ type UpdateTripStopInput = {
     | undefined;
   note?: string | null | undefined;
   tripStopOrder?: number | undefined;
+  visitedOn?: string | undefined;
 };
 
 type UpdateParkDetailsInput = {
@@ -416,6 +418,44 @@ const normalizeTripStopLocation = (location: {
     lat: location.coordinate.lat,
     lon: location.coordinate.lon
   };
+};
+
+const getTripStopVisitDateRange = async (database: DbClient, tripId: number) => {
+  const [row] = await database
+    .select({
+      endVisitedOn: sql<
+        string | null
+      >`MAX(CASE WHEN ${parks.removed} = 0 THEN ${parkVisits.visitedOn} END)`,
+      startVisitedOn: sql<
+        string | null
+      >`MIN(CASE WHEN ${parks.removed} = 0 THEN ${parkVisits.visitedOn} END)`,
+      visitCount: sql<number>`COUNT(CASE WHEN ${parks.removed} = 0 THEN ${parkVisits.id} END)`
+    })
+    .from(parkVisits)
+    .innerJoin(parks, eq(parkVisits.parkId, parks.id))
+    .where(eq(parkVisits.tripId, tripId));
+
+  return {
+    endVisitedOn: row!.endVisitedOn,
+    startVisitedOn: row!.startVisitedOn,
+    visitCount: row!.visitCount
+  };
+};
+
+const assertTripStopVisitedOn = async (database: DbClient, tripId: number, visitedOn: string) => {
+  const tripDateRange = await getTripStopVisitDateRange(database, tripId);
+
+  if (
+    tripDateRange.visitCount === 0 ||
+    tripDateRange.startVisitedOn === null ||
+    tripDateRange.endVisitedOn === null
+  ) {
+    throw new RepositoryValidationError('Trip stop requires at least one visit in the trip.');
+  }
+
+  if (visitedOn < tripDateRange.startVisitedOn || visitedOn > tripDateRange.endVisitedOn) {
+    throw new RepositoryValidationError('Trip stop date must be within the trip date range.');
+  }
 };
 
 type TripAwareVisitOrder = {
@@ -796,7 +836,8 @@ const toTripStop = (row: TripStopRow) => {
     location: toTripStopLocation(row),
     note: row.note,
     tripStopOrder: row.tripStopOrder,
-    updatedAt: row.updatedAt
+    updatedAt: row.updatedAt,
+    visitedOn: row.visitedOn
   };
 };
 
@@ -2160,6 +2201,8 @@ export const createTripStop = async (
   const timestamp = new Date().toISOString();
 
   return database.transaction(async (tx) => {
+    await assertTripStopVisitedOn(tx, tripId, input.visitedOn);
+
     const tripStopOrder = (await resolveCreateTripStopOrder(
       tx,
       tripId,
@@ -2177,6 +2220,7 @@ export const createTripStop = async (
           note: normalizeOptionalText(input.note),
           tripId,
           tripStopOrder,
+          visitedOn: input.visitedOn,
           updatedAt: timestamp
         })
         .returning()
@@ -2532,8 +2576,11 @@ export const updateTripStop = async (
   const nextLocation =
     input.location === undefined ? undefined : normalizeTripStopLocation(input.location);
   const timestamp = new Date().toISOString();
+  const nextVisitedOn = input.visitedOn ?? existingTripStop.visitedOn;
 
   return database.transaction(async (tx) => {
+    await assertTripStopVisitedOn(tx, existingTripStop.tripId, nextVisitedOn);
+
     const tripStopOrder = await resolveUpdatedTripStopOrder(
       tx,
       {
@@ -2555,7 +2602,8 @@ export const updateTripStop = async (
         lon: nextLocation?.lon ?? existingTripStop.lon,
         note: input.note === undefined ? existingTripStop.note : normalizeOptionalText(input.note),
         tripStopOrder: tripStopOrder!,
-        updatedAt: timestamp
+        updatedAt: timestamp,
+        visitedOn: nextVisitedOn
       })
       .where(eq(tripStops.id, tripStopId));
 
