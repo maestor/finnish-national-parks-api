@@ -560,6 +560,47 @@ export const baseSpecialParkConfigs: SpecialParkConfig[] = [
   },
   {
     displayTypeName: null,
+    locationLabel: 'Kastelholm',
+    parkUrl:
+      'https://itameri.fi/vapaa-ajan-vietto/nahtavaa-merella/linnakkeet/kastelholman-linna-ahvenanmaa/',
+    name: 'Kastelholman linna',
+    parkTypeSlug: 'cultural-history-area',
+    postalCode: null,
+    postalOffice: null,
+    responseShapeVersion: 'manual-aland-fornminnen-v1',
+    slug: 'kastelholman-linna',
+    sourceUrl: 'special://kastelholman-linna',
+    syntheticLipasId: 9_002_048
+  },
+  {
+    displayTypeName: null,
+    locationLabel: 'Bomarsund',
+    parkUrl:
+      'https://itameri.fi/vapaa-ajan-vietto/nahtavaa-merella/linnakkeet/bomarsundin-linnoitusrauniot-ahvenanmaa/',
+    name: 'Bomarsundin linnoitusrauniot',
+    parkTypeSlug: 'cultural-history-area',
+    postalCode: null,
+    postalOffice: null,
+    responseShapeVersion: 'manual-aland-fornminnen-v1',
+    slug: 'bomarsundin-linnoitusrauniot',
+    sourceUrl: 'special://bomarsundin-linnoitusrauniot',
+    syntheticLipasId: 9_002_049
+  },
+  {
+    displayTypeName: null,
+    locationLabel: 'Österleden 110',
+    parkUrl: 'https://book.visitaland.com/fi/maarianhaminan-merikortteli',
+    name: 'Maarianhaminan Merikortteli',
+    parkTypeSlug: 'cultural-history-area',
+    postalCode: '22100',
+    postalOffice: 'Mariehamn',
+    responseShapeVersion: 'manual-visitaland-point-proxy-v1',
+    slug: 'maarianhaminan-merikortteli',
+    sourceUrl: 'special://maarianhaminan-merikortteli',
+    syntheticLipasId: 9_002_050
+  },
+  {
+    displayTypeName: null,
     locationLabel: 'Hiidenkirnujentie',
     parkUrl: null,
     name: 'Askolan hiidenkirnut',

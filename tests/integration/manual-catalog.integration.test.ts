@@ -55,7 +55,7 @@ describe('manual catalog imports', () => {
       now: () => '2026-05-27T08:00:00.000Z'
     });
 
-    expect(result.results).toHaveLength(148);
+    expect(result.results).toHaveLength(151);
 
     const merenkurkku = await getParkBySlug(
       testDatabase.database,
@@ -1141,6 +1141,47 @@ describe('manual catalog imports', () => {
       type: { slug: 'cultural-history-area' }
     });
 
+    const kastelholmanLinna = await getParkBySlug(testDatabase.database, 'kastelholman-linna');
+    expect(kastelholmanLinna).toMatchObject({
+      lipasId: 9002048,
+      locationLabel: 'Kastelholm',
+      parkUrl:
+        'https://itameri.fi/vapaa-ajan-vietto/nahtavaa-merella/linnakkeet/kastelholman-linna-ahvenanmaa/',
+      name: 'Kastelholman linna',
+      type: { slug: 'cultural-history-area' }
+    });
+    expect(kastelholmanLinna?.boundaryGeoJson?.features).toHaveLength(2);
+
+    const bomarsundinLinnoitusrauniot = await getParkBySlug(
+      testDatabase.database,
+      'bomarsundin-linnoitusrauniot'
+    );
+    expect(bomarsundinLinnoitusrauniot).toMatchObject({
+      lipasId: 9002049,
+      locationLabel: 'Bomarsund',
+      parkUrl:
+        'https://itameri.fi/vapaa-ajan-vietto/nahtavaa-merella/linnakkeet/bomarsundin-linnoitusrauniot-ahvenanmaa/',
+      name: 'Bomarsundin linnoitusrauniot',
+      type: { slug: 'cultural-history-area' }
+    });
+    expect(bomarsundinLinnoitusrauniot?.boundaryGeoJson?.features).toHaveLength(1);
+
+    const maarianhaminanMerikortteli = await getParkBySlug(
+      testDatabase.database,
+      'maarianhaminan-merikortteli'
+    );
+    expect(maarianhaminanMerikortteli).toMatchObject({
+      address: 'Österleden 110, 22100 Mariehamn',
+      lipasId: 9002050,
+      locationLabel: 'Österleden 110',
+      parkUrl: 'https://book.visitaland.com/fi/maarianhaminan-merikortteli',
+      name: 'Maarianhaminan Merikortteli',
+      postalCode: '22100',
+      postalOffice: 'Mariehamn',
+      type: { slug: 'cultural-history-area' }
+    });
+    expect(maarianhaminanMerikortteli?.boundaryGeoJson?.features).toHaveLength(1);
+
     const fiskars = await getParkBySlug(testDatabase.database, 'fiskarsin-ruukki');
     expect(fiskars).toMatchObject({
       address: 'Fiskarsintie 9, 10470 Fiskars',
@@ -1249,7 +1290,7 @@ describe('manual catalog imports', () => {
     );
     const kevo = await getParkBySlug(testDatabase.database, 'kevon-luonnonpuisto');
 
-    expect(allParks).toHaveLength(148);
+    expect(allParks).toHaveLength(151);
     expect(merenkurkku).toMatchObject({ catalogStatus: 'active' });
     expect(kevo).toMatchObject({ catalogStatus: 'active' });
   });
@@ -1326,7 +1367,7 @@ describe('manual catalog imports', () => {
       database: testDatabase.database
     });
 
-    expect(result.results).toHaveLength(148);
+    expect(result.results).toHaveLength(151);
 
     const merenkurkku = await getParkBySlug(
       testDatabase.database,
@@ -1559,7 +1600,7 @@ describe('manual catalog imports', () => {
       now: () => '2026-05-27T08:00:00.000Z'
     });
 
-    expect(result.results).toHaveLength(148);
+    expect(result.results).toHaveLength(151);
   });
 
   it('fails clearly when a selected special-park slug is unknown', async () => {

@@ -1,0 +1,24 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Maarianhaminan Merikortteli",
+        "source": "Official Visit Aland point proxy polygon"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [19.94385, 60.10555],
+            [19.94385, 60.10695],
+            [19.94595, 60.10695],
+            [19.94595, 60.10555],
+            [19.94385, 60.10555]
+          ]
+        ]
+      }
+    }
+  ]
+}
