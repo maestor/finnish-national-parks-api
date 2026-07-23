@@ -31,6 +31,11 @@ export type TripPlannerResolvedLocation = {
 
 export type TripPlannerSuggestion = TripPlannerResolvedLocation;
 
+export type TripPlannerRoundTripInput = {
+  mode: TripPlannerMode;
+  waypoints: TripPlannerResolvedLocation[];
+};
+
 export type TripPlannerRoute = {
   boundingBox: BoundingBox;
   distanceMeters: number;
@@ -108,6 +113,14 @@ export type TripPlannerNearbySearchResponse = {
   };
 };
 
+export type TripPlannerRoundTripRoute = {
+  distanceMeters: number;
+  durationSeconds: number;
+  geometry: LineStringGeometry;
+  returnsToStart: boolean;
+  waypointCount: number;
+};
+
 export type TripPlannerProvider = {
   geocode: (query: string) => Promise<TripPlannerResolvedLocation | null>;
   route: (input: {
@@ -119,6 +132,9 @@ export type TripPlannerProvider = {
 };
 
 export type TripPlannerService = {
+  buildRoundTripRoute?: (
+    input: TripPlannerRoundTripInput
+  ) => Promise<TripPlannerRoundTripRoute | null>;
   search: (input: TripPlannerSearchInput) => Promise<TripPlannerSearchResponse>;
   searchNearby: (input: TripPlannerNearbySearchInput) => Promise<TripPlannerNearbySearchResponse>;
   suggest: (query: string) => Promise<TripPlannerSuggestion[]>;

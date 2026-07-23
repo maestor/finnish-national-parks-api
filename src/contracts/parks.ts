@@ -253,6 +253,42 @@ export const tripDetailSchema = tripSchema.extend({
   itinerary: z.array(tripItineraryEntrySchema)
 });
 
+export const publicTripVisitParkSchema = visitParkSchema.extend({
+  markerPoint: pointSchema,
+  typeLabel: z.string()
+});
+
+export const publicTripItineraryVisitSchema = tripItineraryVisitSchema.extend({
+  imageCount: z.number().int(),
+  park: publicTripVisitParkSchema
+});
+
+export const publicTripItineraryVisitEntrySchema = z.object({
+  kind: z.literal('visit'),
+  tripStopOrder: z.number().int().positive(),
+  visit: publicTripItineraryVisitSchema
+});
+
+export const publicTripRouteSchema = z.object({
+  distanceMeters: z.number().int().nonnegative(),
+  durationSeconds: z.number().int().nonnegative(),
+  geometry: geoJsonLineStringSchema,
+  returnsToStart: z.boolean(),
+  waypointCount: z.number().int().positive()
+});
+
+export const publicTripItineraryEntrySchema = z.union([
+  publicTripItineraryVisitEntrySchema,
+  tripItineraryStopEntrySchema
+]);
+
+export const publicTripDetailSchema = tripSchema.extend({
+  imageCount: z.number().int(),
+  itinerary: z.array(publicTripItineraryEntrySchema),
+  route: publicTripRouteSchema.nullable(),
+  stopCount: z.number().int()
+});
+
 export const visitWithParkSchema = visitSchema.extend({
   park: visitParkSchema
 });

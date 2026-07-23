@@ -23,6 +23,7 @@ import {
   getParkVisitsBySlug,
   getPublicHomeSummary,
   getPublicMapSummary,
+  getPublicTripBySlug,
   getPublicVisitDataVersion,
   getPublicVisitSummaryEtagSeed,
   getTripById,
@@ -113,6 +114,7 @@ import {
   createTripStopRoute,
   deleteTripRoute,
   deleteTripStopRoute,
+  getTripBySlugRoute,
   getTripRoute,
   listTripsRoute,
   updateTripRoute,
@@ -145,6 +147,7 @@ type AppDependencies = {
 // Keep direct `hono` imports out of this module. Vercel may otherwise mis-detect
 // `src/app.ts` as the deployment entrypoint instead of the dedicated `src/index.ts`.
 type SessionContext = Parameters<typeof getSessionCookie>[0];
+type PublicTripDetail = NonNullable<Awaited<ReturnType<typeof getPublicTripBySlug>>>;
 
 const MAX_VISIT_IMAGE_FILE_SIZE = 15 * 1024 * 1024;
 const ACCEPTED_VISIT_IMAGE_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
@@ -156,6 +159,56 @@ const jsonNotFound = (error: string) => {
   return {
     error
   };
+};
+
+const buildPublicTripRouteWaypoints = (trip: PublicTripDetail) => {
+  const visitEntries = trip.itinerary.filter((entry) => entry.kind === 'visit');
+
+  if (!trip.startingPoint || visitEntries.length < 2) {
+    return null;
+  }
+
+  return [
+    trip.startingPoint,
+    ...trip.itinerary.map((entry) =>
+      entry.kind === 'visit'
+        ? {
+            coordinate: entry.visit.park.markerPoint,
+            label: entry.visit.park.name
+          }
+        : {
+            coordinate: entry.stop.location.coordinate,
+            label: entry.stop.location.label
+          }
+    ),
+    trip.startingPoint
+  ];
+};
+
+const attachPublicTripRoute = async (trip: PublicTripDetail, tripPlanner?: TripPlannerService) => {
+  const waypoints = buildPublicTripRouteWaypoints(trip);
+
+  if (!waypoints || !tripPlanner?.buildRoundTripRoute) {
+    return {
+      ...trip,
+      route: null
+    };
+  }
+
+  try {
+    return {
+      ...trip,
+      route: await tripPlanner.buildRoundTripRoute({
+        mode: 'drive',
+        waypoints
+      })
+    };
+  } catch {
+    return {
+      ...trip,
+      route: null
+    };
+  }
 };
 
 const getVisitImageFileExtension = (contentType: string) => {
@@ -711,6 +764,19 @@ export const createApp = ({
       const trips = await listTrips(database);
 
       return context.json({ trips }, 200);
+    });
+
+    app.openapi(getTripBySlugRoute, async (context) => {
+      context.header('Cache-Control', PRIVATE_CACHE_CONTROL);
+
+      const { slug } = context.req.valid('param');
+      const trip = await getPublicTripBySlug(database, slug);
+
+      if (!trip) {
+        return context.json(jsonNotFound('Trip not found.'), 404);
+      }
+
+      return context.json(await attachPublicTripRoute(trip, tripPlanner), 200);
     });
 
     app.openapi(getTripRoute, async (context) => {

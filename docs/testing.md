@@ -83,6 +83,7 @@ If an upload limit exists, at least one test should cover the real stored-object
 - `GET /api/home-summary` returns cache-friendly home summary data including seasonal visit counts, `progressByType` visibility flags, and aggregated `progressByCategory`, without notes, routes, or images.
 - `GET /api/map-summary` returns lightweight map data plus per-park visited summaries.
 - `GET /api/trips` returns named trips with derived `dateRange`, `visitCount`, persisted `slug`, and optional `startingPoint`.
+- `GET /api/trips/slug/:slug` returns one page-ready trip detail payload by public slug, including derived `imageCount` / `stopCount`, itinerary visit park `markerPoint` / `typeLabel` / per-visit `imageCount`, and optional round-trip route geometry that falls back to `route: null` when prerequisites or provider routing are unavailable.
 - `GET /api/trips/:id` returns one trip with a merged itinerary that includes both park visits and non-park trip stops in shared `tripStopOrder`.
 - `GET /api/visits-timeline` returns the lightweight `/kaynnit` timeline dataset with `imageCount`, `trip: { id, name, slug } | null`, `tripStopOrder: number | null`, and pre-resolved park `typeLabel` values.
 - `POST /api/trip-planner/suggestions` returns up to three Geoapify-backed place suggestions with labels and coordinates for origin/destination pickers.

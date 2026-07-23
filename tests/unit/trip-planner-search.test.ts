@@ -199,6 +199,321 @@ describe('trip planner service', () => {
     expect(suggest).toHaveBeenCalledWith('He');
   });
 
+  it('builds a merged round trip route across multiple waypoints', async () => {
+    const route = vi
+      .fn()
+      .mockResolvedValueOnce({
+        boundingBox: {
+          maxLat: 61,
+          maxLon: 25,
+          minLat: 60,
+          minLon: 24
+        },
+        distanceMeters: 10_000,
+        durationSeconds: 900,
+        geometry: {
+          features: [
+            {
+              geometry: {
+                coordinates: [
+                  [24, 60],
+                  [25, 61]
+                ],
+                type: 'LineString'
+              },
+              type: 'Feature'
+            }
+          ],
+          type: 'FeatureCollection'
+        },
+        mode: 'drive' as const
+      })
+      .mockResolvedValueOnce({
+        boundingBox: {
+          maxLat: 62,
+          maxLon: 26,
+          minLat: 61,
+          minLon: 25
+        },
+        distanceMeters: 20_000,
+        durationSeconds: 1_800,
+        geometry: {
+          features: [
+            {
+              geometry: {
+                coordinates: [
+                  [25, 61],
+                  [26, 62]
+                ],
+                type: 'LineString'
+              },
+              type: 'Feature'
+            }
+          ],
+          type: 'FeatureCollection'
+        },
+        mode: 'drive' as const
+      })
+      .mockResolvedValueOnce({
+        boundingBox: {
+          maxLat: 62,
+          maxLon: 26,
+          minLat: 60,
+          minLon: 24
+        },
+        distanceMeters: 30_000,
+        durationSeconds: 2_700,
+        geometry: {
+          features: [
+            {
+              geometry: {
+                coordinates: [
+                  [26, 62],
+                  [24, 60]
+                ],
+                type: 'LineString'
+              },
+              type: 'Feature'
+            }
+          ],
+          type: 'FeatureCollection'
+        },
+        mode: 'drive' as const
+      });
+    const service = createTripPlannerService({
+      database: {} as Database,
+      provider: createProvider({
+        route
+      })
+    });
+
+    const result = await service.buildRoundTripRoute?.({
+      mode: 'drive',
+      waypoints: [
+        {
+          coordinate: { lat: 60, lon: 24 },
+          label: 'Start'
+        },
+        {
+          coordinate: { lat: 61, lon: 25 },
+          label: 'Midpoint'
+        },
+        {
+          coordinate: { lat: 62, lon: 26 },
+          label: 'Destination'
+        },
+        {
+          coordinate: { lat: 60, lon: 24 },
+          label: 'Start'
+        }
+      ]
+    });
+
+    expect(result).toEqual({
+      distanceMeters: 60_000,
+      durationSeconds: 5_400,
+      geometry: {
+        coordinates: [
+          [24, 60],
+          [25, 61],
+          [26, 62],
+          [24, 60]
+        ],
+        type: 'LineString'
+      },
+      returnsToStart: true,
+      waypointCount: 4
+    });
+    expect(route).toHaveBeenCalledTimes(3);
+  });
+
+  it('returns null for round trip routing with fewer than two waypoints', async () => {
+    const route = vi.fn();
+    const service = createTripPlannerService({
+      database: {} as Database,
+      provider: createProvider({
+        route
+      })
+    });
+
+    await expect(
+      service.buildRoundTripRoute?.({
+        mode: 'drive',
+        waypoints: [
+          {
+            coordinate: { lat: 60, lon: 24 },
+            label: 'Start'
+          }
+        ]
+      })
+    ).resolves.toBeNull();
+    expect(route).not.toHaveBeenCalled();
+  });
+
+  it('returns null for round trip routing when a leg cannot be simplified into a line', async () => {
+    const polygonOnlyGeometry: GeoJsonFeatureCollection = {
+      features: [
+        {
+          geometry: {
+            coordinates: [
+              [
+                [24, 60],
+                [25, 60],
+                [25, 61],
+                [24, 60]
+              ]
+            ],
+            type: 'Polygon'
+          },
+          type: 'Feature'
+        }
+      ],
+      type: 'FeatureCollection'
+    };
+    const service = createTripPlannerService({
+      database: {} as Database,
+      provider: createProvider({
+        route: vi.fn(async () => ({
+          boundingBox: {
+            maxLat: 61,
+            maxLon: 25,
+            minLat: 60,
+            minLon: 24
+          },
+          distanceMeters: 10_000,
+          durationSeconds: 900,
+          geometry: polygonOnlyGeometry,
+          mode: 'drive' as const
+        }))
+      })
+    });
+
+    await expect(
+      service.buildRoundTripRoute?.({
+        mode: 'drive',
+        waypoints: [
+          {
+            coordinate: { lat: 60, lon: 24 },
+            label: 'Start'
+          },
+          {
+            coordinate: { lat: 61, lon: 25 },
+            label: 'Stop'
+          }
+        ]
+      })
+    ).resolves.toBeNull();
+  });
+
+  it('returns null for round trip routing when any leg cannot be routed', async () => {
+    const service = createTripPlannerService({
+      database: {} as Database,
+      provider: createProvider({
+        route: vi
+          .fn()
+          .mockResolvedValueOnce({
+            boundingBox: {
+              maxLat: 61,
+              maxLon: 25,
+              minLat: 60,
+              minLon: 24
+            },
+            distanceMeters: 10_000,
+            durationSeconds: 900,
+            geometry: routeGeometry,
+            mode: 'drive' as const
+          })
+          .mockResolvedValueOnce(null)
+      })
+    });
+
+    await expect(
+      service.buildRoundTripRoute?.({
+        mode: 'drive',
+        waypoints: [
+          {
+            coordinate: { lat: 60, lon: 24 },
+            label: 'Start'
+          },
+          {
+            coordinate: { lat: 61, lon: 25 },
+            label: 'Stop'
+          },
+          {
+            coordinate: { lat: 60, lon: 24 },
+            label: 'Start'
+          }
+        ]
+      })
+    ).resolves.toBeNull();
+  });
+
+  it('wraps unexpected round trip provider failures as provider_unavailable errors', async () => {
+    const service = createTripPlannerService({
+      database: {} as Database,
+      provider: createProvider({
+        route: vi.fn(async () => {
+          throw new Error('provider down');
+        })
+      })
+    });
+
+    await expect(
+      service.buildRoundTripRoute?.({
+        mode: 'drive',
+        waypoints: [
+          {
+            coordinate: { lat: 60, lon: 24 },
+            label: 'Start'
+          },
+          {
+            coordinate: { lat: 61, lon: 25 },
+            label: 'Stop'
+          }
+        ]
+      })
+    ).rejects.toMatchObject({
+      code: 'provider_unavailable',
+      message: 'Trip planner provider is unavailable.',
+      status: 503
+    });
+  });
+
+  it('rethrows existing trip planner errors from round trip routing unchanged', async () => {
+    const service = createTripPlannerService({
+      database: {} as Database,
+      provider: createProvider({
+        route: vi.fn(async () => {
+          throw new TripPlannerError(
+            'provider_unavailable',
+            'Trip planner provider is unavailable.',
+            503
+          );
+        })
+      })
+    });
+
+    await expect(
+      service.buildRoundTripRoute?.({
+        mode: 'drive',
+        waypoints: [
+          {
+            coordinate: { lat: 60, lon: 24 },
+            label: 'Start'
+          },
+          {
+            coordinate: { lat: 61, lon: 25 },
+            label: 'Stop'
+          }
+        ]
+      })
+    ).rejects.toMatchObject({
+      code: 'provider_unavailable',
+      message: 'Trip planner provider is unavailable.',
+      status: 503
+    });
+  });
+
   it('returns default and max distance metadata for route search', async () => {
     listTripPlannerCandidateParks.mockResolvedValue([]);
     const service = createTripPlannerService({

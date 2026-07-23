@@ -4,6 +4,7 @@ import { errorSchema } from '../contracts/common.js';
 import {
   createTripRequestSchema,
   createTripStopRequestSchema,
+  publicTripDetailSchema,
   tripDetailSchema,
   tripListResponseSchema,
   tripSchema,
@@ -90,6 +91,36 @@ export const getTripRoute = createRoute({
       content: {
         'application/json': {
           schema: tripDetailSchema
+        }
+      }
+    },
+    404: {
+      description: 'Trip was not found',
+      content: {
+        'application/json': {
+          schema: errorSchema
+        }
+      }
+    }
+  }
+});
+
+export const getTripBySlugRoute = createRoute({
+  method: 'get',
+  path: '/api/trips/slug/{slug}',
+  tags: ['Trips'],
+  security: [{ bearerAuth: [] }],
+  request: {
+    params: z.object({
+      slug: z.string().trim().min(1)
+    })
+  },
+  responses: {
+    200: {
+      description: 'Page-ready trip detail by slug',
+      content: {
+        'application/json': {
+          schema: publicTripDetailSchema
         }
       }
     },

@@ -103,6 +103,7 @@ The importer's LIPAS source URL and supported type-code list are internal config
 - `GET /api/home-summary`
 - `GET /api/map-summary`
 - `GET /api/trips`
+- `GET /api/trips/slug/:slug`
 - `GET /api/trips/:id`
 - `GET /api/visits-timeline`
 - `POST /api/trip-planner/suggestions`
@@ -150,6 +151,7 @@ Catalog endpoints stay cache-friendly and database-backed:
 - `GET /api/home-summary` returns cache-friendly home-page visit totals, seasonal visit counts, type progress with a `visible` flag, category progress, recent activity, and a visit-data `version` / `updatedAt` signal without notes, routes, or images.
 - `GET /api/map-summary` returns cache-friendly park map data plus per-park visited summaries and the same visit data version signal.
 - `GET /api/trips` returns named trips with derived `dateRange`, `visitCount`, persisted `slug`, optional `startingPoint`, and the same visit-data version-backed cache behavior as the other public summary endpoints.
+- `GET /api/trips/slug/:slug` returns one page-ready trip detail payload by public slug, including derived `imageCount` / `stopCount`, itinerary visit park `markerPoint` / `typeLabel` / per-visit `imageCount`, and optional whole-trip route `LineString` geometry when the trip has a starting point plus at least two visit waypoints. Route-generation failures degrade to `route: null`. This detail route uses `Cache-Control: private, no-store`.
 - `GET /api/trips/:id` returns one trip with a merged itinerary ordered by `tripStopOrder`, combining park visits and non-park trip stops. Trip stops now include their own `visitedOn` date in the itinerary response. This detail route uses `Cache-Control: private, no-store`.
 - `GET /api/visits-timeline` returns the lightweight timeline dataset for `/kaynnit`, with each visit including `id`, `visitedOn`, `createdAt`, `route`, `imageCount`, `trip: { id, name, slug } | null`, `tripStopOrder: number | null`, and a resolved park `typeLabel`. When two visits belong to the same trip on the same day, the timeline uses `tripStopOrder` instead of falling back to entry creation time.
 - `POST /api/trip-planner/suggestions` returns up to three Geoapify-backed place suggestions with labels and coordinates for origin/destination pickers.
@@ -175,7 +177,7 @@ Catalog endpoints stay cache-friendly and database-backed:
 - `POST /api/visits/:id/images` remains available for localhost-style server uploads, but Vercel runtime disables that Sharp-based path so uploads do not pass through the function body limit.
 - `GET /health` and `GET /openapi.json` are the only anonymous data endpoints today.
 - `/auth/*` routes are anonymous login-control endpoints, not public data endpoints.
-- There are no anonymous site data endpoints in this API. Frontend-facing `GET` routes such as `/api/home-summary`, `/api/map-summary`, `/api/trips`, and `/api/visits-timeline` still require the API key outside localhost when `API_KEY` is configured.
+- There are no anonymous site data endpoints in this API. Frontend-facing `GET` routes such as `/api/home-summary`, `/api/map-summary`, `/api/trips`, `/api/trips/slug/:slug`, and `/api/visits-timeline` still require the API key outside localhost when `API_KEY` is configured.
 
 ## Data Source
 
