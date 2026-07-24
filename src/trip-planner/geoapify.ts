@@ -1,5 +1,6 @@
 import { logger } from '../http/logger.js';
 import type { GeoJsonFeatureCollection } from '../importer/geometry.js';
+import { deriveLocationDisplayName } from '../location-display.js';
 import { deriveBoundingBox } from './geometry.js';
 import type {
   TripPlannerCoordinate,
@@ -24,9 +25,11 @@ type GeoapifyGeocodeResponse = {
 };
 
 type GeoapifyGeocodeResult = {
+  address_line1?: string;
   formatted?: string;
   lat?: number;
   lon?: number;
+  name?: string;
 };
 
 type GeoapifyRoutingResponse = {
@@ -111,6 +114,11 @@ const normalizeGeocodedLocation = (
       lat: result.lat,
       lon: result.lon
     },
+    displayName: deriveLocationDisplayName({
+      addressLine1: result.address_line1,
+      formatted: result.formatted,
+      name: result.name
+    })!,
     label: result.formatted
   };
 };

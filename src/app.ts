@@ -174,10 +174,12 @@ const buildPublicTripRouteWaypoints = (trip: PublicTripDetail) => {
       entry.kind === 'visit'
         ? {
             coordinate: entry.visit.park.markerPoint,
+            displayName: entry.visit.park.name,
             label: entry.visit.park.name
           }
         : {
             coordinate: entry.stop.location.coordinate,
+            displayName: entry.stop.location.displayName,
             label: entry.stop.location.label
           }
     ),

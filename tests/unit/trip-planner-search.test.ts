@@ -125,6 +125,7 @@ const createTrailCandidate = (
 const createProvider = (overrides: Partial<TripPlannerProvider> = {}): TripPlannerProvider => ({
   geocode: vi.fn(async (query: string) => ({
     coordinate: query === 'Origin' ? { lat: 60, lon: 24 } : { lat: 60, lon: 24.2 },
+    displayName: `${query} label`,
     label: `${query} label`
   })),
   route: vi.fn(async () => ({
@@ -142,6 +143,7 @@ const createProvider = (overrides: Partial<TripPlannerProvider> = {}): TripPlann
   suggest: vi.fn(async (query: string) => [
     {
       coordinate: { lat: 60.1699, lon: 24.9384 },
+      displayName: `${query} label`,
       label: `${query} label`
     }
   ]),
@@ -172,10 +174,12 @@ describe('trip planner service', () => {
     const suggest = vi.fn(async () => [
       {
         coordinate: { lat: 60.1699, lon: 24.9384 },
+        displayName: 'Helsinki, Finland',
         label: 'Helsinki, Finland'
       },
       {
         coordinate: { lat: 60.2055, lon: 24.6559 },
+        displayName: 'Espoo, Finland',
         label: 'Espoo, Finland'
       }
     ]);
@@ -189,10 +193,12 @@ describe('trip planner service', () => {
     await expect(service.suggest('He')).resolves.toEqual([
       {
         coordinate: { lat: 60.1699, lon: 24.9384 },
+        displayName: 'Helsinki, Finland',
         label: 'Helsinki, Finland'
       },
       {
         coordinate: { lat: 60.2055, lon: 24.6559 },
+        displayName: 'Espoo, Finland',
         label: 'Espoo, Finland'
       }
     ]);
@@ -292,18 +298,22 @@ describe('trip planner service', () => {
       waypoints: [
         {
           coordinate: { lat: 60, lon: 24 },
+          displayName: 'Start',
           label: 'Start'
         },
         {
           coordinate: { lat: 61, lon: 25 },
+          displayName: 'Midpoint',
           label: 'Midpoint'
         },
         {
           coordinate: { lat: 62, lon: 26 },
+          displayName: 'Destination',
           label: 'Destination'
         },
         {
           coordinate: { lat: 60, lon: 24 },
+          displayName: 'Start',
           label: 'Start'
         }
       ]
@@ -342,6 +352,7 @@ describe('trip planner service', () => {
         waypoints: [
           {
             coordinate: { lat: 60, lon: 24 },
+            displayName: 'Start',
             label: 'Start'
           }
         ]
@@ -394,10 +405,12 @@ describe('trip planner service', () => {
         waypoints: [
           {
             coordinate: { lat: 60, lon: 24 },
+            displayName: 'Start',
             label: 'Start'
           },
           {
             coordinate: { lat: 61, lon: 25 },
+            displayName: 'Stop',
             label: 'Stop'
           }
         ]
@@ -433,14 +446,17 @@ describe('trip planner service', () => {
         waypoints: [
           {
             coordinate: { lat: 60, lon: 24 },
+            displayName: 'Start',
             label: 'Start'
           },
           {
             coordinate: { lat: 61, lon: 25 },
+            displayName: 'Stop',
             label: 'Stop'
           },
           {
             coordinate: { lat: 60, lon: 24 },
+            displayName: 'Start',
             label: 'Start'
           }
         ]
@@ -464,10 +480,12 @@ describe('trip planner service', () => {
         waypoints: [
           {
             coordinate: { lat: 60, lon: 24 },
+            displayName: 'Start',
             label: 'Start'
           },
           {
             coordinate: { lat: 61, lon: 25 },
+            displayName: 'Stop',
             label: 'Stop'
           }
         ]
@@ -499,10 +517,12 @@ describe('trip planner service', () => {
         waypoints: [
           {
             coordinate: { lat: 60, lon: 24 },
+            displayName: 'Start',
             label: 'Start'
           },
           {
             coordinate: { lat: 61, lon: 25 },
+            displayName: 'Stop',
             label: 'Stop'
           }
         ]
@@ -591,10 +611,12 @@ describe('trip planner service', () => {
     listTripPlannerCandidateParks.mockResolvedValue([]);
     const originDeferred = createDeferred<{
       coordinate: { lat: number; lon: number };
+      displayName: string;
       label: string;
     } | null>();
     const destinationDeferred = createDeferred<{
       coordinate: { lat: number; lon: number };
+      displayName: string;
       label: string;
     } | null>();
     const geocode = vi.fn((query: string) => {
@@ -617,18 +639,22 @@ describe('trip planner service', () => {
 
     originDeferred.resolve({
       coordinate: { lat: 60, lon: 24 },
+      displayName: 'Origin label',
       label: 'Origin label'
     });
     destinationDeferred.resolve({
       coordinate: { lat: 60, lon: 24.2 },
+      displayName: 'Destination label',
       label: 'Destination label'
     });
 
     await expect(searchPromise).resolves.toMatchObject({
       destination: {
+        displayName: 'Destination label',
         label: 'Destination label'
       },
       origin: {
+        displayName: 'Origin label',
         label: 'Origin label'
       }
     });
@@ -707,6 +733,7 @@ describe('trip planner service', () => {
     expect(route).not.toHaveBeenCalled();
     expect(result.origin).toEqual({
       coordinate: { lat: 60, lon: 24 },
+      displayName: 'Origin label',
       label: 'Origin label'
     });
     expect(result.defaultDistanceKm).toBe(10);
@@ -1594,6 +1621,7 @@ describe('trip planner service', () => {
           ? null
           : {
               coordinate: { lat: 60, lon: 24 },
+              displayName: 'Origin label',
               label: 'Origin label'
             }
       )

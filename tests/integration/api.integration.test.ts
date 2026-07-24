@@ -188,6 +188,7 @@ describe('API routes', () => {
             lat: number;
             lon: number;
           };
+          displayName: string;
           label: string;
         } | null;
         visitCount: number;
@@ -1760,13 +1761,14 @@ describe('API routes', () => {
         id: createdTrip.id,
         name: 'Kesäreissu 2026',
         slug: 'kesareissu-2026',
-        startingPoint: {
+        startingPoint: expect.objectContaining({
           coordinate: {
             lat: 60.1699,
             lon: 24.9384
           },
+          displayName: 'Helsinki',
           label: 'Helsinki'
-        },
+        }),
         visitCount: 2
       })
     );
@@ -2206,7 +2208,7 @@ describe('API routes', () => {
           lat: 61.3167,
           lon: 22.1333
         },
-        label: 'ABC Huittinen'
+        label: 'Neste Vantaa Koivukyla, Halmekuja 1, 01360 Vantaa, Finland'
       },
       note: 'Lunch break',
       tripStopOrder: 2,
@@ -2260,6 +2262,7 @@ describe('API routes', () => {
                   lat: number;
                   lon: number;
                 };
+                displayName: string;
                 label: string;
               };
               note: string | null;
@@ -2327,6 +2330,7 @@ describe('API routes', () => {
           lat: 60.1699,
           lon: 24.9384
         },
+        displayName: 'Helsinki',
         label: 'Helsinki'
       },
       stopCount: 1,
@@ -2359,7 +2363,8 @@ describe('API routes', () => {
               lat: 61.3167,
               lon: 22.1333
             },
-            label: 'ABC Huittinen'
+            displayName: 'Neste Vantaa Koivukyla',
+            label: 'Neste Vantaa Koivukyla, Halmekuja 1, 01360 Vantaa, Finland'
           },
           note: 'Lunch break',
           visitedOn: '2026-06-08'

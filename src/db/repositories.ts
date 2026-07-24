@@ -1,6 +1,7 @@
 import { and, asc, desc, eq, gt, gte, inArray, lt, lte, notInArray, sql } from 'drizzle-orm';
 
 import type { GeoJsonFeatureCollection } from '../importer/geometry.js';
+import { deriveDisplayNameFromLabel } from '../location-display.js';
 import { createParkSlug, createSlug, normalizeParkUrl } from '../parks/park-normalization.js';
 import type { SupportedParkCategorySlug, SupportedParkTypeSlug } from '../parks/park-types.js';
 import {
@@ -151,11 +152,13 @@ type MarkerPoint = {
 
 type TripStartingPoint = {
   coordinate: MarkerPoint;
+  displayName: string;
   label: string;
 };
 
 type TripStopLocation = {
   coordinate: MarkerPoint;
+  displayName: string;
   label: string;
 };
 
@@ -373,6 +376,7 @@ const toTripStartingPoint = (row: {
       lat: row.startingPointLat,
       lon: row.startingPointLon
     },
+    displayName: deriveDisplayNameFromLabel(row.startingPointLabel),
     label: row.startingPointLabel
   };
 };
@@ -410,6 +414,7 @@ const toTripStopLocation = (row: { label: string; lat: number; lon: number }): T
       lat: row.lat,
       lon: row.lon
     },
+    displayName: deriveDisplayNameFromLabel(row.label),
     label: row.label
   };
 };

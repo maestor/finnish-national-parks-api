@@ -21,6 +21,7 @@ export const pointSchema = z.object({
 
 export const labeledPointSchema = z.object({
   coordinate: pointSchema,
+  displayName: z.string(),
   label: z.string()
 });
 

@@ -26,6 +26,7 @@ export type TripPlannerNearbySearchInput = {
 
 export type TripPlannerResolvedLocation = {
   coordinate: TripPlannerCoordinate;
+  displayName: string;
   label: string;
 };
 

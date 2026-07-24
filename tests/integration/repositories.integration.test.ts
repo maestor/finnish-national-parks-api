@@ -368,6 +368,7 @@ describe('repositories', () => {
           lat: 60.1699,
           lon: 24.9384
         },
+        displayName: 'Helsinki',
         label: 'Helsinki'
       },
       visitCount: 0
@@ -395,13 +396,14 @@ describe('repositories', () => {
         id: trip.id,
         name: 'Kesäreissu 2026',
         slug: 'kesareissu-2026',
-        startingPoint: {
+        startingPoint: expect.objectContaining({
           coordinate: {
             lat: 60.1699,
             lon: 24.9384
           },
+          displayName: 'Helsinki',
           label: 'Helsinki'
-        },
+        }),
         visitCount: 2
       })
     ]);
