@@ -3439,7 +3439,7 @@ describe('API routes', () => {
     expect(updateBody.error).toBe('Trip stop order requires an assigned trip.');
   });
 
-  it('allows trip stops one day outside the visit range and still rejects anything beyond that', async () => {
+  it('lets new end stops extend from the latest trip place through the trip stop API', async () => {
     const app = createAuthedApp();
     const { body: trip } = await createTrip(app, {
       name: 'Kesäreissu 2026'
@@ -3518,7 +3518,17 @@ describe('API routes', () => {
         },
         label: 'Tampereen kautta kotiin'
       },
-      visitedOn: '2026-06-09'
+      visitedOn: '2026-06-10'
+    });
+    const { body: overnightStop } = await createTripStop(app, trip.id, {
+      location: {
+        coordinate: {
+          lat: 61.4981,
+          lon: 23.761
+        },
+        label: 'Yopyminen matkan varrella'
+      },
+      visitedOn: '2026-06-11'
     });
     const tripResponse = await app.request('/api/trips');
     const tripBody = (await tripResponse.json()) as {
@@ -3529,21 +3539,22 @@ describe('API routes', () => {
     };
 
     expect(outboundStop.visitedOn).toBe('2026-06-06');
-    expect(returnStop.visitedOn).toBe('2026-06-09');
+    expect(returnStop.visitedOn).toBe('2026-06-10');
+    expect(overnightStop.visitedOn).toBe('2026-06-11');
     expect(tripBody.trips).toContainEqual(
       expect.objectContaining({
         dateRange: {
-          end: '2026-06-09',
+          end: '2026-06-11',
           start: '2026-06-06'
         },
         id: trip.id
       })
     );
 
-    const updateStopResponse = await requestAsAdmin(app, `/api/trip-stops/${returnStop.id}`, {
+    const updateStopResponse = await requestAsAdmin(app, `/api/trip-stops/${overnightStop.id}`, {
       method: 'PATCH',
       body: JSON.stringify({
-        visitedOn: '2026-06-10'
+        note: 'Late arrival'
       }),
       headers: {
         'content-type': 'application/json'
@@ -3555,14 +3566,15 @@ describe('API routes', () => {
 
     expect(updateStopResponse.status).toBe(200);
     expect(updateStopBody).toMatchObject({
-      id: returnStop.id,
-      visitedOn: '2026-06-10'
+      id: overnightStop.id,
+      note: 'Late arrival',
+      visitedOn: '2026-06-11'
     });
 
-    const beyondRangeResponse = await requestAsAdmin(app, `/api/trip-stops/${returnStop.id}`, {
+    const beyondRangeResponse = await requestAsAdmin(app, `/api/trip-stops/${overnightStop.id}`, {
       method: 'PATCH',
       body: JSON.stringify({
-        visitedOn: '2026-06-11'
+        visitedOn: '2026-06-13'
       }),
       headers: {
         'content-type': 'application/json'
