@@ -252,6 +252,16 @@ const coordinatesMatch = (first: TripPlannerCoordinate, second: TripPlannerCoord
   return first.lat === second.lat && first.lon === second.lon;
 };
 
+const collapseConsecutiveDuplicateWaypoints = (waypoints: TripPlannerResolvedLocation[]) => {
+  return waypoints.filter((waypoint, index) => {
+    if (index === 0) {
+      return true;
+    }
+
+    return !coordinatesMatch(waypoint.coordinate, waypoints[index - 1]!.coordinate);
+  });
+};
+
 const normalizeRouteFallbackQuery = (query: string) => query.trim().replaceAll(/\s+/g, ' ');
 
 const resolveRouteFallbackDestinations = async (
@@ -352,13 +362,15 @@ const buildRoundTripRoute = async (
 ) => {
   assertModeSupported(mode);
 
-  if (waypoints.length < 2) {
+  const normalizedWaypoints = collapseConsecutiveDuplicateWaypoints(waypoints);
+
+  if (normalizedWaypoints.length < 2) {
     return null;
   }
 
   try {
     const routes: PlannedRoute[] = [];
-    const effectiveWaypoints = [...waypoints];
+    const effectiveWaypoints = [...normalizedWaypoints];
 
     for (let index = 0; index < effectiveWaypoints.length - 1; index += 1) {
       const origin = effectiveWaypoints[index]!;
