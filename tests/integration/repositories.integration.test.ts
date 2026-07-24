@@ -657,7 +657,7 @@ describe('repositories', () => {
     });
   });
 
-  it('requires at least one trip visit and allows trip stops within one day of the visit range', async () => {
+  it('requires at least one trip visit and lets new end stops extend from the latest trip place', async () => {
     const trip = await createTrip(testDatabase.database, {
       name: 'Kesäreissu 2026'
     });
@@ -716,16 +716,28 @@ describe('repositories', () => {
         },
         label: 'Tampereen kautta kotiin'
       },
-      visitedOn: '2026-04-15'
+      visitedOn: '2026-04-16'
+    });
+
+    const overnightStop = await createTripStop(testDatabase.database, trip.id, {
+      location: {
+        coordinate: {
+          lat: 61.4981,
+          lon: 23.761
+        },
+        label: 'Yopyminen matkan varrella'
+      },
+      visitedOn: '2026-04-17'
     });
     const trips = await listTrips(testDatabase.database);
 
     expect(outboundStop.visitedOn).toBe('2026-04-12');
-    expect(returnStop.visitedOn).toBe('2026-04-15');
+    expect(returnStop.visitedOn).toBe('2026-04-16');
+    expect(overnightStop.visitedOn).toBe('2026-04-17');
     expect(trips).toContainEqual(
       expect.objectContaining({
         dateRange: {
-          end: '2026-04-15',
+          end: '2026-04-17',
           start: '2026-04-12'
         },
         id: trip.id
@@ -733,19 +745,14 @@ describe('repositories', () => {
     );
 
     await expect(
-      updateTripStop(testDatabase.database, returnStop.id, {
-        visitedOn: '2026-04-16'
+      updateTripStop(testDatabase.database, overnightStop.id, {
+        note: 'Late arrival'
       })
     ).resolves.toMatchObject({
-      id: returnStop.id,
-      visitedOn: '2026-04-16'
+      id: overnightStop.id,
+      note: 'Late arrival',
+      visitedOn: '2026-04-17'
     });
-
-    await expect(
-      updateTripStop(testDatabase.database, returnStop.id, {
-        visitedOn: '2026-04-17'
-      })
-    ).rejects.toThrow('Trip stop date must be within the trip date range.');
   });
 
   it('rejects missing trip assignments when creating or updating visits', async () => {

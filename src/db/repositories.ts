@@ -445,25 +445,59 @@ const shiftVisitDate = (visitedOn: string, dayOffset: number) => {
   return shiftedDate.toISOString().slice(0, 10);
 };
 
+const pickVisitedOnBoundary = (
+  dates: Array<string | null>,
+  direction: 'earliest' | 'latest'
+): string | null => {
+  let boundary: string | null = null;
+
+  for (const date of dates) {
+    if (date === null) {
+      continue;
+    }
+
+    if (boundary === null || (direction === 'earliest' ? date < boundary : date > boundary)) {
+      boundary = date;
+    }
+  }
+
+  return boundary;
+};
+
 const getTripStopVisitDateRange = async (database: DbClient, tripId: number) => {
-  const [row] = await database
-    .select({
-      endVisitedOn: sql<
-        string | null
-      >`MAX(CASE WHEN ${parks.removed} = 0 THEN ${parkVisits.visitedOn} END)`,
-      startVisitedOn: sql<
-        string | null
-      >`MIN(CASE WHEN ${parks.removed} = 0 THEN ${parkVisits.visitedOn} END)`,
-      visitCount: sql<number>`COUNT(CASE WHEN ${parks.removed} = 0 THEN ${parkVisits.id} END)`
-    })
-    .from(parkVisits)
-    .innerJoin(parks, eq(parkVisits.parkId, parks.id))
-    .where(eq(parkVisits.tripId, tripId));
+  const [visitRow, stopRow] = await Promise.all([
+    database
+      .select({
+        endVisitedOn: sql<
+          string | null
+        >`MAX(CASE WHEN ${parks.removed} = 0 THEN ${parkVisits.visitedOn} END)`,
+        startVisitedOn: sql<
+          string | null
+        >`MIN(CASE WHEN ${parks.removed} = 0 THEN ${parkVisits.visitedOn} END)`,
+        visitCount: sql<number>`COUNT(CASE WHEN ${parks.removed} = 0 THEN ${parkVisits.id} END)`
+      })
+      .from(parkVisits)
+      .innerJoin(parks, eq(parkVisits.parkId, parks.id))
+      .where(eq(parkVisits.tripId, tripId)),
+    database
+      .select({
+        endVisitedOn: sql<string | null>`MAX(${tripStops.visitedOn})`,
+        startVisitedOn: sql<string | null>`MIN(${tripStops.visitedOn})`
+      })
+      .from(tripStops)
+      .where(eq(tripStops.tripId, tripId))
+  ]);
 
   return {
-    endVisitedOn: row!.endVisitedOn,
-    startVisitedOn: row!.startVisitedOn,
-    visitCount: row!.visitCount
+    endVisitedOn: pickVisitedOnBoundary(
+      [visitRow[0]!.endVisitedOn, stopRow[0]!.endVisitedOn],
+      'latest'
+    ),
+    startVisitedOn: pickVisitedOnBoundary(
+      [visitRow[0]!.startVisitedOn, stopRow[0]!.startVisitedOn],
+      'earliest'
+    ),
+    visitCount: visitRow[0]!.visitCount
   };
 };
 
