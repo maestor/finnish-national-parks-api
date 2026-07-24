@@ -278,6 +278,30 @@ export const publicTripRouteSchema = z.object({
   waypointCount: z.number().int().positive()
 });
 
+export const publicTripRouteErrorCodeSchema = z.enum([
+  'provider_unavailable',
+  'route_not_found',
+  'trip_planner_not_configured'
+]);
+
+export const publicTripRouteFailureSchema = z.object({
+  destination: labeledPointSchema,
+  origin: labeledPointSchema,
+  waypointIndex: z.number().int().positive()
+});
+
+export const publicTripRouteErrorSchema = z.object({
+  error: z.string(),
+  errorCode: publicTripRouteErrorCodeSchema,
+  routeFailure: publicTripRouteFailureSchema.optional()
+});
+
+export const publicTripRouteStateSchema = z.object({
+  data: publicTripRouteSchema.nullable(),
+  error: publicTripRouteErrorSchema.nullable(),
+  success: z.boolean()
+});
+
 export const publicTripItineraryEntrySchema = z.union([
   publicTripItineraryVisitEntrySchema,
   tripItineraryStopEntrySchema
@@ -286,7 +310,7 @@ export const publicTripItineraryEntrySchema = z.union([
 export const publicTripDetailSchema = tripSchema.extend({
   imageCount: z.number().int(),
   itinerary: z.array(publicTripItineraryEntrySchema),
-  route: publicTripRouteSchema.nullable(),
+  route: publicTripRouteStateSchema,
   stopCount: z.number().int()
 });
 
