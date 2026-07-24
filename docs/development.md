@@ -117,7 +117,10 @@ The importer should:
 
 - Fetch LIPAS sports sites with type codes `103,109,110,111,112,4403,4404,4405`.
 - Keep only records where `status` is `active`.
-- Expect 2557 active LIPAS records from the current source dataset.
+- Import new matching LIPAS rows automatically when they appear upstream.
+- Import newly discovered parks as removed by default so they stay hidden until an admin explicitly enables them.
+- Support `npm run import:parks -- --dry-run` for no-write previews of what the next import would add.
+- Print the newly added catalog rows after each import run so changes stay visible without halting the sync.
 - Upsert catalog rows by `lipasId`.
 - Upsert normalized catalog types in a dedicated `park_types` table.
 - Persist both `postal_code` and `postal_office` from LIPAS for stronger location matching.
@@ -135,7 +138,7 @@ The importer should:
 - Update import metadata so catalog ETags change when imported catalog data changes.
 - Keep non-LIPAS-managed catalog rows outside the normal LIPAS deactivation pass.
 
-The current implementation fails the import if the active LIPAS record count does not match `2557`, so upstream drift is visible immediately.
+The current implementation no longer blocks on raw active-count drift. It imports matching rows, adds newly discovered rows as removed by default, and reports which catalog rows were newly added during the run. Use `npm run import:parks -- --dry-run` when you want the same preview without persisting any catalog or import-run changes.
 If a destination cannot be matched from the official Luontoon sitemap, the importer falls back to the normalized LIPAS `www` value for that row.
 
 ### Manual Catalog Imports

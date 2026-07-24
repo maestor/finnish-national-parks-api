@@ -5,6 +5,10 @@ This repo has two import paths:
 - `npm run import:parks` for the main LIPAS-backed catalog import
 - `npm run import:special-parks` for curated non-LIPAS additions that still belong in the shared park catalog
 
+The main LIPAS import no longer blocks on raw upstream count drift.
+When `npm run import:parks` finds brand-new parks, it imports them as removed so they stay hidden until you explicitly enable them from the admin UI, and it prints the newly added names in the CLI output.
+Use `npm run import:parks -- --dry-run` when you want that same preview without writing any database changes.
+
 Use this guide when you need to reproduce or extend the curated special import workflow.
 
 ## Entry Points

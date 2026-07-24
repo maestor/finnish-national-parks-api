@@ -10,6 +10,7 @@ import {
   upsertImportedPark
 } from '../db/repositories.js';
 import {
+  getSupportedParkTypeByCode,
   hikingAreaDisplayTypeName,
   hikingAreaTypeCode,
   isHikingTrailTypeCode,
@@ -37,8 +38,10 @@ type ImportParksOptions = {
   database: Database;
   expectedActiveCount?: number;
   beforeEachUpsert?: (index: number, lipasId: number) => void | Promise<void>;
+  dryRun?: boolean;
   fetchSource?: (sourceUrl: string) => Promise<unknown>;
   fetchLuontoonSitemap?: ((sourceUrl: string) => Promise<string>) | undefined;
+  markNewParksRemoved?: boolean;
   now?: () => string;
   sourceUrl: string;
 };
@@ -46,6 +49,12 @@ type ImportParksOptions = {
 const RESPONSE_SHAPE_VERSION = 'catalog-v2';
 const LUONTOON_SITEMAP_URL = 'https://www.luontoon.fi/resources/sitemap/fi.xml';
 const SUPPORTED_LIPAS_TYPE_CODES = [103, 109, 110, 111, 112, 4403, 4404, 4405] as const;
+
+class ImportDryRunRollbackError extends Error {
+  constructor() {
+    super('Import dry run rollback.');
+  }
+}
 
 export const defaultLipasCatalogSourceUrl = `https://api.lipas.fi/v2/sports-sites?type-codes=${SUPPORTED_LIPAS_TYPE_CODES.join(',')}&page-size=100&page=1`;
 
@@ -151,10 +160,12 @@ const shouldSkipTrailImport = (park: MappedPark, areas: MappedPark[]) => {
 
 export const importParks = async ({
   database,
-  expectedActiveCount = 2557,
+  expectedActiveCount: _expectedActiveCount,
   beforeEachUpsert,
+  dryRun = false,
   fetchSource = defaultFetchSource,
   fetchLuontoonSitemap,
+  markNewParksRemoved = false,
   now = () => new Date().toISOString(),
   sourceUrl
 }: ImportParksOptions) => {
@@ -169,12 +180,6 @@ export const importParks = async ({
     const candidate = item as { status?: string };
     return candidate.status === 'active';
   });
-
-  if (activeItems.length !== expectedActiveCount) {
-    throw new Error(
-      `Expected ${expectedActiveCount} active LIPAS records but received ${activeItems.length}.`
-    );
-  }
   const mappedActiveParks = activeItems.map((item) => mapLipasPark(item));
   const importedAreas = mappedActiveParks.filter((park) => !isTrailTypeCode(park.type.code));
   const importedParks = mappedActiveParks.filter(
@@ -182,9 +187,23 @@ export const importParks = async ({
   );
   const importedLipasIds = importedParks.map((park) => park.lipasId);
   const existingParks = await listExistingParksByLipasIds(database, importedLipasIds);
+  const existingLipasIds = new Set(existingParks.map((park) => park.lipasId));
   const existingImportedSlugByLipasId = new Map(
     existingParks.map((park) => [park.lipasId, park.importedSlug ?? park.slug])
   );
+  const newParks = importedParks
+    .filter((park) => !existingLipasIds.has(park.lipasId))
+    .map((park) => ({
+      lipasId: park.lipasId,
+      name: park.name,
+      removed:
+        markNewParksRemoved ||
+        isHikingTrailTypeCode(park.type.code) ||
+        isWalkingTrailTypeCode(park.type.code),
+      slug: park.slug,
+      typeCode: park.type.code,
+      typeName: getSupportedParkTypeByCode(park.type.code).name
+    }));
   const takenSlugs = new Set(
     (await listParkRecordsIncludingRemoved(database)).map((park) => park.slug)
   );
@@ -194,72 +213,89 @@ export const importParks = async ({
     parksByLipasId.has((item as { 'lipas-id': number })['lipas-id'])
   );
 
-  await syncParkTypes(database);
+  let importRunId: number | null = null;
 
-  let importRunId: number;
+  try {
+    await database.transaction(async (tx) => {
+      await syncParkTypes(tx);
 
-  await database.transaction(async (tx) => {
-    importRunId = await createImportRun(tx, {
-      activeCount: importedParks.length,
-      importedAt,
-      responseShapeVersion: RESPONSE_SHAPE_VERSION,
-      sourceUrl
-    });
+      importRunId = await createImportRun(tx, {
+        activeCount: importedParks.length,
+        importedAt,
+        responseShapeVersion: RESPONSE_SHAPE_VERSION,
+        sourceUrl
+      });
 
-    for (let index = 0; index < importableItems.length; index += 1) {
-      const item = importableItems[index];
-      const lipasId = (item as { 'lipas-id': number })['lipas-id'];
+      for (let index = 0; index < importableItems.length; index += 1) {
+        const item = importableItems[index];
+        const lipasId = (item as { 'lipas-id': number })['lipas-id'];
 
-      if (beforeEachUpsert) {
-        await beforeEachUpsert(index, lipasId);
+        if (beforeEachUpsert) {
+          await beforeEachUpsert(index, lipasId);
+        }
+
+        const mapped = mapLipasPark(item, existingImportedSlugByLipasId.get(lipasId));
+        const resolvedParkUrl = resolveParkUrl(mapped) ?? mapped.parkUrl;
+        const slug =
+          existingImportedSlugByLipasId.get(lipasId) ??
+          ensureUniqueSlug(mapped.slug, lipasId, takenSlugs);
+        const insertAsRemoved =
+          (!existingLipasIds.has(mapped.lipasId) && markNewParksRemoved) ||
+          isHikingTrailTypeCode(mapped.type.code) ||
+          isWalkingTrailTypeCode(mapped.type.code);
+
+        await upsertImportedPark(tx, {
+          areaKm2: mapped.areaKm2,
+          bboxMaxLat: mapped.boundingBox.maxLat,
+          bboxMaxLon: mapped.boundingBox.maxLon,
+          bboxMinLat: mapped.boundingBox.minLat,
+          bboxMinLon: mapped.boundingBox.minLon,
+          boundaryGeojson: JSON.stringify(mapped.boundaryGeoJson),
+          catalogStatus: 'active',
+          createdAt: importedAt,
+          displayTypeName:
+            mapped.sourceTypeCode === hikingAreaTypeCode ? hikingAreaDisplayTypeName : null,
+          establishmentYear: mapped.establishmentYear,
+          lastImportRunId: importRunId!,
+          lipasId: mapped.lipasId,
+          locationLabel: mapped.locationLabel,
+          parkUrl: resolvedParkUrl,
+          managedByLipasImport: true,
+          markerLat: mapped.markerPoint.lat,
+          removed: insertAsRemoved,
+          markerLon: mapped.markerPoint.lon,
+          municipalityCode: mapped.municipalityCode,
+          name: mapped.name,
+          postalCode: mapped.postalCode,
+          postalOffice: mapped.postalOffice,
+          slug,
+          sourceEventDate: mapped.sourceEventDate,
+          typeId: mapped.type.id,
+          updatedAt: importedAt
+        });
       }
 
-      const mapped = mapLipasPark(item, existingImportedSlugByLipasId.get(lipasId));
-      const resolvedParkUrl = resolveParkUrl(mapped) ?? mapped.parkUrl;
-      const slug =
-        existingImportedSlugByLipasId.get(lipasId) ??
-        ensureUniqueSlug(mapped.slug, lipasId, takenSlugs);
+      await markMissingParksInactive(tx, importedLipasIds, importRunId!, importedAt);
 
-      await upsertImportedPark(tx, {
-        areaKm2: mapped.areaKm2,
-        bboxMaxLat: mapped.boundingBox.maxLat,
-        bboxMaxLon: mapped.boundingBox.maxLon,
-        bboxMinLat: mapped.boundingBox.minLat,
-        bboxMinLon: mapped.boundingBox.minLon,
-        boundaryGeojson: JSON.stringify(mapped.boundaryGeoJson),
-        catalogStatus: 'active',
-        createdAt: importedAt,
-        displayTypeName:
-          mapped.sourceTypeCode === hikingAreaTypeCode ? hikingAreaDisplayTypeName : null,
-        establishmentYear: mapped.establishmentYear,
-        lastImportRunId: importRunId,
-        lipasId: mapped.lipasId,
-        locationLabel: mapped.locationLabel,
-        parkUrl: resolvedParkUrl,
-        managedByLipasImport: true,
-        markerLat: mapped.markerPoint.lat,
-        removed:
-          isHikingTrailTypeCode(mapped.type.code) || isWalkingTrailTypeCode(mapped.type.code),
-        markerLon: mapped.markerPoint.lon,
-        municipalityCode: mapped.municipalityCode,
-        name: mapped.name,
-        postalCode: mapped.postalCode,
-        postalOffice: mapped.postalOffice,
-        slug,
-        sourceEventDate: mapped.sourceEventDate,
-        typeId: mapped.type.id,
-        updatedAt: importedAt
-      });
+      if (dryRun) {
+        throw new ImportDryRunRollbackError();
+      }
+    });
+  } catch (error) {
+    if (!(error instanceof ImportDryRunRollbackError)) {
+      throw error;
     }
 
-    await markMissingParksInactive(tx, importedLipasIds, importRunId, importedAt);
-  });
+    importRunId = null;
+  }
 
   return {
     activeCount: importedParks.length,
+    dryRun,
+    newParks,
     skippedTrailCount: activeItems.length - importedParks.length,
     sourceActiveCount: activeItems.length,
-    importRunId: importRunId!,
+    importRunId,
     importedAt
   };
 };
