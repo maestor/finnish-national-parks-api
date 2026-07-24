@@ -61,6 +61,10 @@ export type MuseovirastoRkyAreaSeed = {
   displayTypeName: string | null;
   excludedSourceNames?: string[];
   locationLabel?: string;
+  markerPoint?: {
+    lat: number;
+    lon: number;
+  };
   parkUrl: string | null;
   name: string;
   parkTypeSlug: SupportedParkTypeSlug;

@@ -900,70 +900,81 @@ export const createSpecialParksSource = () => {
         )
       )
     ) {
+      const allFeatures = [
+        createPolygonFeature(
+          [
+            [
+              [22.78, 60.077],
+              [22.784, 60.078],
+              [22.783, 60.08],
+              [22.777, 60.079],
+              [22.78, 60.077]
+            ]
+          ],
+          {
+            kohdenimi: 'Turunmaan rannikon kalkkilouhokset ja Paraisten kalkkitehdas',
+            nimi: 'Vestlax'
+          }
+        ),
+        createPolygonFeature(
+          [
+            [
+              [22.298, 60.297],
+              [22.287, 60.3],
+              [22.272, 60.293],
+              [22.286, 60.289],
+              [22.298, 60.297]
+            ]
+          ],
+          {
+            kohdenimi: 'Turunmaan rannikon kalkkilouhokset ja Paraisten kalkkitehdas',
+            nimi: 'Paraisten kalkin teollisuuslaitokset ja Limberg - Skräbböle'
+          }
+        ),
+        createPolygonFeature(
+          [
+            [
+              [22.884, 60.1],
+              [22.879, 60.1],
+              [22.87, 60.099],
+              [22.884, 60.098],
+              [22.884, 60.1]
+            ]
+          ],
+          {
+            kohdenimi: 'Turunmaan rannikon kalkkilouhokset ja Paraisten kalkkitehdas',
+            nimi: 'Förby'
+          }
+        ),
+        createPolygonFeature(
+          [
+            [
+              [22.229, 60.281],
+              [22.243, 60.283],
+              [22.257, 60.287],
+              [22.238, 60.284],
+              [22.229, 60.281]
+            ]
+          ],
+          {
+            kohdenimi: 'Turunmaan rannikon kalkkilouhokset ja Paraisten kalkkitehdas',
+            nimi: 'Simonby'
+          }
+        )
+      ];
+      const filteredFeatures = sourceUrl.includes(
+        encodeURIComponent("nimi='Paraisten kalkin teollisuuslaitokset ja Limberg - Skräbböle'")
+      )
+        ? allFeatures.filter(
+            (feature) =>
+              feature.properties.nimi ===
+              'Paraisten kalkin teollisuuslaitokset ja Limberg - Skräbböle'
+          )
+        : allFeatures;
+
       return {
         type: 'FeatureCollection',
-        features: [
-          createPolygonFeature(
-            [
-              [
-                [22.78, 60.077],
-                [22.784, 60.078],
-                [22.783, 60.08],
-                [22.777, 60.079],
-                [22.78, 60.077]
-              ]
-            ],
-            {
-              kohdenimi: 'Turunmaan rannikon kalkkilouhokset ja Paraisten kalkkitehdas',
-              nimi: 'Vestlax'
-            }
-          ),
-          createPolygonFeature(
-            [
-              [
-                [22.298, 60.297],
-                [22.287, 60.3],
-                [22.272, 60.293],
-                [22.286, 60.289],
-                [22.298, 60.297]
-              ]
-            ],
-            {
-              kohdenimi: 'Turunmaan rannikon kalkkilouhokset ja Paraisten kalkkitehdas',
-              nimi: 'Paraisten kalkin teollisuuslaitokset ja Limberg - Skräbböle'
-            }
-          ),
-          createPolygonFeature(
-            [
-              [
-                [22.884, 60.1],
-                [22.879, 60.1],
-                [22.87, 60.099],
-                [22.884, 60.098],
-                [22.884, 60.1]
-              ]
-            ],
-            {
-              kohdenimi: 'Turunmaan rannikon kalkkilouhokset ja Paraisten kalkkitehdas',
-              nimi: 'Förby'
-            }
-          ),
-          createPolygonFeature(
-            [
-              [
-                [22.229, 60.281],
-                [22.243, 60.283],
-                [22.257, 60.287],
-                [22.238, 60.284],
-                [22.229, 60.281]
-              ]
-            ],
-            {
-              kohdenimi: 'Turunmaan rannikon kalkkilouhokset ja Paraisten kalkkitehdas',
-              nimi: 'Simonby'
-            }
-          )
-        ]
+        features: filteredFeatures
       };
     }
 
