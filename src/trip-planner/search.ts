@@ -20,6 +20,7 @@ import type {
   TripPlannerNearbySearchResponse,
   TripPlannerParkCandidate,
   TripPlannerProvider,
+  TripPlannerRoundTripInput,
   TripPlannerSearchInput,
   TripPlannerSearchResponse,
   TripPlannerService,
@@ -94,6 +95,8 @@ type OrderResultsOptions<T> = {
   getIsInStartZone?: ((park: T) => boolean) | undefined;
   prioritizeStartZoneLast: boolean;
 };
+
+type PlannedRoute = NonNullable<Awaited<ReturnType<TripPlannerProvider['route']>>>;
 
 const getDistanceFromRouteMeters = (
   route: Parameters<typeof getRouteDistanceToFeatureCollectionMeters>[0],
@@ -229,6 +232,91 @@ const suggestLocations = async (
   }
 };
 
+const coordinatesMatch = (first: TripPlannerCoordinate, second: TripPlannerCoordinate) => {
+  return first.lat === second.lat && first.lon === second.lon;
+};
+
+const toSimplifiedLineString = (route: PlannedRoute) => {
+  return toRouteLineString(
+    simplifyRouteGeometry(route.geometry, ROUTE_DISTANCE_SIMPLIFICATION_TOLERANCE_METERS)
+  );
+};
+
+const buildRoundTripLineString = (routes: PlannedRoute[]) => {
+  const coordinates: Array<[number, number, ...number[]]> = [];
+
+  for (const route of routes) {
+    const lineString = toSimplifiedLineString(route);
+
+    if (!lineString) {
+      return null;
+    }
+
+    coordinates.push(
+      ...(coordinates.length === 0 ? lineString.coordinates : lineString.coordinates.slice(1))
+    );
+  }
+
+  return {
+    coordinates,
+    type: 'LineString' as const
+  };
+};
+
+const buildRoundTripRoute = async (
+  provider: TripPlannerProvider,
+  { mode, waypoints }: TripPlannerRoundTripInput
+) => {
+  assertModeSupported(mode);
+
+  if (waypoints.length < 2) {
+    return null;
+  }
+
+  try {
+    const routes: PlannedRoute[] = [];
+
+    for (let index = 0; index < waypoints.length - 1; index += 1) {
+      const origin = waypoints[index]!;
+      const destination = waypoints[index + 1]!;
+      const route = await provider.route({
+        destination: destination.coordinate,
+        mode,
+        origin: origin.coordinate
+      });
+
+      if (!route) {
+        return null;
+      }
+
+      routes.push(route);
+    }
+
+    const geometry = buildRoundTripLineString(routes);
+
+    if (!geometry) {
+      return null;
+    }
+
+    return {
+      distanceMeters: routes.reduce((total, route) => total + route.distanceMeters, 0),
+      durationSeconds: routes.reduce((total, route) => total + route.durationSeconds, 0),
+      geometry,
+      returnsToStart: coordinatesMatch(
+        waypoints[0]!.coordinate,
+        waypoints[waypoints.length - 1]!.coordinate
+      ),
+      waypointCount: waypoints.length
+    };
+  } catch (error) {
+    if (error instanceof TripPlannerError) {
+      throw error;
+    }
+
+    throw createProviderUnavailableError();
+  }
+};
+
 const mapParkBaseResult = (park: TripPlannerParkCandidate) => ({
   address: park.address,
   boundingBox: park.boundingBox,
@@ -249,6 +337,9 @@ export const createTripPlannerService = ({
   provider
 }: CreateTripPlannerServiceOptions): TripPlannerService => {
   return {
+    buildRoundTripRoute: async (input) => {
+      return buildRoundTripRoute(provider, input);
+    },
     suggest: async (query) => {
       return suggestLocations(provider, query);
     },

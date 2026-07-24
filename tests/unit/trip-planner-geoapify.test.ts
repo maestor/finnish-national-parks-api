@@ -9,9 +9,11 @@ describe('geoapify client', () => {
         JSON.stringify({
           results: [
             {
+              address_line1: 'Mannerheimintie 1',
               formatted: 'Helsinki, Finland',
               lat: 60.1699,
-              lon: 24.9384
+              lon: 24.9384,
+              name: 'Lasipalatsi'
             }
           ]
         }),
@@ -38,6 +40,7 @@ describe('geoapify client', () => {
         lat: 60.1699,
         lon: 24.9384
       },
+      displayName: 'Lasipalatsi',
       label: 'Helsinki, Finland'
     });
   });
@@ -48,11 +51,14 @@ describe('geoapify client', () => {
         JSON.stringify({
           results: [
             {
+              address_line1: 'Mannerheimintie 1',
               formatted: 'Helsinki, Finland',
               lat: 60.1699,
-              lon: 24.9384
+              lon: 24.9384,
+              name: 'Lasipalatsi'
             },
             {
+              address_line1: 'Helsingbyvagen 2',
               formatted: 'Helsingby, Finland',
               lat: 60.22,
               lon: 24.7
@@ -94,6 +100,7 @@ describe('geoapify client', () => {
           lat: 60.1699,
           lon: 24.9384
         },
+        displayName: 'Lasipalatsi',
         label: 'Helsinki, Finland'
       },
       {
@@ -101,6 +108,7 @@ describe('geoapify client', () => {
           lat: 60.22,
           lon: 24.7
         },
+        displayName: 'Helsingbyvagen 2',
         label: 'Helsingby, Finland'
       },
       {
@@ -108,6 +116,7 @@ describe('geoapify client', () => {
           lat: 60.3,
           lon: 25.01
         },
+        displayName: 'Helsinge, Finland',
         label: 'Helsinge, Finland'
       }
     ]);
@@ -338,6 +347,7 @@ describe('geoapify client', () => {
         lat: 60.1699,
         lon: 24.9384
       },
+      displayName: 'Helsinki, Finland',
       label: 'Helsinki, Finland'
     });
     expect(fetchFn).toHaveBeenCalledTimes(2);

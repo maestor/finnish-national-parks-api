@@ -1,6 +1,7 @@
 import { and, asc, desc, eq, gt, gte, inArray, lt, lte, notInArray, sql } from 'drizzle-orm';
 
 import type { GeoJsonFeatureCollection } from '../importer/geometry.js';
+import { deriveDisplayNameFromLabel } from '../location-display.js';
 import { createParkSlug, createSlug, normalizeParkUrl } from '../parks/park-normalization.js';
 import type { SupportedParkCategorySlug, SupportedParkTypeSlug } from '../parks/park-types.js';
 import {
@@ -151,11 +152,13 @@ type MarkerPoint = {
 
 type TripStartingPoint = {
   coordinate: MarkerPoint;
+  displayName: string;
   label: string;
 };
 
 type TripStopLocation = {
   coordinate: MarkerPoint;
+  displayName: string;
   label: string;
 };
 
@@ -206,6 +209,14 @@ type TripDetailVisitRow = {
   tripStopOrder: number;
   updatedAt: string;
   visitedOn: string;
+};
+
+type PublicTripDetailVisitRow = TripDetailVisitRow & {
+  displayTypeName: string | null;
+  imageCount: number;
+  markerLat: number;
+  markerLon: number;
+  typeName: string;
 };
 
 type PublicParkRow = {
@@ -365,6 +376,7 @@ const toTripStartingPoint = (row: {
       lat: row.startingPointLat,
       lon: row.startingPointLon
     },
+    displayName: deriveDisplayNameFromLabel(row.startingPointLabel),
     label: row.startingPointLabel
   };
 };
@@ -402,6 +414,7 @@ const toTripStopLocation = (row: { label: string; lat: number; lon: number }): T
       lat: row.lat,
       lon: row.lon
     },
+    displayName: deriveDisplayNameFromLabel(row.label),
     label: row.label
   };
 };
@@ -853,6 +866,32 @@ const toTripItineraryVisitEntry = (row: TripDetailVisitRow) => {
       park: {
         name: row.parkName,
         slug: row.parkSlug
+      },
+      route: row.route,
+      updatedAt: row.updatedAt,
+      visitedOn: row.visitedOn
+    }
+  };
+};
+
+const toPublicTripItineraryVisitEntry = (row: PublicTripDetailVisitRow) => {
+  return {
+    kind: 'visit' as const,
+    tripStopOrder: row.tripStopOrder,
+    visit: {
+      author: row.author,
+      createdAt: row.createdAt,
+      id: row.id,
+      imageCount: row.imageCount,
+      note: row.note,
+      park: {
+        markerPoint: {
+          lat: row.markerLat,
+          lon: row.markerLon
+        },
+        name: row.parkName,
+        slug: row.parkSlug,
+        typeLabel: resolveTypeLabel(row)
       },
       route: row.route,
       updatedAt: row.updatedAt,
@@ -1360,6 +1399,54 @@ const listTripDetailVisitRowsByTripId = async (
     .innerJoin(parks, eq(parkVisits.parkId, parks.id))
     .where(and(eq(parkVisits.tripId, tripId), eq(parks.removed, false)))
     .orderBy(asc(parkVisits.tripStopOrder), asc(parkVisits.id)) as Promise<TripDetailVisitRow[]>;
+};
+
+const listPublicTripDetailVisitRowsByTripId = async (
+  database: Database,
+  tripId: number
+): Promise<PublicTripDetailVisitRow[]> => {
+  return database
+    .select({
+      author: parkVisits.author,
+      createdAt: parkVisits.createdAt,
+      displayTypeName: parks.displayTypeName,
+      id: parkVisits.id,
+      imageCount: sql<number>`COUNT(${visitImages.id})`,
+      markerLat: parks.markerLat,
+      markerLon: parks.markerLon,
+      note: parkVisits.note,
+      parkName: parks.name,
+      parkSlug: parks.slug,
+      route: parkVisits.route,
+      tripStopOrder: parkVisits.tripStopOrder,
+      typeName: parkTypes.name,
+      updatedAt: parkVisits.updatedAt,
+      visitedOn: parkVisits.visitedOn
+    })
+    .from(parkVisits)
+    .innerJoin(parks, eq(parkVisits.parkId, parks.id))
+    .innerJoin(parkTypes, eq(parks.typeId, parkTypes.id))
+    .leftJoin(visitImages, eq(visitImages.visitId, parkVisits.id))
+    .where(and(eq(parkVisits.tripId, tripId), eq(parks.removed, false)))
+    .groupBy(
+      parkVisits.id,
+      parkVisits.author,
+      parkVisits.createdAt,
+      parkVisits.note,
+      parkVisits.route,
+      parkVisits.tripStopOrder,
+      parkVisits.updatedAt,
+      parkVisits.visitedOn,
+      parks.displayTypeName,
+      parks.markerLat,
+      parks.markerLon,
+      parks.name,
+      parks.slug,
+      parkTypes.name
+    )
+    .orderBy(asc(parkVisits.tripStopOrder), asc(parkVisits.id)) as Promise<
+    PublicTripDetailVisitRow[]
+  >;
 };
 
 const listVisitTimelineRows = async (database: Database): Promise<VisitTimelineRow[]> => {
@@ -1901,6 +1988,33 @@ export const getTripById = async (database: Database, tripId: number) => {
   return {
     ...toTrip(trip),
     itinerary
+  };
+};
+
+export const getPublicTripBySlug = async (database: Database, slug: string) => {
+  const tripRecord = await findTripRecordBySlug(database, slug);
+
+  if (!tripRecord) {
+    return null;
+  }
+
+  const [tripRows, tripStopRows, tripVisitRows] = await Promise.all([
+    listTripRows(database),
+    listTripStopRowsByTripId(database, tripRecord.id),
+    listPublicTripDetailVisitRowsByTripId(database, tripRecord.id)
+  ]);
+  const trip = tripRows.find((row) => row.id === tripRecord.id)!;
+
+  const itinerary = [
+    ...tripVisitRows.map((row) => toPublicTripItineraryVisitEntry(row)),
+    ...tripStopRows.map((row) => toTripItineraryStopEntry(row))
+  ].sort((a, b) => a.tripStopOrder - b.tripStopOrder);
+
+  return {
+    ...toTrip(trip),
+    imageCount: tripVisitRows.reduce((total, row) => total + row.imageCount, 0),
+    itinerary,
+    stopCount: tripStopRows.length
   };
 };
 

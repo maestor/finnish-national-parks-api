@@ -28,7 +28,7 @@ Every route must fit one explicit access class:
 Rules:
 
 - Do not describe a route as public unless it is anonymously accessible over the network.
-- There are no anonymous site data endpoints. Frontend-facing `GET` routes such as `/api/home-summary`, `/api/map-summary`, `/api/trips`, `/api/trips/:id`, and `/api/visits-timeline` still require the API key outside localhost, while admin routes require a valid admin session.
+- There are no anonymous site data endpoints. Frontend-facing `GET` routes such as `/api/home-summary`, `/api/map-summary`, `/api/trips`, `/api/trips/slug/:slug`, `/api/trips/:id`, and `/api/visits-timeline` still require the API key outside localhost, while admin routes require a valid admin session.
 - New anonymously accessible routes must define cache policy, abuse controls, and the reason they are safe to expose.
 - Removing an unused admin endpoint is preferred over leaving it available behind auth.
 
@@ -42,7 +42,7 @@ Rules:
 - If OAuth/session auth is unavailable, admin-session routes should fail closed rather than silently downgrading to weaker auth.
 - When auth policy changes, update runtime enforcement, route contracts, integration tests, `README.md`, `docs/development.md`, and this file in the same change.
 - When a route mixes API-key and session requirements, document both clearly in contract and contributor docs.
-- Named-trip writes (`POST /api/trips`, `PATCH /api/trips/:id`, `DELETE /api/trips/:id`, `POST /api/trips/:id/stops`, `PATCH /api/trip-stops/:id`, `DELETE /api/trip-stops/:id`) stay on the admin-session side, while trip reads (`GET /api/trips`, `GET /api/trips/:id`) stay read-only and API-key protected like the other frontend summary endpoints.
+- Named-trip writes (`POST /api/trips`, `PATCH /api/trips/:id`, `DELETE /api/trips/:id`, `POST /api/trips/:id/stops`, `PATCH /api/trip-stops/:id`, `DELETE /api/trip-stops/:id`) stay on the admin-session side, while trip reads (`GET /api/trips`, `GET /api/trips/slug/:slug`, `GET /api/trips/:id`) stay read-only and API-key protected like the other frontend summary endpoints.
 
 ## Storage And Upload Rules
 

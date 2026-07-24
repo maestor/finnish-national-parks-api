@@ -34,8 +34,14 @@ const mockGeoapifyFetch = ({
   originFound = true,
   suggestionStatus = 200,
   suggestions = [
-    { formatted: 'Helsinki, Finland', lat: 60.1699, lon: 24.9384 },
-    { formatted: 'Helsingby, Finland', lat: 60.22, lon: 24.7 },
+    {
+      address_line1: 'Mannerheimintie 1',
+      formatted: 'Helsinki, Finland',
+      lat: 60.1699,
+      lon: 24.9384,
+      name: 'Lasipalatsi'
+    },
+    { address_line1: 'Helsingbyvagen 2', formatted: 'Helsingby, Finland', lat: 60.22, lon: 24.7 },
     { formatted: 'Helsinge, Finland', lat: 60.3, lon: 25.01 },
     { formatted: 'Ignored fourth', lat: 61, lon: 26 }
   ],
@@ -63,7 +69,17 @@ const mockGeoapifyFetch = ({
         return Promise.resolve(
           new Response(
             JSON.stringify({
-              results: originFound ? [{ formatted: 'Origin label', lat: 60, lon: 24 }] : []
+              results: originFound
+                ? [
+                    {
+                      address_line1: 'Origin address',
+                      formatted: 'Origin label',
+                      lat: 60,
+                      lon: 24,
+                      name: 'Origin place'
+                    }
+                  ]
+                : []
             }),
             {
               headers: { 'content-type': 'application/json' },
@@ -78,7 +94,14 @@ const mockGeoapifyFetch = ({
           new Response(
             JSON.stringify({
               results: destinationFound
-                ? [{ formatted: 'Destination label', lat: 60, lon: 24.3 }]
+                ? [
+                    {
+                      address_line1: 'Destination address',
+                      formatted: 'Destination label',
+                      lat: 60,
+                      lon: 24.3
+                    }
+                  ]
                 : []
             }),
             {
@@ -299,14 +322,17 @@ describe('trip planner route', () => {
       suggestions: [
         {
           coordinate: { lat: 60.1699, lon: 24.9384 },
+          displayName: 'Lasipalatsi',
           label: 'Helsinki, Finland'
         },
         {
           coordinate: { lat: 60.22, lon: 24.7 },
+          displayName: 'Helsingbyvagen 2',
           label: 'Helsingby, Finland'
         },
         {
           coordinate: { lat: 60.3, lon: 25.01 },
+          displayName: 'Helsinge, Finland',
           label: 'Helsinge, Finland'
         }
       ]
@@ -322,9 +348,9 @@ describe('trip planner route', () => {
     });
     const body = (await response.json()) as {
       defaultDistanceKm: number;
-      destination: { label: string };
+      destination: { displayName: string; label: string };
       maxDistanceKm: number;
-      origin: { label: string };
+      origin: { displayName: string; label: string };
       parks: Array<{
         boundingBox: {
           maxLat: number;
@@ -357,7 +383,9 @@ describe('trip planner route', () => {
     expect(response.headers.get('cache-control')).toBe('private, no-store');
     expect(body.maxDistanceKm).toBe(25);
     expect(body.defaultDistanceKm).toBe(20);
+    expect(body.origin.displayName).toBe('Origin place');
     expect(body.origin.label).toBe('Origin label');
+    expect(body.destination.displayName).toBe('Destination address');
     expect(body.destination.label).toBe('Destination label');
     expect(body.route).toEqual({
       boundingBox: {
@@ -416,7 +444,7 @@ describe('trip planner route', () => {
     const body = (await response.json()) as {
       defaultDistanceKm: number;
       maxDistanceKm: number;
-      origin: { label: string };
+      origin: { displayName: string; label: string };
       parks: Array<{
         distanceFromOriginKm: number;
         slug: string;
@@ -438,6 +466,7 @@ describe('trip planner route', () => {
     expect(response.headers.get('cache-control')).toBe('private, no-store');
     expect(body.maxDistanceKm).toBe(25);
     expect(body.defaultDistanceKm).toBe(10);
+    expect(body.origin.displayName).toBe('Origin place');
     expect(body.origin.label).toBe('Origin label');
     expect(body.searchArea.center).toEqual({ lat: 60, lon: 24 });
     expect(body.searchArea.maxDistanceKm).toBe(25);
@@ -806,6 +835,7 @@ describe('trip planner route', () => {
           maxDistanceKm: 25,
           origin: {
             coordinate: { lat: 60, lon: 24 },
+            displayName: 'Origin',
             label: 'Origin'
           },
           parks: [],
@@ -827,11 +857,13 @@ describe('trip planner route', () => {
           defaultDistanceKm: 25,
           destination: {
             coordinate: { lat: 60, lon: 24.3 },
+            displayName: 'Destination',
             label: 'Destination'
           },
           maxDistanceKm: 25,
           origin: {
             coordinate: { lat: 60, lon: 24 },
+            displayName: 'Origin',
             label: 'Origin'
           },
           parks: [],
@@ -882,11 +914,13 @@ describe('trip planner route', () => {
           defaultDistanceKm: 25,
           destination: {
             coordinate: { lat: 60, lon: 24.3 },
+            displayName: 'Destination',
             label: 'Destination'
           },
           maxDistanceKm: 25,
           origin: {
             coordinate: { lat: 60, lon: 24 },
+            displayName: 'Origin',
             label: 'Origin'
           },
           parks: [],
