@@ -433,6 +433,15 @@ const normalizeTripStopLocation = (location: {
   };
 };
 
+const shiftVisitDate = (visitedOn: string, dayOffset: number) => {
+  const [year, month, day] = visitedOn.split('-').map(Number);
+  const shiftedDate = new Date(Date.UTC(year!, month! - 1, day!));
+
+  shiftedDate.setUTCDate(shiftedDate.getUTCDate() + dayOffset);
+
+  return shiftedDate.toISOString().slice(0, 10);
+};
+
 const getTripStopVisitDateRange = async (database: DbClient, tripId: number) => {
   const [row] = await database
     .select({
@@ -466,7 +475,10 @@ const assertTripStopVisitedOn = async (database: DbClient, tripId: number, visit
     throw new RepositoryValidationError('Trip stop requires at least one visit in the trip.');
   }
 
-  if (visitedOn < tripDateRange.startVisitedOn || visitedOn > tripDateRange.endVisitedOn) {
+  const allowedStartVisitedOn = shiftVisitDate(tripDateRange.startVisitedOn, -1);
+  const allowedEndVisitedOn = shiftVisitDate(tripDateRange.endVisitedOn, 1);
+
+  if (visitedOn < allowedStartVisitedOn || visitedOn > allowedEndVisitedOn) {
     throw new RepositoryValidationError('Trip stop date must be within the trip date range.');
   }
 };
@@ -1335,39 +1347,65 @@ const listPublicVisitRows = async (database: Database) => {
 };
 
 const listTripRows = async (database: Database): Promise<TripRow[]> => {
+  const activeTripVisitStats = database
+    .select({
+      visitEndVisitedOn: sql<string | null>`MAX(${parkVisits.visitedOn})`.as(
+        'visit_end_visited_on'
+      ),
+      visitStartVisitedOn: sql<string | null>`MIN(${parkVisits.visitedOn})`.as(
+        'visit_start_visited_on'
+      ),
+      tripId: parkVisits.tripId,
+      visitCount: sql<number>`COUNT(${parkVisits.id})`.as('visit_count')
+    })
+    .from(parkVisits)
+    .innerJoin(parks, eq(parkVisits.parkId, parks.id))
+    .where(eq(parks.removed, false))
+    .groupBy(parkVisits.tripId)
+    .as('active_trip_visit_stats');
+
+  const tripStopDateStats = database
+    .select({
+      stopEndVisitedOn: sql<string | null>`MAX(${tripStops.visitedOn})`.as('stop_end_visited_on'),
+      stopStartVisitedOn: sql<string | null>`MIN(${tripStops.visitedOn})`.as(
+        'stop_start_visited_on'
+      ),
+      tripId: tripStops.tripId
+    })
+    .from(tripStops)
+    .groupBy(tripStops.tripId)
+    .as('trip_stop_date_stats');
+
   return database
     .select({
       createdAt: trips.createdAt,
       description: trips.description,
-      endVisitedOn: sql<
-        string | null
-      >`MAX(CASE WHEN ${parks.removed} = 0 THEN ${parkVisits.visitedOn} END)`,
+      endVisitedOn: sql<string | null>`CASE
+        WHEN ${activeTripVisitStats.visitEndVisitedOn} IS NULL THEN ${tripStopDateStats.stopEndVisitedOn}
+        WHEN ${tripStopDateStats.stopEndVisitedOn} IS NULL THEN ${activeTripVisitStats.visitEndVisitedOn}
+        WHEN ${activeTripVisitStats.visitEndVisitedOn} >= ${tripStopDateStats.stopEndVisitedOn}
+          THEN ${activeTripVisitStats.visitEndVisitedOn}
+        ELSE ${tripStopDateStats.stopEndVisitedOn}
+      END`,
       id: trips.id,
       name: trips.name,
       slug: trips.slug,
       startingPointLabel: trips.startingPointLabel,
       startingPointLat: trips.startingPointLat,
       startingPointLon: trips.startingPointLon,
-      startVisitedOn: sql<
-        string | null
-      >`MIN(CASE WHEN ${parks.removed} = 0 THEN ${parkVisits.visitedOn} END)`,
+      startVisitedOn: sql<string | null>`CASE
+        WHEN ${activeTripVisitStats.visitStartVisitedOn} IS NULL THEN ${tripStopDateStats.stopStartVisitedOn}
+        WHEN ${tripStopDateStats.stopStartVisitedOn} IS NULL THEN ${activeTripVisitStats.visitStartVisitedOn}
+        WHEN ${activeTripVisitStats.visitStartVisitedOn} <= ${tripStopDateStats.stopStartVisitedOn}
+          THEN ${activeTripVisitStats.visitStartVisitedOn}
+        ELSE ${tripStopDateStats.stopStartVisitedOn}
+      END`,
       updatedAt: trips.updatedAt,
-      visitCount: sql<number>`COUNT(CASE WHEN ${parks.removed} = 0 THEN ${parkVisits.id} END)`
+      visitCount: sql<number>`COALESCE(${activeTripVisitStats.visitCount}, 0)`
     })
     .from(trips)
-    .leftJoin(parkVisits, eq(parkVisits.tripId, trips.id))
-    .leftJoin(parks, eq(parkVisits.parkId, parks.id))
-    .groupBy(
-      trips.id,
-      trips.createdAt,
-      trips.description,
-      trips.name,
-      trips.slug,
-      trips.startingPointLabel,
-      trips.startingPointLat,
-      trips.startingPointLon,
-      trips.updatedAt
-    )
+    .leftJoin(activeTripVisitStats, eq(activeTripVisitStats.tripId, trips.id))
+    .leftJoin(tripStopDateStats, eq(tripStopDateStats.tripId, trips.id))
     .orderBy(asc(trips.name), asc(trips.id));
 };
 
