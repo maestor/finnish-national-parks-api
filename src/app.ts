@@ -174,9 +174,7 @@ const normalizeRouteFallbackQueries = (...queries: Array<string | null | undefin
 };
 
 const buildPublicTripRouteWaypoints = async (database: Database, trip: PublicTripDetail) => {
-  const visitEntries = trip.itinerary.filter((entry) => entry.kind === 'visit');
-
-  if (!trip.startingPoint || visitEntries.length < 2) {
+  if (!trip.startingPoint || trip.itinerary.length < 2) {
     return null;
   }
 

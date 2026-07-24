@@ -2524,6 +2524,105 @@ describe('API routes', () => {
     expect(buildRoundTripRoute).not.toHaveBeenCalled();
   });
 
+  it('builds a route by slug when the trip has two itinerary entries across visits and stops', async () => {
+    const routeData: TripPlannerRoundTripRoute = {
+      distanceMeters: 12_345,
+      durationSeconds: 2_345,
+      geometry: {
+        coordinates: [
+          [24.9384, 60.1699] as [number, number],
+          [24.5, 61.5] as [number, number],
+          [25.1, 61.8] as [number, number],
+          [24.9384, 60.1699] as [number, number]
+        ],
+        type: 'LineString'
+      },
+      returnsToStart: true,
+      waypointCount: 4
+    };
+    const buildRoundTripRoute: NonNullable<TripPlannerService['buildRoundTripRoute']> = vi.fn(
+      async (): Promise<TripPlannerRoundTripRoute> => routeData
+    );
+    const app = createAuthedApp({
+      tripPlanner: {
+        buildRoundTripRoute,
+        search: vi.fn(async () => {
+          throw new Error('not used in this test');
+        }),
+        searchNearby: vi.fn(async () => {
+          throw new Error('not used in this test');
+        }),
+        suggest: vi.fn(async () => {
+          throw new Error('not used in this test');
+        })
+      }
+    });
+    const { body: trip } = await createTrip(app, {
+      name: 'Sekalainen retki',
+      startingPoint: {
+        coordinate: {
+          lat: 60.1699,
+          lon: 24.9384
+        },
+        label: 'Helsinki'
+      }
+    });
+
+    await createVisit(app, 'akasmannyn-kansallispuisto', {
+      tripId: trip.id,
+      tripStopOrder: 1,
+      visitedOn: '2026-06-07'
+    });
+    await createTripStop(app, trip.id, {
+      location: {
+        coordinate: {
+          lat: 61.5,
+          lon: 24.5
+        },
+        label: 'Matkan varsi 1, 11111 Testila, Finland'
+      },
+      tripStopOrder: 2,
+      visitedOn: '2026-06-08'
+    });
+
+    const response = await app.request('/api/trips/slug/sekalainen-retki');
+    const body = (await response.json()) as {
+      route: {
+        data: TripPlannerRoundTripRoute | null;
+        error: null;
+        success: boolean;
+      };
+      stopCount: number;
+      visitCount: number;
+    };
+
+    expect(response.status).toBe(200);
+    expect(body.visitCount).toBe(1);
+    expect(body.stopCount).toBe(1);
+    expect(body.route).toEqual({
+      data: routeData,
+      error: null,
+      success: true
+    });
+    expect(buildRoundTripRoute).toHaveBeenCalledWith({
+      mode: 'drive',
+      waypoints: expect.arrayContaining([
+        expect.objectContaining({
+          displayName: 'Helsinki',
+          label: 'Helsinki'
+        }),
+        expect.objectContaining({
+          displayName: 'Äkäsmännyn kansallispuisto',
+          label: 'Äkäsmännyn kansallispuisto'
+        }),
+        expect.objectContaining({
+          displayName: 'Matkan varsi 1',
+          label: 'Matkan varsi 1, 11111 Testila, Finland'
+        })
+      ])
+    });
+  });
+
   it('returns a failed route state by slug when the trip planner is not configured', async () => {
     const app = createAuthedApp();
     const { body: trip } = await createTrip(app, {
