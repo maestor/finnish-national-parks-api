@@ -174,6 +174,15 @@ export const sourceReadyHistoryRkyAreaSeeds: MuseovirastoRkyAreaSeed[] = [
   },
   {
     displayTypeName: null,
+    parkUrl: 'https://www.hamina.fi/asuminen-ymparisto/linnoitus-ja-ympyrakeskusta/',
+    name: 'Haminan linnoitus',
+    parkTypeSlug: 'cultural-history-area',
+    slug: 'haminan-linnoitus',
+    sourceName: 'Haminan linnoitus- ja varuskuntakaupunki',
+    syntheticLipasId: 9_001_088
+  },
+  {
+    displayTypeName: null,
     markerPoint: {
       lat: 60.2991,
       lon: 22.2944
