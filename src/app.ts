@@ -174,12 +174,16 @@ const normalizeRouteFallbackQueries = (...queries: Array<string | null | undefin
 };
 
 const buildPublicTripRouteWaypoints = async (database: Database, trip: PublicTripDetail) => {
-  if (!trip.startingPoint || trip.itinerary.length < 2) {
+  const routeEntries = trip.itinerary.filter(
+    (entry) => entry.kind === 'stop' || !entry.visit.excludeFromRoute
+  );
+
+  if (!trip.startingPoint || routeEntries.length < 2) {
     return null;
   }
 
   const routeWaypoints = await Promise.all(
-    trip.itinerary.map(async (entry) => {
+    routeEntries.map(async (entry) => {
       if (entry.kind === 'visit') {
         const park = await getParkBySlug(database, entry.visit.park.slug);
 

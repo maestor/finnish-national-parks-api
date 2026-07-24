@@ -27,6 +27,7 @@ import {
 
 type PutVisitInput = {
   author?: string | null | undefined;
+  excludeFromRoute?: boolean | undefined;
   note?: string | null | undefined;
   route?: string | null | undefined;
   tripId?: number | null | undefined;
@@ -36,6 +37,7 @@ type PutVisitInput = {
 
 type UpdateVisitInput = {
   author?: string | null | undefined;
+  excludeFromRoute?: boolean | undefined;
   note?: string | null | undefined;
   route?: string | null | undefined;
   tripId?: number | null | undefined;
@@ -201,6 +203,7 @@ type TripStopRow = typeof tripStops.$inferSelect;
 type TripDetailVisitRow = {
   author: string | null;
   createdAt: string;
+  excludeFromRoute: boolean;
   id: number;
   note: string | null;
   parkName: string;
@@ -873,6 +876,7 @@ const toTripItineraryVisitEntry = (row: TripDetailVisitRow) => {
     visit: {
       author: row.author,
       createdAt: row.createdAt,
+      excludeFromRoute: row.excludeFromRoute,
       id: row.id,
       note: row.note,
       park: {
@@ -893,6 +897,7 @@ const toPublicTripItineraryVisitEntry = (row: PublicTripDetailVisitRow) => {
     visit: {
       author: row.author,
       createdAt: row.createdAt,
+      excludeFromRoute: row.excludeFromRoute,
       id: row.id,
       imageCount: row.imageCount,
       note: row.note,
@@ -928,6 +933,7 @@ const toVisit = (
   return {
     author: row.author,
     createdAt: row.createdAt,
+    excludeFromRoute: row.excludeFromRoute,
     id: row.id,
     images,
     note: row.note,
@@ -1424,6 +1430,7 @@ const listTripDetailVisitRowsByTripId = async (
     .select({
       author: parkVisits.author,
       createdAt: parkVisits.createdAt,
+      excludeFromRoute: parkVisits.excludeFromRoute,
       id: parkVisits.id,
       note: parkVisits.note,
       parkName: parks.name,
@@ -1448,6 +1455,7 @@ const listPublicTripDetailVisitRowsByTripId = async (
       author: parkVisits.author,
       createdAt: parkVisits.createdAt,
       displayTypeName: parks.displayTypeName,
+      excludeFromRoute: parkVisits.excludeFromRoute,
       id: parkVisits.id,
       imageCount: sql<number>`COUNT(${visitImages.id})`,
       markerLat: parks.markerLat,
@@ -1470,6 +1478,7 @@ const listPublicTripDetailVisitRowsByTripId = async (
       parkVisits.id,
       parkVisits.author,
       parkVisits.createdAt,
+      parkVisits.excludeFromRoute,
       parkVisits.note,
       parkVisits.route,
       parkVisits.tripStopOrder,
@@ -2407,6 +2416,7 @@ export const createVisit = async (database: Database, slug: string, input: PutVi
         .values({
           author: input.author?.trim() || null,
           createdAt: timestamp,
+          excludeFromRoute: input.excludeFromRoute ?? false,
           note: input.note?.trim() || null,
           parkId: park.id,
           route: input.route?.trim() || null,
@@ -2802,6 +2812,10 @@ export const updateVisit = async (database: Database, visitId: number, input: Up
       .update(parkVisits)
       .set({
         author: input.author === undefined ? existingVisit.author : input.author?.trim() || null,
+        excludeFromRoute:
+          input.excludeFromRoute === undefined
+            ? existingVisit.excludeFromRoute
+            : input.excludeFromRoute,
         note: input.note === undefined ? existingVisit.note : input.note?.trim() || null,
         route: input.route === undefined ? existingVisit.route : input.route?.trim() || null,
         tripId: resolvedTripId,

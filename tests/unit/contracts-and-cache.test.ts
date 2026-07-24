@@ -23,6 +23,9 @@ describe('contracts and cache helpers', () => {
     expect(updateVisitRequestSchema.parse({ note: 'Updated note' })).toEqual({
       note: 'Updated note'
     });
+    expect(updateVisitRequestSchema.parse({ excludeFromRoute: true })).toEqual({
+      excludeFromRoute: true
+    });
     expect(updateVisitRequestSchema.parse({ tripStopOrder: 2 })).toEqual({
       tripStopOrder: 2
     });
