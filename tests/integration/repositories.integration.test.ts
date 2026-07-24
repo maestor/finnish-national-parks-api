@@ -657,7 +657,7 @@ describe('repositories', () => {
     });
   });
 
-  it('requires at least one trip visit and keeps stop dates inside the trip date range', async () => {
+  it('requires at least one trip visit and allows trip stops within one day of the visit range', async () => {
     const trip = await createTrip(testDatabase.database, {
       name: 'Kesäreissu 2026'
     });
@@ -693,11 +693,11 @@ describe('repositories', () => {
           },
           label: 'ABC Huittinen'
         },
-        visitedOn: '2026-04-12'
+        visitedOn: '2026-04-11'
       })
     ).rejects.toThrow('Trip stop date must be within the trip date range.');
 
-    const stop = await createTripStop(testDatabase.database, trip.id, {
+    const outboundStop = await createTripStop(testDatabase.database, trip.id, {
       location: {
         coordinate: {
           lat: 61.3167,
@@ -705,14 +705,45 @@ describe('repositories', () => {
         },
         label: 'ABC Huittinen'
       },
-      visitedOn: '2026-04-15'
+      visitedOn: '2026-04-12'
     });
 
-    expect(stop.visitedOn).toBe('2026-04-15');
+    const returnStop = await createTripStop(testDatabase.database, trip.id, {
+      location: {
+        coordinate: {
+          lat: 61.45,
+          lon: 23.85
+        },
+        label: 'Tampereen kautta kotiin'
+      },
+      visitedOn: '2026-04-15'
+    });
+    const trips = await listTrips(testDatabase.database);
+
+    expect(outboundStop.visitedOn).toBe('2026-04-12');
+    expect(returnStop.visitedOn).toBe('2026-04-15');
+    expect(trips).toContainEqual(
+      expect.objectContaining({
+        dateRange: {
+          end: '2026-04-15',
+          start: '2026-04-12'
+        },
+        id: trip.id
+      })
+    );
 
     await expect(
-      updateTripStop(testDatabase.database, stop.id, {
+      updateTripStop(testDatabase.database, returnStop.id, {
         visitedOn: '2026-04-16'
+      })
+    ).resolves.toMatchObject({
+      id: returnStop.id,
+      visitedOn: '2026-04-16'
+    });
+
+    await expect(
+      updateTripStop(testDatabase.database, returnStop.id, {
+        visitedOn: '2026-04-17'
       })
     ).rejects.toThrow('Trip stop date must be within the trip date range.');
   });

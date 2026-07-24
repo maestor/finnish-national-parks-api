@@ -99,7 +99,7 @@ If an upload limit exists, at least one test should cover the real stored-object
 - Park removal toggle can hide and restore a park through the authenticated park-management API.
 - Trip create/edit/delete supports named-trip CRUD, persisted trip slugs, optional starting points, and clears visit assignments on delete.
 - Trip-stop create/edit/delete supports non-park itinerary stops with labeled coordinates, required `visitedOn` dates, optional notes, and shared ordering between stops and park visits.
-- Trip-stop validation covers both required trip membership context and date-range constraints: a stop cannot be created for a trip with zero visits, and each stop date must remain inside the trip's visit-derived date range, inclusive.
+- Trip-stop validation covers both required trip membership context and date-range constraints: a stop cannot be created for a trip with zero visits, and each stop date may be at most one day outside the trip's visit-derived range so departure-day and return-day stops can extend the trip window.
 - Visit create/edit/delete supports optional route, author, `tripId`, and `tripStopOrder` fields, including same-day ordering inside a named trip.
 - Visit create/edit/delete works against a real temporary database.
 - Park logo upload logic verifies the park slug, prefers `data/logos/<slug>.png`, falls back to `data/logos/display-types/<normalized-display-type>.png` when a park shares a display type, uploads the resolved file once to the matching R2 key, and persists the logo reference in the database.

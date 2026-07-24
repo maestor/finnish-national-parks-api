@@ -3189,7 +3189,7 @@ describe('API routes', () => {
     expect(updateBody.error).toBe('Trip stop order requires an assigned trip.');
   });
 
-  it('rejects trip stops before the first trip visit and outside the trip date range', async () => {
+  it('allows trip stops one day outside the visit range and still rejects anything beyond that', async () => {
     const app = createAuthedApp();
     const { body: trip } = await createTrip(app, {
       name: 'Kesäreissu 2026'
@@ -3237,7 +3237,7 @@ describe('API routes', () => {
           },
           label: 'ABC Huittinen'
         },
-        visitedOn: '2026-06-06'
+        visitedOn: '2026-06-05'
       }),
       headers: {
         'content-type': 'application/json'
@@ -3250,7 +3250,7 @@ describe('API routes', () => {
     expect(beforeRangeResponse.status).toBe(422);
     expect(beforeRangeBody.error).toBe('Trip stop date must be within the trip date range.');
 
-    const { body: stop } = await createTripStop(app, trip.id, {
+    const { body: outboundStop } = await createTripStop(app, trip.id, {
       location: {
         coordinate: {
           lat: 61.3167,
@@ -3258,10 +3258,39 @@ describe('API routes', () => {
         },
         label: 'ABC Huittinen'
       },
+      visitedOn: '2026-06-06'
+    });
+    const { body: returnStop } = await createTripStop(app, trip.id, {
+      location: {
+        coordinate: {
+          lat: 61.45,
+          lon: 23.85
+        },
+        label: 'Tampereen kautta kotiin'
+      },
       visitedOn: '2026-06-09'
     });
+    const tripResponse = await app.request('/api/trips');
+    const tripBody = (await tripResponse.json()) as {
+      trips: Array<{
+        dateRange: { end: string; start: string } | null;
+        id: number;
+      }>;
+    };
 
-    const updateStopResponse = await requestAsAdmin(app, `/api/trip-stops/${stop.id}`, {
+    expect(outboundStop.visitedOn).toBe('2026-06-06');
+    expect(returnStop.visitedOn).toBe('2026-06-09');
+    expect(tripBody.trips).toContainEqual(
+      expect.objectContaining({
+        dateRange: {
+          end: '2026-06-09',
+          start: '2026-06-06'
+        },
+        id: trip.id
+      })
+    );
+
+    const updateStopResponse = await requestAsAdmin(app, `/api/trip-stops/${returnStop.id}`, {
       method: 'PATCH',
       body: JSON.stringify({
         visitedOn: '2026-06-10'
@@ -3274,8 +3303,27 @@ describe('API routes', () => {
       error: string;
     };
 
-    expect(updateStopResponse.status).toBe(422);
-    expect(updateStopBody.error).toBe('Trip stop date must be within the trip date range.');
+    expect(updateStopResponse.status).toBe(200);
+    expect(updateStopBody).toMatchObject({
+      id: returnStop.id,
+      visitedOn: '2026-06-10'
+    });
+
+    const beyondRangeResponse = await requestAsAdmin(app, `/api/trip-stops/${returnStop.id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({
+        visitedOn: '2026-06-11'
+      }),
+      headers: {
+        'content-type': 'application/json'
+      }
+    });
+    const beyondRangeBody = (await beyondRangeResponse.json()) as {
+      error: string;
+    };
+
+    expect(beyondRangeResponse.status).toBe(422);
+    expect(beyondRangeBody.error).toBe('Trip stop date must be within the trip date range.');
   });
 
   it('returns 500 for unexpected visit write failures', async () => {
