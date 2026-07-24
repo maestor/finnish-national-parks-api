@@ -337,6 +337,126 @@ describe('trip planner service', () => {
     expect(route).toHaveBeenCalledTimes(3);
   });
 
+  it('ignores consecutive duplicate round trip waypoints', async () => {
+    const route = vi
+      .fn()
+      .mockResolvedValueOnce({
+        boundingBox: {
+          maxLat: 62,
+          maxLon: 26,
+          minLat: 60,
+          minLon: 24
+        },
+        distanceMeters: 20_000,
+        durationSeconds: 1_800,
+        geometry: {
+          features: [
+            {
+              geometry: {
+                coordinates: [
+                  [24, 60],
+                  [26, 62]
+                ],
+                type: 'LineString'
+              },
+              type: 'Feature'
+            }
+          ],
+          type: 'FeatureCollection'
+        },
+        mode: 'drive' as const
+      })
+      .mockResolvedValueOnce({
+        boundingBox: {
+          maxLat: 62,
+          maxLon: 26,
+          minLat: 60,
+          minLon: 24
+        },
+        distanceMeters: 30_000,
+        durationSeconds: 2_700,
+        geometry: {
+          features: [
+            {
+              geometry: {
+                coordinates: [
+                  [26, 62],
+                  [24, 60]
+                ],
+                type: 'LineString'
+              },
+              type: 'Feature'
+            }
+          ],
+          type: 'FeatureCollection'
+        },
+        mode: 'drive' as const
+      });
+    const service = createTripPlannerService({
+      database: {} as Database,
+      provider: createProvider({
+        route
+      })
+    });
+
+    const result = await service.buildRoundTripRoute?.({
+      mode: 'drive',
+      waypoints: [
+        {
+          coordinate: { lat: 60, lon: 24 },
+          displayName: 'Start',
+          label: 'Start'
+        },
+        {
+          coordinate: { lat: 60, lon: 24 },
+          displayName: 'Start duplicate',
+          label: 'Start duplicate'
+        },
+        {
+          coordinate: { lat: 62, lon: 26 },
+          displayName: 'Destination',
+          label: 'Destination'
+        },
+        {
+          coordinate: { lat: 60, lon: 24 },
+          displayName: 'Start',
+          label: 'Start'
+        }
+      ]
+    });
+
+    expect(route.mock.calls).toEqual([
+      [
+        {
+          destination: { lat: 62, lon: 26 },
+          mode: 'drive',
+          origin: { lat: 60, lon: 24 }
+        }
+      ],
+      [
+        {
+          destination: { lat: 60, lon: 24 },
+          mode: 'drive',
+          origin: { lat: 62, lon: 26 }
+        }
+      ]
+    ]);
+    expect(result).toEqual({
+      distanceMeters: 50_000,
+      durationSeconds: 4_500,
+      geometry: {
+        coordinates: [
+          [24, 60],
+          [26, 62],
+          [24, 60]
+        ],
+        type: 'LineString'
+      },
+      returnsToStart: true,
+      waypointCount: 3
+    });
+  });
+
   it('returns null for round trip routing with fewer than two waypoints', async () => {
     const route = vi.fn();
     const service = createTripPlannerService({
