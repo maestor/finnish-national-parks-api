@@ -140,6 +140,7 @@ export const parkVisits = sqliteTable(
     visitedOn: text('visited_on').notNull(),
     note: text('note'),
     route: text('route'),
+    excludeFromRoute: integer('exclude_from_route', { mode: 'boolean' }).notNull().default(false),
     author: text('author'),
     createdAt: text('created_at').notNull(),
     updatedAt: text('updated_at').notNull()

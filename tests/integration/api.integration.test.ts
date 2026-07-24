@@ -134,6 +134,7 @@ describe('API routes', () => {
     slug: string,
     body: {
       author?: string;
+      excludeFromRoute?: boolean;
       note?: string;
       route?: string;
       tripId?: number | null;
@@ -150,7 +151,7 @@ describe('API routes', () => {
     });
 
     return {
-      body: (await response.json()) as { id: number },
+      body: (await response.json()) as { excludeFromRoute: boolean; id: number },
       response
     };
   };
@@ -1683,6 +1684,7 @@ describe('API routes', () => {
 
     expect(createTripResponse.status).toBe(201);
     expect(createTripResponse.headers.get('cache-control')).toBe('private, no-store');
+    expect(firstVisit.excludeFromRoute).toBe(false);
     expect(createdTrip).toMatchObject({
       dateRange: null,
       description: 'Lapin puistoja ja yksi yllätys.',
@@ -1709,6 +1711,7 @@ describe('API routes', () => {
       }
     });
     const assignTripBody = (await assignTripResponse.json()) as {
+      excludeFromRoute: boolean;
       tripStopOrder: number | null;
       trip: {
         id: number;
@@ -1723,7 +1726,24 @@ describe('API routes', () => {
       name: 'Kesäreissu 2026',
       slug: 'kesareissu-2026'
     });
+    expect(assignTripBody.excludeFromRoute).toBe(false);
     expect(assignTripBody.tripStopOrder).toBe(2);
+
+    const excludeVisitResponse = await requestAsAdmin(app, `/api/visits/${secondVisit.id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({
+        excludeFromRoute: true
+      }),
+      headers: {
+        'content-type': 'application/json'
+      }
+    });
+    const excludeVisitBody = (await excludeVisitResponse.json()) as {
+      excludeFromRoute: boolean;
+    };
+
+    expect(excludeVisitResponse.status).toBe(200);
+    expect(excludeVisitBody.excludeFromRoute).toBe(true);
 
     const tripsResponse = await app.request('/api/trips');
     const tripsBody = (await tripsResponse.json()) as {
@@ -1790,6 +1810,7 @@ describe('API routes', () => {
     const visitsResponse = await app.request('/api/visits');
     const visitsBody = (await visitsResponse.json()) as {
       visits: Array<{
+        excludeFromRoute: boolean;
         id: number;
         tripStopOrder: number | null;
         trip: {
@@ -1801,6 +1822,7 @@ describe('API routes', () => {
     };
     const visitDetailResponse = await app.request(`/api/visits/${firstVisit.id}`);
     const visitDetailBody = (await visitDetailResponse.json()) as {
+      excludeFromRoute: boolean;
       tripStopOrder: number | null;
       trip: {
         id: number;
@@ -1833,12 +1855,16 @@ describe('API routes', () => {
       slug: 'kesareissu-2026'
     });
     expect(visitsBody.visits.find((visit) => visit.id === firstVisit.id)?.tripStopOrder).toBe(1);
+    expect(visitsBody.visits.find((visit) => visit.id === secondVisit.id)?.excludeFromRoute).toBe(
+      true
+    );
     expect(visitDetailResponse.status).toBe(200);
     expect(visitDetailBody.trip).toEqual({
       id: createdTrip.id,
       name: 'Kesäreissu 2026',
       slug: 'kesareissu-2026'
     });
+    expect(visitDetailBody.excludeFromRoute).toBe(false);
     expect(visitDetailBody.tripStopOrder).toBe(1);
 
     const renameTripResponse = await requestAsAdmin(app, `/api/trips/${createdTrip.id}`, {
@@ -2522,6 +2548,131 @@ describe('API routes', () => {
       success: true
     });
     expect(buildRoundTripRoute).not.toHaveBeenCalled();
+  });
+
+  it('keeps excluded visits in the trip payload but omits them from route calculation', async () => {
+    const routeData: TripPlannerRoundTripRoute = {
+      distanceMeters: 11_100,
+      durationSeconds: 1_800,
+      geometry: {
+        coordinates: [
+          [24.9384, 60.1699] as [number, number],
+          [23.7, 61.9] as [number, number],
+          [24.4, 61.7] as [number, number],
+          [24.9384, 60.1699] as [number, number]
+        ],
+        type: 'LineString'
+      },
+      returnsToStart: true,
+      waypointCount: 4
+    };
+    const buildRoundTripRoute: NonNullable<TripPlannerService['buildRoundTripRoute']> = vi.fn(
+      async (): Promise<TripPlannerRoundTripRoute> => routeData
+    );
+    const app = createAuthedApp({
+      tripPlanner: {
+        buildRoundTripRoute,
+        search: vi.fn(async () => {
+          throw new Error('not used in this test');
+        }),
+        searchNearby: vi.fn(async () => {
+          throw new Error('not used in this test');
+        }),
+        suggest: vi.fn(async () => {
+          throw new Error('not used in this test');
+        })
+      }
+    });
+    const { body: trip } = await createTrip(app, {
+      name: 'Marker only visit',
+      startingPoint: {
+        coordinate: {
+          lat: 60.1699,
+          lon: 24.9384
+        },
+        label: 'Helsinki'
+      }
+    });
+
+    await createVisit(app, 'akasmannyn-kansallispuisto', {
+      tripId: trip.id,
+      tripStopOrder: 1,
+      visitedOn: '2026-06-07'
+    });
+    const { body: excludedVisit } = await createVisit(app, 'kaupunkilaakson-ulkoilualue', {
+      excludeFromRoute: true,
+      tripId: trip.id,
+      tripStopOrder: 2,
+      visitedOn: '2026-06-08'
+    });
+    const secondPark = await getParkBySlug(testDatabase.database, 'seitsemisen-kansallispuisto');
+
+    await createVisit(app, 'seitsemisen-kansallispuisto', {
+      tripId: trip.id,
+      tripStopOrder: 3,
+      visitedOn: '2026-06-08'
+    });
+
+    const response = await app.request('/api/trips/slug/marker-only-visit');
+    const body = (await response.json()) as {
+      itinerary: Array<{
+        kind: 'visit';
+        tripStopOrder: number;
+        visit: {
+          excludeFromRoute: boolean;
+          id: number;
+        };
+      }>;
+      route: {
+        data: TripPlannerRoundTripRoute | null;
+        error: null;
+        success: boolean;
+      };
+    };
+
+    expect(secondPark).not.toBeNull();
+    expect(response.status).toBe(200);
+    expect(body.itinerary).toEqual([
+      expect.objectContaining({
+        kind: 'visit',
+        tripStopOrder: 1
+      }),
+      {
+        kind: 'visit',
+        tripStopOrder: 2,
+        visit: expect.objectContaining({
+          excludeFromRoute: true,
+          id: excludedVisit.id
+        })
+      },
+      expect.objectContaining({
+        kind: 'visit',
+        tripStopOrder: 3
+      })
+    ]);
+    expect(body.route).toEqual({
+      data: routeData,
+      error: null,
+      success: true
+    });
+    expect(buildRoundTripRoute).toHaveBeenCalledWith({
+      mode: 'drive',
+      waypoints: [
+        expect.objectContaining({
+          displayName: 'Helsinki'
+        }),
+        expect.objectContaining({
+          displayName: 'Äkäsmännyn kansallispuisto'
+        }),
+        expect.objectContaining({
+          coordinate: secondPark!.markerPoint,
+          displayName: 'Seitsemisen kansallispuisto'
+        }),
+        expect.objectContaining({
+          displayName: 'Helsinki'
+        })
+      ]
+    });
   });
 
   it('builds a route by slug when the trip has two itinerary entries across visits and stops', async () => {
