@@ -1137,7 +1137,11 @@ describe('manual catalog imports', () => {
     expect(turunmaanKalkkilouhokset).toMatchObject({
       lipasId: 9001079,
       parkUrl: 'https://www.rky.fi/read/asp/r_kohde_det.aspx?KOHDE_ID=1799',
-      name: 'Turunmaan kalkkilouhokset',
+      markerPoint: {
+        lat: 60.2991,
+        lon: 22.2944
+      },
+      name: 'Paraisten kalkkikaivos',
       type: { slug: 'cultural-history-area' }
     });
 
@@ -1451,9 +1455,9 @@ describe('manual catalog imports', () => {
         slug: 'loviisan-alakaupunki'
       },
       {
-        featureCount: 4,
+        featureCount: 1,
         importRunId: 2,
-        name: 'Turunmaan kalkkilouhokset',
+        name: 'Paraisten kalkkikaivos',
         slug: 'turunmaan-kalkkilouhokset'
       }
     ]);
@@ -1474,7 +1478,7 @@ describe('manual catalog imports', () => {
     );
     expect(turunmaanKalkkilouhokset).toMatchObject({
       lipasId: 9001079,
-      name: 'Turunmaan kalkkilouhokset',
+      name: 'Paraisten kalkkikaivos',
       type: { slug: 'cultural-history-area' }
     });
   });

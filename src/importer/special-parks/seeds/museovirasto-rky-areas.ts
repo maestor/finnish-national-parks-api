@@ -174,10 +174,15 @@ export const sourceReadyHistoryRkyAreaSeeds: MuseovirastoRkyAreaSeed[] = [
   },
   {
     displayTypeName: null,
+    markerPoint: {
+      lat: 60.2991,
+      lon: 22.2944
+    },
     parkUrl: 'https://www.rky.fi/read/asp/r_kohde_det.aspx?KOHDE_ID=1799',
-    name: 'Turunmaan kalkkilouhokset',
+    name: 'Paraisten kalkkikaivos',
     parkTypeSlug: 'cultural-history-area',
     slug: 'turunmaan-kalkkilouhokset',
+    sourceFeatureName: 'Paraisten kalkin teollisuuslaitokset ja Limberg - Skräbböle',
     sourceName: 'Turunmaan rannikon kalkkilouhokset ja Paraisten kalkkitehdas',
     syntheticLipasId: 9_001_079
   },

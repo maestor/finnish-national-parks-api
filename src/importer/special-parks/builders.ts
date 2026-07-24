@@ -241,6 +241,7 @@ export const createMuseovirastoRkyAreaConfig = ({
   displayTypeName,
   excludedSourceNames,
   locationLabel,
+  markerPoint,
   parkUrl,
   name,
   parkTypeSlug,
@@ -253,6 +254,7 @@ export const createMuseovirastoRkyAreaConfig = ({
 }: MuseovirastoRkyAreaSeed): SpecialParkConfig => ({
   displayTypeName: normalizeSpecialParkDisplayTypeName(name, displayTypeName),
   locationLabel: locationLabel ?? name,
+  ...(markerPoint ? { markerPoint } : {}),
   parkUrl,
   name,
   parkTypeSlug,
