@@ -4,7 +4,7 @@ import { createApp } from '../../src/app.js';
 import { createVisit } from '../../src/db/repositories.js';
 import { importParks } from '../../src/importer/import-parks.js';
 import { createGeoapifyClient } from '../../src/trip-planner/geoapify.js';
-import { createTripPlannerService } from '../../src/trip-planner/search.js';
+import { createTripPlannerService, TripPlannerError } from '../../src/trip-planner/search.js';
 import { createLipasPark, createLipasTrail, parkTypeFixtures } from '../fixtures/lipas.js';
 import { createTestDatabase } from '../helpers/test-db.js';
 
@@ -653,6 +653,94 @@ describe('trip planner route', () => {
     expect(body).toEqual({
       error: 'Trip planner provider is unavailable.',
       errorCode: 'provider_unavailable'
+    });
+  });
+
+  it('returns route failure details when trip planner search throws route_not_found', async () => {
+    const app = createApp({
+      apiKey: 'test-api-key',
+      database: testDatabase.database,
+      tripPlanner: {
+        searchNearby: async () => {
+          throw new Error('not used in this test');
+        },
+        search: async () => {
+          throw new TripPlannerError(
+            'route_not_found',
+            'Driving route could not be found from A to B.',
+            422,
+            {
+              routeFailure: {
+                destination: {
+                  coordinate: {
+                    lat: 61,
+                    lon: 25
+                  },
+                  displayName: 'B',
+                  label: 'B'
+                },
+                origin: {
+                  coordinate: {
+                    lat: 60,
+                    lon: 24
+                  },
+                  displayName: 'A',
+                  label: 'A'
+                },
+                waypointIndex: 1
+              }
+            }
+          );
+        },
+        suggest: async () => {
+          throw new Error('not used in this test');
+        }
+      }
+    });
+    const response = await requestAsRemote(app, {
+      destinationQuery: 'Destination',
+      mode: 'drive',
+      originQuery: 'Origin'
+    });
+    const body = (await response.json()) as {
+      error: string;
+      errorCode: string;
+      routeFailure: {
+        destination: {
+          displayName: string;
+          label: string;
+        };
+        origin: {
+          displayName: string;
+          label: string;
+        };
+        waypointIndex: number;
+      };
+    };
+
+    expect(response.status).toBe(422);
+    expect(body).toEqual({
+      error: 'Driving route could not be found from A to B.',
+      errorCode: 'route_not_found',
+      routeFailure: {
+        destination: {
+          coordinate: {
+            lat: 61,
+            lon: 25
+          },
+          displayName: 'B',
+          label: 'B'
+        },
+        origin: {
+          coordinate: {
+            lat: 60,
+            lon: 24
+          },
+          displayName: 'A',
+          label: 'A'
+        },
+        waypointIndex: 1
+      }
     });
   });
 

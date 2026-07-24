@@ -415,10 +415,25 @@ describe('trip planner service', () => {
           }
         ]
       })
-    ).resolves.toBeNull();
+    ).rejects.toMatchObject({
+      code: 'route_not_found',
+      message: 'Driving route could not be displayed from Start to Stop.',
+      routeFailure: {
+        destination: {
+          displayName: 'Stop',
+          label: 'Stop'
+        },
+        origin: {
+          displayName: 'Start',
+          label: 'Start'
+        },
+        waypointIndex: 1
+      },
+      status: 422
+    });
   });
 
-  it('returns null for round trip routing when any leg cannot be routed', async () => {
+  it('returns route_not_found for round trip routing when any leg cannot be routed', async () => {
     const service = createTripPlannerService({
       database: {} as Database,
       provider: createProvider({
@@ -461,7 +476,159 @@ describe('trip planner service', () => {
           }
         ]
       })
-    ).resolves.toBeNull();
+    ).rejects.toMatchObject({
+      code: 'route_not_found',
+      message: 'Driving route could not be found from Stop to Start.',
+      routeFailure: {
+        destination: {
+          displayName: 'Start',
+          label: 'Start'
+        },
+        origin: {
+          displayName: 'Stop',
+          label: 'Stop'
+        },
+        waypointIndex: 2
+      },
+      status: 422
+    });
+  });
+
+  it('falls back to a destination geocode when a waypoint marker is not drive-routable', async () => {
+    const geocode = vi.fn(async (query: string) => {
+      if (query === 'Stop address') {
+        return {
+          coordinate: { lat: 61.2, lon: 25.2 },
+          displayName: 'Stop address',
+          label: 'Stop address'
+        };
+      }
+
+      return null;
+    });
+    const route = vi
+      .fn()
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({
+        boundingBox: {
+          maxLat: 61.2,
+          maxLon: 25.2,
+          minLat: 60,
+          minLon: 24
+        },
+        distanceMeters: 15_000,
+        durationSeconds: 1_200,
+        geometry: {
+          features: [
+            {
+              geometry: {
+                coordinates: [
+                  [24, 60],
+                  [25.2, 61.2]
+                ],
+                type: 'LineString'
+              },
+              type: 'Feature'
+            }
+          ],
+          type: 'FeatureCollection'
+        },
+        mode: 'drive' as const
+      })
+      .mockResolvedValueOnce({
+        boundingBox: {
+          maxLat: 61.2,
+          maxLon: 25.2,
+          minLat: 60,
+          minLon: 24
+        },
+        distanceMeters: 16_000,
+        durationSeconds: 1_300,
+        geometry: {
+          features: [
+            {
+              geometry: {
+                coordinates: [
+                  [25.2, 61.2],
+                  [24, 60]
+                ],
+                type: 'LineString'
+              },
+              type: 'Feature'
+            }
+          ],
+          type: 'FeatureCollection'
+        },
+        mode: 'drive' as const
+      });
+    const service = createTripPlannerService({
+      database: {} as Database,
+      provider: createProvider({
+        geocode,
+        route
+      })
+    });
+
+    const result = await service.buildRoundTripRoute?.({
+      mode: 'drive',
+      waypoints: [
+        {
+          coordinate: { lat: 60, lon: 24 },
+          displayName: 'Start',
+          label: 'Start'
+        },
+        {
+          coordinate: { lat: 61, lon: 25 },
+          displayName: 'Stop',
+          label: 'Stop',
+          routeFallbackQueries: ['Stop address']
+        },
+        {
+          coordinate: { lat: 60, lon: 24 },
+          displayName: 'Start',
+          label: 'Start'
+        }
+      ]
+    });
+
+    expect(geocode).toHaveBeenCalledWith('Stop address');
+    expect(route.mock.calls).toEqual([
+      [
+        {
+          destination: { lat: 61, lon: 25 },
+          mode: 'drive',
+          origin: { lat: 60, lon: 24 }
+        }
+      ],
+      [
+        {
+          destination: { lat: 61.2, lon: 25.2 },
+          mode: 'drive',
+          origin: { lat: 60, lon: 24 }
+        }
+      ],
+      [
+        {
+          destination: { lat: 60, lon: 24 },
+          mode: 'drive',
+          origin: { lat: 61.2, lon: 25.2 }
+        }
+      ]
+    ]);
+    expect(result).toEqual({
+      distanceMeters: 31_000,
+      durationSeconds: 2_500,
+      geometry: {
+        coordinates: [
+          [24, 60],
+          [25.2, 61.2],
+          [24, 60]
+        ],
+        type: 'LineString'
+      },
+      returnsToStart: true,
+      waypointCount: 3
+    });
   });
 
   it('wraps unexpected round trip provider failures as provider_unavailable errors', async () => {
@@ -635,6 +802,8 @@ describe('trip planner service', () => {
       originQuery: 'Origin'
     });
 
+    await Promise.resolve();
+
     expect(geocode.mock.calls).toEqual([['Origin'], ['Destination']]);
 
     originDeferred.resolve({
@@ -658,6 +827,186 @@ describe('trip planner service', () => {
         label: 'Origin label'
       }
     });
+  });
+
+  it('resolves known park names from the local catalog before provider geocoding', async () => {
+    listTripPlannerCandidateParks.mockResolvedValue([
+      createCandidate({
+        markerPoint: {
+          lat: 63.9117535,
+          lon: 23.0120755
+        },
+        name: 'Kokkolan kansallinen kaupunkipuisto',
+        slug: 'kokkolan-kansallinen-kaupunkipuisto'
+      }),
+      createCandidate({
+        markerPoint: {
+          lat: 64.2392903,
+          lon: 23.81604485
+        },
+        name: 'Kalajoen hiekkasarkat',
+        slug: 'kalajoen-hiekkasarkat'
+      })
+    ]);
+    const geocode = vi.fn(async (_query: string) => null);
+    const route = vi.fn(async () => ({
+      boundingBox: {
+        maxLat: 64.2392903,
+        maxLon: 23.81604485,
+        minLat: 63.9117535,
+        minLon: 23.0120755
+      },
+      distanceMeters: 95_000,
+      durationSeconds: 5_400,
+      geometry: routeGeometry,
+      mode: 'drive' as const
+    }));
+    const service = createTripPlannerService({
+      database: {} as Database,
+      provider: createProvider({
+        geocode,
+        route
+      })
+    });
+
+    const result = await service.search({
+      destinationQuery: 'Kokkolan kansallinen kaupunkipuisto',
+      mode: 'drive',
+      originQuery: 'Kalajoen hiekkasarkat'
+    });
+
+    expect(geocode).not.toHaveBeenCalled();
+    expect(route).toHaveBeenCalledWith({
+      destination: {
+        lat: 63.9117535,
+        lon: 23.0120755
+      },
+      mode: 'drive',
+      origin: {
+        lat: 64.2392903,
+        lon: 23.81604485
+      }
+    });
+    expect(result.origin).toEqual({
+      coordinate: {
+        lat: 64.2392903,
+        lon: 23.81604485
+      },
+      displayName: 'Kalajoen hiekkasarkat',
+      label: 'Kalajoen hiekkasarkat'
+    });
+    expect(result.destination).toEqual({
+      coordinate: {
+        lat: 63.9117535,
+        lon: 23.0120755
+      },
+      displayName: 'Kokkolan kansallinen kaupunkipuisto',
+      label: 'Kokkolan kansallinen kaupunkipuisto'
+    });
+  });
+
+  it('resolves known park slugs from the local catalog before provider geocoding', async () => {
+    listTripPlannerCandidateParks.mockResolvedValue([
+      createCandidate({
+        markerPoint: {
+          lat: 63.9117535,
+          lon: 23.0120755
+        },
+        name: 'Kokkolan puisto',
+        slug: 'kokkolan-kansallinen-kaupunkipuisto'
+      }),
+      createCandidate({
+        markerPoint: {
+          lat: 64.2392903,
+          lon: 23.81604485
+        },
+        name: 'Kalajoen puisto',
+        slug: 'kalajoen-hiekkasarkat'
+      })
+    ]);
+    const geocode = vi.fn(async (_query: string) => null);
+    const route = vi.fn(async () => ({
+      boundingBox: {
+        maxLat: 64.2392903,
+        maxLon: 23.81604485,
+        minLat: 63.9117535,
+        minLon: 23.0120755
+      },
+      distanceMeters: 95_000,
+      durationSeconds: 5_400,
+      geometry: routeGeometry,
+      mode: 'drive' as const
+    }));
+    const service = createTripPlannerService({
+      database: {} as Database,
+      provider: createProvider({
+        geocode,
+        route
+      })
+    });
+
+    const result = await service.search({
+      destinationQuery: 'kokkolan-kansallinen-kaupunkipuisto',
+      mode: 'drive',
+      originQuery: 'kalajoen-hiekkasarkat'
+    });
+
+    expect(geocode).not.toHaveBeenCalled();
+    expect(result.origin.label).toBe('Kalajoen puisto');
+    expect(result.destination.label).toBe('Kokkolan puisto');
+  });
+
+  it('resolves known park location labels from the local catalog before provider geocoding', async () => {
+    listTripPlannerCandidateParks.mockResolvedValue([
+      createCandidate({
+        locationLabel: 'Kokkolan vierailukeskus',
+        markerPoint: {
+          lat: 63.9117535,
+          lon: 23.0120755
+        },
+        name: 'Kokkolan puisto',
+        slug: 'kokkolan-kansallinen-kaupunkipuisto'
+      }),
+      createCandidate({
+        locationLabel: 'Kalajoen hiekkasarkkien pysakointi',
+        markerPoint: {
+          lat: 64.2392903,
+          lon: 23.81604485
+        },
+        name: 'Kalajoen puisto',
+        slug: 'kalajoen-hiekkasarkat'
+      })
+    ]);
+    const geocode = vi.fn(async (_query: string) => null);
+    const route = vi.fn(async () => ({
+      boundingBox: {
+        maxLat: 64.2392903,
+        maxLon: 23.81604485,
+        minLat: 63.9117535,
+        minLon: 23.0120755
+      },
+      distanceMeters: 95_000,
+      durationSeconds: 5_400,
+      geometry: routeGeometry,
+      mode: 'drive' as const
+    }));
+    const service = createTripPlannerService({
+      database: {} as Database,
+      provider: createProvider({
+        geocode,
+        route
+      })
+    });
+
+    const result = await service.search({
+      destinationQuery: 'Kokkolan vierailukeskus',
+      mode: 'drive',
+      originQuery: 'Kalajoen hiekkasarkkien pysakointi'
+    });
+
+    expect(geocode).not.toHaveBeenCalled();
+    expect(result.origin.label).toBe('Kalajoen puisto');
+    expect(result.destination.label).toBe('Kokkolan puisto');
   });
 
   it('searches nearby parks around the origin without routing and returns a map-ready search area', async () => {
@@ -1723,6 +2072,157 @@ describe('trip planner service', () => {
     ).rejects.toMatchObject({
       code: 'route_not_found',
       status: 422
+    });
+  });
+
+  it('skips duplicate fallback coordinates and keeps trying later fallback destinations', async () => {
+    const geocode = vi
+      .fn()
+      .mockResolvedValueOnce({
+        coordinate: { lat: 61, lon: 25 },
+        displayName: 'Same stop',
+        label: 'Same stop'
+      })
+      .mockResolvedValueOnce({
+        coordinate: { lat: 61.1, lon: 25.1 },
+        displayName: 'First fallback',
+        label: 'First fallback'
+      })
+      .mockResolvedValueOnce({
+        coordinate: { lat: 61.2, lon: 25.2 },
+        displayName: 'Second fallback',
+        label: 'Second fallback'
+      });
+    const route = vi
+      .fn()
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({
+        boundingBox: {
+          maxLat: 61.2,
+          maxLon: 25.2,
+          minLat: 60,
+          minLon: 24
+        },
+        distanceMeters: 18_000,
+        durationSeconds: 1_400,
+        geometry: {
+          features: [
+            {
+              geometry: {
+                coordinates: [
+                  [24, 60],
+                  [25.2, 61.2]
+                ],
+                type: 'LineString'
+              },
+              type: 'Feature'
+            }
+          ],
+          type: 'FeatureCollection'
+        },
+        mode: 'drive' as const
+      })
+      .mockResolvedValueOnce({
+        boundingBox: {
+          maxLat: 61.2,
+          maxLon: 25.2,
+          minLat: 60,
+          minLon: 24
+        },
+        distanceMeters: 13_000,
+        durationSeconds: 1_000,
+        geometry: {
+          features: [
+            {
+              geometry: {
+                coordinates: [
+                  [25.2, 61.2],
+                  [24, 60]
+                ],
+                type: 'LineString'
+              },
+              type: 'Feature'
+            }
+          ],
+          type: 'FeatureCollection'
+        },
+        mode: 'drive' as const
+      });
+    const service = createTripPlannerService({
+      database: {} as Database,
+      provider: createProvider({
+        geocode,
+        route
+      })
+    });
+
+    const result = await service.buildRoundTripRoute?.({
+      mode: 'drive',
+      waypoints: [
+        {
+          coordinate: { lat: 60, lon: 24 },
+          displayName: 'Start',
+          label: 'Start'
+        },
+        {
+          coordinate: { lat: 61, lon: 25 },
+          displayName: 'Stop',
+          label: 'Stop',
+          routeFallbackQueries: ['Same stop', 'First fallback', 'Second fallback']
+        },
+        {
+          coordinate: { lat: 60, lon: 24 },
+          displayName: 'Start',
+          label: 'Start'
+        }
+      ]
+    });
+
+    expect(geocode.mock.calls).toEqual([['Same stop'], ['First fallback'], ['Second fallback']]);
+    expect(route.mock.calls).toEqual([
+      [
+        {
+          destination: { lat: 61, lon: 25 },
+          mode: 'drive',
+          origin: { lat: 60, lon: 24 }
+        }
+      ],
+      [
+        {
+          destination: { lat: 61.1, lon: 25.1 },
+          mode: 'drive',
+          origin: { lat: 60, lon: 24 }
+        }
+      ],
+      [
+        {
+          destination: { lat: 61.2, lon: 25.2 },
+          mode: 'drive',
+          origin: { lat: 60, lon: 24 }
+        }
+      ],
+      [
+        {
+          destination: { lat: 60, lon: 24 },
+          mode: 'drive',
+          origin: { lat: 61.2, lon: 25.2 }
+        }
+      ]
+    ]);
+    expect(result).toEqual({
+      distanceMeters: 31_000,
+      durationSeconds: 2_400,
+      geometry: {
+        coordinates: [
+          [24, 60],
+          [25.2, 61.2],
+          [24, 60]
+        ],
+        type: 'LineString'
+      },
+      returnsToStart: true,
+      waypointCount: 3
     });
   });
 

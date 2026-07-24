@@ -28,6 +28,13 @@ export type TripPlannerResolvedLocation = {
   coordinate: TripPlannerCoordinate;
   displayName: string;
   label: string;
+  routeFallbackQueries?: string[] | undefined;
+};
+
+export type TripPlannerRouteFailure = {
+  destination: TripPlannerResolvedLocation;
+  origin: TripPlannerResolvedLocation;
+  waypointIndex: number;
 };
 
 export type TripPlannerSuggestion = TripPlannerResolvedLocation;

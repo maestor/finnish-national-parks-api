@@ -1,5 +1,6 @@
 import type { Database } from '../db/database.js';
 import { listTripPlannerCandidateParks } from '../db/repositories.js';
+import { createSlug } from '../parks/park-normalization.js';
 import { isTrailTypeSlug } from '../parks/park-types.js';
 import {
   boundingBoxesIntersect,
@@ -20,7 +21,9 @@ import type {
   TripPlannerNearbySearchResponse,
   TripPlannerParkCandidate,
   TripPlannerProvider,
+  TripPlannerResolvedLocation,
   TripPlannerRoundTripInput,
+  TripPlannerRouteFailure,
   TripPlannerSearchInput,
   TripPlannerSearchResponse,
   TripPlannerService,
@@ -42,13 +45,26 @@ type CreateTripPlannerServiceOptions = {
   provider: TripPlannerProvider;
 };
 
+type TripPlannerErrorDetails = {
+  routeFailure?: TripPlannerRouteFailure | undefined;
+};
+
 export class TripPlannerError extends Error {
   code: TripPlannerErrorCode;
+  details?: TripPlannerErrorDetails | undefined;
+  routeFailure?: TripPlannerRouteFailure | undefined;
   status: 422 | 503;
 
-  constructor(code: TripPlannerErrorCode, message: string, status: 422 | 503) {
+  constructor(
+    code: TripPlannerErrorCode,
+    message: string,
+    status: 422 | 503,
+    details?: TripPlannerErrorDetails
+  ) {
     super(message);
     this.code = code;
+    this.details = details;
+    this.routeFailure = details?.routeFailure;
     this.status = status;
   }
 }
@@ -236,20 +252,87 @@ const coordinatesMatch = (first: TripPlannerCoordinate, second: TripPlannerCoord
   return first.lat === second.lat && first.lon === second.lon;
 };
 
+const normalizeRouteFallbackQuery = (query: string) => query.trim().replaceAll(/\s+/g, ' ');
+
+const resolveRouteFallbackDestinations = async (
+  provider: TripPlannerProvider,
+  location: TripPlannerResolvedLocation
+) => {
+  const fallbackQueries = Array.from(
+    new Set(
+      (location.routeFallbackQueries ?? []).map((query) => normalizeRouteFallbackQuery(query))
+    )
+  ).filter((query) => query.length > 0);
+  const destinations: TripPlannerResolvedLocation[] = [];
+
+  for (const query of fallbackQueries) {
+    const resolvedLocation = await provider.geocode(query);
+
+    if (!resolvedLocation || coordinatesMatch(resolvedLocation.coordinate, location.coordinate)) {
+      continue;
+    }
+
+    destinations.push(resolvedLocation);
+  }
+
+  return destinations;
+};
+
+const createRouteFailureDetails = (
+  origin: TripPlannerResolvedLocation,
+  destination: TripPlannerResolvedLocation,
+  waypointIndex: number
+): TripPlannerErrorDetails => ({
+  routeFailure: {
+    destination,
+    origin,
+    waypointIndex
+  }
+});
+
+const createRouteNotFoundError = (
+  origin: TripPlannerResolvedLocation,
+  destination: TripPlannerResolvedLocation,
+  waypointIndex: number
+) => {
+  return new TripPlannerError(
+    'route_not_found',
+    `Driving route could not be found from ${origin.displayName} to ${destination.displayName}.`,
+    422,
+    createRouteFailureDetails(origin, destination, waypointIndex)
+  );
+};
+
+const createRouteNotDisplayableError = (
+  origin: TripPlannerResolvedLocation,
+  destination: TripPlannerResolvedLocation,
+  waypointIndex: number
+) => {
+  return new TripPlannerError(
+    'route_not_found',
+    `Driving route could not be displayed from ${origin.displayName} to ${destination.displayName}.`,
+    422,
+    createRouteFailureDetails(origin, destination, waypointIndex)
+  );
+};
+
 const toSimplifiedLineString = (route: PlannedRoute) => {
   return toRouteLineString(
     simplifyRouteGeometry(route.geometry, ROUTE_DISTANCE_SIMPLIFICATION_TOLERANCE_METERS)
   );
 };
 
-const buildRoundTripLineString = (routes: PlannedRoute[]) => {
+const buildRoundTripLineString = (
+  routes: PlannedRoute[],
+  waypoints: TripPlannerResolvedLocation[]
+) => {
   const coordinates: Array<[number, number, ...number[]]> = [];
 
-  for (const route of routes) {
+  for (const [index, route] of routes.entries()) {
     const lineString = toSimplifiedLineString(route);
 
     if (!lineString) {
-      return null;
+      throw createRouteNotDisplayableError(waypoints[index]!, waypoints[index + 1]!, index + 1);
     }
 
     coordinates.push(
@@ -275,38 +358,57 @@ const buildRoundTripRoute = async (
 
   try {
     const routes: PlannedRoute[] = [];
+    const effectiveWaypoints = [...waypoints];
 
-    for (let index = 0; index < waypoints.length - 1; index += 1) {
-      const origin = waypoints[index]!;
-      const destination = waypoints[index + 1]!;
-      const route = await provider.route({
+    for (let index = 0; index < effectiveWaypoints.length - 1; index += 1) {
+      const origin = effectiveWaypoints[index]!;
+      const destination = effectiveWaypoints[index + 1]!;
+      let route = await provider.route({
         destination: destination.coordinate,
         mode,
         origin: origin.coordinate
       });
 
       if (!route) {
-        return null;
+        const fallbackDestinations = await resolveRouteFallbackDestinations(provider, destination);
+
+        for (const fallbackDestination of fallbackDestinations) {
+          route = await provider.route({
+            destination: fallbackDestination.coordinate,
+            mode,
+            origin: origin.coordinate
+          });
+
+          if (!route) {
+            continue;
+          }
+
+          effectiveWaypoints[index + 1] = {
+            ...destination,
+            coordinate: fallbackDestination.coordinate
+          };
+          break;
+        }
+      }
+
+      if (!route) {
+        throw createRouteNotFoundError(origin, destination, index + 1);
       }
 
       routes.push(route);
     }
 
-    const geometry = buildRoundTripLineString(routes);
-
-    if (!geometry) {
-      return null;
-    }
+    const geometry = buildRoundTripLineString(routes, effectiveWaypoints);
 
     return {
       distanceMeters: routes.reduce((total, route) => total + route.distanceMeters, 0),
       durationSeconds: routes.reduce((total, route) => total + route.durationSeconds, 0),
       geometry,
       returnsToStart: coordinatesMatch(
-        waypoints[0]!.coordinate,
-        waypoints[waypoints.length - 1]!.coordinate
+        effectiveWaypoints[0]!.coordinate,
+        effectiveWaypoints[effectiveWaypoints.length - 1]!.coordinate
       ),
-      waypointCount: waypoints.length
+      waypointCount: effectiveWaypoints.length
     };
   } catch (error) {
     if (error instanceof TripPlannerError) {
@@ -315,6 +417,43 @@ const buildRoundTripRoute = async (
 
     throw createProviderUnavailableError();
   }
+};
+
+const normalizeLocationQuery = (value: string) => createSlug(value.trim(), 'location');
+
+const toResolvedParkLocation = (park: TripPlannerParkCandidate): TripPlannerResolvedLocation => ({
+  coordinate: park.markerPoint,
+  displayName: park.name,
+  label: park.name
+});
+
+const resolveKnownParkLocation = (
+  query: string,
+  parks: TripPlannerParkCandidate[]
+): TripPlannerResolvedLocation | null => {
+  const normalizedQuery = normalizeLocationQuery(query);
+
+  const exactNameMatch = parks.find(
+    (park) => normalizeLocationQuery(park.name) === normalizedQuery
+  );
+
+  if (exactNameMatch) {
+    return toResolvedParkLocation(exactNameMatch);
+  }
+
+  const exactSlugMatch = parks.find(
+    (park) => normalizeLocationQuery(park.slug) === normalizedQuery
+  );
+
+  if (exactSlugMatch) {
+    return toResolvedParkLocation(exactSlugMatch);
+  }
+
+  const exactLocationLabelMatch = parks.find(
+    (park) => normalizeLocationQuery(park.locationLabel) === normalizedQuery
+  );
+
+  return exactLocationLabelMatch ? toResolvedParkLocation(exactLocationLabelMatch) : null;
 };
 
 const mapParkBaseResult = (park: TripPlannerParkCandidate) => ({
@@ -352,9 +491,12 @@ export const createTripPlannerService = ({
       assertModeSupported(mode);
 
       try {
+        const candidateParks = await listTripPlannerCandidateParks(database);
+        const localOrigin = resolveKnownParkLocation(originQuery, candidateParks);
+        const localDestination = resolveKnownParkLocation(destinationQuery, candidateParks);
         const [origin, destination] = await Promise.all([
-          provider.geocode(originQuery),
-          provider.geocode(destinationQuery)
+          localOrigin ? Promise.resolve(localOrigin) : provider.geocode(originQuery),
+          localDestination ? Promise.resolve(localDestination) : provider.geocode(destinationQuery)
         ]);
 
         if (!origin) {
@@ -372,7 +514,7 @@ export const createTripPlannerService = ({
         });
 
         if (!route) {
-          throw new TripPlannerError('route_not_found', 'Route was not found.', 422);
+          throw createRouteNotFoundError(origin, destination, 1);
         }
 
         const candidateBoundingBox = expandBoundingBoxByKm(route.boundingBox, maxDistanceKm);
@@ -387,10 +529,10 @@ export const createTripPlannerService = ({
           route.distanceMeters >= LONG_ROUTE_START_ZONE_MIN_DISTANCE_METERS;
 
         if (!routeLineString) {
-          throw new TripPlannerError('route_not_found', 'Route was not found.', 422);
+          throw createRouteNotDisplayableError(origin, destination, 1);
         }
 
-        const parks: RankedParkResult[] = (await listTripPlannerCandidateParks(database))
+        const parks: RankedParkResult[] = candidateParks
           .filter((park) => boundingBoxesIntersect(candidateBoundingBox, park.boundingBox))
           .map((park) => ({
             distanceAlongRouteMeters: getDistanceAlongRouteToPointMeters(
@@ -457,7 +599,10 @@ export const createTripPlannerService = ({
       originQuery
     }: TripPlannerNearbySearchInput) => {
       try {
-        const origin = await provider.geocode(originQuery);
+        const candidateParks = await listTripPlannerCandidateParks(database);
+        const origin =
+          resolveKnownParkLocation(originQuery, candidateParks) ??
+          (await provider.geocode(originQuery));
 
         if (!origin) {
           throw new TripPlannerError('origin_not_found', 'Origin was not found.', 422);
@@ -468,7 +613,7 @@ export const createTripPlannerService = ({
           maxDistanceKm
         );
         const maxDistanceMeters = maxDistanceKm * 1000;
-        const parks: RankedNearbyParkResult[] = (await listTripPlannerCandidateParks(database))
+        const parks: RankedNearbyParkResult[] = candidateParks
           .filter((park) => boundingBoxesIntersect(searchAreaBoundingBox, park.boundingBox))
           .map((park) => {
             const distanceMeters = getDistanceFromOriginMeters(origin.coordinate, park);

@@ -10,12 +10,14 @@ const authConfig = {
 };
 
 import { createApp } from '../../src/app.js';
+import * as repositories from '../../src/db/repositories.js';
 import { createVisitImage, getParkBySlug } from '../../src/db/repositories.js';
 import { parks } from '../../src/db/schema.js';
 import { createSessionToken } from '../../src/http/session.js';
 import { importParks } from '../../src/importer/import-parks.js';
 import { importSpecialParks } from '../../src/importer/import-special-parks.js';
 import { createMemoryStorage } from '../../src/storage/memory-storage.js';
+import { TripPlannerError } from '../../src/trip-planner/search.js';
 import type {
   TripPlannerRoundTripRoute,
   TripPlannerService
@@ -2291,15 +2293,19 @@ describe('API routes', () => {
           }
       >;
       route: {
-        distanceMeters: number;
-        durationSeconds: number;
-        geometry: {
-          coordinates: number[][];
-          type: 'LineString';
-        };
-        returnsToStart: boolean;
-        waypointCount: number;
-      } | null;
+        data: {
+          distanceMeters: number;
+          durationSeconds: number;
+          geometry: {
+            coordinates: number[][];
+            type: 'LineString';
+          };
+          returnsToStart: boolean;
+          waypointCount: number;
+        } | null;
+        error: null;
+        success: boolean;
+      };
       slug: string;
       startingPoint: {
         coordinate: {
@@ -2388,25 +2394,73 @@ describe('API routes', () => {
       }
     ]);
     expect(body.route).toEqual({
-      distanceMeters: 482_500,
-      durationSeconds: 21_600,
-      geometry: {
-        coordinates: [
-          [24.9384, 60.1699],
-          [24.5, 61.5],
-          [22.1333, 61.3167],
-          [23.7, 61.9],
-          [24.9384, 60.1699]
-        ],
-        type: 'LineString'
+      data: {
+        distanceMeters: 482_500,
+        durationSeconds: 21_600,
+        geometry: {
+          coordinates: [
+            [24.9384, 60.1699],
+            [24.5, 61.5],
+            [22.1333, 61.3167],
+            [23.7, 61.9],
+            [24.9384, 60.1699]
+          ],
+          type: 'LineString'
+        },
+        returnsToStart: true,
+        waypointCount: 5
       },
-      returnsToStart: true,
-      waypointCount: 5
+      error: null,
+      success: true
     });
     expect(buildRoundTripRoute).toHaveBeenCalledTimes(1);
+    expect(buildRoundTripRoute).toHaveBeenCalledWith({
+      mode: 'drive',
+      waypoints: [
+        expect.objectContaining({
+          coordinate: {
+            lat: 60.1699,
+            lon: 24.9384
+          },
+          routeFallbackQueries: ['Helsinki']
+        }),
+        expect.objectContaining({
+          coordinate: firstPark!.markerPoint,
+          displayName: 'Äkäsmännyn kansallispuisto',
+          label: 'Äkäsmännyn kansallispuisto',
+          routeFallbackQueries: expect.arrayContaining([
+            firstPark!.address,
+            firstPark!.locationLabel
+          ])
+        }),
+        expect.objectContaining({
+          coordinate: {
+            lat: 61.3167,
+            lon: 22.1333
+          },
+          routeFallbackQueries: ['Neste Vantaa Koivukyla, Halmekuja 1, 01360 Vantaa, Finland']
+        }),
+        expect.objectContaining({
+          coordinate: secondPark!.markerPoint,
+          displayName: 'Seitsemisen kansallispuisto',
+          label: 'Seitsemisen kansallispuisto',
+          routeFallbackQueries: expect.arrayContaining([
+            secondPark!.address,
+            secondPark!.locationLabel
+          ])
+        }),
+        expect.objectContaining({
+          coordinate: {
+            lat: 60.1699,
+            lon: 24.9384
+          },
+          routeFallbackQueries: ['Helsinki']
+        })
+      ]
+    });
   });
 
-  it('returns route null by slug when the trip does not meet route prerequisites', async () => {
+  it('returns a successful empty route state by slug when the trip does not meet route prerequisites', async () => {
     const buildRoundTripRoute: NonNullable<TripPlannerService['buildRoundTripRoute']> = vi.fn(
       async (): Promise<TripPlannerRoundTripRoute> => ({
         distanceMeters: 1,
@@ -2449,8 +2503,12 @@ describe('API routes', () => {
     const response = await app.request('/api/trips/slug/yksinainen-retki');
     const body = (await response.json()) as {
       route: {
-        distanceMeters: number;
-      } | null;
+        data: {
+          distanceMeters: number;
+        } | null;
+        error: null;
+        success: boolean;
+      };
       stopCount: number;
       visitCount: number;
     };
@@ -2458,14 +2516,176 @@ describe('API routes', () => {
     expect(response.status).toBe(200);
     expect(body.visitCount).toBe(1);
     expect(body.stopCount).toBe(0);
-    expect(body.route).toBeNull();
+    expect(body.route).toEqual({
+      data: null,
+      error: null,
+      success: true
+    });
     expect(buildRoundTripRoute).not.toHaveBeenCalled();
   });
 
-  it('returns route null by slug when route generation throws unexpectedly', async () => {
+  it('returns a failed route state by slug when the trip planner is not configured', async () => {
+    const app = createAuthedApp();
+    const { body: trip } = await createTrip(app, {
+      name: 'Konfiguroimaton reitti',
+      startingPoint: {
+        coordinate: {
+          lat: 60.1699,
+          lon: 24.9384
+        },
+        label: 'Helsinki'
+      }
+    });
+
+    await createVisit(app, 'akasmannyn-kansallispuisto', {
+      tripId: trip.id,
+      tripStopOrder: 1,
+      visitedOn: '2026-06-07'
+    });
+    await createVisit(app, 'seitsemisen-kansallispuisto', {
+      tripId: trip.id,
+      tripStopOrder: 2,
+      visitedOn: '2026-06-08'
+    });
+
+    const response = await app.request('/api/trips/slug/konfiguroimaton-reitti');
+    const body = (await response.json()) as {
+      route: {
+        data: null;
+        error: {
+          error: string;
+          errorCode: string;
+        };
+        success: boolean;
+      };
+    };
+
+    expect(response.status).toBe(200);
+    expect(body.route).toEqual({
+      data: null,
+      error: {
+        error: 'Trip planner is not configured.',
+        errorCode: 'trip_planner_not_configured'
+      },
+      success: false
+    });
+  });
+
+  it('returns route_not_found by slug when trip routing returns null and omits empty fallback queries', async () => {
+    const buildRoundTripRoute: NonNullable<TripPlannerService['buildRoundTripRoute']> = vi.fn(
+      async () => null
+    );
+    const originalGetParkBySlug = repositories.getParkBySlug;
+    const getParkBySlugSpy = vi
+      .spyOn(repositories, 'getParkBySlug')
+      .mockImplementation(async (database, slug) => {
+        if (slug === 'akasmannyn-kansallispuisto') {
+          return null;
+        }
+
+        return originalGetParkBySlug(database, slug);
+      });
+    const app = createAuthedApp({
+      tripPlanner: {
+        buildRoundTripRoute,
+        search: vi.fn(async () => {
+          throw new Error('not used in this test');
+        }),
+        searchNearby: vi.fn(async () => {
+          throw new Error('not used in this test');
+        }),
+        suggest: vi.fn(async () => {
+          throw new Error('not used in this test');
+        })
+      }
+    });
+    const { body: trip } = await createTrip(app, {
+      name: 'Tyhja reitti',
+      startingPoint: {
+        coordinate: {
+          lat: 60.1699,
+          lon: 24.9384
+        },
+        label: 'Helsinki'
+      }
+    });
+
+    await createVisit(app, 'akasmannyn-kansallispuisto', {
+      tripId: trip.id,
+      tripStopOrder: 1,
+      visitedOn: '2026-06-07'
+    });
+    await createVisit(app, 'seitsemisen-kansallispuisto', {
+      tripId: trip.id,
+      tripStopOrder: 2,
+      visitedOn: '2026-06-08'
+    });
+
+    try {
+      const response = await app.request('/api/trips/slug/tyhja-reitti');
+      const body = (await response.json()) as {
+        route: {
+          data: null;
+          error: {
+            error: string;
+            errorCode: string;
+          };
+          success: boolean;
+        };
+      };
+
+      expect(response.status).toBe(200);
+      expect(body.route).toEqual({
+        data: null,
+        error: {
+          error: 'Driving route could not be found.',
+          errorCode: 'route_not_found'
+        },
+        success: false
+      });
+      expect(buildRoundTripRoute).toHaveBeenCalledWith({
+        mode: 'drive',
+        waypoints: expect.arrayContaining([
+          expect.objectContaining({
+            displayName: 'Äkäsmännyn kansallispuisto',
+            routeFallbackQueries: undefined
+          })
+        ])
+      });
+    } finally {
+      getParkBySlugSpy.mockRestore();
+    }
+  });
+
+  it('returns a failed route state by slug when a trip route leg cannot be routed', async () => {
     const buildRoundTripRoute: NonNullable<TripPlannerService['buildRoundTripRoute']> = vi.fn(
       async () => {
-        throw new Error('route provider down');
+        throw new TripPlannerError(
+          'route_not_found',
+          'Driving route could not be found from A to B.',
+          422,
+          {
+            routeFailure: {
+              destination: {
+                coordinate: {
+                  lat: 61,
+                  lon: 25
+                },
+                displayName: 'B',
+                label: 'B'
+              },
+              origin: {
+                coordinate: {
+                  lat: 60,
+                  lon: 24
+                },
+                displayName: 'A',
+                label: 'A'
+              },
+              waypointIndex: 1
+            }
+          }
+        );
       }
     );
     const app = createAuthedApp({
@@ -2507,15 +2727,209 @@ describe('API routes', () => {
     const response = await app.request('/api/trips/slug/retki-virhepolulla');
     const body = (await response.json()) as {
       route: {
-        distanceMeters: number;
-      } | null;
-      visitCount: number;
+        data: null;
+        error: {
+          error: string;
+          errorCode: string;
+          routeFailure: {
+            destination: {
+              displayName: string;
+              label: string;
+            };
+            origin: {
+              displayName: string;
+              label: string;
+            };
+            waypointIndex: number;
+          };
+        };
+        success: boolean;
+      };
     };
 
     expect(response.status).toBe(200);
-    expect(body.visitCount).toBe(2);
-    expect(body.route).toBeNull();
+    expect(body.route).toEqual({
+      data: null,
+      error: {
+        error: 'Driving route could not be found from A to B.',
+        errorCode: 'route_not_found',
+        routeFailure: {
+          destination: {
+            coordinate: {
+              lat: 61,
+              lon: 25
+            },
+            displayName: 'B',
+            label: 'B'
+          },
+          origin: {
+            coordinate: {
+              lat: 60,
+              lon: 24
+            },
+            displayName: 'A',
+            label: 'A'
+          },
+          waypointIndex: 1
+        }
+      },
+      success: false
+    });
     expect(buildRoundTripRoute).toHaveBeenCalledTimes(1);
+  });
+
+  it('returns 500 for an unexpected public trip route failure by slug', async () => {
+    const app = createAuthedApp({
+      tripPlanner: {
+        buildRoundTripRoute: vi.fn(async () => {
+          throw new Error('boom');
+        }),
+        search: vi.fn(async () => {
+          throw new Error('not used in this test');
+        }),
+        searchNearby: vi.fn(async () => {
+          throw new Error('not used in this test');
+        }),
+        suggest: vi.fn(async () => {
+          throw new Error('not used in this test');
+        })
+      }
+    });
+    const { body: trip } = await createTrip(app, {
+      name: 'Rikkoutuva julkinen reitti',
+      startingPoint: {
+        coordinate: {
+          lat: 60.1699,
+          lon: 24.9384
+        },
+        label: 'Helsinki'
+      }
+    });
+
+    await createVisit(app, 'akasmannyn-kansallispuisto', {
+      tripId: trip.id,
+      tripStopOrder: 1,
+      visitedOn: '2026-06-07'
+    });
+    await createVisit(app, 'seitsemisen-kansallispuisto', {
+      tripId: trip.id,
+      tripStopOrder: 2,
+      visitedOn: '2026-06-08'
+    });
+
+    const response = await app.request('/api/trips/slug/rikkoutuva-julkinen-reitti');
+
+    expect(response.status).toBe(500);
+  });
+
+  it('returns a failed public route state for provider_unavailable errors by slug', async () => {
+    const app = createAuthedApp({
+      tripPlanner: {
+        buildRoundTripRoute: vi.fn(async () => {
+          throw new TripPlannerError(
+            'provider_unavailable',
+            'Trip planner provider is unavailable.',
+            503
+          );
+        }),
+        search: vi.fn(async () => {
+          throw new Error('not used in this test');
+        }),
+        searchNearby: vi.fn(async () => {
+          throw new Error('not used in this test');
+        }),
+        suggest: vi.fn(async () => {
+          throw new Error('not used in this test');
+        })
+      }
+    });
+    const { body: trip } = await createTrip(app, {
+      name: 'Palvelu poissa kaytosta',
+      startingPoint: {
+        coordinate: {
+          lat: 60.1699,
+          lon: 24.9384
+        },
+        label: 'Helsinki'
+      }
+    });
+
+    await createVisit(app, 'akasmannyn-kansallispuisto', {
+      tripId: trip.id,
+      tripStopOrder: 1,
+      visitedOn: '2026-06-07'
+    });
+    await createVisit(app, 'seitsemisen-kansallispuisto', {
+      tripId: trip.id,
+      tripStopOrder: 2,
+      visitedOn: '2026-06-08'
+    });
+
+    const response = await app.request('/api/trips/slug/palvelu-poissa-kaytosta');
+    const body = (await response.json()) as {
+      route: {
+        data: null;
+        error: {
+          error: string;
+          errorCode: string;
+        };
+        success: boolean;
+      };
+    };
+
+    expect(response.status).toBe(200);
+    expect(body.route).toEqual({
+      data: null,
+      error: {
+        error: 'Trip planner provider is unavailable.',
+        errorCode: 'provider_unavailable'
+      },
+      success: false
+    });
+  });
+
+  it('returns 500 for unsupported public trip route planner error codes by slug', async () => {
+    const app = createAuthedApp({
+      tripPlanner: {
+        buildRoundTripRoute: vi.fn(async () => {
+          throw new TripPlannerError('origin_not_found', 'Origin could not be resolved.', 422);
+        }),
+        search: vi.fn(async () => {
+          throw new Error('not used in this test');
+        }),
+        searchNearby: vi.fn(async () => {
+          throw new Error('not used in this test');
+        }),
+        suggest: vi.fn(async () => {
+          throw new Error('not used in this test');
+        })
+      }
+    });
+    const { body: trip } = await createTrip(app, {
+      name: 'Vaaraehto reitilla',
+      startingPoint: {
+        coordinate: {
+          lat: 60.1699,
+          lon: 24.9384
+        },
+        label: 'Helsinki'
+      }
+    });
+
+    await createVisit(app, 'akasmannyn-kansallispuisto', {
+      tripId: trip.id,
+      tripStopOrder: 1,
+      visitedOn: '2026-06-07'
+    });
+    await createVisit(app, 'seitsemisen-kansallispuisto', {
+      tripId: trip.id,
+      tripStopOrder: 2,
+      visitedOn: '2026-06-08'
+    });
+
+    const response = await app.request('/api/trips/slug/vaaraehto-reitilla');
+
+    expect(response.status).toBe(500);
   });
 
   it('returns 404 for an unknown trip slug', async () => {

@@ -14,13 +14,16 @@ It is meant to answer two questions quickly:
   - returns up to three Geoapify-backed place suggestions with `label` and `coordinate`
 - `POST /api/trip-planner/search`
   - accepts `originQuery`, `destinationQuery`, `mode`, and optional `maxDistanceKm`
-  - geocodes the endpoints server-side
+  - first resolves exact known park and trail names from the local catalog
+  - geocodes only unmatched free-text endpoints server-side
   - fetches a real driving route from Geoapify
   - returns visible catalog parks near that route
   - returns response-level `maxDistanceKm` and `defaultDistanceKm` values for frontend distance filters
+  - returns `422` with failed-leg details when a route cannot be built
 - `POST /api/trip-planner/nearby`
   - accepts `originQuery` and optional `maxDistanceKm`
-  - geocodes only the origin server-side
+  - first resolves exact known park and trail names from the local catalog
+  - geocodes only unmatched free-text origins server-side
   - returns visible catalog parks near that point
   - returns a `searchArea` bounding box and center for map rendering without route geometry
   - returns the same response-level `maxDistanceKm` and `defaultDistanceKm` fields as route search
@@ -57,6 +60,8 @@ That means the main inclusion question is still:
 
 - is this park close enough to the route we would actually drive?
 
+Before Geoapify geocoding is used, the backend now checks whether the origin or destination exactly matches a known park or trail name, slug, or location label in the local catalog. When it does, the planner uses the stored `markerPoint` directly. This is especially important for queries like `Kokkolan kansallinen kaupunkipuisto`, where third-party text geocoding may be unreliable even though the backend already owns a map marker for the destination.
+
 The current backend then refines that with long-trip behavior:
 
 1. Keep the broad default `25 km` corridor for normal eligibility.
@@ -78,11 +83,25 @@ It asks a different inclusion question:
 
 Current nearby behavior:
 
-1. Geocode the origin only.
-2. Build a search area from the origin point with the same default `25 km` distance.
-3. Filter parks by straight-line distance from the origin to stored park geometry, or to bounding-box / marker fallbacks when full geometry is missing.
-4. Return the origin, matching parks, and a backend-provided `searchArea` bounding box for the map.
-5. Return `defaultDistanceKm` equal to `maxDistanceKm` because there is no route-length-based default to derive.
+1. Resolve exact known park and trail names from the local catalog first.
+2. Geocode the origin only when no local match exists.
+3. Build a search area from the origin point with the same default `25 km` distance.
+4. Filter parks by straight-line distance from the origin to stored park geometry, or to bounding-box / marker fallbacks when full geometry is missing.
+5. Return the origin, matching parks, and a backend-provided `searchArea` bounding box for the map.
+6. Return `defaultDistanceKm` equal to `maxDistanceKm` because there is no route-length-based default to derive.
+
+## Route Failure Reporting
+
+Route-capable endpoints no longer silently downgrade real routing failures to an empty success payload when enough waypoints were available.
+
+Current behavior:
+
+- `POST /api/trip-planner/search` returns `422` with `errorCode: route_not_found` when a leg cannot be routed or displayed
+- the same error now includes `routeFailure.origin`, `routeFailure.destination`, and `routeFailure.waypointIndex`
+- `GET /api/trips/slug/:slug` always stays page-friendly at `200` for found trips
+- when the trip is missing route prerequisites such as a starting point or a second visit, the route payload becomes `{ success: true, error: null, data: null }`
+- once a trip has enough waypoints, route-building failures move into `route.error` with the same failed-leg details and `route.success: false`
+- provider or configuration problems for trip-page routing also stay inside `route.error` instead of changing the endpoint status
 
 The nearby endpoint does not use:
 

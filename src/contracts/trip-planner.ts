@@ -35,6 +35,12 @@ export const tripPlannerSuggestionsResponseSchema = z.object({
   suggestions: z.array(tripPlannerLocationSchema)
 });
 
+export const tripPlannerRouteFailureSchema = z.object({
+  destination: tripPlannerLocationSchema,
+  origin: tripPlannerLocationSchema,
+  waypointIndex: z.number().int().positive()
+});
+
 export const tripPlannerRouteSchema = z.object({
   boundingBox: boundingBoxSchema,
   distanceMeters: z.number().nonnegative(),
@@ -97,5 +103,6 @@ export const tripPlannerErrorCodeSchema = z.enum([
 ]);
 
 export const tripPlannerErrorSchema = errorSchema.extend({
-  errorCode: tripPlannerErrorCodeSchema
+  errorCode: tripPlannerErrorCodeSchema,
+  routeFailure: tripPlannerRouteFailureSchema.optional()
 });

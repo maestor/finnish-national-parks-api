@@ -161,55 +161,128 @@ const jsonNotFound = (error: string) => {
   };
 };
 
-const buildPublicTripRouteWaypoints = (trip: PublicTripDetail) => {
+const normalizeRouteFallbackQueries = (...queries: Array<string | null | undefined>) => {
+  const normalizedQueries = Array.from(
+    new Set(
+      queries
+        .map((query) => query?.trim())
+        .filter((query): query is string => Boolean(query && query.length > 0))
+    )
+  );
+
+  return normalizedQueries.length > 0 ? normalizedQueries : undefined;
+};
+
+const buildPublicTripRouteWaypoints = async (database: Database, trip: PublicTripDetail) => {
   const visitEntries = trip.itinerary.filter((entry) => entry.kind === 'visit');
 
   if (!trip.startingPoint || visitEntries.length < 2) {
     return null;
   }
 
+  const routeWaypoints = await Promise.all(
+    trip.itinerary.map(async (entry) => {
+      if (entry.kind === 'visit') {
+        const park = await getParkBySlug(database, entry.visit.park.slug);
+
+        return {
+          coordinate: entry.visit.park.markerPoint,
+          displayName: entry.visit.park.name,
+          label: entry.visit.park.name,
+          routeFallbackQueries: normalizeRouteFallbackQueries(
+            park?.address,
+            park?.locationLabel,
+            park?.postalOffice
+          )
+        };
+      }
+
+      return {
+        coordinate: entry.stop.location.coordinate,
+        displayName: entry.stop.location.displayName,
+        label: entry.stop.location.label,
+        routeFallbackQueries: normalizeRouteFallbackQueries(entry.stop.location.label)
+      };
+    })
+  );
+
   return [
-    trip.startingPoint,
-    ...trip.itinerary.map((entry) =>
-      entry.kind === 'visit'
-        ? {
-            coordinate: entry.visit.park.markerPoint,
-            displayName: entry.visit.park.name,
-            label: entry.visit.park.name
-          }
-        : {
-            coordinate: entry.stop.location.coordinate,
-            displayName: entry.stop.location.displayName,
-            label: entry.stop.location.label
-          }
-    ),
-    trip.startingPoint
+    {
+      ...trip.startingPoint,
+      routeFallbackQueries: normalizeRouteFallbackQueries(trip.startingPoint.label)
+    },
+    ...routeWaypoints,
+    {
+      ...trip.startingPoint,
+      routeFallbackQueries: normalizeRouteFallbackQueries(trip.startingPoint.label)
+    }
   ];
 };
 
-const attachPublicTripRoute = async (trip: PublicTripDetail, tripPlanner?: TripPlannerService) => {
-  const waypoints = buildPublicTripRouteWaypoints(trip);
+const attachPublicTripRoute = async (
+  database: Database,
+  trip: PublicTripDetail,
+  tripPlanner?: TripPlannerService
+) => {
+  const waypoints = await buildPublicTripRouteWaypoints(database, trip);
 
-  if (!waypoints || !tripPlanner?.buildRoundTripRoute) {
+  if (!waypoints) {
     return {
       ...trip,
-      route: null
+      route: {
+        data: null,
+        error: null,
+        success: true
+      }
+    };
+  }
+
+  if (!tripPlanner?.buildRoundTripRoute) {
+    return {
+      ...trip,
+      route: {
+        data: null,
+        error: {
+          error: 'Trip planner is not configured.',
+          errorCode: 'trip_planner_not_configured' as const
+        },
+        success: false
+      }
     };
   }
 
   try {
+    const route = await tripPlanner.buildRoundTripRoute({
+      mode: 'drive',
+      waypoints
+    });
+
     return {
       ...trip,
-      route: await tripPlanner.buildRoundTripRoute({
-        mode: 'drive',
-        waypoints
-      })
+      route: {
+        data: route,
+        error: route
+          ? null
+          : {
+              error: 'Driving route could not be found.',
+              errorCode: 'route_not_found' as const
+            },
+        success: route !== null
+      }
     };
-  } catch {
-    return {
-      ...trip,
-      route: null
-    };
+  } catch (error) {
+    if (error instanceof TripPlannerError) {
+      return {
+        ...trip,
+        route: {
+          data: null,
+          error: toPublicTripRouteErrorResponse(error),
+          success: false
+        }
+      };
+    }
+
+    throw error;
   }
 };
 
@@ -227,6 +300,45 @@ const getVisitImageFileExtension = (contentType: string) => {
 
 const normalizeOptionalOriginalName = (originalName?: string | null) => {
   return originalName?.trim() || null;
+};
+
+type PublicTripRouteErrorCode =
+  | 'provider_unavailable'
+  | 'route_not_found'
+  | 'trip_planner_not_configured';
+
+const toTripPlannerErrorResponse = (
+  error: TripPlannerError
+): {
+  error: string;
+  errorCode: TripPlannerError['code'];
+  routeFailure?: TripPlannerError['routeFailure'];
+} => ({
+  error: error.message,
+  errorCode: error.code,
+  ...(error.routeFailure ? { routeFailure: error.routeFailure } : {})
+});
+
+const toPublicTripRouteErrorResponse = (
+  error: TripPlannerError
+): {
+  error: string;
+  errorCode: PublicTripRouteErrorCode;
+  routeFailure?: TripPlannerError['routeFailure'];
+} => {
+  if (
+    error.code !== 'provider_unavailable' &&
+    error.code !== 'route_not_found' &&
+    error.code !== 'trip_planner_not_configured'
+  ) {
+    throw new Error(`Unsupported public trip route error code: ${error.code}`);
+  }
+
+  return {
+    error: error.message,
+    errorCode: error.code,
+    ...(error.routeFailure ? { routeFailure: error.routeFailure } : {})
+  };
 };
 
 const requireAdminSession = async (context: SessionContext, auth?: AuthConfig) => {
@@ -778,7 +890,7 @@ export const createApp = ({
         return context.json(jsonNotFound('Trip not found.'), 404);
       }
 
-      return context.json(await attachPublicTripRoute(trip, tripPlanner), 200);
+      return context.json(await attachPublicTripRoute(database, trip, tripPlanner), 200);
     });
 
     app.openapi(getTripRoute, async (context) => {
@@ -815,13 +927,7 @@ export const createApp = ({
         return context.json({ suggestions }, 200);
       } catch (error) {
         if (error instanceof TripPlannerError && error.status === 503) {
-          return context.json(
-            {
-              error: error.message,
-              errorCode: error.code
-            },
-            error.status
-          );
+          return context.json(toTripPlannerErrorResponse(error), error.status);
         }
 
         throw error;
@@ -849,13 +955,7 @@ export const createApp = ({
         return context.json(result, 200);
       } catch (error) {
         if (error instanceof TripPlannerError) {
-          return context.json(
-            {
-              error: error.message,
-              errorCode: error.code
-            },
-            error.status
-          );
+          return context.json(toTripPlannerErrorResponse(error), error.status);
         }
 
         throw error;
@@ -883,13 +983,7 @@ export const createApp = ({
         return context.json(result, 200);
       } catch (error) {
         if (error instanceof TripPlannerError) {
-          return context.json(
-            {
-              error: error.message,
-              errorCode: error.code
-            },
-            error.status
-          );
+          return context.json(toTripPlannerErrorResponse(error), error.status);
         }
 
         throw error;
