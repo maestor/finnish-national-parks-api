@@ -190,7 +190,10 @@ https://api.lipas.fi/v2/sports-sites?type-codes=103,109,110,111,112,4403,4404,44
 Importer expectations:
 
 - Keep only `status === "active"` records.
-- Expect 2557 active LIPAS records in the current source dataset.
+- Import new matching LIPAS rows automatically when they appear upstream.
+- Import newly discovered parks as removed by default so they stay hidden until explicitly enabled from the admin UI.
+- Support `npm run import:parks -- --dry-run` so you can preview incoming parks without writing any catalog changes.
+- Print the newly added catalog rows after each import run so operator review does not block the sync itself.
 - Import these supported LIPAS catalog types:
   - `103` Ulkoilu-/virkistysalue
   - `109` Valtion retkeilyalue

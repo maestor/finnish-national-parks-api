@@ -31,25 +31,170 @@ describe('importParks', () => {
     await testDatabase.dispose();
   });
 
-  it('imports only active parks and rejects unexpected active counts', async () => {
-    await expect(
-      importParks({
-        database: testDatabase.database,
-        expectedActiveCount: 41,
-        now: () => '2026-05-01T08:00:00.000Z',
-        sourceUrl: 'https://example.test/lipas',
-        fetchSource: async () => ({
-          items: [
-            createLipasPark(),
-            createLipasPark({
-              'lipas-id': 99999,
-              name: 'Virheellinen kohde',
-              status: 'incorrect-data'
-            })
-          ]
-        })
+  it('imports active rows without blocking on source count drift and reports newly added parks', async () => {
+    const result = await importParks({
+      database: testDatabase.database,
+      now: () => '2026-05-02T08:00:00.000Z',
+      sourceUrl: 'https://example.test/lipas',
+      fetchSource: async () => ({
+        items: [
+          createLipasPark(),
+          createLipasPark({
+            'lipas-id': 99999,
+            location: {
+              address: 'Uusi polku 2',
+              'postal-code': '33100',
+              'postal-office': 'Tampere'
+            },
+            name: 'Uusi luontopolku',
+            type: {
+              'type-code': parkTypeFixtures.natureTrail.typeCode
+            }
+          }),
+          createLipasPark({
+            'lipas-id': 100000,
+            name: 'Virheellinen kohde',
+            status: 'incorrect-data'
+          })
+        ]
       })
-    ).rejects.toThrow('Expected 41 active LIPAS records but received 1.');
+    });
+
+    const parks = await listParks(testDatabase.database);
+
+    expect(result.sourceActiveCount).toBe(2);
+    expect(result.activeCount).toBe(2);
+    expect(result.newParks).toEqual([
+      {
+        lipasId: 12345,
+        name: 'Äkäsmännyn kansallispuisto',
+        removed: false,
+        slug: 'akasmannyn-kansallispuisto',
+        typeCode: parkTypeFixtures.nationalPark.typeCode,
+        typeName: parkTypeFixtures.nationalPark.name
+      },
+      {
+        lipasId: 99999,
+        name: 'Uusi luontopolku',
+        removed: false,
+        slug: 'uusi-luontopolku',
+        typeCode: parkTypeFixtures.natureTrail.typeCode,
+        typeName: parkTypeFixtures.natureTrail.name
+      }
+    ]);
+    expect(parks).toHaveLength(2);
+  });
+
+  it('can import newly discovered parks as removed until an admin explicitly enables them', async () => {
+    await importParks({
+      database: testDatabase.database,
+      now: () => '2026-05-01T08:00:00.000Z',
+      sourceUrl: 'https://example.test/lipas',
+      fetchSource: async () => ({
+        items: [createLipasPark()]
+      })
+    });
+
+    const result = await importParks({
+      database: testDatabase.database,
+      markNewParksRemoved: true,
+      now: () => '2026-05-02T08:00:00.000Z',
+      sourceUrl: 'https://example.test/lipas',
+      fetchSource: async () => ({
+        items: [
+          createLipasPark(),
+          createLipasPark({
+            'lipas-id': 99999,
+            location: {
+              address: 'Uusi puistotie 2',
+              'postal-code': '33100',
+              'postal-office': 'Tampere'
+            },
+            name: 'Uusi kansallispuisto'
+          })
+        ]
+      })
+    });
+
+    const newPark = await testDatabase.database.query.parks.findFirst({
+      where: eq(parks.lipasId, 99999)
+    });
+    const visibleParks = await listParks(testDatabase.database);
+
+    expect(result.newParks).toEqual([
+      {
+        lipasId: 99999,
+        name: 'Uusi kansallispuisto',
+        removed: true,
+        slug: 'uusi-kansallispuisto',
+        typeCode: parkTypeFixtures.nationalPark.typeCode,
+        typeName: parkTypeFixtures.nationalPark.name
+      }
+    ]);
+    expect(newPark).toMatchObject({
+      name: 'Uusi kansallispuisto',
+      removed: true
+    });
+    expect(visibleParks).toHaveLength(1);
+    expect(visibleParks[0]).toMatchObject({
+      slug: 'akasmannyn-kansallispuisto'
+    });
+  });
+
+  it('supports dry-run previews without persisting imported parks or import runs', async () => {
+    const runsBefore = await testDatabase.database.select().from(importRuns);
+
+    const result = await importParks({
+      database: testDatabase.database,
+      dryRun: true,
+      markNewParksRemoved: true,
+      now: () => '2026-05-02T08:00:00.000Z',
+      sourceUrl: 'https://example.test/lipas',
+      fetchSource: async () => ({
+        items: [
+          createLipasPark(),
+          createLipasPark({
+            'lipas-id': 99999,
+            location: {
+              address: 'Kuivaharjuntie 4',
+              'postal-code': '33500',
+              'postal-office': 'Tampere'
+            },
+            name: 'Kuivaharjun kansallispuisto'
+          })
+        ]
+      })
+    });
+
+    const runsAfter = await testDatabase.database.select().from(importRuns);
+    const parksAfter = await listParks(testDatabase.database);
+
+    expect(result).toMatchObject({
+      activeCount: 2,
+      dryRun: true,
+      importRunId: null,
+      sourceActiveCount: 2
+    });
+    expect(result.newParks).toEqual([
+      {
+        lipasId: 12345,
+        name: 'Äkäsmännyn kansallispuisto',
+        removed: true,
+        slug: 'akasmannyn-kansallispuisto',
+        typeCode: parkTypeFixtures.nationalPark.typeCode,
+        typeName: parkTypeFixtures.nationalPark.name
+      },
+      {
+        lipasId: 99999,
+        name: 'Kuivaharjun kansallispuisto',
+        removed: true,
+        slug: 'kuivaharjun-kansallispuisto',
+        typeCode: parkTypeFixtures.nationalPark.typeCode,
+        typeName: parkTypeFixtures.nationalPark.name
+      }
+    ]);
+    expect(runsAfter).toEqual(runsBefore);
+    expect(parksAfter).toEqual([]);
   });
 
   it('updates catalog rows without deleting personal visit data', async () => {
