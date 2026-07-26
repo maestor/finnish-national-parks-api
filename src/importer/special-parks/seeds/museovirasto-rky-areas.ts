@@ -183,6 +183,16 @@ export const sourceReadyHistoryRkyAreaSeeds: MuseovirastoRkyAreaSeed[] = [
   },
   {
     displayTypeName: null,
+    excludedSourceNames: ['Kuorsalo'],
+    parkUrl: 'https://www.rky.fi/read/asp/r_kohde_det.aspx?KOHDE_ID=1164',
+    name: 'Tammion saaristokylä',
+    parkTypeSlug: 'cultural-history-area',
+    slug: 'tammion-saaristokyla',
+    sourceName: 'Tammion ja Kuorsalon saaristokylät',
+    syntheticLipasId: 9_001_089
+  },
+  {
+    displayTypeName: null,
     markerPoint: {
       lat: 60.2991,
       lon: 22.2944

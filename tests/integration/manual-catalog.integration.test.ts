@@ -55,7 +55,7 @@ describe('manual catalog imports', () => {
       now: () => '2026-05-27T08:00:00.000Z'
     });
 
-    expect(result.results).toHaveLength(152);
+    expect(result.results).toHaveLength(153);
 
     const merenkurkku = await getParkBySlug(
       testDatabase.database,
@@ -1131,6 +1131,18 @@ describe('manual catalog imports', () => {
       type: { slug: 'cultural-history-area' }
     });
 
+    const tammionSaaristokyla = await getParkBySlug(testDatabase.database, 'tammion-saaristokyla');
+    expect(tammionSaaristokyla).toMatchObject({
+      lipasId: 9001089,
+      parkUrl: 'https://www.rky.fi/read/asp/r_kohde_det.aspx?KOHDE_ID=1164',
+      name: 'Tammion saaristokylä',
+      type: { slug: 'cultural-history-area' }
+    });
+    expect(tammionSaaristokyla?.boundingBox.minLat).toBeLessThan(60.415);
+    expect(tammionSaaristokyla?.boundingBox.maxLat).toBeLessThan(60.43);
+    expect(tammionSaaristokyla?.boundingBox.minLon).toBeGreaterThan(27.41);
+    expect(tammionSaaristokyla?.boundingBox.maxLon).toBeLessThan(27.43);
+
     expect(tullisaari).toMatchObject({
       lipasId: 9001084,
       parkUrl: 'https://vihreatsylit.fi/tullisaaren-kartanopuisto/',
@@ -1302,7 +1314,7 @@ describe('manual catalog imports', () => {
     );
     const kevo = await getParkBySlug(testDatabase.database, 'kevon-luonnonpuisto');
 
-    expect(allParks).toHaveLength(152);
+    expect(allParks).toHaveLength(153);
     expect(merenkurkku).toMatchObject({ catalogStatus: 'active' });
     expect(kevo).toMatchObject({ catalogStatus: 'active' });
   });
@@ -1379,7 +1391,7 @@ describe('manual catalog imports', () => {
       database: testDatabase.database
     });
 
-    expect(result.results).toHaveLength(152);
+    expect(result.results).toHaveLength(153);
 
     const merenkurkku = await getParkBySlug(
       testDatabase.database,
@@ -1489,6 +1501,35 @@ describe('manual catalog imports', () => {
       name: 'Paraisten kalkkikaivos',
       type: { slug: 'cultural-history-area' }
     });
+  });
+
+  it('can import Tammion saaristokylä without the Kuorsalo sibling geometry', async () => {
+    const result = await importSpecialParks({
+      database: testDatabase.database,
+      fetchSource: createSpecialParksSource(),
+      includeSlugs: ['tammion-saaristokyla'],
+      now: () => '2026-05-27T08:00:00.000Z'
+    });
+
+    expect(result.results).toEqual([
+      {
+        featureCount: 1,
+        importRunId: 1,
+        name: 'Tammion saaristokylä',
+        slug: 'tammion-saaristokyla'
+      }
+    ]);
+
+    const tammionSaaristokyla = await getParkBySlug(testDatabase.database, 'tammion-saaristokyla');
+    expect(tammionSaaristokyla).toMatchObject({
+      lipasId: 9001089,
+      parkUrl: 'https://www.rky.fi/read/asp/r_kohde_det.aspx?KOHDE_ID=1164',
+      name: 'Tammion saaristokylä',
+      type: { slug: 'cultural-history-area' }
+    });
+    expect(tammionSaaristokyla?.boundaryGeoJson?.features).toHaveLength(1);
+    expect(tammionSaaristokyla?.boundingBox.maxLat).toBeLessThan(60.43);
+    expect(tammionSaaristokyla?.boundingBox.maxLon).toBeLessThan(27.43);
   });
 
   it('re-imports Viikin luontoalue in place when stale imported metadata exists', async () => {
@@ -1612,7 +1653,7 @@ describe('manual catalog imports', () => {
       now: () => '2026-05-27T08:00:00.000Z'
     });
 
-    expect(result.results).toHaveLength(152);
+    expect(result.results).toHaveLength(153);
   });
 
   it('fails clearly when a selected special-park slug is unknown', async () => {
