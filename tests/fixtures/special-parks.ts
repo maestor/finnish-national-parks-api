@@ -1029,6 +1029,57 @@ export const createSpecialParksSource = () => {
       };
     }
 
+    if (sourceUrl.includes(encodeURIComponent("kohdenimi='Tammion ja Kuorsalon saaristokylät'"))) {
+      const allFeatures = [
+        createPolygonFeature(
+          [
+            [
+              [27.424945, 60.41950808],
+              [27.41667871, 60.41775873],
+              [27.41310748, 60.41531905],
+              [27.41314319, 60.41414355],
+              [27.42687709, 60.41257477],
+              [27.42862636, 60.41484481],
+              [27.424945, 60.41950808]
+            ]
+          ],
+          {
+            kohdenimi: 'Tammion ja Kuorsalon saaristokylät',
+            nimi: ' '
+          }
+        ),
+        createPolygonFeature(
+          [
+            [
+              [27.41135593, 60.44693503],
+              [27.42240629, 60.45673873],
+              [27.41475832, 60.46304775],
+              [27.37551787, 60.47537125],
+              [27.36705536, 60.47569112],
+              [27.36191516, 60.47504695],
+              [27.37078496, 60.46301574],
+              [27.37079302, 60.45268029],
+              [27.38311336, 60.44665725],
+              [27.39835913, 60.44618475],
+              [27.41135593, 60.44693503]
+            ]
+          ],
+          {
+            kohdenimi: 'Tammion ja Kuorsalon saaristokylät',
+            nimi: 'Kuorsalo'
+          }
+        )
+      ];
+      const filteredFeatures = sourceUrl.includes(encodeURIComponent("nimi<>'Kuorsalo'"))
+        ? allFeatures.filter((feature) => feature.properties.nimi !== 'Kuorsalo')
+        : allFeatures;
+
+      return {
+        type: 'FeatureCollection',
+        features: filteredFeatures
+      };
+    }
+
     if (sourceUrl.includes('typeNames=rajapinta_suojellut:rky_alue')) {
       return {
         type: 'FeatureCollection',
