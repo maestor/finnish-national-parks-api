@@ -37,7 +37,7 @@ import {
   updateTripStop,
   updateVisit
 } from '../../src/db/repositories.js';
-import { parks, parkVisits } from '../../src/db/schema.js';
+import { parks, parkVisits, trips } from '../../src/db/schema.js';
 import { importParks } from '../../src/importer/import-parks.js';
 import { createLipasPark } from '../fixtures/lipas.js';
 import { createTestDatabase } from '../helpers/test-db.js';
@@ -1885,7 +1885,7 @@ describe('repositories', () => {
   it('builds home summary ordering from lightweight visit data', async () => {
     await importParks({
       database: testDatabase.database,
-      expectedActiveCount: 4,
+      expectedActiveCount: 6,
       now: () => '2026-05-02T10:00:00.000Z',
       sourceUrl: 'https://example.test/lipas',
       fetchSource: async () => ({
@@ -1902,45 +1902,227 @@ describe('repositories', () => {
           createLipasPark({
             'lipas-id': 99997,
             name: 'Neljäs puisto'
+          }),
+          createLipasPark({
+            'lipas-id': 99996,
+            name: 'Viides puisto'
+          }),
+          createLipasPark({
+            'lipas-id': 99995,
+            name: 'Kuudes puisto'
           })
         ]
       })
     });
 
+    const firstTrip = await createTrip(testDatabase.database, {
+      name: 'Talviretki'
+    });
+    const secondTrip = await createTrip(testDatabase.database, {
+      name: 'Kevätretki'
+    });
+    const thirdTrip = await createTrip(testDatabase.database, {
+      name: 'Kesäretki'
+    });
+    const fourthTrip = await createTrip(testDatabase.database, {
+      name: 'Syysretki'
+    });
+    const fifthTrip = await createTrip(testDatabase.database, {
+      name: 'Jouluretki'
+    });
+    const sixthTrip = await createTrip(testDatabase.database, {
+      name: 'Mökkiretki'
+    });
+
     await createVisit(testDatabase.database, 'akasmannyn-kansallispuisto', {
+      tripId: firstTrip.id,
       visitedOn: '2026-01-15'
     });
     await createVisit(testDatabase.database, 'akasmannyn-kansallispuisto', {
       visitedOn: '2026-04-22'
     });
     await createVisit(testDatabase.database, 'toinen-puisto', {
+      tripId: thirdTrip.id,
       visitedOn: '2026-07-10'
     });
     await createVisit(testDatabase.database, 'kolmas-puisto', {
-      visitedOn: '2026-07-10'
+      tripId: secondTrip.id,
+      visitedOn: '2026-03-02'
     });
     await createVisit(testDatabase.database, 'neljas-puisto', {
+      tripId: fourthTrip.id,
       visitedOn: '2026-10-05'
+    });
+    await createVisit(testDatabase.database, 'viides-puisto', {
+      tripId: fifthTrip.id,
+      visitedOn: '2026-12-24'
+    });
+    await createVisit(testDatabase.database, 'kuudes-puisto', {
+      tripId: sixthTrip.id,
+      visitedOn: '2026-05-30'
+    });
+
+    const summary = await getPublicHomeSummary(testDatabase.database);
+
+    expect(summary.mostVisitedParks).toHaveLength(5);
+    expect(summary.mostVisitedParks.map((park) => park.park.slug)).toEqual([
+      'akasmannyn-kansallispuisto',
+      'viides-puisto',
+      'neljas-puisto',
+      'toinen-puisto',
+      'kuudes-puisto'
+    ]);
+    expect(summary.recentVisits).toHaveLength(5);
+    expect(summary.recentVisits.map((park) => park.park.slug)).toEqual([
+      'viides-puisto',
+      'neljas-puisto',
+      'toinen-puisto',
+      'kuudes-puisto',
+      'akasmannyn-kansallispuisto'
+    ]);
+    expect(summary.latestVisitEntries).toHaveLength(5);
+    expect(summary.latestTrips).toEqual([
+      {
+        name: 'Jouluretki',
+        slug: 'jouluretki',
+        startDate: '2026-12-24'
+      },
+      {
+        name: 'Syysretki',
+        slug: 'syysretki',
+        startDate: '2026-10-05'
+      },
+      {
+        name: 'Kesäretki',
+        slug: 'kesaretki',
+        startDate: '2026-07-10'
+      },
+      {
+        name: 'Mökkiretki',
+        slug: 'mokkiretki',
+        startDate: '2026-05-30'
+      },
+      {
+        name: 'Kevätretki',
+        slug: 'kevatretki',
+        startDate: '2026-03-02'
+      }
+    ]);
+    expect(summary.seasonalVisitCounts).toEqual({ autumn: 1, spring: 3, summer: 1, winter: 2 });
+    expect(summary.latestVisitEntries[0]).not.toHaveProperty('note');
+    expect(summary.latestVisitEntries[0]).not.toHaveProperty('route');
+    expect(summary.version).toBeGreaterThan(0);
+  });
+
+  it('orders latest trips by start date, then creation time, then name', async () => {
+    const januaryTrip = await createTrip(testDatabase.database, {
+      name: 'Tammiretki'
+    });
+    const nullDateOlderTrip = await createTrip(testDatabase.database, {
+      name: 'A-retki'
+    });
+    const nullDateNewerTrip = await createTrip(testDatabase.database, {
+      name: 'Uudempi retki'
+    });
+    const nullDateSameTimeNameLaterTrip = await createTrip(testDatabase.database, {
+      name: 'Z-retki'
+    });
+
+    await createVisit(testDatabase.database, 'akasmannyn-kansallispuisto', {
+      tripId: januaryTrip.id,
+      visitedOn: '2026-01-15'
+    });
+
+    await testDatabase.database
+      .update(trips)
+      .set({
+        createdAt: '2026-05-01T10:00:00.000Z',
+        updatedAt: '2026-05-01T10:00:00.000Z'
+      })
+      .where(eq(trips.id, nullDateOlderTrip.id));
+
+    await testDatabase.database
+      .update(trips)
+      .set({
+        createdAt: '2026-05-03T10:00:00.000Z',
+        updatedAt: '2026-05-03T10:00:00.000Z'
+      })
+      .where(eq(trips.id, nullDateNewerTrip.id));
+
+    await testDatabase.database
+      .update(trips)
+      .set({
+        createdAt: '2026-05-01T10:00:00.000Z',
+        updatedAt: '2026-05-01T10:00:00.000Z'
+      })
+      .where(eq(trips.id, nullDateSameTimeNameLaterTrip.id));
+
+    const summary = await getPublicHomeSummary(testDatabase.database);
+
+    expect(summary.latestTrips).toEqual([
+      {
+        name: 'Tammiretki',
+        slug: 'tammiretki',
+        startDate: '2026-01-15'
+      },
+      {
+        name: 'Uudempi retki',
+        slug: 'uudempi-retki',
+        startDate: null
+      },
+      {
+        name: 'A-retki',
+        slug: 'a-retki',
+        startDate: null
+      },
+      {
+        name: 'Z-retki',
+        slug: 'z-retki',
+        startDate: null
+      }
+    ]);
+  });
+
+  it('orders tied home summary parks alphabetically', async () => {
+    await importParks({
+      database: testDatabase.database,
+      expectedActiveCount: 3,
+      now: () => '2026-05-01T10:00:00.000Z',
+      sourceUrl: 'https://example.test/lipas',
+      fetchSource: async () => ({
+        items: [
+          createLipasPark(),
+          createLipasPark({
+            'lipas-id': 22334,
+            name: 'Aava puisto',
+            www: 'https://www.luontoon.fi/aava-puisto'
+          }),
+          createLipasPark({
+            'lipas-id': 22335,
+            name: 'Boreaali puisto',
+            www: 'https://www.luontoon.fi/boreaali-puisto'
+          })
+        ]
+      })
+    });
+
+    await createVisit(testDatabase.database, 'aava-puisto', {
+      visitedOn: '2026-04-10'
+    });
+    await createVisit(testDatabase.database, 'boreaali-puisto', {
+      visitedOn: '2026-04-10'
     });
 
     const summary = await getPublicHomeSummary(testDatabase.database);
 
     expect(summary.mostVisitedParks.map((park) => park.park.slug)).toEqual([
-      'akasmannyn-kansallispuisto',
-      'neljas-puisto',
-      'kolmas-puisto',
-      'toinen-puisto'
+      'aava-puisto',
+      'boreaali-puisto'
     ]);
     expect(summary.recentVisits.map((park) => park.park.slug)).toEqual([
-      'neljas-puisto',
-      'kolmas-puisto',
-      'toinen-puisto',
-      'akasmannyn-kansallispuisto'
+      'aava-puisto',
+      'boreaali-puisto'
     ]);
-    expect(summary.seasonalVisitCounts).toEqual({ autumn: 1, spring: 1, summer: 2, winter: 1 });
-    expect(summary.latestVisitEntries[0]).not.toHaveProperty('note');
-    expect(summary.latestVisitEntries[0]).not.toHaveProperty('route');
-    expect(summary.version).toBeGreaterThan(0);
   });
 
   it('lists only removed parks for admin restore workflows', async () => {
