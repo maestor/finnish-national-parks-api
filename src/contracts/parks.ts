@@ -365,6 +365,12 @@ export const publicVisitEntrySchema = z.object({
   visitedOn: visitDateSchema
 });
 
+export const publicHomeSummaryTripSchema = z.object({
+  name: z.string(),
+  slug: z.string(),
+  startDate: visitDateSchema.nullable()
+});
+
 export const seasonalVisitCountsSchema = z.object({
   autumn: z.number().int(),
   spring: z.number().int(),
@@ -373,6 +379,7 @@ export const seasonalVisitCountsSchema = z.object({
 });
 
 export const publicHomeSummaryResponseSchema = publicVisitVersionSchema.extend({
+  latestTrips: z.array(publicHomeSummaryTripSchema),
   progressByCategory: z.array(publicCategoryProgressSchema),
   latestVisitEntries: z.array(publicVisitEntrySchema),
   mostVisitedParks: z.array(publicMostVisitedParkSchema),

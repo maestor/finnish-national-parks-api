@@ -594,6 +594,8 @@ const sortTripAwareVisitRows = <T extends TripAwareVisitOrder>(visitRows: T[]) =
   return [...visitRows].sort(compareTripAwareVisitOrder);
 };
 
+const HOME_SUMMARY_MAX_ITEMS = 5;
+
 const toBoundingBox = (row: typeof parks.$inferSelect): BoundingBox => {
   return {
     maxLat: row.bboxMaxLat,
@@ -2247,8 +2249,9 @@ export const getPublicVisitDataVersion = async (
 };
 
 export const getPublicHomeSummary = async (database: Database) => {
-  const [parkRows, visitRows, version] = await Promise.all([
+  const [parkRows, tripRows, visitRows, version] = await Promise.all([
     listPublicParkRows(database),
+    listTripRows(database),
     listPublicVisitRows(database),
     getPublicVisitDataVersion(database)
   ]);
@@ -2361,7 +2364,7 @@ export const getPublicHomeSummary = async (database: Database) => {
       park,
       visitCount: visitedSummary.visitCount
     }))
-    .slice(0, 10);
+    .slice(0, HOME_SUMMARY_MAX_ITEMS);
 
   const recentVisits = [...parkVisitSummaries]
     .sort((a, b) => {
@@ -2371,10 +2374,38 @@ export const getPublicHomeSummary = async (database: Database) => {
 
       return a.park.name.localeCompare(b.park.name);
     })
-    .slice(0, 10);
+    .slice(0, HOME_SUMMARY_MAX_ITEMS);
+
+  const latestTrips = [...tripRows]
+    .sort((a, b) => {
+      if (a.startVisitedOn !== b.startVisitedOn) {
+        if (b.startVisitedOn === null) {
+          return -1;
+        }
+
+        if (a.startVisitedOn === null) {
+          return 1;
+        }
+
+        return b.startVisitedOn.localeCompare(a.startVisitedOn);
+      }
+
+      if (b.createdAt !== a.createdAt) {
+        return b.createdAt.localeCompare(a.createdAt);
+      }
+
+      return a.name.localeCompare(b.name);
+    })
+    .slice(0, HOME_SUMMARY_MAX_ITEMS)
+    .map((trip) => ({
+      name: trip.name,
+      slug: trip.slug,
+      startDate: trip.startVisitedOn
+    }));
 
   return {
-    latestVisitEntries: visitRows.slice(0, 10).map((visit) => ({
+    latestTrips,
+    latestVisitEntries: visitRows.slice(0, HOME_SUMMARY_MAX_ITEMS).map((visit) => ({
       createdAt: visit.createdAt,
       id: visit.id,
       park: {

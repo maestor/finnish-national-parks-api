@@ -1177,6 +1177,11 @@ describe('API routes', () => {
         summer: number;
         winter: number;
       };
+      latestTrips: Array<{
+        name: string;
+        slug: string;
+        startDate: string | null;
+      }>;
       totalVisits: number;
       uniqueVisitedParks: number;
       updatedAt: string | null;
@@ -1242,9 +1247,65 @@ describe('API routes', () => {
       'akasmannyn-kansallispuisto',
       'akasmannyn-kansallispuisto'
     ]);
+    expect(body.latestTrips).toEqual([]);
     expect(body.latestVisitEntries[0]).not.toHaveProperty('note');
     expect(body.latestVisitEntries[0]).not.toHaveProperty('route');
     expect(body.latestVisitEntries[0]).not.toHaveProperty('images');
+  });
+
+  it('includes latest trips in home summary ordered by trip start date', async () => {
+    const app = createAuthedApp();
+
+    const { body: springTrip } = await createTrip(app, {
+      name: 'Kevätretki'
+    });
+    const { body: summerTrip } = await createTrip(app, {
+      name: 'Kesäretki'
+    });
+    const { body: winterTrip } = await createTrip(app, {
+      name: 'Talviretki'
+    });
+
+    await createVisit(app, 'akasmannyn-kansallispuisto', {
+      tripId: springTrip.id,
+      visitedOn: '2026-03-02'
+    });
+    await createVisit(app, 'seitsemisen-kansallispuisto', {
+      tripId: summerTrip.id,
+      visitedOn: '2026-07-15'
+    });
+    await createVisit(app, 'evon-retkeilyalue', {
+      tripId: winterTrip.id,
+      visitedOn: '2026-01-10'
+    });
+
+    const response = await app.request('/api/home-summary');
+    const body = (await response.json()) as {
+      latestTrips: Array<{
+        name: string;
+        slug: string;
+        startDate: string | null;
+      }>;
+    };
+
+    expect(response.status).toBe(200);
+    expect(body.latestTrips).toEqual([
+      {
+        name: 'Kesäretki',
+        slug: 'kesaretki',
+        startDate: '2026-07-15'
+      },
+      {
+        name: 'Kevätretki',
+        slug: 'kevatretki',
+        startDate: '2026-03-02'
+      },
+      {
+        name: 'Talviretki',
+        slug: 'talviretki',
+        startDate: '2026-01-10'
+      }
+    ]);
   });
 
   it('orders latest visit entries by addition time instead of visit date', async () => {
