@@ -131,6 +131,24 @@ Coverage thresholds should start high from the beginning. Aim for 100 percent on
 
 `npm run verify` must pass before any task or pull request is considered ready. The only exception is changes that are entirely outside what `verify` validates — for example, pure documentation updates or repository configuration that does not affect code, tests, or types. In those cases, skip `verify` and note the exception in the PR description. User review and explicit acceptance are required before merging.
 
+## Pre-Review Coverage Closure
+
+Do not wait for the post-review `npm run verify` step to discover obvious missing branches in newly added behavior.
+
+Before the review pause for implementation work:
+
+1. Run the cheapest focused test or test file that exercises the new behavior.
+2. If the change adds a route, upload flow, or persistence workflow, cover the full behavior shape before asking for review:
+   - happy path
+   - auth failure
+   - missing parent resource
+   - validation and limit failures
+   - storage or repository error branches that return user-facing responses
+3. If the touched file contains explicit guards or fallback branches, inspect uncovered lines from focused coverage or the nearest targeted coverage run and close them while the implementation context is still fresh.
+4. Only after the touched behavior is locally covered well enough that no obvious branch gaps remain should the change move to the review pause.
+
+The goal is not to run the full repo gate early. The goal is to avoid turning the post-review verify step into a long branch-coverage cleanup session for behavior we already knew we added.
+
 ## Verification Order
 
 For implementation tasks, start with the cheapest check that can fail for the right reason:
@@ -138,8 +156,9 @@ For implementation tasks, start with the cheapest check that can fail for the ri
 1. Focused test for the changed behavior.
 2. Typecheck or lint when configured.
 3. API integration tests for touched routes/importer behavior, especially auth and cache boundaries.
-4. Full verification command (`npm run verify`).
-5. Scoped mutation run for meaningful backend logic.
+4. Focused coverage follow-up when the repo-wide threshold is strict or the change added new conditional flows.
+5. Full verification command (`npm run verify`) after user review and acceptance.
+6. Scoped mutation run for meaningful backend logic.
 
 Do not claim behavior is verified unless the check actually exercised it.
 When a production platform behavior cannot be reproduced locally, add the smallest regression test that proves the repo-side contract the platform depends on, and document that contract near the affected runtime files.

@@ -41,9 +41,10 @@ The deployment guardrail test for this lives in `tests/integration/vercel-entry.
 
 - Create a dedicated branch for every change: `feature/<name>`, `bugfix/<name>`, `chore/<name>`, `docs/<name>`, etc.
 - If you are currently on `main`, create or switch to the correct work branch before editing files, running write-capable fixers, or staging changes.
+- Before the review pause on implementation work, finish the focused verification needed for the touched behavior, including closing obvious branch-coverage gaps in new routes, upload flows, and other conditional workflows. Save the full `npm run verify` gate for after user acceptance, but do not treat that final run as the first time uncovered branches are discovered.
 - After the review pause, treat a brief approval such as `done`, `looks good`, or `approved` as permission to continue the remaining PR-ready workflow steps unless the user explicitly asks to stop before verify, commit, or push.
 - Push the branch and open a pull request against `main`.
-- Ensure `npm run verify` passes locally before requesting review.
+- Ensure focused verification is complete before requesting review, then run and pass `npm run verify` after user acceptance and before the PR-ready handoff.
 - User review and explicit acceptance are required before merging.
 - Do not push directly to `main`.
 
