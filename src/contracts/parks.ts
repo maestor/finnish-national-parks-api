@@ -196,6 +196,7 @@ export const visitSchema = z.object({
   excludeFromRoute: z.boolean(),
   id: z.number().int(),
   images: z.array(visitImageSchema),
+  location: pointSchema.nullable(),
   note: z.string().nullable(),
   route: z.string().nullable(),
   trip: visitTripSchema.nullable(),
@@ -228,6 +229,7 @@ export const tripItineraryVisitSchema = z.object({
   createdAt: z.string().datetime(),
   excludeFromRoute: z.boolean(),
   id: z.number().int(),
+  location: pointSchema.nullable(),
   note: z.string().nullable(),
   park: visitParkSchema,
   route: z.string().nullable(),
@@ -431,6 +433,7 @@ export const visitListResponseSchema = z.object({
 export const createVisitRequestSchema = z.object({
   author: z.string().max(50).nullable().optional(),
   excludeFromRoute: z.boolean().optional(),
+  location: pointSchema.nullable().optional(),
   note: z.string().max(5000).nullable().optional(),
   route: z.string().max(80).nullable().optional(),
   tripId: z.number().int().nullable().optional(),
@@ -462,6 +465,7 @@ export const updateParkRequestSchema = z
     displayTypeName: z.string().max(120).nullable().optional(),
     establishmentYear: z.number().int().nullable().optional(),
     locationLabel: z.string().trim().min(1).max(255).optional(),
+    markerPoint: pointSchema.nullable().optional(),
     parkUrl: z.string().trim().min(1).max(500).nullable().optional(),
     name: z.string().trim().min(1).max(255).optional(),
     postalCode: z.string().trim().max(20).nullable().optional(),
@@ -474,6 +478,7 @@ export const updateParkRequestSchema = z
       input.displayTypeName !== undefined ||
       input.establishmentYear !== undefined ||
       input.locationLabel !== undefined ||
+      input.markerPoint !== undefined ||
       input.parkUrl !== undefined ||
       input.name !== undefined ||
       input.postalCode !== undefined ||
@@ -490,6 +495,7 @@ export const updateVisitRequestSchema = createVisitRequestSchema
     (input) =>
       input.author !== undefined ||
       input.excludeFromRoute !== undefined ||
+      input.location !== undefined ||
       input.note !== undefined ||
       input.route !== undefined ||
       input.tripId !== undefined ||

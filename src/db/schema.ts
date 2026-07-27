@@ -64,6 +64,8 @@ export const parks = sqliteTable(
     bboxMaxLat: real('bbox_max_lat').notNull(),
     markerLon: real('marker_lon').notNull(),
     markerLat: real('marker_lat').notNull(),
+    importedMarkerLon: real('imported_marker_lon'),
+    importedMarkerLat: real('imported_marker_lat'),
     catalogStatus: text('catalog_status').notNull(),
     removed: integer('removed', { mode: 'boolean' }).notNull().default(false),
     lastImportRunId: integer('last_import_run_id')
@@ -138,6 +140,8 @@ export const parkVisits = sqliteTable(
     tripId: integer('trip_id').references(() => trips.id, { onDelete: 'set null' }),
     tripStopOrder: integer('trip_stop_order'),
     visitedOn: text('visited_on').notNull(),
+    locationLat: real('location_lat'),
+    locationLon: real('location_lon'),
     note: text('note'),
     route: text('route'),
     excludeFromRoute: integer('exclude_from_route', { mode: 'boolean' }).notNull().default(false),

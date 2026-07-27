@@ -32,6 +32,19 @@ describe('contracts and cache helpers', () => {
     expect(updateVisitRequestSchema.parse({ tripId: null })).toEqual({
       tripId: null
     });
+    expect(
+      updateVisitRequestSchema.parse({
+        location: {
+          lat: 68.1123,
+          lon: 24.5567
+        }
+      })
+    ).toEqual({
+      location: {
+        lat: 68.1123,
+        lon: 24.5567
+      }
+    });
   });
 
   it('requires at least one field when patching a park', () => {
@@ -40,6 +53,22 @@ describe('contracts and cache helpers', () => {
     );
     expect(updateParkRequestSchema.parse({ name: 'Updated park' })).toEqual({
       name: 'Updated park'
+    });
+    expect(
+      updateParkRequestSchema.parse({
+        markerPoint: {
+          lat: 60.1699,
+          lon: 24.9384
+        }
+      })
+    ).toEqual({
+      markerPoint: {
+        lat: 60.1699,
+        lon: 24.9384
+      }
+    });
+    expect(updateParkRequestSchema.parse({ markerPoint: null })).toEqual({
+      markerPoint: null
     });
   });
 

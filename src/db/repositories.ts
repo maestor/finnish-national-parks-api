@@ -28,6 +28,13 @@ import {
 type PutVisitInput = {
   author?: string | null | undefined;
   excludeFromRoute?: boolean | undefined;
+  location?:
+    | {
+        lat: number;
+        lon: number;
+      }
+    | null
+    | undefined;
   note?: string | null | undefined;
   route?: string | null | undefined;
   tripId?: number | null | undefined;
@@ -38,6 +45,13 @@ type PutVisitInput = {
 type UpdateVisitInput = {
   author?: string | null | undefined;
   excludeFromRoute?: boolean | undefined;
+  location?:
+    | {
+        lat: number;
+        lon: number;
+      }
+    | null
+    | undefined;
   note?: string | null | undefined;
   route?: string | null | undefined;
   tripId?: number | null | undefined;
@@ -110,6 +124,13 @@ type UpdateParkDetailsInput = {
   displayTypeName?: string | null | undefined;
   establishmentYear?: number | null | undefined;
   locationLabel?: string | undefined;
+  markerPoint?:
+    | {
+        lat: number;
+        lon: number;
+      }
+    | null
+    | undefined;
   parkUrl?: string | null | undefined;
   name?: string | undefined;
   postalCode?: string | null | undefined;
@@ -164,6 +185,11 @@ type TripStopLocation = {
   label: string;
 };
 
+type OptionalMarkerPointRow = {
+  locationLat: number | null;
+  locationLon: number | null;
+};
+
 type GetLogoPublicUrl = (key: string, updatedAt: string) => string | Promise<string>;
 type GetMapPublicUrl = (key: string, updatedAt: string) => string | Promise<string>;
 
@@ -205,6 +231,8 @@ type TripDetailVisitRow = {
   createdAt: string;
   excludeFromRoute: boolean;
   id: number;
+  locationLat: number | null;
+  locationLon: number | null;
   note: string | null;
   parkName: string;
   parkSlug: string;
@@ -336,6 +364,8 @@ type UpsertCatalogParkInput = Omit<
   | 'importedAreaKm2'
   | 'importedDisplayTypeName'
   | 'importedEstablishmentYear'
+  | 'importedMarkerLat'
+  | 'importedMarkerLon'
   | 'importedLocationLabel'
   | 'importedParkUrl'
   | 'importedName'
@@ -419,6 +449,17 @@ const toTripStopLocation = (row: { label: string; lat: number; lon: number }): T
     },
     displayName: deriveDisplayNameFromLabel(row.label),
     label: row.label
+  };
+};
+
+const toOptionalMarkerPoint = (row: OptionalMarkerPointRow): MarkerPoint | null => {
+  if (row.locationLat === null || row.locationLon === null) {
+    return null;
+  }
+
+  return {
+    lat: row.locationLat,
+    lon: row.locationLon
   };
 };
 
@@ -912,6 +953,7 @@ const toTripItineraryVisitEntry = (row: TripDetailVisitRow) => {
       createdAt: row.createdAt,
       excludeFromRoute: row.excludeFromRoute,
       id: row.id,
+      location: toOptionalMarkerPoint(row),
       note: row.note,
       park: {
         name: row.parkName,
@@ -925,6 +967,11 @@ const toTripItineraryVisitEntry = (row: TripDetailVisitRow) => {
 };
 
 const toPublicTripItineraryVisitEntry = (row: PublicTripDetailVisitRow) => {
+  const markerPoint = toOptionalMarkerPoint(row) ?? {
+    lat: row.markerLat,
+    lon: row.markerLon
+  };
+
   return {
     kind: 'visit' as const,
     tripStopOrder: row.tripStopOrder,
@@ -934,12 +981,10 @@ const toPublicTripItineraryVisitEntry = (row: PublicTripDetailVisitRow) => {
       excludeFromRoute: row.excludeFromRoute,
       id: row.id,
       imageCount: row.imageCount,
+      location: toOptionalMarkerPoint(row),
       note: row.note,
       park: {
-        markerPoint: {
-          lat: row.markerLat,
-          lon: row.markerLon
-        },
+        markerPoint,
         name: row.parkName,
         slug: row.parkSlug,
         typeLabel: resolveTypeLabel(row)
@@ -970,6 +1015,7 @@ const toVisit = (
     excludeFromRoute: row.excludeFromRoute,
     id: row.id,
     images,
+    location: toOptionalMarkerPoint(row),
     note: row.note,
     route: row.route,
     trip,
@@ -1466,6 +1512,8 @@ const listTripDetailVisitRowsByTripId = async (
       createdAt: parkVisits.createdAt,
       excludeFromRoute: parkVisits.excludeFromRoute,
       id: parkVisits.id,
+      locationLat: parkVisits.locationLat,
+      locationLon: parkVisits.locationLon,
       note: parkVisits.note,
       parkName: parks.name,
       parkSlug: parks.slug,
@@ -1492,6 +1540,8 @@ const listPublicTripDetailVisitRowsByTripId = async (
       excludeFromRoute: parkVisits.excludeFromRoute,
       id: parkVisits.id,
       imageCount: sql<number>`COUNT(${visitImages.id})`,
+      locationLat: parkVisits.locationLat,
+      locationLon: parkVisits.locationLon,
       markerLat: parks.markerLat,
       markerLon: parks.markerLon,
       note: parkVisits.note,
@@ -1513,6 +1563,8 @@ const listPublicTripDetailVisitRowsByTripId = async (
       parkVisits.author,
       parkVisits.createdAt,
       parkVisits.excludeFromRoute,
+      parkVisits.locationLat,
+      parkVisits.locationLon,
       parkVisits.note,
       parkVisits.route,
       parkVisits.tripStopOrder,
@@ -2444,6 +2496,7 @@ export const createVisit = async (database: Database, slug: string, input: PutVi
       input.tripStopOrder,
       timestamp
     );
+    const location = input.location ?? null;
     const row = (
       await tx
         .insert(parkVisits)
@@ -2451,6 +2504,8 @@ export const createVisit = async (database: Database, slug: string, input: PutVi
           author: input.author?.trim() || null,
           createdAt: timestamp,
           excludeFromRoute: input.excludeFromRoute ?? false,
+          locationLat: location?.lat ?? null,
+          locationLon: location?.lon ?? null,
           note: input.note?.trim() || null,
           parkId: park.id,
           route: input.route?.trim() || null,
@@ -2609,6 +2664,18 @@ export const updateParkDetails = async (
       : input.parkUrl === null
         ? null
         : normalizeParkUrl(input.parkUrl);
+  const nextMarkerPoint =
+    input.markerPoint === undefined
+      ? {
+          lat: park.markerLat,
+          lon: park.markerLon
+        }
+      : input.markerPoint === null
+        ? {
+            lat: park.importedMarkerLat ?? park.markerLat,
+            lon: park.importedMarkerLon ?? park.markerLon
+          }
+        : input.markerPoint;
 
   if (input.parkUrl !== undefined && input.parkUrl !== null && !nextParkUrl) {
     throw new Error('Invalid park URL.');
@@ -2635,6 +2702,8 @@ export const updateParkDetails = async (
       establishmentYear:
         input.establishmentYear === undefined ? park.establishmentYear : input.establishmentYear,
       locationLabel: nextLocationLabel,
+      markerLat: nextMarkerPoint.lat,
+      markerLon: nextMarkerPoint.lon,
       parkUrl: nextParkUrl,
       name: nextName,
       postalCode:
@@ -2850,6 +2919,10 @@ export const updateVisit = async (database: Database, visitId: number, input: Up
           input.excludeFromRoute === undefined
             ? existingVisit.excludeFromRoute
             : input.excludeFromRoute,
+        locationLat:
+          input.location === undefined ? existingVisit.locationLat : (input.location?.lat ?? null),
+        locationLon:
+          input.location === undefined ? existingVisit.locationLon : (input.location?.lon ?? null),
         note: input.note === undefined ? existingVisit.note : input.note?.trim() || null,
         route: input.route === undefined ? existingVisit.route : input.route?.trim() || null,
         tripId: resolvedTripId,
@@ -3005,6 +3078,8 @@ export const upsertCatalogPark = async (database: DbClient, values: UpsertCatalo
     importedAreaKm2: values.areaKm2,
     importedDisplayTypeName: values.displayTypeName,
     importedEstablishmentYear: values.establishmentYear,
+    importedMarkerLat: values.markerLat,
+    importedMarkerLon: values.markerLon,
     importedLocationLabel: values.locationLabel,
     importedParkUrl: values.parkUrl,
     importedName: values.name,
@@ -3042,6 +3117,8 @@ export const upsertCatalogPark = async (database: DbClient, values: UpsertCatalo
         importedAreaKm2: valuesWithImportedFields.importedAreaKm2,
         importedDisplayTypeName: valuesWithImportedFields.importedDisplayTypeName,
         importedEstablishmentYear: valuesWithImportedFields.importedEstablishmentYear,
+        importedMarkerLat: valuesWithImportedFields.importedMarkerLat,
+        importedMarkerLon: valuesWithImportedFields.importedMarkerLon,
         importedLocationLabel: valuesWithImportedFields.importedLocationLabel,
         importedParkUrl: valuesWithImportedFields.importedParkUrl,
         importedName: valuesWithImportedFields.importedName,
@@ -3060,8 +3137,18 @@ export const upsertCatalogPark = async (database: DbClient, values: UpsertCatalo
           ELSE ${parks.parkUrl}
         END`,
         managedByLipasImport: values.managedByLipasImport,
-        markerLat: values.markerLat,
-        markerLon: values.markerLon,
+        markerLat: sql`CASE
+          WHEN ${parks.markerLat} IS ${parks.importedMarkerLat}
+            AND ${parks.markerLon} IS ${parks.importedMarkerLon}
+            THEN excluded.imported_marker_lat
+          ELSE ${parks.markerLat}
+        END`,
+        markerLon: sql`CASE
+          WHEN ${parks.markerLat} IS ${parks.importedMarkerLat}
+            AND ${parks.markerLon} IS ${parks.importedMarkerLon}
+            THEN excluded.imported_marker_lon
+          ELSE ${parks.markerLon}
+        END`,
         municipalityCode: values.municipalityCode,
         name: sql`CASE
           WHEN ${parks.name} IS ${parks.importedName}
