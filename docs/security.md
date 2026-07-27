@@ -42,12 +42,12 @@ Rules:
 - If OAuth/session auth is unavailable, admin-session routes should fail closed rather than silently downgrading to weaker auth.
 - When auth policy changes, update runtime enforcement, route contracts, integration tests, `README.md`, `docs/development.md`, and this file in the same change.
 - When a route mixes API-key and session requirements, document both clearly in contract and contributor docs.
-- Named-trip writes (`POST /api/trips`, `PATCH /api/trips/:id`, `DELETE /api/trips/:id`, `POST /api/trips/:id/stops`, `PATCH /api/trip-stops/:id`, `DELETE /api/trip-stops/:id`) stay on the admin-session side, while trip reads (`GET /api/trips`, `GET /api/trips/slug/:slug`, `GET /api/trips/:id`) stay read-only and API-key protected like the other frontend summary endpoints.
+- Named-trip writes (`POST /api/trips`, `PATCH /api/trips/:id`, `DELETE /api/trips/:id`, `POST /api/trips/:id/stops`, `PATCH /api/trip-stops/:id`, `DELETE /api/trip-stops/:id`, and the trip-stop image upload/delete/reorder routes) stay on the admin-session side, while trip reads (`GET /api/trips`, `GET /api/trips/slug/:slug`, `GET /api/trips/:id`) stay read-only and API-key protected like the other frontend summary endpoints.
 
 ## Storage And Upload Rules
 
 - Keep R2 private by default.
-- Use presigned URLs for visit images, park logos, and similar assets instead of public bucket URLs.
+- Use presigned URLs for visit images, trip-stop images, park logos, and similar assets instead of public bucket URLs.
 - Enforce upload limits against the actual stored object metadata, not only client-declared metadata.
 - Keep a documented size budget for uploads so storage growth and bandwidth remain predictable.
 - If direct uploads can create orphaned objects, define and document cleanup strategy.
@@ -80,7 +80,7 @@ Rules:
 - Production Turso credentials for automated migrations must live in GitHub Actions environment secrets, not in committed files or browser-reachable config.
 - Production deployment promotion should stay gated on the GitHub migration check so schema updates complete before merged code is served.
 - Shared cache headers and `ETag` behavior must be deliberate for catalog and summary routes.
-- Shared cache headers and `ETag` behavior for trip and visit summary datasets must stay tied to the owned visit-data version signal so trip rename/delete, trip-stop reordering, and visit reassignment invalidate cached timeline reads predictably.
+- Shared cache headers and `ETag` behavior for trip and visit summary datasets must stay tied to the owned visit-data version signal so trip rename/delete, trip-stop reordering, trip-stop image changes, and visit reassignment invalidate cached timeline reads predictably.
 - Private or admin responses must use non-cacheable headers.
 - New rate-sensitive anonymous flows should add edge or app-layer rate limiting before exposure.
 - Add a minimal API-focused security header set when platform defaults do not already provide it.

@@ -83,8 +83,8 @@ If an upload limit exists, at least one test should cover the real stored-object
 - `GET /api/home-summary` returns cache-friendly home summary data including seasonal visit counts, `progressByType` visibility flags, and aggregated `progressByCategory`, without notes, routes, or images.
 - `GET /api/map-summary` returns lightweight map data plus per-park visited summaries, including effective park `markerPoint` overrides.
 - `GET /api/trips` returns named trips with derived `dateRange`, `visitCount`, persisted `slug`, and optional `startingPoint`.
-- `GET /api/trips/slug/:slug` returns one page-ready trip detail payload by public slug, including derived `imageCount` / `stopCount`, itinerary visit park `markerPoint` / `typeLabel` / per-visit `imageCount`, and a route state shaped as `route: { success, error, data }`. Visit itinerary entries include optional visit `location`, and a stored visit location overrides the park default marker point for both the itinerary marker and route waypoint. Missing route prerequisites return a successful empty route state, while actual routing failures stay inside `route.error` with failed-leg details when available.
-- `GET /api/trips/:id` returns one trip with a merged itinerary that includes both park visits and non-park trip stops in shared `tripStopOrder`, including optional visit `location` overrides for admin workflows.
+- `GET /api/trips/slug/:slug` returns one page-ready trip detail payload by public slug, including derived `imageCount` / `stopCount`, itinerary visit park `markerPoint` / `typeLabel` / per-visit `imageCount`, and trip-stop image arrays. Visit itinerary entries include optional visit `location`, and a stored visit location overrides the park default marker point for both the itinerary marker and route waypoint. Missing route prerequisites return a successful empty route state, while actual routing failures stay inside `route.error` with failed-leg details when available.
+- `GET /api/trips/:id` returns one trip with a merged itinerary that includes both park visits and non-park trip stops in shared `tripStopOrder`, including optional visit `location` overrides for admin workflows and `images: VisitImage[]` on trip stops.
 - `GET /api/visits-timeline` returns the lightweight `/kaynnit` timeline dataset with `imageCount`, `trip: { id, name, slug } | null`, `tripStopOrder: number | null`, and pre-resolved park `typeLabel` values.
 - `POST /api/trip-planner/suggestions` returns up to three Geoapify-backed place suggestions with labels and coordinates for origin/destination pickers.
 - `POST /api/trip-planner/search` resolves exact known park and trail names from the local catalog before provider geocoding, filters parks against the real routed path, excludes parks outside the corridor, preserves the documented unvisited-first ordering, suppresses overly broad matches from the first 30 km of long trips, and returns map-ready route geometry plus route and park bounding boxes.
@@ -92,13 +92,14 @@ If an upload limit exists, at least one test should cover the real stored-object
 - `GET /api/visits` and `GET /api/visits/:id` expose visit resources with parent park references, `trip: { id, name, slug } | null`, and optional `location: { lat, lon } | null`.
 - Catalog, home summary, map summary, trip list, and visits timeline `GET` endpoints emit ETags and return `304 Not Modified` for matching `If-None-Match`.
 - Catalog `GET` endpoints are safe for public caching.
-- Home summary, map summary, trip list, and visits timeline endpoints use shared-cache headers and bump their version signal when trip, trip-stop, visit, or visit-image data changes.
+- Home summary, map summary, trip list, and visits timeline endpoints use shared-cache headers and bump their version signal when trip, trip-stop, trip-stop image, visit, or visit-image data changes.
 - Visit and management endpoints are private or no-store.
 - Trip planner provider failures surface as stable app errors instead of raw Geoapify responses.
 - All write routes and admin-only visibility reads require an admin session and fail closed when OAuth session auth is unavailable.
 - Park removal toggle can hide and restore a park through the authenticated park-management API.
 - Trip create/edit/delete supports named-trip CRUD, persisted trip slugs, optional starting points, and clears visit assignments on delete.
 - Trip-stop create/edit/delete supports non-park itinerary stops with labeled coordinates, required `visitedOn` dates, optional notes, and shared ordering between stops and park visits.
+- Trip-stop image routes support multipart uploads, direct uploads, delete, reorder, and a maximum of 6 images per stop.
 - Trip-stop validation covers both required trip membership context and date-range constraints: a stop cannot be created for a trip with zero visits, and each stop date may be at most one day outside the trip's visit-derived range so departure-day and return-day stops can extend the trip window.
 - Visit create/edit/delete supports optional route, author, `tripId`, `tripStopOrder`, and nullable visit `location` fields, including same-day ordering inside a named trip.
 - Visit create/edit/delete works against a real temporary database.
@@ -130,6 +131,24 @@ Coverage thresholds should start high from the beginning. Aim for 100 percent on
 
 `npm run verify` must pass before any task or pull request is considered ready. The only exception is changes that are entirely outside what `verify` validates — for example, pure documentation updates or repository configuration that does not affect code, tests, or types. In those cases, skip `verify` and note the exception in the PR description. User review and explicit acceptance are required before merging.
 
+## Pre-Review Coverage Closure
+
+Do not wait for the post-review `npm run verify` step to discover obvious missing branches in newly added behavior.
+
+Before the review pause for implementation work:
+
+1. Run the cheapest focused test or test file that exercises the new behavior.
+2. If the change adds a route, upload flow, or persistence workflow, cover the full behavior shape before asking for review:
+   - happy path
+   - auth failure
+   - missing parent resource
+   - validation and limit failures
+   - storage or repository error branches that return user-facing responses
+3. If the touched file contains explicit guards or fallback branches, inspect uncovered lines from focused coverage or the nearest targeted coverage run and close them while the implementation context is still fresh.
+4. Only after the touched behavior is locally covered well enough that no obvious branch gaps remain should the change move to the review pause.
+
+The goal is not to run the full repo gate early. The goal is to avoid turning the post-review verify step into a long branch-coverage cleanup session for behavior we already knew we added.
+
 ## Verification Order
 
 For implementation tasks, start with the cheapest check that can fail for the right reason:
@@ -137,8 +156,9 @@ For implementation tasks, start with the cheapest check that can fail for the ri
 1. Focused test for the changed behavior.
 2. Typecheck or lint when configured.
 3. API integration tests for touched routes/importer behavior, especially auth and cache boundaries.
-4. Full verification command (`npm run verify`).
-5. Scoped mutation run for meaningful backend logic.
+4. Focused coverage follow-up when the repo-wide threshold is strict or the change added new conditional flows.
+5. Full verification command (`npm run verify`) after user review and acceptance.
+6. Scoped mutation run for meaningful backend logic.
 
 Do not claim behavior is verified unless the check actually exercised it.
 When a production platform behavior cannot be reproduced locally, add the smallest regression test that proves the repo-side contract the platform depends on, and document that contract near the affected runtime files.

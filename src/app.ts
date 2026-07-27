@@ -5,16 +5,21 @@ import { cors } from 'hono/cors';
 
 import type { Database } from './db/database.js';
 import {
+  countTripStopImages,
   createTrip,
   createTripStop,
+  createTripStopImage,
   createVisit,
   createVisitImage,
   deleteTrip,
   deleteTripStop,
+  deleteTripStopImage,
   deleteVisit,
   deleteVisitImage,
   findAdminByEmail,
   findParkRecordBySlugIncludingRemoved,
+  findTripStopImageById,
+  findTripStopRecordById,
   findVisitImageById,
   findVisitRecordById,
   getCatalogListEtagSeed,
@@ -36,6 +41,7 @@ import {
   listVisitsTimeline,
   RepositoryNotFoundError,
   RepositoryValidationError,
+  reorderTripStopImages,
   reorderVisitImages,
   updateParkDetails,
   updateParkRemoved,
@@ -110,15 +116,20 @@ import {
   suggestTripPlannerRoute
 } from './routes/trip-planner.js';
 import {
+  completeTripStopImageUploadRoute,
   createTripRoute,
+  createTripStopImageUploadUrlRoute,
   createTripStopRoute,
   deleteTripRoute,
+  deleteTripStopImageRoute,
   deleteTripStopRoute,
   getTripBySlugRoute,
   getTripRoute,
   listTripsRoute,
+  reorderTripStopImagesRoute,
   updateTripRoute,
-  updateTripStopRoute
+  updateTripStopRoute,
+  uploadTripStopImagesRoute
 } from './routes/trips.js';
 import type { StorageClient } from './storage/types.js';
 import { TripPlannerError } from './trip-planner/search.js';
@@ -150,6 +161,7 @@ type SessionContext = Parameters<typeof getSessionCookie>[0];
 type PublicTripDetail = NonNullable<Awaited<ReturnType<typeof getPublicTripBySlug>>>;
 
 const MAX_VISIT_IMAGE_FILE_SIZE = 15 * 1024 * 1024;
+const MAX_TRIP_STOP_IMAGE_COUNT = 6;
 const ACCEPTED_VISIT_IMAGE_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 const DIRECT_VISIT_UPLOAD_URL_TTL_SECONDS = 15 * 60;
 const LOGO_PRESIGNED_URL_TTL_SECONDS = 7 * 24 * 60 * 60;
@@ -886,7 +898,7 @@ export const createApp = ({
       context.header('Cache-Control', PRIVATE_CACHE_CONTROL);
 
       const { slug } = context.req.valid('param');
-      const trip = await getPublicTripBySlug(database, slug);
+      const trip = await getPublicTripBySlug(database, slug, getImagePublicUrl);
 
       if (!trip) {
         return context.json(jsonNotFound('Trip not found.'), 404);
@@ -899,7 +911,7 @@ export const createApp = ({
       context.header('Cache-Control', PRIVATE_CACHE_CONTROL);
 
       const { id } = context.req.valid('param');
-      const trip = await getTripById(database, id);
+      const trip = await getTripById(database, id, getImagePublicUrl);
 
       if (!trip) {
         return context.json(jsonNotFound('Trip not found.'), 404);
@@ -1253,6 +1265,310 @@ export const createApp = ({
     });
 
     if (storage) {
+      app.openapi(createTripStopImageUploadUrlRoute, async (context) => {
+        context.header('Cache-Control', PRIVATE_CACHE_CONTROL);
+        const authFailure = await requireAdminSession(context, auth);
+
+        if (authFailure) {
+          return authFailure;
+        }
+
+        const { id } = context.req.valid('param');
+        const { contentType, fileSizeBytes } = context.req.valid('json');
+
+        const existingTripStop = await findTripStopRecordById(database, id);
+
+        if (!existingTripStop) {
+          return context.json(jsonNotFound('Trip stop not found.'), 404);
+        }
+
+        if (fileSizeBytes > MAX_VISIT_IMAGE_FILE_SIZE) {
+          return context.json({ error: 'File too large.' }, 413);
+        }
+
+        const imageCount = await countTripStopImages(database, id);
+
+        if (imageCount >= MAX_TRIP_STOP_IMAGE_COUNT) {
+          return context.json(
+            { error: `Trip stop already has the maximum of ${MAX_TRIP_STOP_IMAGE_COUNT} images.` },
+            422
+          );
+        }
+
+        const key = `trip-stops/${id}/${randomUUID()}.${getVisitImageFileExtension(contentType)}`;
+        const uploadUrl = await storage.getPresignedUploadUrl(
+          key,
+          contentType,
+          DIRECT_VISIT_UPLOAD_URL_TTL_SECONDS
+        );
+
+        return context.json(
+          {
+            expiresAt: new Date(
+              Date.now() + DIRECT_VISIT_UPLOAD_URL_TTL_SECONDS * 1000
+            ).toISOString(),
+            headers: {
+              'content-type': contentType
+            },
+            key,
+            method: 'PUT' as const,
+            uploadUrl
+          },
+          201
+        );
+      });
+
+      app.openapi(completeTripStopImageUploadRoute, async (context) => {
+        context.header('Cache-Control', PRIVATE_CACHE_CONTROL);
+        const authFailure = await requireAdminSession(context, auth);
+
+        if (authFailure) {
+          return authFailure;
+        }
+
+        const { id } = context.req.valid('param');
+        const { fullHeight, fullWidth, key, originalName } = context.req.valid('json');
+
+        const existingTripStop = await findTripStopRecordById(database, id);
+
+        if (!existingTripStop) {
+          return context.json(jsonNotFound('Trip stop not found.'), 404);
+        }
+
+        if (!key.startsWith(`trip-stops/${id}/`)) {
+          return context.json({ error: 'Upload key does not belong to this trip stop.' }, 422);
+        }
+
+        const objectMetadata = await storage.getObjectMetadata(key);
+
+        if (!objectMetadata) {
+          return context.json({ error: 'Upload is missing from storage.' }, 422);
+        }
+
+        const resolvedContentType = objectMetadata.contentType ?? 'application/octet-stream';
+
+        if (!ACCEPTED_VISIT_IMAGE_MIME_TYPES.includes(resolvedContentType)) {
+          return context.json({ error: 'Unsupported file type.' }, 422);
+        }
+
+        try {
+          const timestamp = new Date().toISOString();
+          const row = await createTripStopImage(database, {
+            createdAt: timestamp,
+            displayOrder: 0,
+            fileSizeBytes: objectMetadata.contentLength,
+            fullHeight: fullHeight ?? null,
+            fullKey: key,
+            fullWidth: fullWidth ?? null,
+            mimeType: resolvedContentType,
+            originalName: normalizeOptionalOriginalName(originalName),
+            thumbHeight: fullHeight ?? null,
+            thumbKey: key,
+            thumbWidth: fullWidth ?? null,
+            tripStopId: id,
+            updatedAt: timestamp
+          });
+
+          return context.json(
+            {
+              image: await toVisitImageResponse(storage, row)
+            },
+            201
+          );
+        } catch (error) {
+          if (error instanceof RepositoryValidationError) {
+            return context.json({ error: error.message }, 422);
+          }
+
+          throw error;
+        }
+      });
+
+      app.openapi(uploadTripStopImagesRoute, async (context) => {
+        context.header('Cache-Control', PRIVATE_CACHE_CONTROL);
+        const authFailure = await requireAdminSession(context, auth);
+
+        if (authFailure) {
+          return authFailure;
+        }
+
+        if (!allowServerImageUploads) {
+          return context.json(
+            {
+              error: 'Server-side multipart uploads are disabled here. Use the direct upload flow.'
+            },
+            501
+          );
+        }
+
+        const { id } = context.req.valid('param');
+        const body = await context.req.parseBody({ all: true });
+        const rawImages = body.images;
+        const files: File[] = [];
+
+        if (Array.isArray(rawImages)) {
+          for (const item of rawImages) {
+            if (item instanceof File) {
+              files.push(item);
+            }
+          }
+        } else if (rawImages instanceof File) {
+          files.push(rawImages);
+        }
+
+        if (files.length === 0) {
+          return context.json({ error: 'No images provided.' }, 400);
+        }
+
+        const existingTripStop = await findTripStopRecordById(database, id);
+
+        if (!existingTripStop) {
+          return context.json(jsonNotFound('Trip stop not found.'), 404);
+        }
+
+        const imageCount = await countTripStopImages(database, id);
+
+        if (imageCount + files.length > MAX_TRIP_STOP_IMAGE_COUNT) {
+          return context.json(
+            { error: `Trip stop already has the maximum of ${MAX_TRIP_STOP_IMAGE_COUNT} images.` },
+            422
+          );
+        }
+
+        type UploadResult = {
+          createdAt: string;
+          displayOrder: number;
+          fullHeight: number | null;
+          fullUrl: string;
+          fullWidth: number | null;
+          id: number;
+          originalName: string | null;
+          thumbHeight: number | null;
+          thumbUrl: string;
+          thumbWidth: number | null;
+        };
+
+        const results: UploadResult[] = [];
+        const errors: { originalName: string; reason: string }[] = [];
+
+        for (const file of files) {
+          if (!ACCEPTED_VISIT_IMAGE_MIME_TYPES.includes(file.type)) {
+            errors.push({ originalName: file.name, reason: 'Unsupported file type.' });
+            continue;
+          }
+
+          if (file.size > MAX_VISIT_IMAGE_FILE_SIZE) {
+            errors.push({ originalName: file.name, reason: 'File too large.' });
+            continue;
+          }
+
+          try {
+            const buffer = Buffer.from(await file.arrayBuffer());
+            const { processImage } = await import('./images/process-image.js');
+            const processed = await processImage(buffer);
+
+            const baseKey = `trip-stops/${id}/${randomUUID()}`;
+            const fullKey = `${baseKey}-full.jpg`;
+            const thumbKey = `${baseKey}-thumb.jpg`;
+
+            await storage.upload(fullKey, processed.fullBuffer, 'image/jpeg');
+            await storage.upload(thumbKey, processed.thumbBuffer, 'image/jpeg');
+
+            const timestamp = new Date().toISOString();
+            const row = await createTripStopImage(database, {
+              createdAt: timestamp,
+              displayOrder: 0,
+              fileSizeBytes: processed.fullBuffer.length,
+              fullHeight: processed.fullHeight,
+              fullKey,
+              fullWidth: processed.fullWidth,
+              mimeType: 'image/jpeg',
+              originalName: file.name,
+              thumbHeight: processed.thumbHeight,
+              thumbKey,
+              thumbWidth: processed.thumbWidth,
+              tripStopId: id,
+              updatedAt: timestamp
+            });
+
+            results.push(await toVisitImageResponse(storage, row));
+          } catch (error) {
+            if (error instanceof RepositoryValidationError) {
+              return context.json({ error: error.message }, 422);
+            }
+
+            logger.error(
+              { err: (error as Error).message, fileName: file.name },
+              'Trip stop image upload failed'
+            );
+            errors.push({ originalName: file.name, reason: 'Processing failed.' });
+          }
+        }
+
+        if (results.length === 0) {
+          return context.json({ error: 'All uploads failed.', errors }, 422);
+        }
+
+        return context.json({ images: results, errors }, 201);
+      });
+
+      app.openapi(deleteTripStopImageRoute, async (context) => {
+        context.header('Cache-Control', PRIVATE_CACHE_CONTROL);
+        const authFailure = await requireAdminSession(context, auth);
+
+        if (authFailure) {
+          return authFailure;
+        }
+
+        const { imageId, tripStopId } = context.req.valid('param');
+        const image = await findTripStopImageById(database, imageId);
+
+        if (!image || image.tripStopId !== tripStopId) {
+          return context.json(jsonNotFound('Image not found.'), 404);
+        }
+
+        await storage.delete(image.fullKey);
+        await storage.delete(image.thumbKey);
+        await deleteTripStopImage(database, imageId);
+
+        return new Response(null, {
+          headers: context.res.headers,
+          status: 204
+        });
+      });
+
+      app.openapi(reorderTripStopImagesRoute, async (context) => {
+        context.header('Cache-Control', PRIVATE_CACHE_CONTROL);
+        const authFailure = await requireAdminSession(context, auth);
+
+        if (authFailure) {
+          return authFailure;
+        }
+
+        const { id } = context.req.valid('param');
+        const { imageIds } = context.req.valid('json');
+        const existingTripStop = await findTripStopRecordById(database, id);
+
+        if (!existingTripStop) {
+          return context.json(jsonNotFound('Trip stop not found.'), 404);
+        }
+
+        try {
+          await reorderTripStopImages(database, id, imageIds);
+        } catch (error) {
+          if (error instanceof Error && error.message.startsWith('Invalid image order:')) {
+            return context.json({ error: error.message }, 422);
+          }
+
+          throw error;
+        }
+
+        return new Response(null, {
+          headers: context.res.headers,
+          status: 204
+        });
+      });
+
       app.openapi(createVisitImageUploadUrlRoute, async (context) => {
         context.header('Cache-Control', PRIVATE_CACHE_CONTROL);
         const authFailure = await requireAdminSession(context, auth);

@@ -156,6 +156,7 @@ export const tripSchema = z.object({
 export const tripStopSchema = z.object({
   createdAt: z.string().datetime(),
   id: z.number().int(),
+  images: z.array(visitImageSchema),
   location: labeledPointSchema,
   note: z.string().nullable(),
   tripStopOrder: z.number().int().positive(),
