@@ -20,6 +20,7 @@ import {
   parkTypes,
   parkVisits,
   publicDataVersions,
+  tripStopImages,
   tripStops,
   trips,
   visitImages
@@ -888,8 +889,21 @@ export type VisitImage = {
   createdAt: string;
 };
 
+const MAX_TRIP_STOP_IMAGES = 6;
+
 const toVisitImage = async (
-  row: typeof visitImages.$inferSelect,
+  row: {
+    createdAt: string;
+    displayOrder: number;
+    fullHeight: number | null;
+    fullKey: string;
+    fullWidth: number | null;
+    id: number;
+    originalName: string | null;
+    thumbHeight: number | null;
+    thumbKey: string;
+    thumbWidth: number | null;
+  },
   getPublicUrl: (key: string) => Promise<string>
 ): Promise<VisitImage> => ({
   id: row.id,
@@ -932,10 +946,11 @@ const toTrip = (row: TripRow) => {
   };
 };
 
-const toTripStop = (row: TripStopRow) => {
+const toTripStop = (row: TripStopRow, images: VisitImage[] = []) => {
   return {
     createdAt: row.createdAt,
     id: row.id,
+    images,
     location: toTripStopLocation(row),
     note: row.note,
     tripStopOrder: row.tripStopOrder,
@@ -996,11 +1011,11 @@ const toPublicTripItineraryVisitEntry = (row: PublicTripDetailVisitRow) => {
   };
 };
 
-const toTripItineraryStopEntry = (row: TripStopRow) => {
+const toTripItineraryStopEntry = (row: TripStopRow, images: VisitImage[] = []) => {
   return {
     kind: 'stop' as const,
     tripStopOrder: row.tripStopOrder,
-    stop: toTripStop(row)
+    stop: toTripStop(row, images)
   };
 };
 
@@ -1037,7 +1052,7 @@ const getTripRecordById = async (database: DbClient, tripId: number) => {
   });
 };
 
-const getTripStopRecordById = async (database: DbClient, tripStopId: number) => {
+export const findTripStopRecordById = async (database: DbClient, tripStopId: number) => {
   return database.query.tripStops.findFirst({
     where: eq(tripStops.id, tripStopId)
   });
@@ -1293,6 +1308,17 @@ const getImagesForVisitIds = async (database: Database, visitIds: number[]) => {
   });
 };
 
+const getImagesForTripStopIds = async (database: Database, tripStopIds: number[]) => {
+  if (tripStopIds.length === 0) {
+    return [];
+  }
+
+  return database.query.tripStopImages.findMany({
+    orderBy: [asc(tripStopImages.displayOrder), asc(tripStopImages.createdAt)],
+    where: inArray(tripStopImages.tripStopId, tripStopIds)
+  });
+};
+
 const buildVisitImagesByVisitId = async (
   database: Database,
   visitIds: number[],
@@ -1316,6 +1342,32 @@ const buildVisitImagesByVisitId = async (
   }
 
   return visitImagesByVisitId;
+};
+
+const buildTripStopImagesByTripStopId = async (
+  database: Database,
+  tripStopIds: number[],
+  getImagePublicUrl: (key: string) => Promise<string>
+) => {
+  const imageRows = await getImagesForTripStopIds(database, tripStopIds);
+  const imagesByTripStopId = new Map<number, (typeof tripStopImages.$inferSelect)[]>();
+
+  for (const img of imageRows) {
+    const list = imagesByTripStopId.get(img.tripStopId) ?? [];
+    list.push(img);
+    imagesByTripStopId.set(img.tripStopId, list);
+  }
+
+  const tripStopImagesByTripStopId = new Map<number, VisitImage[]>();
+
+  for (const tripStopId of tripStopIds) {
+    const images = await Promise.all(
+      (imagesByTripStopId.get(tripStopId) ?? []).map((img) => toVisitImage(img, getImagePublicUrl))
+    );
+    tripStopImagesByTripStopId.set(tripStopId, images);
+  }
+
+  return tripStopImagesByTripStopId;
 };
 
 const buildVisitTripsByTripId = async (
@@ -2101,7 +2153,11 @@ export const listTrips = async (database: Database) => {
   return rows.map((row) => toTrip(row));
 };
 
-export const getTripById = async (database: Database, tripId: number) => {
+export const getTripById = async (
+  database: Database,
+  tripId: number,
+  getImagePublicUrl: (key: string) => Promise<string>
+) => {
   const [tripRows, tripStopRows, tripVisitRows] = await Promise.all([
     listTripRows(database),
     listTripStopRowsByTripId(database, tripId),
@@ -2113,9 +2169,17 @@ export const getTripById = async (database: Database, tripId: number) => {
     return null;
   }
 
+  const tripStopImagesByTripStopId = await buildTripStopImagesByTripStopId(
+    database,
+    tripStopRows.map((row) => row.id),
+    getImagePublicUrl
+  );
+
   const itinerary = [
     ...tripVisitRows.map((row) => toTripItineraryVisitEntry(row)),
-    ...tripStopRows.map((row) => toTripItineraryStopEntry(row))
+    ...tripStopRows.map((row) =>
+      toTripItineraryStopEntry(row, tripStopImagesByTripStopId.get(row.id))
+    )
   ].sort((a, b) => a.tripStopOrder - b.tripStopOrder);
 
   return {
@@ -2124,7 +2188,11 @@ export const getTripById = async (database: Database, tripId: number) => {
   };
 };
 
-export const getPublicTripBySlug = async (database: Database, slug: string) => {
+export const getPublicTripBySlug = async (
+  database: Database,
+  slug: string,
+  getImagePublicUrl: (key: string) => Promise<string>
+) => {
   const tripRecord = await findTripRecordBySlug(database, slug);
 
   if (!tripRecord) {
@@ -2137,15 +2205,27 @@ export const getPublicTripBySlug = async (database: Database, slug: string) => {
     listPublicTripDetailVisitRowsByTripId(database, tripRecord.id)
   ]);
   const trip = tripRows.find((row) => row.id === tripRecord.id)!;
+  const tripStopImagesByTripStopId = await buildTripStopImagesByTripStopId(
+    database,
+    tripStopRows.map((row) => row.id),
+    getImagePublicUrl
+  );
 
   const itinerary = [
     ...tripVisitRows.map((row) => toPublicTripItineraryVisitEntry(row)),
-    ...tripStopRows.map((row) => toTripItineraryStopEntry(row))
+    ...tripStopRows.map((row) =>
+      toTripItineraryStopEntry(row, tripStopImagesByTripStopId.get(row.id))
+    )
   ].sort((a, b) => a.tripStopOrder - b.tripStopOrder);
 
   return {
     ...toTrip(trip),
-    imageCount: tripVisitRows.reduce((total, row) => total + row.imageCount, 0),
+    imageCount:
+      tripVisitRows.reduce((total, row) => total + row.imageCount, 0) +
+      Array.from(tripStopImagesByTripStopId.values()).reduce(
+        (total, images) => total + images.length,
+        0
+      ),
     itinerary,
     stopCount: tripStopRows.length
   };
@@ -2475,7 +2555,7 @@ export const createTripStop = async (
 
     await bumpPublicVisitDataVersion(tx, timestamp);
 
-    return toTripStop(row);
+    return toTripStop(row, []);
   });
 };
 
@@ -2832,7 +2912,7 @@ export const updateTripStop = async (
   tripStopId: number,
   input: UpdateTripStopInput
 ) => {
-  const existingTripStop = await getTripStopRecordById(database, tripStopId);
+  const existingTripStop = await findTripStopRecordById(database, tripStopId);
 
   if (!existingTripStop) {
     return null;
@@ -2878,7 +2958,7 @@ export const updateTripStop = async (
 
     await bumpPublicVisitDataVersion(tx, timestamp);
 
-    return toTripStop(updatedTripStop);
+    return toTripStop(updatedTripStop, []);
   });
 };
 
@@ -2968,7 +3048,7 @@ export const deleteTrip = async (database: Database, tripId: number) => {
 };
 
 export const deleteTripStop = async (database: Database, tripStopId: number) => {
-  const existingTripStop = await getTripStopRecordById(database, tripStopId);
+  const existingTripStop = await findTripStopRecordById(database, tripStopId);
 
   if (!existingTripStop) {
     return false;
@@ -3022,6 +3102,38 @@ export const createVisitImage = async (
   return row;
 };
 
+export const countTripStopImages = async (database: Database, tripStopId: number) => {
+  const rows = await database
+    .select({ count: sql<number>`COUNT(*)` })
+    .from(tripStopImages)
+    .where(eq(tripStopImages.tripStopId, tripStopId));
+
+  return Number(rows[0]?.count ?? 0);
+};
+
+export const createTripStopImage = async (
+  database: Database,
+  values: typeof tripStopImages.$inferInsert
+) => {
+  const existingTripStop = await findTripStopRecordById(database, values.tripStopId);
+
+  if (!existingTripStop) {
+    throw new RepositoryNotFoundError('Trip stop not found.');
+  }
+
+  const imageCount = await countTripStopImages(database, values.tripStopId);
+
+  if (imageCount >= MAX_TRIP_STOP_IMAGES) {
+    throw new RepositoryValidationError(
+      `Trip stop already has the maximum of ${MAX_TRIP_STOP_IMAGES} images.`
+    );
+  }
+
+  const row = (await database.insert(tripStopImages).values(values).returning())[0]!;
+  await bumpPublicVisitDataVersion(database, values.updatedAt);
+  return row;
+};
+
 export const findVisitImageById = async (database: Database, imageId: number) => {
   const rows = await database
     .select()
@@ -3031,8 +3143,28 @@ export const findVisitImageById = async (database: Database, imageId: number) =>
   return rows[0] ?? null;
 };
 
+export const findTripStopImageById = async (database: Database, imageId: number) => {
+  const rows = await database
+    .select()
+    .from(tripStopImages)
+    .where(eq(tripStopImages.id, imageId))
+    .limit(1);
+
+  return rows[0] ?? null;
+};
+
 export const deleteVisitImage = async (database: Database, imageId: number) => {
   const result = await database.delete(visitImages).where(eq(visitImages.id, imageId));
+
+  if (Number(result.rowsAffected) > 0) {
+    await bumpPublicVisitDataVersion(database, new Date().toISOString());
+  }
+
+  return Number(result.rowsAffected) > 0;
+};
+
+export const deleteTripStopImage = async (database: Database, imageId: number) => {
+  const result = await database.delete(tripStopImages).where(eq(tripStopImages.id, imageId));
 
   if (Number(result.rowsAffected) > 0) {
     await bumpPublicVisitDataVersion(database, new Date().toISOString());
@@ -3067,6 +3199,38 @@ export const reorderVisitImages = async (
       .update(visitImages)
       .set({ displayOrder: index, updatedAt: timestamp })
       .where(eq(visitImages.id, imageId));
+  }
+
+  await bumpPublicVisitDataVersion(database, timestamp);
+};
+
+export const reorderTripStopImages = async (
+  database: Database,
+  tripStopId: number,
+  orderedImageIds: number[]
+) => {
+  const existing = await database
+    .select({ id: tripStopImages.id })
+    .from(tripStopImages)
+    .where(eq(tripStopImages.tripStopId, tripStopId));
+
+  const existingIds = new Set(existing.map((row) => row.id));
+
+  if (
+    orderedImageIds.length !== existingIds.size ||
+    !orderedImageIds.every((id) => existingIds.has(id))
+  ) {
+    throw new Error('Invalid image order: IDs do not match trip stop images.');
+  }
+
+  const timestamp = new Date().toISOString();
+
+  for (let index = 0; index < orderedImageIds.length; index++) {
+    const imageId = orderedImageIds[index]!;
+    await database
+      .update(tripStopImages)
+      .set({ displayOrder: index, updatedAt: timestamp })
+      .where(eq(tripStopImages.id, imageId));
   }
 
   await bumpPublicVisitDataVersion(database, timestamp);

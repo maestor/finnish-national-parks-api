@@ -2,14 +2,18 @@ import { eq } from 'drizzle-orm';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import {
+  countTripStopImages,
   createTrip,
   createTripStop,
+  createTripStopImage,
   createVisit,
   createVisitImage,
   deleteTrip,
   deleteTripStop,
+  deleteTripStopImage,
   deleteVisit,
   deleteVisitImage,
+  findTripStopImageById,
   getCatalogListEtagSeed,
   getParkBySlug,
   getParkBySlugIncludingRemoved,
@@ -24,6 +28,7 @@ import {
   listTrips,
   listVisits,
   reassignParkVisits,
+  reorderTripStopImages,
   reorderVisitImages,
   updateParkDetails,
   updateParkLogo,
@@ -39,6 +44,7 @@ import { createTestDatabase } from '../helpers/test-db.js';
 
 describe('repositories', () => {
   let testDatabase: Awaited<ReturnType<typeof createTestDatabase>>;
+  const getImagePublicUrl = async () => '';
 
   beforeEach(async () => {
     testDatabase = await createTestDatabase();
@@ -636,7 +642,7 @@ describe('repositories', () => {
       tripStopOrder: 2,
       visitedOn: '2026-04-13'
     });
-    const tripDetail = await getTripById(testDatabase.database, trip.id);
+    const tripDetail = await getTripById(testDatabase.database, trip.id, getImagePublicUrl);
 
     expect(stop).toMatchObject({
       location: {
@@ -665,6 +671,7 @@ describe('repositories', () => {
           tripStopOrder: 2,
           stop: {
             id: stop.id,
+            images: [],
             note: 'Lunch break'
           }
         },
@@ -704,7 +711,7 @@ describe('repositories', () => {
       note: 'Coffee break',
       tripStopOrder: 1
     });
-    const movedTripDetail = await getTripById(testDatabase.database, trip.id);
+    const movedTripDetail = await getTripById(testDatabase.database, trip.id, getImagePublicUrl);
 
     expect(movedStop).toMatchObject({
       note: 'Coffee break',
@@ -718,7 +725,9 @@ describe('repositories', () => {
 
     await expect(deleteTripStop(testDatabase.database, stop.id)).resolves.toBe(true);
     await expect(deleteTripStop(testDatabase.database, 99999)).resolves.toBe(false);
-    await expect(getTripById(testDatabase.database, trip.id)).resolves.toMatchObject({
+    await expect(
+      getTripById(testDatabase.database, trip.id, getImagePublicUrl)
+    ).resolves.toMatchObject({
       itinerary: [
         {
           kind: 'visit',
@@ -1476,6 +1485,142 @@ describe('repositories', () => {
     await expect(
       reorderVisitImages(testDatabase.database, visit.id, [99999, img1.id])
     ).rejects.toThrow('Invalid image order');
+  });
+
+  it('stores trip stop images and rejects over-limit or invalid reorder cases', async () => {
+    const trip = await createTrip(testDatabase.database, {
+      name: 'Kesäreissu 2026'
+    });
+    await createVisit(testDatabase.database, 'akasmannyn-kansallispuisto', {
+      tripId: trip.id,
+      visitedOn: '2026-04-10'
+    });
+    const stop = await createTripStop(testDatabase.database, trip.id, {
+      location: {
+        coordinate: {
+          lat: 61.3167,
+          lon: 22.1333
+        },
+        label: 'ABC Huittinen'
+      },
+      visitedOn: '2026-04-10'
+    });
+
+    expect(await countTripStopImages(testDatabase.database, stop.id)).toBe(0);
+
+    const timestamp = new Date().toISOString();
+    const firstImage = await createTripStopImage(testDatabase.database, {
+      createdAt: timestamp,
+      displayOrder: 0,
+      fullHeight: 100,
+      fullKey: 'trip-stops/1/full-1.jpg',
+      fullWidth: 100,
+      mimeType: 'image/jpeg',
+      thumbHeight: 50,
+      thumbKey: 'trip-stops/1/thumb-1.jpg',
+      thumbWidth: 50,
+      tripStopId: stop.id,
+      updatedAt: timestamp
+    });
+
+    expect(await findTripStopImageById(testDatabase.database, firstImage.id)).toMatchObject({
+      id: firstImage.id
+    });
+    expect(await findTripStopImageById(testDatabase.database, 99999)).toBeNull();
+
+    const secondImage = await createTripStopImage(testDatabase.database, {
+      createdAt: timestamp,
+      displayOrder: 0,
+      fullHeight: 100,
+      fullKey: 'trip-stops/1/full-2.jpg',
+      fullWidth: 100,
+      mimeType: 'image/jpeg',
+      thumbHeight: 50,
+      thumbKey: 'trip-stops/1/thumb-2.jpg',
+      thumbWidth: 50,
+      tripStopId: stop.id,
+      updatedAt: timestamp
+    });
+
+    await reorderTripStopImages(testDatabase.database, stop.id, [secondImage.id, firstImage.id]);
+
+    const tripDetail = await getTripById(testDatabase.database, trip.id, getImagePublicUrl);
+    const stopEntry = tripDetail?.itinerary.find((entry) => entry.kind === 'stop');
+
+    expect(stopEntry).toMatchObject({
+      kind: 'stop',
+      stop: {
+        id: stop.id,
+        images: [{ id: secondImage.id }, { id: firstImage.id }]
+      }
+    });
+
+    await expect(
+      reorderTripStopImages(testDatabase.database, stop.id, [firstImage.id])
+    ).rejects.toThrow('Invalid image order');
+
+    await expect(
+      createTripStopImage(testDatabase.database, {
+        createdAt: timestamp,
+        displayOrder: 0,
+        fullHeight: 100,
+        fullKey: 'trip-stops/missing/full.jpg',
+        fullWidth: 100,
+        mimeType: 'image/jpeg',
+        thumbHeight: 50,
+        thumbKey: 'trip-stops/missing/thumb.jpg',
+        thumbWidth: 50,
+        tripStopId: 99999,
+        updatedAt: timestamp
+      })
+    ).rejects.toThrow('Trip stop not found.');
+
+    for (let index = 0; index < 4; index++) {
+      await createTripStopImage(testDatabase.database, {
+        createdAt: timestamp,
+        displayOrder: 0,
+        fullHeight: 100,
+        fullKey: `trip-stops/1/full-extra-${index}.jpg`,
+        fullWidth: 100,
+        mimeType: 'image/jpeg',
+        thumbHeight: 50,
+        thumbKey: `trip-stops/1/thumb-extra-${index}.jpg`,
+        thumbWidth: 50,
+        tripStopId: stop.id,
+        updatedAt: timestamp
+      });
+    }
+
+    await expect(
+      createTripStopImage(testDatabase.database, {
+        createdAt: timestamp,
+        displayOrder: 0,
+        fullHeight: 100,
+        fullKey: 'trip-stops/1/full-over-limit.jpg',
+        fullWidth: 100,
+        mimeType: 'image/jpeg',
+        thumbHeight: 50,
+        thumbKey: 'trip-stops/1/thumb-over-limit.jpg',
+        thumbWidth: 50,
+        tripStopId: stop.id,
+        updatedAt: timestamp
+      })
+    ).rejects.toThrow('Trip stop already has the maximum of 6 images.');
+
+    await expect(deleteTripStopImage(testDatabase.database, firstImage.id)).resolves.toBe(true);
+    await expect(deleteTripStopImage(testDatabase.database, 99999)).resolves.toBe(false);
+  });
+
+  it('returns zero trip stop images when the database returns no count rows', async () => {
+    const database = {
+      select: () => ({
+        from: () => ({
+          where: async () => []
+        })
+      })
+    } as unknown as Parameters<typeof countTripStopImages>[0];
+
+    await expect(countTripStopImages(database, 123)).resolves.toBe(0);
   });
 
   it('reassigns visits and keeps visit images attached under the target park', async () => {
