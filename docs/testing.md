@@ -75,21 +75,21 @@ If an upload limit exists, at least one test should cover the real stored-object
 - `GET /api/parks?category=...` filters the public catalog list by derived API category, such as `trails-and-routes`.
 - `GET /api/parks/:slug` returns catalog detail without visit state.
 - `GET /api/parks/:slug` also returns removed-park detail when the request carries a valid admin session cookie.
-- `PATCH /api/parks/:slug` updates the editable admin-managed park fields and auto-generates a slug when only `name` changes.
+- `PATCH /api/parks/:slug` updates the editable admin-managed park fields, including optional nullable `markerPoint`, and auto-generates a slug when only `name` changes.
 - `tests/integration/vercel-entry.integration.test.ts` protects the Vercel entrypoint contract by ensuring `src/index.ts` remains the recognized Hono entry file and `src/app.ts` does not import directly from `hono`.
 - Park catalog responses expose both the source `type` and a derived `category`.
 - Park catalog responses expose linked logo metadata and stable logo URLs when a park logo has been configured.
 - Park responses expose raw `locationLabel`, `postalCode`, and `postalOffice` fields from the database, plus a derived `address` string for display use.
 - `GET /api/home-summary` returns cache-friendly home summary data including seasonal visit counts, `progressByType` visibility flags, and aggregated `progressByCategory`, without notes, routes, or images.
-- `GET /api/map-summary` returns lightweight map data plus per-park visited summaries.
+- `GET /api/map-summary` returns lightweight map data plus per-park visited summaries, including effective park `markerPoint` overrides.
 - `GET /api/trips` returns named trips with derived `dateRange`, `visitCount`, persisted `slug`, and optional `startingPoint`.
-- `GET /api/trips/slug/:slug` returns one page-ready trip detail payload by public slug, including derived `imageCount` / `stopCount`, itinerary visit park `markerPoint` / `typeLabel` / per-visit `imageCount`, and a route state shaped as `route: { success, error, data }`. Missing route prerequisites return a successful empty route state, while actual routing failures stay inside `route.error` with failed-leg details when available.
-- `GET /api/trips/:id` returns one trip with a merged itinerary that includes both park visits and non-park trip stops in shared `tripStopOrder`.
+- `GET /api/trips/slug/:slug` returns one page-ready trip detail payload by public slug, including derived `imageCount` / `stopCount`, itinerary visit park `markerPoint` / `typeLabel` / per-visit `imageCount`, and a route state shaped as `route: { success, error, data }`. Visit itinerary entries include optional visit `location`, and a stored visit location overrides the park default marker point for both the itinerary marker and route waypoint. Missing route prerequisites return a successful empty route state, while actual routing failures stay inside `route.error` with failed-leg details when available.
+- `GET /api/trips/:id` returns one trip with a merged itinerary that includes both park visits and non-park trip stops in shared `tripStopOrder`, including optional visit `location` overrides for admin workflows.
 - `GET /api/visits-timeline` returns the lightweight `/kaynnit` timeline dataset with `imageCount`, `trip: { id, name, slug } | null`, `tripStopOrder: number | null`, and pre-resolved park `typeLabel` values.
 - `POST /api/trip-planner/suggestions` returns up to three Geoapify-backed place suggestions with labels and coordinates for origin/destination pickers.
 - `POST /api/trip-planner/search` resolves exact known park and trail names from the local catalog before provider geocoding, filters parks against the real routed path, excludes parks outside the corridor, preserves the documented unvisited-first ordering, suppresses overly broad matches from the first 30 km of long trips, and returns map-ready route geometry plus route and park bounding boxes.
 - `GET /api/parks/:slug/visits` returns park-scoped visit history and visited summary.
-- `GET /api/visits` and `GET /api/visits/:id` expose visit resources with parent park references and `trip: { id, name, slug } | null`.
+- `GET /api/visits` and `GET /api/visits/:id` expose visit resources with parent park references, `trip: { id, name, slug } | null`, and optional `location: { lat, lon } | null`.
 - Catalog, home summary, map summary, trip list, and visits timeline `GET` endpoints emit ETags and return `304 Not Modified` for matching `If-None-Match`.
 - Catalog `GET` endpoints are safe for public caching.
 - Home summary, map summary, trip list, and visits timeline endpoints use shared-cache headers and bump their version signal when trip, trip-stop, visit, or visit-image data changes.
@@ -100,7 +100,7 @@ If an upload limit exists, at least one test should cover the real stored-object
 - Trip create/edit/delete supports named-trip CRUD, persisted trip slugs, optional starting points, and clears visit assignments on delete.
 - Trip-stop create/edit/delete supports non-park itinerary stops with labeled coordinates, required `visitedOn` dates, optional notes, and shared ordering between stops and park visits.
 - Trip-stop validation covers both required trip membership context and date-range constraints: a stop cannot be created for a trip with zero visits, and each stop date may be at most one day outside the trip's visit-derived range so departure-day and return-day stops can extend the trip window.
-- Visit create/edit/delete supports optional route, author, `tripId`, and `tripStopOrder` fields, including same-day ordering inside a named trip.
+- Visit create/edit/delete supports optional route, author, `tripId`, `tripStopOrder`, and nullable visit `location` fields, including same-day ordering inside a named trip.
 - Visit create/edit/delete works against a real temporary database.
 - Park logo upload logic verifies the park slug, prefers `data/logos/<slug>.png`, falls back to `data/logos/display-types/<normalized-display-type>.png` when a park shares a display type, uploads the resolved file once to the matching R2 key, and persists the logo reference in the database.
 - Auth routes bypass bearer-token middleware.

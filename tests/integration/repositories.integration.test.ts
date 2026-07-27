@@ -211,6 +211,60 @@ describe('repositories', () => {
     });
   });
 
+  it('can override and clear a park marker point', async () => {
+    const original = await getParkBySlug(testDatabase.database, 'akasmannyn-kansallispuisto');
+
+    expect(original).not.toBeNull();
+
+    const overridden = await updateParkDetails(
+      testDatabase.database,
+      'akasmannyn-kansallispuisto',
+      {
+        markerPoint: {
+          lat: 60.3141,
+          lon: 24.2718
+        }
+      }
+    );
+
+    expect(overridden).toMatchObject({
+      markerPoint: {
+        lat: 60.3141,
+        lon: 24.2718
+      }
+    });
+
+    const cleared = await updateParkDetails(testDatabase.database, 'akasmannyn-kansallispuisto', {
+      markerPoint: null
+    });
+
+    expect(cleared).toMatchObject({
+      markerPoint: original!.markerPoint
+    });
+  });
+
+  it('falls back to the current marker point when clearing without imported marker shadow', async () => {
+    await testDatabase.database
+      .update(parks)
+      .set({
+        importedMarkerLat: null,
+        importedMarkerLon: null
+      })
+      .where(eq(parks.slug, 'akasmannyn-kansallispuisto'));
+
+    const original = await getParkBySlug(testDatabase.database, 'akasmannyn-kansallispuisto');
+
+    expect(original).not.toBeNull();
+
+    const cleared = await updateParkDetails(testDatabase.database, 'akasmannyn-kansallispuisto', {
+      markerPoint: null
+    });
+
+    expect(cleared).toMatchObject({
+      markerPoint: original!.markerPoint
+    });
+  });
+
   it('lists park records including removed rows with display type names', async () => {
     await testDatabase.database
       .update(parks)
@@ -332,8 +386,35 @@ describe('repositories', () => {
 
     expect(clearedVisit).toMatchObject({
       author: null,
+      location: null,
       note: null,
       route: null,
+      visitedOn: '2026-04-13'
+    });
+  });
+
+  it('can clear a visit-specific location override', async () => {
+    const visit = await createVisit(testDatabase.database, 'akasmannyn-kansallispuisto', {
+      location: {
+        lat: 60.3141,
+        lon: 24.2718
+      },
+      visitedOn: '2026-04-13'
+    });
+
+    expect(visit).toMatchObject({
+      location: {
+        lat: 60.3141,
+        lon: 24.2718
+      }
+    });
+
+    const clearedVisit = await updateVisit(testDatabase.database, visit.id, {
+      location: null
+    });
+
+    expect(clearedVisit).toMatchObject({
+      location: null,
       visitedOn: '2026-04-13'
     });
   });

@@ -135,6 +135,10 @@ describe('API routes', () => {
     body: {
       author?: string;
       excludeFromRoute?: boolean;
+      location?: {
+        lat: number;
+        lon: number;
+      } | null;
       note?: string;
       route?: string;
       tripId?: number | null;
@@ -727,6 +731,10 @@ describe('API routes', () => {
         displayTypeName: 'Ystävyyden puisto',
         establishmentYear: 1990,
         locationLabel: 'Korjattu puistotie 9',
+        markerPoint: {
+          lat: 60.3141,
+          lon: 24.2718
+        },
         parkUrl: '/fi/kohteet/korjattu-puisto',
         name: 'Korjattu puisto',
         postalCode: '99130',
@@ -755,6 +763,10 @@ describe('API routes', () => {
       displayTypeName: 'Ystävyyden puisto',
       establishmentYear: 1990,
       locationLabel: 'Korjattu puistotie 9',
+      markerPoint: {
+        lat: 60.3141,
+        lon: 24.2718
+      },
       parkUrl: 'https://www.luontoon.fi/fi/kohteet/korjattu-puisto',
       name: 'Korjattu puisto',
       postalCode: '99130',
@@ -766,6 +778,10 @@ describe('API routes', () => {
     expect(adminDetailBody).toMatchObject({
       address: 'Korjattu puistotie 9, 99130 Kittilä',
       locationLabel: 'Korjattu puistotie 9',
+      markerPoint: {
+        lat: 60.3141,
+        lon: 24.2718
+      },
       postalCode: '99130',
       postalOffice: 'Kittilä'
     });
@@ -775,6 +791,10 @@ describe('API routes', () => {
       displayTypeName: 'Ystävyyden puisto',
       establishmentYear: 1990,
       locationLabel: 'Korjattu puistotie 9',
+      markerPoint: {
+        lat: 60.3141,
+        lon: 24.2718
+      },
       parkUrl: 'https://www.luontoon.fi/fi/kohteet/korjattu-puisto',
       name: 'Korjattu puisto',
       postalCode: '99130',
@@ -782,6 +802,26 @@ describe('API routes', () => {
       slug: 'korjattu-puisto'
     });
     expect(oldSlugResponse.status).toBe(404);
+
+    const clearMarkerResponse = await app.request('/api/parks/korjattu-puisto', {
+      method: 'PATCH',
+      body: JSON.stringify({
+        markerPoint: null
+      }),
+      headers: {
+        cookie: sessionCookie,
+        'content-type': 'application/json'
+      }
+    });
+    const clearMarkerBody = (await clearMarkerResponse.json()) as Record<string, unknown>;
+
+    expect(clearMarkerResponse.status).toBe(200);
+    expect(clearMarkerBody).toMatchObject({
+      markerPoint: {
+        lat: 62.5,
+        lon: 27.5
+      }
+    });
   });
 
   it('requires an admin session for park edits and reports missing, invalid, and conflicting updates', async () => {
@@ -1673,6 +1713,10 @@ describe('API routes', () => {
       }
     });
     const { body: firstVisit } = await createVisit(app, 'akasmannyn-kansallispuisto', {
+      location: {
+        lat: 67.5,
+        lon: 24.2
+      },
       route: 'North trail',
       tripId: createdTrip.id,
       tripStopOrder: 1,
@@ -1712,6 +1756,10 @@ describe('API routes', () => {
     });
     const assignTripBody = (await assignTripResponse.json()) as {
       excludeFromRoute: boolean;
+      location: {
+        lat: number;
+        lon: number;
+      } | null;
       tripStopOrder: number | null;
       trip: {
         id: number;
@@ -1727,6 +1775,7 @@ describe('API routes', () => {
       slug: 'kesareissu-2026'
     });
     expect(assignTripBody.excludeFromRoute).toBe(false);
+    expect(assignTripBody.location).toBeNull();
     expect(assignTripBody.tripStopOrder).toBe(2);
 
     const excludeVisitResponse = await requestAsAdmin(app, `/api/visits/${secondVisit.id}`, {
@@ -1744,6 +1793,31 @@ describe('API routes', () => {
 
     expect(excludeVisitResponse.status).toBe(200);
     expect(excludeVisitBody.excludeFromRoute).toBe(true);
+
+    const visitLocationResponse = await requestAsAdmin(app, `/api/visits/${secondVisit.id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({
+        location: {
+          lat: 61.7788,
+          lon: 23.9988
+        }
+      }),
+      headers: {
+        'content-type': 'application/json'
+      }
+    });
+    const visitLocationBody = (await visitLocationResponse.json()) as {
+      location: {
+        lat: number;
+        lon: number;
+      } | null;
+    };
+
+    expect(visitLocationResponse.status).toBe(200);
+    expect(visitLocationBody.location).toEqual({
+      lat: 61.7788,
+      lon: 23.9988
+    });
 
     const tripsResponse = await app.request('/api/trips');
     const tripsBody = (await tripsResponse.json()) as {
@@ -1812,6 +1886,10 @@ describe('API routes', () => {
       visits: Array<{
         excludeFromRoute: boolean;
         id: number;
+        location: {
+          lat: number;
+          lon: number;
+        } | null;
         tripStopOrder: number | null;
         trip: {
           id: number;
@@ -1823,6 +1901,10 @@ describe('API routes', () => {
     const visitDetailResponse = await app.request(`/api/visits/${firstVisit.id}`);
     const visitDetailBody = (await visitDetailResponse.json()) as {
       excludeFromRoute: boolean;
+      location: {
+        lat: number;
+        lon: number;
+      } | null;
       tripStopOrder: number | null;
       trip: {
         id: number;
@@ -1854,10 +1936,18 @@ describe('API routes', () => {
       name: 'Kesäreissu 2026',
       slug: 'kesareissu-2026'
     });
+    expect(visitsBody.visits.find((visit) => visit.id === firstVisit.id)?.location).toEqual({
+      lat: 67.5,
+      lon: 24.2
+    });
     expect(visitsBody.visits.find((visit) => visit.id === firstVisit.id)?.tripStopOrder).toBe(1);
     expect(visitsBody.visits.find((visit) => visit.id === secondVisit.id)?.excludeFromRoute).toBe(
       true
     );
+    expect(visitsBody.visits.find((visit) => visit.id === secondVisit.id)?.location).toEqual({
+      lat: 61.7788,
+      lon: 23.9988
+    });
     expect(visitDetailResponse.status).toBe(200);
     expect(visitDetailBody.trip).toEqual({
       id: createdTrip.id,
@@ -1865,6 +1955,10 @@ describe('API routes', () => {
       slug: 'kesareissu-2026'
     });
     expect(visitDetailBody.excludeFromRoute).toBe(false);
+    expect(visitDetailBody.location).toEqual({
+      lat: 67.5,
+      lon: 24.2
+    });
     expect(visitDetailBody.tripStopOrder).toBe(1);
 
     const renameTripResponse = await requestAsAdmin(app, `/api/trips/${createdTrip.id}`, {
@@ -2219,6 +2313,10 @@ describe('API routes', () => {
       }
     });
     const { body: firstVisit } = await createVisit(app, 'akasmannyn-kansallispuisto', {
+      location: {
+        lat: 67.5123,
+        lon: 24.4567
+      },
       route: 'North trail',
       tripId: trip.id,
       tripStopOrder: 1,
@@ -2376,7 +2474,10 @@ describe('API routes', () => {
           id: firstVisit.id,
           imageCount: 0,
           park: {
-            markerPoint: firstPark!.markerPoint,
+            markerPoint: {
+              lat: 67.5123,
+              lon: 24.4567
+            },
             name: 'Äkäsmännyn kansallispuisto',
             slug: 'akasmannyn-kansallispuisto',
             typeLabel: parkTypeFixtures.nationalPark.name
@@ -2451,7 +2552,10 @@ describe('API routes', () => {
           routeFallbackQueries: ['Helsinki']
         }),
         expect.objectContaining({
-          coordinate: firstPark!.markerPoint,
+          coordinate: {
+            lat: 67.5123,
+            lon: 24.4567
+          },
           displayName: 'Äkäsmännyn kansallispuisto',
           label: 'Äkäsmännyn kansallispuisto',
           routeFallbackQueries: expect.arrayContaining([

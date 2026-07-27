@@ -331,6 +331,53 @@ describe('importParks', () => {
     });
   });
 
+  it('preserves a manually overridden park marker point across re-imports', async () => {
+    await importParks({
+      database: testDatabase.database,
+      expectedActiveCount: 1,
+      now: () => '2026-05-01T08:00:00.000Z',
+      sourceUrl: 'https://example.test/lipas',
+      fetchSource: async () => ({
+        items: [createLipasPark()]
+      })
+    });
+
+    await testDatabase.database
+      .update(parks)
+      .set({
+        markerLat: 60.3141,
+        markerLon: 24.2718
+      })
+      .where(eq(parks.slug, 'akasmannyn-kansallispuisto'));
+
+    await importParks({
+      database: testDatabase.database,
+      expectedActiveCount: 1,
+      now: () => '2026-05-02T08:00:00.000Z',
+      sourceUrl: 'https://example.test/lipas',
+      fetchSource: async () => ({
+        items: [
+          createLipasPark({
+            location: {
+              address: 'Tuotu tie 2',
+              'postal-code': '00100',
+              'postal-office': 'Helsinki'
+            }
+          })
+        ]
+      })
+    });
+
+    await expect(
+      getParkBySlug(testDatabase.database, 'akasmannyn-kansallispuisto')
+    ).resolves.toMatchObject({
+      markerPoint: {
+        lat: 60.3141,
+        lon: 24.2718
+      }
+    });
+  });
+
   it('falls back to the current slug when importedSlug is missing on an existing row', async () => {
     await importParks({
       database: testDatabase.database,
