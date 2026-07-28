@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import type { Env } from '../../src/env.js';
-import { createAuthConfig, createStorage, createTripPlanner } from '../../src/runtime.js';
+import {
+  createAuthConfig,
+  createLogoPublicUrl,
+  createStorage,
+  createTripPlanner
+} from '../../src/runtime.js';
 
 const createEnv = (overrides: Partial<Env> = {}): Env => {
   return {
@@ -16,6 +21,7 @@ const createEnv = (overrides: Partial<Env> = {}): Env => {
     GOOGLE_REDIRECT_URI: undefined,
     MEMORY_STORAGE: 'false',
     PORT: undefined,
+    PUBLIC_API_BASE_URL: undefined,
     R2_ACCESS_KEY_ID: undefined,
     R2_BUCKET_NAME: undefined,
     R2_ENDPOINT: undefined,
@@ -70,6 +76,39 @@ describe('runtime helpers', () => {
       googleClientSecret: 'google-client-secret',
       jwtSecret: '12345678901234567890123456789012'
     });
+  });
+
+  it('creates a stable public logo URL builder only when a public API base URL is configured', () => {
+    expect(createLogoPublicUrl(createEnv())).toBeUndefined();
+
+    const getLogoPublicUrl = createLogoPublicUrl(
+      createEnv({
+        PUBLIC_API_BASE_URL: 'https://api.example.com'
+      })
+    );
+    const getLogoPublicUrlWithTrailingSlash = createLogoPublicUrl(
+      createEnv({
+        PUBLIC_API_BASE_URL: 'https://api.example.com/'
+      })
+    );
+
+    expect(getLogoPublicUrl).toBeDefined();
+    expect(
+      getLogoPublicUrl?.('logos/akasmannyn-kansallispuisto.png', '2026-07-28T10:00:00.000Z')
+    ).toBe(
+      'https://api.example.com/assets/logos/akasmannyn-kansallispuisto.png?v=2026-07-28T10%3A00%3A00.000Z'
+    );
+    expect(getLogoPublicUrl?.('nested/logo image.png', '2026-07-28T11:00:00.000Z')).toBe(
+      'https://api.example.com/assets/logos/nested/logo%20image.png?v=2026-07-28T11%3A00%3A00.000Z'
+    );
+    expect(
+      getLogoPublicUrlWithTrailingSlash?.(
+        'logos/ukko-kolin-kansallismaisema.png',
+        '2026-07-28T12:00:00.000Z'
+      )
+    ).toBe(
+      'https://api.example.com/assets/logos/ukko-kolin-kansallismaisema.png?v=2026-07-28T12%3A00%3A00.000Z'
+    );
   });
 
   it('adds google redirect uri when one is configured', () => {

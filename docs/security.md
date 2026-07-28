@@ -17,7 +17,7 @@ It is intentionally policy-oriented. Keep it focused on standing rules, design e
 Every route must fit one explicit access class:
 
 - Anonymous remote:
-  Only `GET /health`, `GET /openapi.json`, and login-control `/auth/*` routes belong here unless a future change is explicitly designed, tested, and documented otherwise.
+  `GET /health`, `GET /openapi.json`, login-control `/auth/*` routes, and the public logo asset redirect route `GET /assets/logos/*` belong here today.
 - API-key integration:
   Read-only `/api/*` routes that are intentionally available to trusted non-browser callers may use the shared `API_KEY`.
 - Admin session:
@@ -28,7 +28,7 @@ Every route must fit one explicit access class:
 Rules:
 
 - Do not describe a route as public unless it is anonymously accessible over the network.
-- There are no anonymous site data endpoints. Frontend-facing `GET` routes such as `/api/home-summary`, `/api/map-summary`, `/api/trips`, `/api/trips/slug/:slug`, `/api/trips/:id`, and `/api/visits-timeline` still require the API key outside localhost, while admin routes require a valid admin session.
+- There are no anonymous site data JSON endpoints. Frontend-facing `GET` routes such as `/api/home-summary`, `/api/map-summary`, `/api/trips`, `/api/trips/slug/:slug`, `/api/trips/:id`, and `/api/visits-timeline` still require the API key outside localhost, while admin routes require a valid admin session. The only anonymous asset read route is `GET /assets/logos/*`.
 - New anonymously accessible routes must define cache policy, abuse controls, and the reason they are safe to expose.
 - Removing an unused admin endpoint is preferred over leaving it available behind auth.
 
@@ -47,7 +47,8 @@ Rules:
 ## Storage And Upload Rules
 
 - Keep R2 private by default.
-- Use presigned URLs for visit images, trip-stop images, park logos, and similar assets instead of public bucket URLs.
+- Use presigned URLs for visit images, trip-stop images, and other non-public assets instead of public bucket URLs.
+- Public park logos may use stable API-owned redirect URLs such as `GET /assets/logos/*?v=<updatedAt>` so frontend caches see deterministic source URLs while the underlying R2 bucket stays private.
 - Enforce upload limits against the actual stored object metadata, not only client-declared metadata.
 - Keep a documented size budget for uploads so storage growth and bandwidth remain predictable.
 - If direct uploads can create orphaned objects, define and document cleanup strategy.

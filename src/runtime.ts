@@ -7,6 +7,17 @@ import { createR2Client } from './storage/r2-client.js';
 import { createGeoapifyClient } from './trip-planner/geoapify.js';
 import { createTripPlannerService } from './trip-planner/search.js';
 
+const normalizeBaseUrl = (baseUrl: string) => {
+  return baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`;
+};
+
+const encodeKeyPath = (key: string) => {
+  return key
+    .split('/')
+    .map((segment) => encodeURIComponent(segment))
+    .join('/');
+};
+
 export const createStorage = (env: Env) => {
   if (env.MEMORY_STORAGE === 'true') {
     return createMemoryStorage();
@@ -60,6 +71,21 @@ export const createTripPlanner = (env: Env, database: Database) => {
   });
 };
 
+export const createLogoPublicUrl = (env: Env) => {
+  if (!env.PUBLIC_API_BASE_URL) {
+    return undefined;
+  }
+
+  const baseUrl = normalizeBaseUrl(env.PUBLIC_API_BASE_URL);
+
+  return (key: string, updatedAt: string) => {
+    const logoPath = key.startsWith('logos/') ? key.slice('logos/'.length) : key;
+    const url = new URL(`assets/logos/${encodeKeyPath(logoPath)}`, baseUrl);
+    url.searchParams.set('v', updatedAt);
+    return url.toString();
+  };
+};
+
 export const env = getEnv();
 export const databaseClient = createDatabaseClient();
 export const database = createDatabase(databaseClient);
@@ -69,7 +95,7 @@ export const app = createApp({
   allowServerImageUploads: !isVercelDeployment(),
   auth: createAuthConfig(env),
   database,
-  getLogoPublicUrl: undefined,
+  getLogoPublicUrl: createLogoPublicUrl(env),
   getMapPublicUrl: undefined,
   storage: createStorage(env),
   tripPlanner

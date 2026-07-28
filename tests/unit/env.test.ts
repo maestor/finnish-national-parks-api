@@ -16,6 +16,7 @@ const createEnv = (overrides: Partial<Env> = {}): Env => {
     GOOGLE_REDIRECT_URI: undefined,
     MEMORY_STORAGE: 'false',
     PORT: undefined,
+    PUBLIC_API_BASE_URL: undefined,
     R2_ACCESS_KEY_ID: undefined,
     R2_BUCKET_NAME: undefined,
     R2_ENDPOINT: undefined,
