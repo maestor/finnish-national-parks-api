@@ -186,3 +186,6 @@ export const getParkCategoryByTypeSlug = (typeSlug: SupportedParkTypeSlug) => {
 
   return getSupportedParkCategoryBySlug(typeSlug);
 };
+
+export const hasMagnetByDefaultForTypeSlug = (typeSlug: SupportedParkTypeSlug) =>
+  typeSlug === 'national-park';

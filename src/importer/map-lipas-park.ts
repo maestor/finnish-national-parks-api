@@ -1,6 +1,10 @@
 import { z } from 'zod';
 import { createParkSlug, normalizeParkUrl } from '../parks/park-normalization.js';
-import { getSupportedParkTypeByCode, getSupportedParkTypeBySlug } from '../parks/park-types.js';
+import {
+  getSupportedParkTypeByCode,
+  getSupportedParkTypeBySlug,
+  hasMagnetByDefaultForTypeSlug
+} from '../parks/park-types.js';
 import type { BoundingBox, GeoJsonFeatureCollection } from './geometry.js';
 import { deriveBoundingBox } from './geometry.js';
 
@@ -65,6 +69,7 @@ export type MappedPark = {
   boundingBox: BoundingBox;
   boundaryGeoJson: GeoJsonFeatureCollection;
   establishmentYear: number | null;
+  hasMagnet: boolean;
   lipasId: number;
   locationLabel: string;
   parkUrl: string | null;
@@ -108,6 +113,7 @@ export const mapLipasPark = (source: unknown, existingSlug?: string): MappedPark
     boundingBox,
     boundaryGeoJson,
     establishmentYear: park['construction-year'] ?? null,
+    hasMagnet: hasMagnetByDefaultForTypeSlug(parkType.slug),
     lipasId: park['lipas-id'],
     locationLabel: park.location.address ?? park.location['postal-office'] ?? park.name,
     parkUrl: normalizeParkUrl(park.www),

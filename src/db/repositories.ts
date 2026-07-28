@@ -124,6 +124,7 @@ type UpdateParkDetailsInput = {
   areaKm2?: number | null | undefined;
   displayTypeName?: string | null | undefined;
   establishmentYear?: number | null | undefined;
+  hasMagnet?: boolean | undefined;
   locationLabel?: string | undefined;
   markerPoint?:
     | {
@@ -259,6 +260,7 @@ type PublicParkRow = {
   bboxMinLon: number;
   displayTypeName: string | null;
   establishmentYear: number | null;
+  hasMagnet: boolean;
   locationLabel: string;
   logoKey: string | null;
   logoUpdatedAt: string | null;
@@ -755,6 +757,7 @@ const toPark = async (
     category: toParkCategory(row.parkType.slug as SupportedParkTypeSlug),
     catalogStatus: row.park.catalogStatus as 'active' | 'inactive',
     establishmentYear: row.park.establishmentYear,
+    hasMagnet: row.park.hasMagnet,
     lipasId: row.park.lipasId,
     logo: await toLogo(row.park.logoKey, row.park.logoUpdatedAt, getLogoPublicUrl),
     parkUrl: row.park.parkUrl,
@@ -786,6 +789,7 @@ const toPublicPark = async (
     },
     category: toParkCategory(row.typeSlug as SupportedParkTypeSlug),
     establishmentYear: row.establishmentYear,
+    hasMagnet: row.hasMagnet,
     logo: await toLogo(row.logoKey, row.logoUpdatedAt, getLogoPublicUrl),
     parkUrl: row.parkUrl,
     map: await toMap(row.mapKey, row.mapUpdatedAt, getMapPublicUrl),
@@ -1172,6 +1176,7 @@ const listPublicParkRows = async (database: Database) => {
       bboxMinLon: parks.bboxMinLon,
       displayTypeName: parks.displayTypeName,
       establishmentYear: parks.establishmentYear,
+      hasMagnet: parks.hasMagnet,
       locationLabel: parks.locationLabel,
       logoKey: parks.logoKey,
       logoUpdatedAt: parks.logoUpdatedAt,
@@ -1209,6 +1214,7 @@ const listPublicParkRowsByFilter = async (
       bboxMinLon: parks.bboxMinLon,
       displayTypeName: parks.displayTypeName,
       establishmentYear: parks.establishmentYear,
+      hasMagnet: parks.hasMagnet,
       locationLabel: parks.locationLabel,
       logoKey: parks.logoKey,
       logoUpdatedAt: parks.logoUpdatedAt,
@@ -2084,6 +2090,7 @@ export const listRemovedParks = async (
         boundingBox: toBoundingBox(row.park),
         catalogStatus: row.park.catalogStatus as 'active' | 'inactive',
         establishmentYear: row.park.establishmentYear,
+        hasMagnet: row.park.hasMagnet,
         logo: await toLogo(row.park.logoKey, row.park.logoUpdatedAt, getLogoPublicUrl),
         parkUrl: row.park.parkUrl,
         map: await toMap(row.park.mapKey, row.park.mapUpdatedAt, getMapPublicUrl),
@@ -2812,6 +2819,7 @@ export const updateParkDetails = async (
           : normalizeOptionalText(input.displayTypeName),
       establishmentYear:
         input.establishmentYear === undefined ? park.establishmentYear : input.establishmentYear,
+      hasMagnet: input.hasMagnet === undefined ? park.hasMagnet : input.hasMagnet,
       locationLabel: nextLocationLabel,
       markerLat: nextMarkerPoint.lat,
       markerLon: nextMarkerPoint.lon,
@@ -3273,6 +3281,7 @@ export const upsertCatalogPark = async (database: DbClient, values: UpsertCatalo
     importedAreaKm2: values.areaKm2,
     importedDisplayTypeName: values.displayTypeName,
     importedEstablishmentYear: values.establishmentYear,
+    importedHasMagnet: values.hasMagnet,
     importedMarkerLat: values.markerLat,
     importedMarkerLon: values.markerLon,
     importedLocationLabel: values.locationLabel,
@@ -3309,9 +3318,15 @@ export const upsertCatalogPark = async (database: DbClient, values: UpsertCatalo
             THEN excluded.imported_establishment_year
           ELSE ${parks.establishmentYear}
         END`,
+        hasMagnet: sql`CASE
+          WHEN ${parks.hasMagnet} IS ${parks.importedHasMagnet}
+            THEN excluded.imported_has_magnet
+          ELSE ${parks.hasMagnet}
+        END`,
         importedAreaKm2: valuesWithImportedFields.importedAreaKm2,
         importedDisplayTypeName: valuesWithImportedFields.importedDisplayTypeName,
         importedEstablishmentYear: valuesWithImportedFields.importedEstablishmentYear,
+        importedHasMagnet: valuesWithImportedFields.importedHasMagnet,
         importedMarkerLat: valuesWithImportedFields.importedMarkerLat,
         importedMarkerLon: valuesWithImportedFields.importedMarkerLon,
         importedLocationLabel: valuesWithImportedFields.importedLocationLabel,

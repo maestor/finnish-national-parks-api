@@ -5,7 +5,7 @@ import { z } from 'zod';
 
 import type { Database } from '../db/database.js';
 import { createImportRun, syncParkTypes, upsertCatalogPark } from '../db/repositories.js';
-import { getSupportedParkTypeBySlug } from '../parks/park-types.js';
+import { getSupportedParkTypeBySlug, hasMagnetByDefaultForTypeSlug } from '../parks/park-types.js';
 import type { GeoJsonFeatureCollection, LineStringGeometry, PolygonGeometry } from './geometry.js';
 import { deriveBoundingBox } from './geometry.js';
 import { extractHikingAreaMetadata } from './special-parks/builders.js';
@@ -305,6 +305,7 @@ export const importSpecialParks = async ({
         createdAt: importedAt,
         displayTypeName: config.displayTypeName,
         establishmentYear: metadata.establishmentYear,
+        hasMagnet: hasMagnetByDefaultForTypeSlug(parkType.slug),
         lastImportRunId: importRunId,
         lipasId: config.syntheticLipasId,
         locationLabel: config.locationLabel,

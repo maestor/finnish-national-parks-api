@@ -39,7 +39,7 @@ import {
 } from '../../src/db/repositories.js';
 import { parks, parkVisits, trips } from '../../src/db/schema.js';
 import { importParks } from '../../src/importer/import-parks.js';
-import { createLipasPark } from '../fixtures/lipas.js';
+import { createLipasPark, parkTypeFixtures } from '../fixtures/lipas.js';
 import { createTestDatabase } from '../helpers/test-db.js';
 
 describe('repositories', () => {
@@ -143,6 +143,54 @@ describe('repositories', () => {
     ).resolves.toMatchObject({
       name: 'Oma kohde',
       slug: 'oma-kohde'
+    });
+  });
+
+  it('defaults hasMagnet on national parks and allows admin updates', async () => {
+    await importParks({
+      database: testDatabase.database,
+      expectedActiveCount: 2,
+      now: () => '2026-05-02T10:00:00.000Z',
+      sourceUrl: 'https://example.test/lipas-second-park',
+      fetchSource: async () => ({
+        items: [
+          createLipasPark(),
+          createLipasPark({
+            'lipas-id': 67890,
+            name: 'Kaupunkilaakson ulkoilualue',
+            type: {
+              'type-code': parkTypeFixtures.outdoorRecreationArea.typeCode
+            },
+            www: 'https://www.luontoon.fi/kaupunkilaakso'
+          })
+        ]
+      })
+    });
+
+    await expect(
+      getParkBySlug(testDatabase.database, 'akasmannyn-kansallispuisto')
+    ).resolves.toMatchObject({
+      hasMagnet: true
+    });
+    await expect(
+      getParkBySlug(testDatabase.database, 'kaupunkilaakson-ulkoilualue')
+    ).resolves.toMatchObject({
+      hasMagnet: false
+    });
+
+    const updated = await updateParkDetails(testDatabase.database, 'kaupunkilaakson-ulkoilualue', {
+      hasMagnet: true
+    });
+
+    expect(updated).toMatchObject({
+      hasMagnet: true,
+      slug: 'kaupunkilaakson-ulkoilualue'
+    });
+
+    await expect(
+      getParkBySlug(testDatabase.database, 'kaupunkilaakson-ulkoilualue')
+    ).resolves.toMatchObject({
+      hasMagnet: true
     });
   });
 
@@ -1216,6 +1264,7 @@ describe('repositories', () => {
       category: {
         slug: 'national-park'
       },
+      hasMagnet: true,
       name: 'Äkäsmännyn kansallispuisto',
       parkUrl: 'https://www.luontoon.fi/testi-puisto?foo=bar',
       slug: 'akasmannyn-kansallispuisto'
