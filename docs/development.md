@@ -65,6 +65,7 @@ API_KEY=your-local-dev-key
 DATABASE_URL=file:./data/local.db
 DATABASE_AUTH_TOKEN=
 PORT=3004
+PUBLIC_API_BASE_URL=
 
 # Google OAuth (optional — only needed for control-panel login)
 GOOGLE_CLIENT_ID=
@@ -78,7 +79,8 @@ FRONTEND_URL=http://localhost:4300
 GEOAPIFY_API_KEY=
 
 # Cloudflare R2 (optional — needed for visit image uploads and park logo uploads)
-# Visit images and park logos use presigned URLs today, so the bucket can stay private.
+# The bucket can stay private. PUBLIC_API_BASE_URL enables stable public park-logo
+# URLs through this API while visit images still use presigned read URLs.
 R2_BUCKET_NAME=
 R2_ENDPOINT=
 R2_ACCESS_KEY_ID=
@@ -184,7 +186,12 @@ That command:
 - uploads shared display-type files once to `logos/display-types/<normalized-display-type>.png` and then reuses that same key for every matching park
 - stores the logo key plus a logo timestamp on the matching park row so catalog ETags and logo URLs change together
 
-Catalog APIs currently return presigned logo URLs instead of a configurable public base URL.
+When `PUBLIC_API_BASE_URL` is set, catalog APIs return stable park logo URLs like
+`https://api.example.com/assets/logos/<slug>.png?v=<logoUpdatedAt>`. That anonymous
+asset route redirects to a fresh presigned R2 GET URL and sets long-lived public
+cache headers, so the bucket can stay private while frontend caches see a stable
+source URL. Without `PUBLIC_API_BASE_URL`, catalog APIs fall back to presigned logo
+URLs directly.
 
 ## Database
 

@@ -372,6 +372,82 @@ describe('API routes', () => {
     });
   });
 
+  it('serves anonymous stable logo redirects when a public API base URL is configured', async () => {
+    await testDatabase.database
+      .update(parks)
+      .set({
+        logoKey: 'logos/akasmannyn-kansallispuisto.png',
+        logoUpdatedAt: '2026-07-28T10:00:00.000Z',
+        updatedAt: '2026-07-28T10:00:00.000Z'
+      })
+      .where(eq(parks.slug, 'akasmannyn-kansallispuisto'));
+
+    const apiKey = 'test-api-key';
+    const app = createApp({
+      apiKey,
+      database: testDatabase.database,
+      getLogoPublicUrl: (key, updatedAt) =>
+        `https://api.example.com/assets/logos/${key.slice('logos/'.length)}?v=${encodeURIComponent(updatedAt)}`,
+      storage: createMemoryStorage()
+    });
+
+    const parksResponse = await app.request('/api/parks', {
+      headers: {
+        authorization: `Bearer ${apiKey}`
+      }
+    });
+    const parksBody = (await parksResponse.json()) as {
+      parks: Array<{ logo: null | { url: string } }>;
+    };
+    const logoUrl = parksBody.parks.find((park) => park.logo)?.logo?.url;
+
+    expect(logoUrl).toBeDefined();
+
+    const url = new URL(logoUrl!);
+    const logoResponse = await app.request(`${url.pathname}${url.search}`);
+
+    expect(logoResponse.status).toBe(302);
+    expect(logoResponse.headers.get('cache-control')).toBe('public, max-age=31536000, immutable');
+    expect(logoResponse.headers.get('location')).toContain('https://memory-storage.test/logos/');
+  });
+
+  it('rejects anonymous stable logo requests without a version query', async () => {
+    const app = createApp({
+      database: testDatabase.database,
+      storage: createMemoryStorage()
+    });
+
+    const response = await app.request('/assets/logos/akasmannyn-kansallispuisto.png');
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({ error: 'Missing logo version.' });
+  });
+
+  it('rejects anonymous stable logo requests with empty logo paths', async () => {
+    const app = createApp({
+      database: testDatabase.database,
+      storage: createMemoryStorage()
+    });
+
+    const response = await app.request('/assets/logos/?v=2026-07-28T10:00:00.000Z');
+
+    expect(response.status).toBe(404);
+    await expect(response.json()).resolves.toEqual({ error: 'Logo not found.' });
+  });
+
+  it('returns not found for anonymous stable logo requests when storage is not configured', async () => {
+    const app = createApp({
+      database: testDatabase.database
+    });
+
+    const response = await app.request(
+      '/assets/logos/akasmannyn-kansallispuisto.png?v=2026-07-28T10:00:00.000Z'
+    );
+
+    expect(response.status).toBe(404);
+    await expect(response.json()).resolves.toEqual({ error: 'Logo storage not configured.' });
+  });
+
   it('exposes map details in park list and park detail responses when a map is set', async () => {
     await testDatabase.database
       .update(parks)

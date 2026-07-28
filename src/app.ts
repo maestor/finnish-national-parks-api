@@ -166,6 +166,7 @@ const ACCEPTED_VISIT_IMAGE_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'
 const DIRECT_VISIT_UPLOAD_URL_TTL_SECONDS = 15 * 60;
 const LOGO_PRESIGNED_URL_TTL_SECONDS = 7 * 24 * 60 * 60;
 const MAP_PRESIGNED_URL_TTL_SECONDS = 7 * 24 * 60 * 60;
+const PUBLIC_LOGO_REDIRECT_CACHE_CONTROL = 'public, max-age=31536000, immutable';
 
 const jsonNotFound = (error: string) => {
   return {
@@ -494,6 +495,31 @@ export const createApp = ({
       service: 'finnish-national-parks-api'
     })
   );
+
+  app.get('/assets/logos/*', async (context) => {
+    const version = context.req.query('v');
+
+    if (!version) {
+      return context.json({ error: 'Missing logo version.' }, 400);
+    }
+
+    const logoPath = context.req.path.slice('/assets/logos/'.length);
+    const segments = logoPath.split('/').filter(Boolean);
+    const hasInvalidSegment = segments.some((segment) => segment === '.' || segment === '..');
+
+    if (segments.length === 0 || hasInvalidSegment) {
+      return context.json({ error: 'Logo not found.' }, 404);
+    }
+
+    if (!storage) {
+      return context.json({ error: 'Logo storage not configured.' }, 404);
+    }
+
+    const logoKey = `logos/${segments.join('/')}`;
+    const location = await storage.getPresignedUrl(logoKey, LOGO_PRESIGNED_URL_TTL_SECONDS);
+    context.header('Cache-Control', PUBLIC_LOGO_REDIRECT_CACHE_CONTROL);
+    return context.redirect(location, 302);
+  });
 
   if (database) {
     app.openapi(googleAuthRoute, (c) => {

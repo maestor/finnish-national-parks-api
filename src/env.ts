@@ -16,6 +16,7 @@ const envSchema = z.object({
   GOOGLE_REDIRECT_URI: z.string().url().optional(),
   MEMORY_STORAGE: z.enum(['true', 'false']).default('false'),
   PORT: z.string().optional(),
+  PUBLIC_API_BASE_URL: z.string().url().optional(),
   R2_ACCESS_KEY_ID: z.string().optional(),
   R2_BUCKET_NAME: z.string().optional(),
   R2_ENDPOINT: z.string().optional(),

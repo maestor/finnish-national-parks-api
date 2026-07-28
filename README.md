@@ -66,6 +66,7 @@ FRONTEND_URL=http://localhost:4300
 GEOAPIFY_API_KEY=
 
 # Optional: Cloudflare R2 storage for visit images and park logos
+PUBLIC_API_BASE_URL=
 R2_BUCKET_NAME=
 R2_ENDPOINT=
 R2_ACCESS_KEY_ID=
@@ -87,7 +88,7 @@ Production notes:
 - `npm run db:backup` reads the current remote `DATABASE_URL` and `DATABASE_AUTH_TOKEN`, then writes a timestamped SQLite backup under `data/backups/`. You can append an optional label with `npm run db:backup -- before-import`.
 - `npm run db:migrate` remains available as the manual fallback or recovery path if the production workflow is unavailable.
 - `npm run park:move-visits -- --from <source-slug> --to <target-slug> [--dry-run]` reassigns all visits for one park slug to another. Visit images stay attached automatically because they belong to the visit rows.
-- `npm run park:logo -- <park-slug>` uploads either `data/logos/<park-slug>.png` or, when multiple parks share one `displayTypeName`, `data/logos/display-types/<normalized-display-type>.png`. Shared display-type logos are stored once under `logos/display-types/` in R2 and linked from every matching park row. Park APIs currently expose presigned logo URLs instead of a configurable public base URL.
+- `npm run park:logo -- <park-slug>` uploads either `data/logos/<park-slug>.png` or, when multiple parks share one `displayTypeName`, `data/logos/display-types/<normalized-display-type>.png`. Shared display-type logos are stored once under `logos/display-types/` in R2 and linked from every matching park row. When `PUBLIC_API_BASE_URL` is set, park APIs expose stable versioned logo URLs through `GET /assets/logos/*`; otherwise they fall back to presigned logo URLs.
 
 The importer's LIPAS source URL and supported type-code list are internal configuration, not a normal `.env` setting.
 
@@ -95,6 +96,7 @@ The importer's LIPAS source URL and supported type-code list are internal config
 
 - `GET /health`
 - `GET /openapi.json`
+- `GET /assets/logos/*`
 - `GET /api/parks`
 - `GET /api/parks/search`
 - `GET /api/admin/parks/visibility`
@@ -184,9 +186,9 @@ Catalog endpoints stay cache-friendly and database-backed:
 - `POST /api/visits/:id/images`, `DELETE /api/visits/:visitId/images/:imageId`, and `PATCH /api/visits/:id/images/reorder` are also admin-session write routes.
 - `POST /api/trip-stops/:id/images` remains available for localhost-style server uploads, but trip-stop images still enforce the 6-image cap.
 - `POST /api/visits/:id/images` remains available for localhost-style server uploads, but Vercel runtime disables that Sharp-based path so uploads do not pass through the function body limit.
-- `GET /health` and `GET /openapi.json` are the only anonymous data endpoints today.
+- `GET /health`, `GET /openapi.json`, and `GET /assets/logos/*` are the anonymous read endpoints today.
 - `/auth/*` routes are anonymous login-control endpoints, not public data endpoints.
-- There are no anonymous site data endpoints in this API. Frontend-facing `GET` routes such as `/api/home-summary`, `/api/map-summary`, `/api/trips`, `/api/trips/slug/:slug`, and `/api/visits-timeline` still require the API key outside localhost when `API_KEY` is configured.
+- There are no anonymous site data JSON endpoints in this API. Frontend-facing `GET` routes such as `/api/home-summary`, `/api/map-summary`, `/api/trips`, `/api/trips/slug/:slug`, and `/api/visits-timeline` still require the API key outside localhost when `API_KEY` is configured; the only anonymous asset read route is `GET /assets/logos/*`.
 
 ## Data Source
 
