@@ -256,6 +256,7 @@ export const importParks = async ({
           displayTypeName:
             mapped.sourceTypeCode === hikingAreaTypeCode ? hikingAreaDisplayTypeName : null,
           establishmentYear: mapped.establishmentYear,
+          hasMagnet: mapped.hasMagnet,
           lastImportRunId: importRunId!,
           lipasId: mapped.lipasId,
           locationLabel: mapped.locationLabel,

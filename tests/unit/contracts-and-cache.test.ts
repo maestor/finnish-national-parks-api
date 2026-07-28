@@ -54,6 +54,9 @@ describe('contracts and cache helpers', () => {
     expect(updateParkRequestSchema.parse({ name: 'Updated park' })).toEqual({
       name: 'Updated park'
     });
+    expect(updateParkRequestSchema.parse({ hasMagnet: true })).toEqual({
+      hasMagnet: true
+    });
     expect(
       updateParkRequestSchema.parse({
         markerPoint: {

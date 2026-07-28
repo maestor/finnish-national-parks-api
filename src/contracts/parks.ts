@@ -80,6 +80,7 @@ export const parkListItemSchema = z.object({
   category: parkCategorySchema,
   displayTypeName: z.string().nullable().optional(),
   establishmentYear: z.number().int().nullable(),
+  hasMagnet: z.boolean(),
   locationLabel: z.string(),
   logo: parkLogoSchema.nullable(),
   parkUrl: z.string().nullable(),
@@ -472,6 +473,7 @@ export const updateParkRequestSchema = z
     areaKm2: z.number().nonnegative().nullable().optional(),
     displayTypeName: z.string().max(120).nullable().optional(),
     establishmentYear: z.number().int().nullable().optional(),
+    hasMagnet: z.boolean().optional(),
     locationLabel: z.string().trim().min(1).max(255).optional(),
     markerPoint: pointSchema.nullable().optional(),
     parkUrl: z.string().trim().min(1).max(500).nullable().optional(),
@@ -485,6 +487,7 @@ export const updateParkRequestSchema = z
       input.areaKm2 !== undefined ||
       input.displayTypeName !== undefined ||
       input.establishmentYear !== undefined ||
+      input.hasMagnet !== undefined ||
       input.locationLabel !== undefined ||
       input.markerPoint !== undefined ||
       input.parkUrl !== undefined ||

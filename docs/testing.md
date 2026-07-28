@@ -75,7 +75,8 @@ If an upload limit exists, at least one test should cover the real stored-object
 - `GET /api/parks?category=...` filters the public catalog list by derived API category, such as `trails-and-routes`.
 - `GET /api/parks/:slug` returns catalog detail without visit state.
 - `GET /api/parks/:slug` also returns removed-park detail when the request carries a valid admin session cookie.
-- `PATCH /api/parks/:slug` updates the editable admin-managed park fields, including optional nullable `markerPoint`, and auto-generates a slug when only `name` changes.
+- `GET /api/parks`, `GET /api/parks/:slug`, and `GET /api/map-summary` expose `hasMagnet: boolean`, with imported `national-park` rows defaulting to `true`.
+- `PATCH /api/parks/:slug` updates the editable admin-managed park fields, including `hasMagnet` and optional nullable `markerPoint`, and auto-generates a slug when only `name` changes.
 - `tests/integration/vercel-entry.integration.test.ts` protects the Vercel entrypoint contract by ensuring `src/index.ts` remains the recognized Hono entry file and `src/app.ts` does not import directly from `hono`.
 - Park catalog responses expose both the source `type` and a derived `category`.
 - Park catalog responses expose linked logo metadata and stable logo URLs when a park logo has been configured.

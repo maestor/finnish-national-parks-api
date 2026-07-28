@@ -62,7 +62,8 @@ describe('migrateDatabase', () => {
       '0021_visit_exclude_from_route.sql',
       '0022_visit_location.sql',
       '0023_park_imported_marker_point.sql',
-      '0024_trip_stop_images.sql'
+      '0024_trip_stop_images.sql',
+      '0025_park_magnets.sql'
     ]);
     expect(parkTypes.rows.map((row) => String(row.slug))).toEqual([
       'outdoor-recreation-area',
@@ -89,6 +90,8 @@ describe('migrateDatabase', () => {
     expect(parkColumns.rows.some((row) => String(row.name) === 'imported_slug')).toBe(true);
     expect(parkColumns.rows.some((row) => String(row.name) === 'imported_marker_lat')).toBe(true);
     expect(parkColumns.rows.some((row) => String(row.name) === 'imported_marker_lon')).toBe(true);
+    expect(parkColumns.rows.some((row) => String(row.name) === 'has_magnet')).toBe(true);
+    expect(parkColumns.rows.some((row) => String(row.name) === 'imported_has_magnet')).toBe(true);
     expect(parkColumns.rows.some((row) => String(row.name) === 'imported_location_label')).toBe(
       true
     );
@@ -155,7 +158,8 @@ describe('migrateDatabase', () => {
       '0021_visit_exclude_from_route.sql',
       '0022_visit_location.sql',
       '0023_park_imported_marker_point.sql',
-      '0024_trip_stop_images.sql'
+      '0024_trip_stop_images.sql',
+      '0025_park_magnets.sql'
     ]);
     expect(schemaMigrationTableBeforeApply.rows).toEqual([]);
     expect(pendingAfterApply).toEqual([]);

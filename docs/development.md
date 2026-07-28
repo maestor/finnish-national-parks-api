@@ -248,6 +248,7 @@ Key route behavior:
 - `GET /api/parks/:slug?includeBoundary=true` returns the stored boundary GeoJSON.
 - `GET /api/parks/:slug` still hides removed parks publicly, but returns removed-park detail to a request carrying a valid admin session cookie when OAuth is enabled.
 - Park list, detail, removed, and map summary responses expose both the source `type` and a derived `category`.
+- Park list, detail, and map summary responses expose `hasMagnet: boolean`, with imported `national-park` rows defaulting to `true`.
 - Park list, detail, removed, and map summary responses expose `logo: { key, updatedAt, url } | null` when one has been linked to the park.
 - Park responses expose raw `locationLabel`, `postalCode`, and `postalOffice` fields from the database, plus a derived `address` string for display use.
 - `GET /api/home-summary` returns home-page summary data including seasonal visit counts, `progressByType` with a `visible` flag, `progressByCategory`, up to 5 `mostVisitedParks`, `recentVisits`, `latestVisitEntries`, and `latestTrips`, without visit notes, routes, or images. Each `latestTrips` item includes `name`, `slug`, and the derived trip `startDate`.
@@ -267,7 +268,7 @@ Key route behavior:
 - Visit and management routes use `private, no-store`.
 - Trip planner suggestion, route-search, and nearby-origin routes all use `private, no-store` and keep the provider key server-side.
 - All write routes and `GET /api/admin/parks/visibility` require a valid admin session cookie.
-- `PATCH /api/parks/:slug` updates the admin-editable park fields, including optional nullable `markerPoint`, and auto-generates a slug from `name` when no explicit `slug` is provided. Setting `markerPoint` to `null` clears an override and restores the imported/default marker.
+- `PATCH /api/parks/:slug` updates the admin-editable park fields, including `hasMagnet` and optional nullable `markerPoint`, and auto-generates a slug from `name` when no explicit `slug` is provided. Setting `markerPoint` to `null` clears an override and restores the imported/default marker.
 - `PATCH /api/parks/:slug/removed` toggles whether a park is hidden from catalog and visit responses.
 - `POST /api/trips`, `PATCH /api/trips/:id`, and `DELETE /api/trips/:id` are admin-session write routes for named trips. Trip create/update accepts optional `slug` and optional nullable `startingPoint`, and otherwise derives the slug from `name`.
 - `POST /api/trips/:id/stops`, `PATCH /api/trip-stops/:id`, and `DELETE /api/trip-stops/:id` are admin-session write routes for non-park trip stops. Stops use the same labeled coordinate shape as trip `startingPoint`, require their own `visitedOn` date, carry an optional note, and participate in the same shared `tripStopOrder` sequence as park visits.

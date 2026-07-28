@@ -262,9 +262,18 @@ describe('API routes', () => {
     expect(body.parks[0]).toHaveProperty('category');
     expect(body.parks[0]).toHaveProperty('type');
     expect(body.parks[0]).toHaveProperty('address');
+    expect(body.parks[0]).toHaveProperty('hasMagnet');
     expect(body.parks[0]).toHaveProperty('locationLabel');
     expect(body.parks[0]).toHaveProperty('postalCode');
     expect(body.parks[0]).toHaveProperty('postalOffice');
+    expect(body.parks.find((park) => park.slug === 'akasmannyn-kansallispuisto')).toHaveProperty(
+      'hasMagnet',
+      true
+    );
+    expect(body.parks.find((park) => park.slug === 'kaupunkilaakson-ulkoilualue')).toHaveProperty(
+      'hasMagnet',
+      false
+    );
   });
 
   it('serves lightweight park search results with cache validators', async () => {
@@ -675,6 +684,7 @@ describe('API routes', () => {
     expect(summaryBody).not.toHaveProperty('boundaryGeoJson');
     expect(summaryBody).not.toHaveProperty('location');
     expect(summaryBody).toHaveProperty('address', 'Puistotie 1, 00999 Testikylä');
+    expect(summaryBody).toHaveProperty('hasMagnet', true);
     expect(summaryBody).toHaveProperty('locationLabel', 'Puistotie 1');
     expect(summaryBody).toHaveProperty('postalCode', '00999');
     expect(summaryBody).toHaveProperty('postalOffice', 'Testikylä');
@@ -730,6 +740,7 @@ describe('API routes', () => {
         areaKm2: 14.75,
         displayTypeName: 'Ystävyyden puisto',
         establishmentYear: 1990,
+        hasMagnet: false,
         locationLabel: 'Korjattu puistotie 9',
         markerPoint: {
           lat: 60.3141,
@@ -762,6 +773,7 @@ describe('API routes', () => {
       areaKm2: 14.75,
       displayTypeName: 'Ystävyyden puisto',
       establishmentYear: 1990,
+      hasMagnet: false,
       locationLabel: 'Korjattu puistotie 9',
       markerPoint: {
         lat: 60.3141,
@@ -777,6 +789,7 @@ describe('API routes', () => {
     expect(adminDetailResponse.headers.get('cache-control')).toContain('public');
     expect(adminDetailBody).toMatchObject({
       address: 'Korjattu puistotie 9, 99130 Kittilä',
+      hasMagnet: false,
       locationLabel: 'Korjattu puistotie 9',
       markerPoint: {
         lat: 60.3141,
@@ -790,6 +803,7 @@ describe('API routes', () => {
       areaKm2: 14.75,
       displayTypeName: 'Ystävyyden puisto',
       establishmentYear: 1990,
+      hasMagnet: false,
       locationLabel: 'Korjattu puistotie 9',
       markerPoint: {
         lat: 60.3141,
@@ -1524,6 +1538,7 @@ describe('API routes', () => {
       visited: true
     });
     expect(akasmanty).toHaveProperty('address', 'Puistotie 1, 00999 Testikylä');
+    expect(akasmanty).toHaveProperty('hasMagnet', true);
     expect(akasmanty).toHaveProperty('locationLabel', 'Puistotie 1');
     expect(akasmanty).toHaveProperty('postalCode', '00999');
     expect(akasmanty).toHaveProperty('postalOffice', 'Testikylä');
