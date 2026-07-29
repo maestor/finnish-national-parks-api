@@ -220,6 +220,24 @@ export const publicDataVersions = sqliteTable('public_data_versions', {
   updatedAt: text('updated_at').notNull()
 });
 
+export const yearReviewShares = sqliteTable(
+  'year_review_shares',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    year: integer('year').notNull(),
+    shareId: text('share_id').notNull(),
+    storyJson: text('story_json').notNull(),
+    generatedAt: text('generated_at').notNull(),
+    publishedAt: text('published_at').notNull(),
+    createdAt: text('created_at').notNull(),
+    updatedAt: text('updated_at').notNull()
+  },
+  (table) => ({
+    shareIdIndex: uniqueIndex('year_review_shares_share_id_idx').on(table.shareId),
+    yearIndex: uniqueIndex('year_review_shares_year_idx').on(table.year)
+  })
+);
+
 export const admins = sqliteTable(
   'admins',
   {

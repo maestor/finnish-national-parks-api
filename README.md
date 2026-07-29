@@ -108,6 +108,10 @@ The importer's LIPAS source URL and supported type-code list are internal config
 - `GET /api/trips/slug/:slug`
 - `GET /api/trips/:id`
 - `GET /api/visits-timeline`
+- `GET /api/year-review/:year/preview`
+- `POST /api/year-review/:year/publish`
+- `DELETE /api/year-review/:year/publish`
+- `GET /api/year-review/shares/:shareId`
 - `POST /api/trip-planner/suggestions`
 - `POST /api/trip-planner/search`
 - `POST /api/trip-planner/nearby`
@@ -162,6 +166,10 @@ Catalog endpoints stay cache-friendly and database-backed:
 - `GET /api/trips/slug/:slug` returns one page-ready trip detail payload by public slug, including derived `imageCount` / `stopCount`, itinerary visit park `markerPoint` / `typeLabel` / per-visit `imageCount`, trip-stop image arrays, and a route state shaped as `route: { success, error, data }`. Visit itinerary entries now include `excludeFromRoute: boolean` and optional `location: { lat, lon } | null`; when `location` is present, the public trip itinerary `park.markerPoint` and route-building waypoint use that visit-specific point instead of the park default marker. Missing route prerequisites return `route.success: true` with `route.data: null`, while real routing failures keep the page payload at `200` and surface `errorCode`, optional failed-leg details, and `route.success: false` inside the route object. This detail route uses `Cache-Control: private, no-store`.
 - `GET /api/trips/:id` returns one trip with a merged itinerary ordered by `tripStopOrder`, combining park visits and non-park trip stops. Trip stops now include their own `visitedOn` date plus `images: VisitImage[]` in the itinerary response, and visit entries include `excludeFromRoute: boolean` plus optional `location: { lat, lon } | null` for admin-side route control. This detail route uses `Cache-Control: private, no-store`.
 - `GET /api/visits-timeline` returns the lightweight timeline dataset for `/kaynnit`, with each visit including `id`, `visitedOn`, `createdAt`, `route`, `imageCount`, `trip: { id, name, slug } | null`, `tripStopOrder: number | null`, and a resolved park `typeLabel`. When two visits belong to the same trip on the same day, the timeline uses `tripStopOrder` instead of falling back to entry creation time.
+- `GET /api/year-review/:year/preview` is an admin-session-protected generated preview of the year review story for one year. It derives the story automatically from existing visit and trip data and reports any current published share token for that year.
+- `POST /api/year-review/:year/publish` is an admin-session-protected publish action that snapshots the current generated year review into one tokenized share for that year and returns the share token plus the intended frontend share URL.
+- `DELETE /api/year-review/:year/publish` is an admin-session-protected unpublish action that removes the current published share snapshot for that year.
+- `GET /api/year-review/shares/:shareId` is an API-key-protected frontend-facing snapshot read route for the share page. It serves only previously published snapshots, keeps the payload image-agnostic so it does not depend on expiring presigned visit-image URLs, and uses `Cache-Control: public, max-age=0, s-maxage=600`.
 - `POST /api/trip-planner/suggestions` returns up to three Geoapify-backed place suggestions with labels and coordinates for origin/destination pickers.
 - `POST /api/trip-planner/search` resolves exact known park and trail names from the local catalog before falling back to Geoapify geocoding, fetches a real driving route from Geoapify, and returns visible catalog parks within a route corridor using stored park geometry plus visited summaries, route `LineString` geometry, backend-provided route and park bounding boxes for map rendering, and top-level `maxDistanceKm` / `defaultDistanceKm` filter metadata. On longer trips, the first 30 km from the origin is treated as a stricter start zone so dense departure-area clusters do not dominate the results. Route failures return `422` with failed-leg details instead of a silent empty success.
 - `POST /api/trip-planner/nearby` resolves exact known park and trail names from the local catalog before falling back to Geoapify geocoding, filters visible catalog parks by straight-line proximity to that point, and returns visited summaries plus a backend-provided `searchArea` bounding box and top-level `maxDistanceKm` / `defaultDistanceKm` filter metadata for map rendering without route geometry.
@@ -188,7 +196,7 @@ Catalog endpoints stay cache-friendly and database-backed:
 - `POST /api/visits/:id/images` remains available for localhost-style server uploads, but Vercel runtime disables that Sharp-based path so uploads do not pass through the function body limit.
 - `GET /health`, `GET /openapi.json`, and `GET /assets/logos/*` are the anonymous read endpoints today.
 - `/auth/*` routes are anonymous login-control endpoints, not public data endpoints.
-- There are no anonymous site data JSON endpoints in this API. Frontend-facing `GET` routes such as `/api/home-summary`, `/api/map-summary`, `/api/trips`, `/api/trips/slug/:slug`, and `/api/visits-timeline` still require the API key outside localhost when `API_KEY` is configured; the only anonymous asset read route is `GET /assets/logos/*`.
+- Frontend-facing `GET` routes such as `/api/home-summary`, `/api/map-summary`, `/api/trips`, `/api/trips/slug/:slug`, `/api/visits-timeline`, and `GET /api/year-review/shares/:shareId` still require the API key outside localhost when `API_KEY` is configured.
 
 ## Data Source
 
