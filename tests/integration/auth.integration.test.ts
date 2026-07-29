@@ -145,6 +145,37 @@ describe('auth middleware', () => {
     expect(openApiResponse.status).toBe(200);
   });
 
+  it('protects published year review share reads with the api key while keeping previews admin-only', async () => {
+    const app = createApp({ apiKey, database: testDatabase.database });
+
+    const unauthorizedShareResponse = await app.request(
+      '/api/year-review/shares/11111111-1111-4111-8111-111111111111',
+      {
+        headers: {
+          'x-forwarded-for': '203.0.113.1'
+        }
+      }
+    );
+    const authorizedShareResponse = await app.request(
+      '/api/year-review/shares/11111111-1111-4111-8111-111111111111',
+      {
+        headers: {
+          authorization: `Bearer ${apiKey}`,
+          'x-forwarded-for': '203.0.113.1'
+        }
+      }
+    );
+    const previewResponse = await app.request('/api/year-review/2026/preview', {
+      headers: {
+        'x-forwarded-for': '203.0.113.1'
+      }
+    });
+
+    expect(unauthorizedShareResponse.status).toBe(401);
+    expect(authorizedShareResponse.status).toBe(404);
+    expect(previewResponse.status).toBe(401);
+  });
+
   it('protects frontend summary and timeline endpoints', async () => {
     const app = createApp({ apiKey, database: testDatabase.database });
 

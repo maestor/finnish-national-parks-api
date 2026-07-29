@@ -12,6 +12,7 @@ import {
   supportedParkTypes
 } from '../parks/park-types.js';
 import type { TripPlannerParkCandidate } from '../trip-planner/types.js';
+import type { YearReviewStory, YearReviewStoryImageAsset } from '../year-review/story.js';
 import type { Database, DbClient } from './database.js';
 import {
   admins,
@@ -23,7 +24,8 @@ import {
   tripStopImages,
   tripStops,
   trips,
-  visitImages
+  visitImages,
+  yearReviewShares
 } from './schema.js';
 
 type PutVisitInput = {
@@ -118,6 +120,15 @@ type UpdateTripStopInput = {
   note?: string | null | undefined;
   tripStopOrder?: number | undefined;
   visitedOn?: string | undefined;
+};
+
+export type PublishedYearReviewShare = {
+  generatedAt: string;
+  publishedAt: string;
+  shareId: string;
+  story: YearReviewStory;
+  updatedAt: string;
+  year: number;
 };
 
 type UpdateParkDetailsInput = {
@@ -345,6 +356,7 @@ type VisitTimelineRow = {
   tripSlug: string | null;
   tripStopOrder: number | null;
   typeName: string;
+  typeSlug: string;
   visitedOn: string;
 };
 
@@ -1353,6 +1365,27 @@ const buildVisitImagesByVisitId = async (
   return visitImagesByVisitId;
 };
 
+export const getYearReviewImageAssetsByVisitId = async (database: Database, visitIds: number[]) => {
+  const imageRows = await getImagesForVisitIds(database, visitIds);
+  const imageAssetsByVisitId = new Map<number, YearReviewStoryImageAsset[]>();
+
+  for (const image of imageRows) {
+    const assets = imageAssetsByVisitId.get(image.visitId) ?? [];
+    assets.push({
+      alt: null,
+      fullHeight: image.fullHeight,
+      fullKey: image.fullKey,
+      fullWidth: image.fullWidth,
+      thumbHeight: image.thumbHeight,
+      thumbKey: image.thumbKey,
+      thumbWidth: image.thumbWidth
+    });
+    imageAssetsByVisitId.set(image.visitId, assets);
+  }
+
+  return imageAssetsByVisitId;
+};
+
 const buildTripStopImagesByTripStopId = async (
   database: Database,
   tripStopIds: number[],
@@ -1658,6 +1691,7 @@ const listVisitTimelineRows = async (database: Database): Promise<VisitTimelineR
       tripSlug: trips.slug,
       tripStopOrder: parkVisits.tripStopOrder,
       typeName: parkTypes.name,
+      typeSlug: parkTypes.slug,
       visitedOn: parkVisits.visitedOn
     })
     .from(parkVisits)
@@ -1679,7 +1713,8 @@ const listVisitTimelineRows = async (database: Database): Promise<VisitTimelineR
       trips.id,
       trips.name,
       trips.slug,
-      parkTypes.name
+      parkTypes.name,
+      parkTypes.slug
     )
     .orderBy(desc(parkVisits.visitedOn), desc(parkVisits.createdAt), desc(parkVisits.id));
 };
@@ -1943,6 +1978,17 @@ const getPublicVisitDataVersionRecord = async (database: Database) => {
   return rows[0] ?? null;
 };
 
+const toPublishedYearReviewShare = (
+  row: typeof yearReviewShares.$inferSelect
+): PublishedYearReviewShare => ({
+  generatedAt: row.generatedAt,
+  publishedAt: row.publishedAt,
+  shareId: row.shareId,
+  story: JSON.parse(row.storyJson) as YearReviewStory,
+  updatedAt: row.updatedAt,
+  year: row.year
+});
+
 const buildPublicVisitDataVersionRecordQuery = (database: Database) => {
   return database
     .select({
@@ -1952,6 +1998,69 @@ const buildPublicVisitDataVersionRecordQuery = (database: Database) => {
     .from(publicDataVersions)
     .where(eq(publicDataVersions.key, PUBLIC_VISIT_DATA_VERSION_KEY))
     .limit(1);
+};
+
+export const getPublishedYearReviewShareByYear = async (database: Database, year: number) => {
+  const row =
+    (
+      await database.select().from(yearReviewShares).where(eq(yearReviewShares.year, year)).limit(1)
+    )[0] ?? null;
+
+  return row ? toPublishedYearReviewShare(row) : null;
+};
+
+export const getPublishedYearReviewShareByShareId = async (database: Database, shareId: string) => {
+  const row =
+    (
+      await database
+        .select()
+        .from(yearReviewShares)
+        .where(eq(yearReviewShares.shareId, shareId))
+        .limit(1)
+    )[0] ?? null;
+
+  return row ? toPublishedYearReviewShare(row) : null;
+};
+
+export const publishYearReviewShare = async (
+  database: Database,
+  input: {
+    generatedAt: string;
+    publishedAt: string;
+    shareId: string;
+    story: YearReviewStory;
+    updatedAt: string;
+    year: number;
+  }
+) => {
+  await database
+    .insert(yearReviewShares)
+    .values({
+      createdAt: input.updatedAt,
+      generatedAt: input.generatedAt,
+      publishedAt: input.publishedAt,
+      shareId: input.shareId,
+      storyJson: JSON.stringify(input.story),
+      updatedAt: input.updatedAt,
+      year: input.year
+    })
+    .onConflictDoUpdate({
+      set: {
+        generatedAt: input.generatedAt,
+        publishedAt: input.publishedAt,
+        shareId: input.shareId,
+        storyJson: JSON.stringify(input.story),
+        updatedAt: input.updatedAt
+      },
+      target: yearReviewShares.year
+    });
+
+  return (await getPublishedYearReviewShareByYear(database, input.year))!;
+};
+
+export const unpublishYearReviewShare = async (database: Database, year: number) => {
+  const result = await database.delete(yearReviewShares).where(eq(yearReviewShares.year, year));
+  return Number(result.rowsAffected ?? 0) > 0;
 };
 
 const getVisitRowWithParkById = async (database: Database, visitId: number) => {
@@ -2477,6 +2586,33 @@ export const listVisitsTimeline = async (database: Database) => {
       name: visit.parkName,
       slug: visit.parkSlug,
       typeLabel: resolveTypeLabel(visit)
+    },
+    route: visit.route,
+    trip:
+      visit.tripId === null || !visit.tripName || !visit.tripSlug
+        ? null
+        : {
+            id: visit.tripId,
+            name: visit.tripName,
+            slug: visit.tripSlug
+          },
+    tripStopOrder: visit.tripStopOrder,
+    visitedOn: visit.visitedOn
+  }));
+};
+
+export const listYearReviewTimelineVisits = async (database: Database) => {
+  const visitRows = sortTripAwareVisitRows(await listVisitTimelineRows(database));
+
+  return visitRows.map((visit) => ({
+    createdAt: visit.createdAt,
+    id: visit.id,
+    imageCount: visit.imageCount,
+    park: {
+      name: visit.parkName,
+      slug: visit.parkSlug,
+      typeLabel: resolveTypeLabel(visit),
+      typeSlug: visit.typeSlug
     },
     route: visit.route,
     trip:

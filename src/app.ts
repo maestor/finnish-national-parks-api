@@ -31,18 +31,24 @@ import {
   getPublicTripBySlug,
   getPublicVisitDataVersion,
   getPublicVisitSummaryEtagSeed,
+  getPublishedYearReviewShareByShareId,
+  getPublishedYearReviewShareByYear,
   getTripById,
   getVisitById,
+  getYearReviewImageAssetsByVisitId,
   listAdminParkVisibility,
   listParkSearchEntries,
   listPublicParks,
   listTrips,
   listVisits,
   listVisitsTimeline,
+  listYearReviewTimelineVisits,
+  publishYearReviewShare,
   RepositoryNotFoundError,
   RepositoryValidationError,
   reorderTripStopImages,
   reorderVisitImages,
+  unpublishYearReviewShare,
   updateParkDetails,
   updateParkRemoved,
   updateTrip,
@@ -131,9 +137,21 @@ import {
   updateTripStopRoute,
   uploadTripStopImagesRoute
 } from './routes/trips.js';
+import {
+  getYearReviewPreviewRoute,
+  getYearReviewShareRoute,
+  publishYearReviewRoute,
+  unpublishYearReviewRoute
+} from './routes/year-review.js';
 import type { StorageClient } from './storage/types.js';
 import { TripPlannerError } from './trip-planner/search.js';
 import type { TripPlannerService } from './trip-planner/types.js';
+import {
+  buildYearReviewStory,
+  createYearReviewSharePath,
+  type YearReviewStory,
+  type YearReviewStoryImageAsset
+} from './year-review/story.js';
 
 type AuthConfig = {
   cookieName: string;
@@ -172,6 +190,123 @@ const jsonNotFound = (error: string) => {
   return {
     error
   };
+};
+
+export const getFrontendUrl = (auth?: AuthConfig) => auth?.frontendUrl ?? 'http://localhost:4300';
+
+const buildYearReviewPublicUrl = (frontendUrl: string, shareId: string) => {
+  return `${frontendUrl}${createYearReviewSharePath(shareId)}`;
+};
+
+const resolveYearReviewStoryImageAsset = async (
+  image: YearReviewStoryImageAsset | null,
+  getImagePublicUrl: (key: string) => Promise<string>
+) => {
+  if (!image) {
+    return null;
+  }
+
+  const [fullUrl, thumbUrl] = await Promise.all([
+    getImagePublicUrl(image.fullKey),
+    getImagePublicUrl(image.thumbKey)
+  ]);
+
+  if (!fullUrl || !thumbUrl) {
+    return null;
+  }
+
+  return {
+    alt: image.alt,
+    fullHeight: image.fullHeight,
+    fullUrl,
+    fullWidth: image.fullWidth,
+    thumbHeight: image.thumbHeight,
+    thumbUrl,
+    thumbWidth: image.thumbWidth
+  };
+};
+
+const resolveYearReviewStoryForResponse = async (
+  story: YearReviewStory,
+  getImagePublicUrl: (key: string) => Promise<string>
+) => {
+  const cards = await Promise.all(
+    story.cards.map(async (card) => {
+      switch (card.kind) {
+        case 'milestone':
+          return {
+            ...card,
+            featuredImage: await resolveYearReviewStoryImageAsset(
+              card.featuredImage,
+              getImagePublicUrl
+            )
+          };
+        case 'photo-highlight':
+          return {
+            ...card,
+            featuredImage: await resolveYearReviewStoryImageAsset(
+              card.featuredImage,
+              getImagePublicUrl
+            )
+          };
+        case 'trip-highlight':
+          return {
+            ...card,
+            featuredImage: await resolveYearReviewStoryImageAsset(
+              card.featuredImage,
+              getImagePublicUrl
+            )
+          };
+        case 'new-parks':
+          return {
+            ...card,
+            parks: await Promise.all(
+              card.parks.map(async (parkMoment) => ({
+                ...parkMoment,
+                featuredImage: await resolveYearReviewStoryImageAsset(
+                  parkMoment.featuredImage,
+                  getImagePublicUrl
+                )
+              }))
+            )
+          };
+        default:
+          return card;
+      }
+    })
+  );
+
+  return {
+    ...story,
+    cards
+  };
+};
+
+const buildYearReviewStoryWithImageAssets = async ({
+  database,
+  trips,
+  visits,
+  year
+}: {
+  database: Database;
+  trips: Awaited<ReturnType<typeof listTrips>>;
+  visits: Awaited<ReturnType<typeof listYearReviewTimelineVisits>>;
+  year: number;
+}) => {
+  const visitImagesByVisitId =
+    visits.length === 0
+      ? new Map()
+      : await getYearReviewImageAssetsByVisitId(
+          database,
+          visits.filter((visit) => visit.visitedOn.startsWith(`${year}-`)).map((visit) => visit.id)
+        );
+
+  return buildYearReviewStory({
+    trips,
+    visitImagesByVisitId,
+    visits,
+    year
+  });
 };
 
 const normalizeRouteFallbackQueries = (...queries: Array<string | null | undefined>) => {
@@ -918,6 +1053,136 @@ export const createApp = ({
       const trips = await listTrips(database);
 
       return context.json({ trips }, 200);
+    });
+
+    app.openapi(getYearReviewPreviewRoute, async (context) => {
+      context.header('Cache-Control', PRIVATE_CACHE_CONTROL);
+      const authFailure = await requireAdminSession(context, auth);
+
+      if (authFailure) {
+        return authFailure;
+      }
+
+      const { year } = context.req.valid('param');
+      const [existingShare, trips, visits] = await Promise.all([
+        getPublishedYearReviewShareByYear(database, year),
+        listTrips(database),
+        listYearReviewTimelineVisits(database)
+      ]);
+      const story = await buildYearReviewStoryWithImageAssets({
+        database,
+        trips,
+        visits,
+        year
+      });
+      const frontendUrl = getFrontendUrl(auth);
+
+      return context.json(
+        {
+          generatedAt: new Date().toISOString(),
+          publishInfo: existingShare
+            ? {
+                publicUrl: buildYearReviewPublicUrl(frontendUrl, existingShare.shareId),
+                publishedAt: existingShare.publishedAt,
+                publishedShareId: existingShare.shareId,
+                sharePath: createYearReviewSharePath(existingShare.shareId)
+              }
+            : {
+                publicUrl: null,
+                publishedAt: null,
+                publishedShareId: null,
+                sharePath: null
+              },
+          status: existingShare ? ('published' as const) : ('draft' as const),
+          story: await resolveYearReviewStoryForResponse(story, getImagePublicUrl),
+          year
+        },
+        200
+      );
+    });
+
+    app.openapi(publishYearReviewRoute, async (context) => {
+      context.header('Cache-Control', PRIVATE_CACHE_CONTROL);
+      const authFailure = await requireAdminSession(context, auth);
+
+      if (authFailure) {
+        return authFailure;
+      }
+
+      const { year } = context.req.valid('param');
+      const [existingShare, trips, visits] = await Promise.all([
+        getPublishedYearReviewShareByYear(database, year),
+        listTrips(database),
+        listYearReviewTimelineVisits(database)
+      ]);
+      const now = new Date().toISOString();
+      const story = await buildYearReviewStoryWithImageAssets({
+        database,
+        trips,
+        visits,
+        year
+      });
+      const publishedShare = await publishYearReviewShare(database, {
+        generatedAt: now,
+        publishedAt: now,
+        shareId: existingShare?.shareId ?? randomUUID(),
+        story,
+        updatedAt: now,
+        year
+      });
+      const frontendUrl = getFrontendUrl(auth);
+
+      return context.json(
+        {
+          publicUrl: buildYearReviewPublicUrl(frontendUrl, publishedShare.shareId),
+          publishedAt: publishedShare.publishedAt,
+          shareId: publishedShare.shareId,
+          sharePath: createYearReviewSharePath(publishedShare.shareId)
+        },
+        200
+      );
+    });
+
+    app.openapi(unpublishYearReviewRoute, async (context) => {
+      context.header('Cache-Control', PRIVATE_CACHE_CONTROL);
+      const authFailure = await requireAdminSession(context, auth);
+
+      if (authFailure) {
+        return authFailure;
+      }
+
+      const { year } = context.req.valid('param');
+      const removed = await unpublishYearReviewShare(database, year);
+
+      if (!removed) {
+        return context.json(jsonNotFound('Published year review share not found.'), 404);
+      }
+
+      return new Response(null, {
+        headers: context.res.headers,
+        status: 204
+      });
+    });
+
+    app.openapi(getYearReviewShareRoute, async (context) => {
+      context.header('Cache-Control', PUBLIC_SUMMARY_CACHE_CONTROL);
+
+      const { shareId } = context.req.valid('param');
+      const share = await getPublishedYearReviewShareByShareId(database, shareId);
+
+      if (!share) {
+        return context.json(jsonNotFound('Published year review share not found.'), 404);
+      }
+
+      return context.json(
+        {
+          publishedAt: share.publishedAt,
+          shareId: share.shareId,
+          story: await resolveYearReviewStoryForResponse(share.story, getImagePublicUrl),
+          year: share.year
+        },
+        200
+      );
     });
 
     app.openapi(getTripBySlugRoute, async (context) => {
