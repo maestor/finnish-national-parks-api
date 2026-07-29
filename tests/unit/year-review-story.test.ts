@@ -30,7 +30,8 @@ const createVisit = (overrides: Partial<YearReviewTimelineVisit> = {}): YearRevi
     park: {
       name: 'Akasmännyn kansallispuisto',
       slug: 'akasmannyn-kansallispuisto',
-      typeLabel: 'Kansallispuisto'
+      typeLabel: 'Kansallispuisto',
+      typeSlug: 'national-park'
     },
     route: null,
     trip: {
@@ -138,7 +139,8 @@ describe('year review story builder', () => {
         park: {
           name: 'Akasmännyn kansallispuisto',
           slug: 'akasmannyn-kansallispuisto',
-          typeLabel: 'Kansallispuisto'
+          typeLabel: 'Kansallispuisto',
+          typeSlug: 'national-park'
         },
         trip: null,
         visitedOn: '2025-08-20'
@@ -158,7 +160,8 @@ describe('year review story builder', () => {
         park: {
           name: 'Seitsemisen kansallispuisto',
           slug: 'seitsemisen-kansallispuisto',
-          typeLabel: 'Kansallispuisto'
+          typeLabel: 'Kansallispuisto',
+          typeSlug: 'national-park'
         },
         trip: {
           id: 1,
@@ -186,6 +189,7 @@ describe('year review story builder', () => {
     expect(story.summary.newParkCount).toBe(1);
     expect(story.summary.revisitedParkCount).toBe(1);
     expect(tripHighlightCard).toEqual({
+      featuredImage: null,
       kind: 'trip-highlight',
       trip: {
         dateRange: {
@@ -258,6 +262,22 @@ describe('year review story builder', () => {
             thumbKey: 'visits/1/alpha-thumb.jpg',
             thumbWidth: 700
           },
+          kind: 'milestone',
+          milestone: 'first-visit',
+          visit: expect.objectContaining({
+            id: 1
+          })
+        },
+        {
+          featuredImage: {
+            alt: 'Kuva käynniltä Akasmännyn kansallispuisto 2026-03-10',
+            fullHeight: 900,
+            fullKey: 'visits/1/alpha-full.jpg',
+            fullWidth: 1400,
+            thumbHeight: 450,
+            thumbKey: 'visits/1/alpha-thumb.jpg',
+            thumbWidth: 700
+          },
           kind: 'photo-highlight',
           totalImageCount: 4,
           visit: expect.objectContaining({
@@ -288,7 +308,8 @@ describe('year review story builder', () => {
           park: {
             name: 'Seitsemisen kansallispuisto',
             slug: 'seitsemisen-kansallispuisto',
-            typeLabel: 'Kansallispuisto'
+            typeLabel: 'Kansallispuisto',
+            typeSlug: 'national-park'
           },
           trip: {
             id: 999,
@@ -304,6 +325,7 @@ describe('year review story builder', () => {
     expect(story.cards).toEqual(
       expect.arrayContaining([
         {
+          featuredImage: null,
           kind: 'milestone',
           milestone: 'first-visit',
           visit: expect.objectContaining({
@@ -311,6 +333,7 @@ describe('year review story builder', () => {
           })
         },
         {
+          featuredImage: null,
           kind: 'milestone',
           milestone: 'last-visit',
           visit: expect.objectContaining({
@@ -320,5 +343,199 @@ describe('year review story builder', () => {
       ])
     );
     expect(story.cards.some((card) => card.kind === 'trip-highlight')).toBe(false);
+  });
+
+  it('uses visit images for milestones, trip highlights, and new national parks without reusing the trip image visit', () => {
+    const story = buildYearReviewStory({
+      trips: [createTrip()],
+      visitImagesByVisitId: new Map([
+        [
+          1,
+          [
+            {
+              alt: null,
+              fullHeight: 900,
+              fullKey: 'visits/1/first-full.jpg',
+              fullWidth: 1400,
+              thumbHeight: 450,
+              thumbKey: 'visits/1/first-thumb.jpg',
+              thumbWidth: 700
+            }
+          ]
+        ],
+        [
+          2,
+          [
+            {
+              alt: null,
+              fullHeight: 900,
+              fullKey: 'visits/2/photo-full.jpg',
+              fullWidth: 1400,
+              thumbHeight: 450,
+              thumbKey: 'visits/2/photo-thumb.jpg',
+              thumbWidth: 700
+            }
+          ]
+        ],
+        [
+          3,
+          [
+            {
+              alt: null,
+              fullHeight: 900,
+              fullKey: 'visits/3/trip-full.jpg',
+              fullWidth: 1400,
+              thumbHeight: 450,
+              thumbKey: 'visits/3/trip-thumb.jpg',
+              thumbWidth: 700
+            }
+          ]
+        ],
+        [
+          4,
+          [
+            {
+              alt: null,
+              fullHeight: 900,
+              fullKey: 'visits/4/last-full.jpg',
+              fullWidth: 1400,
+              thumbHeight: 450,
+              thumbKey: 'visits/4/last-thumb.jpg',
+              thumbWidth: 700
+            }
+          ]
+        ]
+      ]),
+      visits: [
+        createVisit({
+          id: 1,
+          imageCount: 1,
+          visitedOn: '2026-03-10'
+        }),
+        createVisit({
+          createdAt: '2026-04-12T09:00:00.000Z',
+          id: 2,
+          imageCount: 4,
+          park: {
+            name: 'Helvetinjärven kansallispuisto',
+            slug: 'helvetinjarven-kansallispuisto',
+            typeLabel: 'Kansallispuisto',
+            typeSlug: 'national-park'
+          },
+          visitedOn: '2026-04-12'
+        }),
+        createVisit({
+          createdAt: '2026-06-18T09:00:00.000Z',
+          id: 3,
+          imageCount: 2,
+          park: {
+            name: 'Seitsemisen kansallispuisto',
+            slug: 'seitsemisen-kansallispuisto',
+            typeLabel: 'Kansallispuisto',
+            typeSlug: 'national-park'
+          },
+          visitedOn: '2026-06-18'
+        }),
+        createVisit({
+          createdAt: '2026-10-02T09:00:00.000Z',
+          id: 4,
+          imageCount: 1,
+          park: {
+            name: 'Evon retkeilyalue',
+            slug: 'evon-retkeilyalue',
+            typeLabel: 'Retkeilyalue',
+            typeSlug: 'state-hiking-area'
+          },
+          visitedOn: '2026-10-02'
+        }),
+        createVisit({
+          createdAt: '2025-08-20T09:00:00.000Z',
+          id: 99,
+          imageCount: 1,
+          park: {
+            name: 'Helvetinjärven kansallispuisto',
+            slug: 'helvetinjarven-kansallispuisto',
+            typeLabel: 'Kansallispuisto',
+            typeSlug: 'national-park'
+          },
+          visitedOn: '2025-08-20'
+        })
+      ],
+      year: 2026
+    });
+
+    expect(story.cards).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          featuredImage: expect.objectContaining({
+            fullKey: 'visits/1/first-full.jpg',
+            thumbKey: 'visits/1/first-thumb.jpg'
+          }),
+          kind: 'milestone',
+          milestone: 'first-visit',
+          visit: expect.objectContaining({
+            id: 1
+          })
+        }),
+        expect.objectContaining({
+          featuredImage: expect.objectContaining({
+            fullKey: 'visits/4/last-full.jpg',
+            thumbKey: 'visits/4/last-thumb.jpg'
+          }),
+          kind: 'milestone',
+          milestone: 'last-visit',
+          visit: expect.objectContaining({
+            id: 4
+          })
+        }),
+        expect.objectContaining({
+          featuredImage: expect.objectContaining({
+            fullKey: 'visits/2/photo-full.jpg',
+            thumbKey: 'visits/2/photo-thumb.jpg'
+          }),
+          kind: 'photo-highlight',
+          visit: expect.objectContaining({
+            id: 2
+          })
+        }),
+        expect.objectContaining({
+          featuredImage: expect.objectContaining({
+            fullKey: 'visits/3/trip-full.jpg',
+            thumbKey: 'visits/3/trip-thumb.jpg'
+          }),
+          kind: 'trip-highlight',
+          trip: expect.objectContaining({
+            id: 1
+          })
+        }),
+        expect.objectContaining({
+          kind: 'new-parks',
+          parks: [
+            expect.objectContaining({
+              featuredImage: expect.objectContaining({
+                fullKey: 'visits/1/first-full.jpg',
+                thumbKey: 'visits/1/first-thumb.jpg'
+              }),
+              park: {
+                name: 'Akasmännyn kansallispuisto',
+                slug: 'akasmannyn-kansallispuisto'
+              },
+              visitedOn: '2026-03-10'
+            }),
+            expect.objectContaining({
+              featuredImage: expect.objectContaining({
+                fullKey: 'visits/3/trip-full.jpg',
+                thumbKey: 'visits/3/trip-thumb.jpg'
+              }),
+              park: {
+                name: 'Seitsemisen kansallispuisto',
+                slug: 'seitsemisen-kansallispuisto'
+              },
+              visitedOn: '2026-06-18'
+            })
+          ]
+        })
+      ])
+    );
   });
 });

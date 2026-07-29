@@ -293,55 +293,177 @@ describe('year review routes', () => {
     });
   });
 
-  it('resolves the published photo highlight image to fresh public urls for preview and share reads', async () => {
+  it('resolves milestone, photo, trip, and new national park images to fresh public urls for preview and share reads', async () => {
     const apiKey = 'test-secret-key';
     const storage = createMemoryStorage();
     const app = createAuthedApp({ apiKey, storage });
+    type StoryImage = {
+      alt: string | null;
+      fullHeight: number | null;
+      fullUrl: string;
+      fullWidth: number | null;
+      thumbHeight: number | null;
+      thumbUrl: string;
+      thumbWidth: number | null;
+    };
+    type StoryCard =
+      | { kind: 'intro' | 'profile' | 'seasonal' | 'summary' }
+      | {
+          featuredImage: StoryImage | null;
+          kind: 'milestone';
+          milestone: 'first-visit' | 'last-visit';
+        }
+      | {
+          featuredImage: StoryImage | null;
+          kind: 'photo-highlight';
+        }
+      | {
+          featuredImage: StoryImage | null;
+          kind: 'trip-highlight';
+        }
+      | {
+          kind: 'new-parks';
+          parks: Array<{
+            featuredImage: StoryImage | null;
+            park: {
+              name: string;
+              slug: string;
+            };
+            visitedOn: string;
+          }>;
+        };
 
-    const visitResponse = await createVisit(app, 'akasmannyn-kansallispuisto', {
-      visitedOn: '2026-06-07'
+    const tripResponse = await createTrip(app, {
+      description: 'Vuosikatsauskuville oma reissu',
+      name: 'Vuosikatsaus 2026'
     });
-    const visitBody = (await visitResponse.json()) as { id: number };
+    const trip = (await tripResponse.json()) as { id: number };
     const imageBuffer = await createTestImageBuffer();
-    const imageFile = new File([imageBuffer], 'year-review.jpg', { type: 'image/jpeg' });
+    const firstImageFile = new File([imageBuffer], 'first.jpg', { type: 'image/jpeg' });
+    const photoLeadImageFile = new File([imageBuffer], 'photo-lead.jpg', { type: 'image/jpeg' });
+    const photoExtraImageFile = new File([imageBuffer], 'photo-extra.jpg', { type: 'image/jpeg' });
+    const tripImageFile = new File([imageBuffer], 'trip.jpg', { type: 'image/jpeg' });
+    const lastImageFile = new File([imageBuffer], 'last.jpg', { type: 'image/jpeg' });
 
-    const uploadResponse = await uploadImages(app, visitBody.id, [imageFile]);
-    expect(uploadResponse.status).toBe(201);
+    const firstVisitResponse = await createVisit(app, 'akasmannyn-kansallispuisto', {
+      tripId: trip.id,
+      tripStopOrder: 1,
+      visitedOn: '2026-03-10'
+    });
+    const firstVisit = (await firstVisitResponse.json()) as { id: number };
+
+    const photoVisitResponse = await createVisit(app, 'evon-retkeilyalue', {
+      tripId: trip.id,
+      tripStopOrder: 2,
+      visitedOn: '2026-04-12'
+    });
+    const photoVisit = (await photoVisitResponse.json()) as { id: number };
+
+    const tripVisitResponse = await createVisit(app, 'seitsemisen-kansallispuisto', {
+      tripId: trip.id,
+      tripStopOrder: 3,
+      visitedOn: '2026-06-18'
+    });
+    const tripVisit = (await tripVisitResponse.json()) as { id: number };
+
+    const lastVisitResponse = await createVisit(app, 'akasmannyn-kansallispuisto', {
+      tripId: trip.id,
+      tripStopOrder: 4,
+      visitedOn: '2026-10-02'
+    });
+    const lastVisit = (await lastVisitResponse.json()) as { id: number };
+
+    const firstUploadResponse = await uploadImages(app, firstVisit.id, [firstImageFile]);
+    expect(firstUploadResponse.status).toBe(201);
+
+    const photoUploadResponse = await uploadImages(app, photoVisit.id, [
+      photoLeadImageFile,
+      photoExtraImageFile
+    ]);
+    expect(photoUploadResponse.status).toBe(201);
+
+    const tripUploadResponse = await uploadImages(app, tripVisit.id, [tripImageFile]);
+    expect(tripUploadResponse.status).toBe(201);
+
+    const lastUploadResponse = await uploadImages(app, lastVisit.id, [lastImageFile]);
+    expect(lastUploadResponse.status).toBe(201);
 
     const previewResponse = await requestAsAdmin(app, '/api/year-review/2026/preview');
     const previewBody = (await previewResponse.json()) as {
       story: {
-        cards: Array<
-          | { kind: string }
-          | {
-              featuredImage: {
-                alt: string | null;
-                fullHeight: number | null;
-                fullUrl: string;
-                fullWidth: number | null;
-                thumbHeight: number | null;
-                thumbUrl: string;
-                thumbWidth: number | null;
-              } | null;
-              kind: 'photo-highlight';
-            }
-        >;
+        cards: StoryCard[];
       };
     };
+    const previewFirstVisitCard = previewBody.story.cards.find(
+      (card): card is Extract<(typeof previewBody.story.cards)[number], { kind: 'milestone' }> =>
+        card.kind === 'milestone' && 'milestone' in card && card.milestone === 'first-visit'
+    );
+    const previewLastVisitCard = previewBody.story.cards.find(
+      (card): card is Extract<(typeof previewBody.story.cards)[number], { kind: 'milestone' }> =>
+        card.kind === 'milestone' && 'milestone' in card && card.milestone === 'last-visit'
+    );
     const previewPhotoCard = previewBody.story.cards.find(
       (
         card
       ): card is Extract<(typeof previewBody.story.cards)[number], { kind: 'photo-highlight' }> =>
         card.kind === 'photo-highlight'
     );
+    const previewTripCard = previewBody.story.cards.find(
+      (
+        card
+      ): card is Extract<(typeof previewBody.story.cards)[number], { kind: 'trip-highlight' }> =>
+        card.kind === 'trip-highlight'
+    );
+    const previewNewParksCard = previewBody.story.cards.find(
+      (card): card is Extract<(typeof previewBody.story.cards)[number], { kind: 'new-parks' }> =>
+        card.kind === 'new-parks'
+    );
 
-    expect(previewPhotoCard?.featuredImage).toMatchObject({
-      alt: 'Kuva käynniltä Äkäsmännyn kansallispuisto 2026-06-07',
+    expect(previewFirstVisitCard?.featuredImage).toMatchObject({
+      alt: 'Kuva käynniltä Äkäsmännyn kansallispuisto 2026-03-10',
       fullHeight: 800,
       fullWidth: 1200
     });
+    expect(previewLastVisitCard?.featuredImage).toMatchObject({
+      alt: 'Kuva käynniltä Äkäsmännyn kansallispuisto 2026-10-02',
+      fullHeight: 800,
+      fullWidth: 1200
+    });
+    expect(previewPhotoCard?.featuredImage).toMatchObject({
+      alt: 'Kuva käynniltä Evon retkeilyalue 2026-04-12',
+      fullHeight: 800,
+      fullWidth: 1200
+    });
+    expect(previewTripCard?.featuredImage).toMatchObject({
+      alt: 'Kuva käynniltä Seitsemisen kansallispuisto 2026-06-18',
+      fullHeight: 800,
+      fullWidth: 1200
+    });
+    expect(previewNewParksCard?.parks).toEqual([
+      expect.objectContaining({
+        park: {
+          name: 'Äkäsmännyn kansallispuisto',
+          slug: 'akasmannyn-kansallispuisto'
+        },
+        visitedOn: '2026-03-10'
+      }),
+      expect.objectContaining({
+        park: {
+          name: 'Seitsemisen kansallispuisto',
+          slug: 'seitsemisen-kansallispuisto'
+        },
+        visitedOn: '2026-06-18'
+      })
+    ]);
+    expect(
+      previewNewParksCard?.parks.every((parkMoment) =>
+        parkMoment.featuredImage?.fullUrl.includes('https://memory-storage.test/')
+      )
+    ).toBe(true);
+    expect(previewFirstVisitCard?.featuredImage?.fullUrl).toContain('https://memory-storage.test/');
+    expect(previewLastVisitCard?.featuredImage?.thumbUrl).toContain('https://memory-storage.test/');
     expect(previewPhotoCard?.featuredImage?.fullUrl).toContain('https://memory-storage.test/');
-    expect(previewPhotoCard?.featuredImage?.thumbUrl).toContain('https://memory-storage.test/');
+    expect(previewTripCard?.featuredImage?.thumbUrl).toContain('https://memory-storage.test/');
 
     const publishResponse = await requestAsAdmin(app, '/api/year-review/2026/publish', {
       method: 'POST'
@@ -358,38 +480,78 @@ describe('year review routes', () => {
     });
     const shareBody = (await shareResponse.json()) as {
       story: {
-        cards: Array<
-          | { kind: string }
-          | {
-              featuredImage: {
-                alt: string | null;
-                fullHeight: number | null;
-                fullUrl: string;
-                fullWidth: number | null;
-                thumbHeight: number | null;
-                thumbUrl: string;
-                thumbWidth: number | null;
-              } | null;
-              kind: 'photo-highlight';
-            }
-        >;
+        cards: StoryCard[];
       };
     };
+    const shareFirstVisitCard = shareBody.story.cards.find(
+      (card): card is Extract<(typeof shareBody.story.cards)[number], { kind: 'milestone' }> =>
+        card.kind === 'milestone' && 'milestone' in card && card.milestone === 'first-visit'
+    );
+    const shareLastVisitCard = shareBody.story.cards.find(
+      (card): card is Extract<(typeof shareBody.story.cards)[number], { kind: 'milestone' }> =>
+        card.kind === 'milestone' && 'milestone' in card && card.milestone === 'last-visit'
+    );
     const sharePhotoCard = shareBody.story.cards.find(
       (
         card
       ): card is Extract<(typeof shareBody.story.cards)[number], { kind: 'photo-highlight' }> =>
         card.kind === 'photo-highlight'
     );
+    const shareTripCard = shareBody.story.cards.find(
+      (card): card is Extract<(typeof shareBody.story.cards)[number], { kind: 'trip-highlight' }> =>
+        card.kind === 'trip-highlight'
+    );
+    const shareNewParksCard = shareBody.story.cards.find(
+      (card): card is Extract<(typeof shareBody.story.cards)[number], { kind: 'new-parks' }> =>
+        card.kind === 'new-parks'
+    );
 
     expect(shareResponse.status).toBe(200);
-    expect(sharePhotoCard?.featuredImage).toMatchObject({
-      alt: 'Kuva käynniltä Äkäsmännyn kansallispuisto 2026-06-07',
+    expect(shareFirstVisitCard?.featuredImage).toMatchObject({
+      alt: 'Kuva käynniltä Äkäsmännyn kansallispuisto 2026-03-10',
       fullHeight: 800,
       fullWidth: 1200
     });
+    expect(shareLastVisitCard?.featuredImage).toMatchObject({
+      alt: 'Kuva käynniltä Äkäsmännyn kansallispuisto 2026-10-02',
+      fullHeight: 800,
+      fullWidth: 1200
+    });
+    expect(sharePhotoCard?.featuredImage).toMatchObject({
+      alt: 'Kuva käynniltä Evon retkeilyalue 2026-04-12',
+      fullHeight: 800,
+      fullWidth: 1200
+    });
+    expect(shareTripCard?.featuredImage).toMatchObject({
+      alt: 'Kuva käynniltä Seitsemisen kansallispuisto 2026-06-18',
+      fullHeight: 800,
+      fullWidth: 1200
+    });
+    expect(shareNewParksCard?.parks).toEqual([
+      expect.objectContaining({
+        park: {
+          name: 'Äkäsmännyn kansallispuisto',
+          slug: 'akasmannyn-kansallispuisto'
+        },
+        visitedOn: '2026-03-10'
+      }),
+      expect.objectContaining({
+        park: {
+          name: 'Seitsemisen kansallispuisto',
+          slug: 'seitsemisen-kansallispuisto'
+        },
+        visitedOn: '2026-06-18'
+      })
+    ]);
+    expect(shareFirstVisitCard?.featuredImage?.fullUrl).toContain('https://memory-storage.test/');
+    expect(shareLastVisitCard?.featuredImage?.thumbUrl).toContain('https://memory-storage.test/');
     expect(sharePhotoCard?.featuredImage?.fullUrl).toContain('https://memory-storage.test/');
-    expect(sharePhotoCard?.featuredImage?.thumbUrl).toContain('https://memory-storage.test/');
+    expect(shareTripCard?.featuredImage?.thumbUrl).toContain('https://memory-storage.test/');
+    expect(
+      shareNewParksCard?.parks.every((parkMoment) =>
+        parkMoment.featuredImage?.thumbUrl.includes('https://memory-storage.test/')
+      )
+    ).toBe(true);
   });
 
   it('drops the photo highlight image from the response when a fresh public url cannot be resolved', async () => {

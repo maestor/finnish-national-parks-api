@@ -65,6 +65,7 @@ const yearReviewIntroCardSchema = z.object({
 });
 
 const yearReviewMilestoneCardSchema = z.object({
+  featuredImage: yearReviewStoryImageSchema.nullable(),
   kind: z.literal('milestone'),
   milestone: z.enum(['first-visit', 'last-visit']),
   visit: yearReviewVisitReferenceSchema
@@ -87,6 +88,7 @@ const yearReviewProfileCardSchema = z.object({
 });
 
 const yearReviewTripHighlightCardSchema = z.object({
+  featuredImage: yearReviewStoryImageSchema.nullable(),
   kind: z.literal('trip-highlight'),
   trip: z.object({
     dateRange: z
@@ -101,6 +103,20 @@ const yearReviewTripHighlightCardSchema = z.object({
     slug: z.string(),
     visitCount: z.number().int().nonnegative()
   })
+});
+
+const yearReviewNewParkMomentSchema = z.object({
+  featuredImage: yearReviewStoryImageSchema.nullable(),
+  park: z.object({
+    name: z.string(),
+    slug: z.string()
+  }),
+  visitedOn: visitDateSchema
+});
+
+const yearReviewNewParksCardSchema = z.object({
+  kind: z.literal('new-parks'),
+  parks: z.array(yearReviewNewParkMomentSchema)
 });
 
 const yearReviewSeasonalCardSchema = z.object({
@@ -120,6 +136,7 @@ export const yearReviewCardSchema = z.discriminatedUnion('kind', [
   yearReviewPhotoHighlightCardSchema,
   yearReviewProfileCardSchema,
   yearReviewTripHighlightCardSchema,
+  yearReviewNewParksCardSchema,
   yearReviewSeasonalCardSchema,
   yearReviewSummaryCardSchema
 ]);

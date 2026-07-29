@@ -356,6 +356,7 @@ type VisitTimelineRow = {
   tripSlug: string | null;
   tripStopOrder: number | null;
   typeName: string;
+  typeSlug: string;
   visitedOn: string;
 };
 
@@ -1690,6 +1691,7 @@ const listVisitTimelineRows = async (database: Database): Promise<VisitTimelineR
       tripSlug: trips.slug,
       tripStopOrder: parkVisits.tripStopOrder,
       typeName: parkTypes.name,
+      typeSlug: parkTypes.slug,
       visitedOn: parkVisits.visitedOn
     })
     .from(parkVisits)
@@ -1711,7 +1713,8 @@ const listVisitTimelineRows = async (database: Database): Promise<VisitTimelineR
       trips.id,
       trips.name,
       trips.slug,
-      parkTypes.name
+      parkTypes.name,
+      parkTypes.slug
     )
     .orderBy(desc(parkVisits.visitedOn), desc(parkVisits.createdAt), desc(parkVisits.id));
 };
@@ -2583,6 +2586,33 @@ export const listVisitsTimeline = async (database: Database) => {
       name: visit.parkName,
       slug: visit.parkSlug,
       typeLabel: resolveTypeLabel(visit)
+    },
+    route: visit.route,
+    trip:
+      visit.tripId === null || !visit.tripName || !visit.tripSlug
+        ? null
+        : {
+            id: visit.tripId,
+            name: visit.tripName,
+            slug: visit.tripSlug
+          },
+    tripStopOrder: visit.tripStopOrder,
+    visitedOn: visit.visitedOn
+  }));
+};
+
+export const listYearReviewTimelineVisits = async (database: Database) => {
+  const visitRows = sortTripAwareVisitRows(await listVisitTimelineRows(database));
+
+  return visitRows.map((visit) => ({
+    createdAt: visit.createdAt,
+    id: visit.id,
+    imageCount: visit.imageCount,
+    park: {
+      name: visit.parkName,
+      slug: visit.parkSlug,
+      typeLabel: resolveTypeLabel(visit),
+      typeSlug: visit.typeSlug
     },
     route: visit.route,
     trip:

@@ -42,6 +42,7 @@ import {
   listTrips,
   listVisits,
   listVisitsTimeline,
+  listYearReviewTimelineVisits,
   publishYearReviewShare,
   RepositoryNotFoundError,
   RepositoryValidationError,
@@ -231,14 +232,47 @@ const resolveYearReviewStoryForResponse = async (
 ) => {
   const cards = await Promise.all(
     story.cards.map(async (card) => {
-      if (card.kind !== 'photo-highlight') {
-        return card;
+      switch (card.kind) {
+        case 'milestone':
+          return {
+            ...card,
+            featuredImage: await resolveYearReviewStoryImageAsset(
+              card.featuredImage,
+              getImagePublicUrl
+            )
+          };
+        case 'photo-highlight':
+          return {
+            ...card,
+            featuredImage: await resolveYearReviewStoryImageAsset(
+              card.featuredImage,
+              getImagePublicUrl
+            )
+          };
+        case 'trip-highlight':
+          return {
+            ...card,
+            featuredImage: await resolveYearReviewStoryImageAsset(
+              card.featuredImage,
+              getImagePublicUrl
+            )
+          };
+        case 'new-parks':
+          return {
+            ...card,
+            parks: await Promise.all(
+              card.parks.map(async (parkMoment) => ({
+                ...parkMoment,
+                featuredImage: await resolveYearReviewStoryImageAsset(
+                  parkMoment.featuredImage,
+                  getImagePublicUrl
+                )
+              }))
+            )
+          };
+        default:
+          return card;
       }
-
-      return {
-        ...card,
-        featuredImage: await resolveYearReviewStoryImageAsset(card.featuredImage, getImagePublicUrl)
-      };
     })
   );
 
@@ -256,20 +290,16 @@ const buildYearReviewStoryWithImageAssets = async ({
 }: {
   database: Database;
   trips: Awaited<ReturnType<typeof listTrips>>;
-  visits: Awaited<ReturnType<typeof listVisitsTimeline>>;
+  visits: Awaited<ReturnType<typeof listYearReviewTimelineVisits>>;
   year: number;
 }) => {
-  const draftStory = buildYearReviewStory({
-    trips,
-    visits,
-    year
-  });
-  const photoHighlightVisitId =
-    draftStory.cards.find((card) => card.kind === 'photo-highlight')?.visit?.id ?? null;
   const visitImagesByVisitId =
-    photoHighlightVisitId === null
+    visits.length === 0
       ? new Map()
-      : await getYearReviewImageAssetsByVisitId(database, [photoHighlightVisitId]);
+      : await getYearReviewImageAssetsByVisitId(
+          database,
+          visits.filter((visit) => visit.visitedOn.startsWith(`${year}-`)).map((visit) => visit.id)
+        );
 
   return buildYearReviewStory({
     trips,
@@ -1037,7 +1067,7 @@ export const createApp = ({
       const [existingShare, trips, visits] = await Promise.all([
         getPublishedYearReviewShareByYear(database, year),
         listTrips(database),
-        listVisitsTimeline(database)
+        listYearReviewTimelineVisits(database)
       ]);
       const story = await buildYearReviewStoryWithImageAssets({
         database,
@@ -1083,7 +1113,7 @@ export const createApp = ({
       const [existingShare, trips, visits] = await Promise.all([
         getPublishedYearReviewShareByYear(database, year),
         listTrips(database),
-        listVisitsTimeline(database)
+        listYearReviewTimelineVisits(database)
       ]);
       const now = new Date().toISOString();
       const story = await buildYearReviewStoryWithImageAssets({

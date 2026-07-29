@@ -8,6 +8,7 @@ export type YearReviewTimelineVisit = {
     name: string;
     slug: string;
     typeLabel: string;
+    typeSlug: string;
   };
   route: string | null;
   trip: {
@@ -77,6 +78,7 @@ export type YearReviewCard =
       year: number;
     }
   | {
+      featuredImage: YearReviewStoryImageAsset | null;
       kind: 'milestone';
       milestone: 'first-visit' | 'last-visit';
       visit: YearReviewVisitReference;
@@ -100,6 +102,7 @@ export type YearReviewCard =
       topTypeLabel: string | null;
     }
   | {
+      featuredImage: YearReviewStoryImageAsset | null;
       kind: 'trip-highlight';
       trip: {
         dateRange: {
@@ -112,6 +115,17 @@ export type YearReviewCard =
         slug: string;
         visitCount: number;
       };
+    }
+  | {
+      kind: 'new-parks';
+      parks: Array<{
+        featuredImage: YearReviewStoryImageAsset | null;
+        park: {
+          name: string;
+          slug: string;
+        };
+        visitedOn: string;
+      }>;
     }
   | {
       kind: 'seasonal';
@@ -169,6 +183,8 @@ const compareCountsAscendingKey = <Key extends string | number>(
   return right[1] - left[1] || String(left[0]).localeCompare(String(right[0]), 'fi');
 };
 
+const NATIONAL_PARK_TYPE_SLUG = 'national-park';
+
 const toVisitReference = (visit: YearReviewTimelineVisit): YearReviewVisitReference => ({
   id: visit.id,
   imageCount: visit.imageCount,
@@ -181,8 +197,28 @@ const toVisitReference = (visit: YearReviewTimelineVisit): YearReviewVisitRefere
   visitedOn: visit.visitedOn
 });
 
-const buildPhotoHighlightAlt = (visit: YearReviewTimelineVisit) => {
+const buildVisitFeaturedImageAlt = (visit: YearReviewTimelineVisit) => {
   return `Kuva käynniltä ${visit.park.name} ${visit.visitedOn}`;
+};
+
+const getFeaturedImageForVisit = (
+  visit: YearReviewTimelineVisit | null,
+  visitImagesByVisitId: Map<number, YearReviewStoryImageAsset[]>
+) => {
+  if (!visit) {
+    return null;
+  }
+
+  const image = visitImagesByVisitId.get(visit.id)?.[0] ?? null;
+
+  if (!image) {
+    return null;
+  }
+
+  return {
+    ...image,
+    alt: buildVisitFeaturedImageAlt(visit)
+  };
 };
 
 const buildEarliestVisitYearByPark = (visits: YearReviewTimelineVisit[]) => {
@@ -334,8 +370,9 @@ export const buildYearReviewStory = ({
       (left, right) =>
         right.imageCount - left.imageCount || compareVisitsByNarrativeOrder(left, right)
     )[0] ?? null;
-  const photoVisitImage =
-    photoVisit === null ? null : (visitImagesByVisitId.get(photoVisit.id)?.[0] ?? null);
+  const firstVisitImage = getFeaturedImageForVisit(firstVisit, visitImagesByVisitId);
+  const lastVisitImage = getFeaturedImageForVisit(lastVisit, visitImagesByVisitId);
+  const photoVisitImage = getFeaturedImageForVisit(photoVisit, visitImagesByVisitId);
   const mostVisitedPark =
     [...visitsByPark.values()].sort(
       (left, right) =>
@@ -361,6 +398,44 @@ export const buildYearReviewStory = ({
         right.imageCount - left.imageCount ||
         left.trip.name.localeCompare(right.trip.name, 'fi')
     )[0] ?? null;
+  const tripHighlightExcludedVisitIds = new Set(
+    [firstVisit?.id, lastVisit?.id, photoVisit?.id].filter(
+      (value): value is number => value !== undefined
+    )
+  );
+  const tripHighlightVisit =
+    strongestTripEntry === null
+      ? null
+      : (yearVisits.find(
+          (visit) =>
+            visit.trip?.id === strongestTripEntry.trip.id &&
+            visit.imageCount > 0 &&
+            !tripHighlightExcludedVisitIds.has(visit.id)
+        ) ?? null);
+  const tripHighlightImage = getFeaturedImageForVisit(tripHighlightVisit, visitImagesByVisitId);
+  const seenNewNationalParkSlugs = new Set<string>();
+  const newNationalParkMoments = yearVisits.flatMap((visit) => {
+    if (
+      visit.park.typeSlug !== NATIONAL_PARK_TYPE_SLUG ||
+      earliestVisitYearByPark.get(visit.park.slug) !== year ||
+      seenNewNationalParkSlugs.has(visit.park.slug)
+    ) {
+      return [];
+    }
+
+    seenNewNationalParkSlugs.add(visit.park.slug);
+
+    return [
+      {
+        featuredImage: getFeaturedImageForVisit(visit, visitImagesByVisitId),
+        park: {
+          name: visit.park.name,
+          slug: visit.park.slug
+        },
+        visitedOn: visit.visitedOn
+      }
+    ];
+  });
 
   const cards: YearReviewCard[] = [
     {
@@ -375,6 +450,7 @@ export const buildYearReviewStory = ({
 
   if (firstVisit) {
     cards.push({
+      featuredImage: firstVisitImage,
       kind: 'milestone',
       milestone: 'first-visit',
       visit: toVisitReference(firstVisit)
@@ -383,6 +459,7 @@ export const buildYearReviewStory = ({
 
   if (lastVisit && lastVisit.id !== firstVisit?.id) {
     cards.push({
+      featuredImage: lastVisitImage,
       kind: 'milestone',
       milestone: 'last-visit',
       visit: toVisitReference(lastVisit)
@@ -390,13 +467,7 @@ export const buildYearReviewStory = ({
   }
 
   cards.push({
-    featuredImage:
-      photoVisit && photoVisitImage
-        ? {
-            ...photoVisitImage,
-            alt: buildPhotoHighlightAlt(photoVisit)
-          }
-        : null,
+    featuredImage: photoVisitImage,
     kind: 'photo-highlight',
     totalImageCount: summary.imageCount,
     visit: photoVisit ? toVisitReference(photoVisit) : null
@@ -413,6 +484,7 @@ export const buildYearReviewStory = ({
 
   if (strongestTripEntry) {
     cards.push({
+      featuredImage: tripHighlightImage,
       kind: 'trip-highlight',
       trip: {
         dateRange: strongestTripEntry.trip.dateRange,
@@ -422,6 +494,13 @@ export const buildYearReviewStory = ({
         slug: strongestTripEntry.trip.slug,
         visitCount: strongestTripEntry.visitCount
       }
+    });
+  }
+
+  if (newNationalParkMoments.length > 0) {
+    cards.push({
+      kind: 'new-parks',
+      parks: newNationalParkMoments
     });
   }
 
