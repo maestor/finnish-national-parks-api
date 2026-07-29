@@ -845,7 +845,8 @@ const toTripPlannerPark = (row: TripPlannerParkRow, visits: Array<{ visitedOn: s
       minLat: row.bboxMinLat,
       minLon: row.bboxMinLon
     },
-    boundaryGeoJson: JSON.parse(row.boundaryGeojson) as GeoJsonFeatureCollection,
+    boundaryGeoJson: null,
+    boundaryGeoJsonSource: row.boundaryGeojson,
     category: toParkCategory(row.typeSlug as SupportedParkTypeSlug),
     locationLabel: row.locationLabel,
     markerPoint: {

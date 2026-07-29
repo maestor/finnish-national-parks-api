@@ -114,15 +114,39 @@ type OrderResultsOptions<T> = {
 
 type PlannedRoute = NonNullable<Awaited<ReturnType<TripPlannerProvider['route']>>>;
 
-const getDistanceFromRouteMeters = (
-  route: Parameters<typeof getRouteDistanceToFeatureCollectionMeters>[0],
-  park: TripPlannerParkCandidate
-) => {
+const getParkBoundaryGeoJson = (park: TripPlannerParkCandidate) => {
   if (park.boundaryGeoJson) {
-    return getRouteDistanceToFeatureCollectionMeters(route, park.boundaryGeoJson);
+    return park.boundaryGeoJson;
   }
 
+  if (!park.boundaryGeoJsonSource) {
+    return null;
+  }
+
+  const boundaryGeoJson = JSON.parse(park.boundaryGeoJsonSource) as NonNullable<
+    TripPlannerParkCandidate['boundaryGeoJson']
+  >;
+  park.boundaryGeoJson = boundaryGeoJson;
+
+  return boundaryGeoJson;
+};
+
+export const getDistanceFromRouteMetersWithinThreshold = (
+  route: Parameters<typeof getRouteDistanceToFeatureCollectionMeters>[0],
+  park: TripPlannerParkCandidate,
+  maxDistanceMeters: number
+) => {
   const boundingBoxDistance = getRouteDistanceToBoundingBoxMeters(route, park.boundingBox);
+
+  if (Number.isFinite(boundingBoxDistance) && boundingBoxDistance > maxDistanceMeters) {
+    return Number.POSITIVE_INFINITY;
+  }
+
+  const boundaryGeoJson = getParkBoundaryGeoJson(park);
+
+  if (boundaryGeoJson) {
+    return getRouteDistanceToFeatureCollectionMeters(route, boundaryGeoJson);
+  }
 
   if (Number.isFinite(boundingBoxDistance)) {
     return boundingBoxDistance;
@@ -142,8 +166,10 @@ const getDistanceFromOriginMeters = (
   origin: TripPlannerCoordinate,
   park: TripPlannerParkCandidate
 ) => {
-  if (park.boundaryGeoJson) {
-    return getPointDistanceToFeatureCollectionMeters(origin, park.boundaryGeoJson);
+  const boundaryGeoJson = getParkBoundaryGeoJson(park);
+
+  if (boundaryGeoJson) {
+    return getPointDistanceToFeatureCollectionMeters(origin, boundaryGeoJson);
   }
 
   const boundingBoxDistance = getPointDistanceToBoundingBoxMeters(origin, park.boundingBox);
@@ -551,25 +577,39 @@ export const createTripPlannerService = ({
               routeLineString,
               park.markerPoint
             ),
-            distanceFromRouteMeters: getDistanceFromRouteMeters(routeGeometry, park),
             park
           }))
-          .filter(({ distanceAlongRouteMeters, distanceFromRouteMeters }) => {
+          .map(({ distanceAlongRouteMeters, park }) => {
             const isInStartZone =
               applyLongRouteStartZoneLogic && distanceAlongRouteMeters <= START_ZONE_LENGTH_METERS;
             const effectiveMaxDistanceMeters = isInStartZone
               ? Math.min(maxDistanceMeters, START_ZONE_DISTANCE_LIMIT_METERS)
               : maxDistanceMeters;
 
-            return distanceFromRouteMeters <= effectiveMaxDistanceMeters;
+            const distanceFromRouteMeters = getDistanceFromRouteMetersWithinThreshold(
+              routeGeometry,
+              park,
+              effectiveMaxDistanceMeters
+            );
+
+            if (distanceFromRouteMeters > effectiveMaxDistanceMeters) {
+              return null;
+            }
+
+            return {
+              distanceAlongRouteMeters,
+              distanceFromRouteMeters,
+              isInStartZone,
+              park
+            };
           })
-          .map(({ distanceAlongRouteMeters, distanceFromRouteMeters, park }) => ({
+          .filter((park): park is NonNullable<typeof park> => park !== null)
+          .map(({ distanceAlongRouteMeters, distanceFromRouteMeters, isInStartZone, park }) => ({
             ...mapParkBaseResult(park),
             distanceKm: roundDistanceKm(distanceFromRouteMeters),
             distanceAlongRouteMeters,
             distanceFromRouteKm: roundDistanceKm(distanceFromRouteMeters),
-            isInStartZone:
-              applyLongRouteStartZoneLogic && distanceAlongRouteMeters <= START_ZONE_LENGTH_METERS
+            isInStartZone
           }));
 
         return {
