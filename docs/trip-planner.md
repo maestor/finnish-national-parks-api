@@ -71,6 +71,10 @@ The current backend then refines that with long-trip behavior:
 5. For the remaining qualified results on long trips, prefer later-route matches ahead of start-zone matches within the same result group.
 6. Return `defaultDistanceKm` as the route length rounded up to the next kilometer, capped by `maxDistanceKm`, so short trips do not default to the full corridor width in the UI.
 
+For performance, route-corridor scoring now also uses each park's stored bounding box as a safe lower-bound prune step before running the more expensive full boundary-geometry distance calculation. That does not change eligibility or ordering rules; it only skips geometry work when the park is already provably outside the active corridor.
+
+Trip planner candidate parks also keep their stored boundary GeoJSON in a lazy internal form on the search path. The backend now parses a park boundary only when the request actually needs detailed geometry distance work, instead of eagerly parsing every boundary for every route search.
+
 This is intended to reduce dense departure-area flooding such as Uusimaa or the capital region without making Lapland-style long-distance searches too strict.
 
 ## Nearby-Origin Logic

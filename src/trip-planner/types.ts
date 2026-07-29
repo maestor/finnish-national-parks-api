@@ -74,6 +74,7 @@ export type TripPlannerParkCandidate = {
   address: string;
   boundingBox: BoundingBox;
   boundaryGeoJson: GeoJsonFeatureCollection | null;
+  boundaryGeoJsonSource?: string | null | undefined;
   category: TripPlannerParkCategory;
   displayTypeName?: string | null | undefined;
   locationLabel: string;
@@ -86,11 +87,17 @@ export type TripPlannerParkCandidate = {
   visitedSummary: TripPlannerVisitedSummary;
 };
 
-export type TripPlannerParkResult = Omit<TripPlannerParkCandidate, 'boundaryGeoJson'> & {
+export type TripPlannerParkResult = Omit<
+  TripPlannerParkCandidate,
+  'boundaryGeoJson' | 'boundaryGeoJsonSource'
+> & {
   distanceFromRouteKm: number;
 };
 
-export type TripPlannerNearbyParkResult = Omit<TripPlannerParkCandidate, 'boundaryGeoJson'> & {
+export type TripPlannerNearbyParkResult = Omit<
+  TripPlannerParkCandidate,
+  'boundaryGeoJson' | 'boundaryGeoJsonSource'
+> & {
   distanceFromOriginKm: number;
 };
 
