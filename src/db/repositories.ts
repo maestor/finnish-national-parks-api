@@ -12,7 +12,7 @@ import {
   supportedParkTypes
 } from '../parks/park-types.js';
 import type { TripPlannerParkCandidate } from '../trip-planner/types.js';
-import type { YearReviewStory } from '../year-review/story.js';
+import type { YearReviewStory, YearReviewStoryImageAsset } from '../year-review/story.js';
 import type { Database, DbClient } from './database.js';
 import {
   admins,
@@ -1362,6 +1362,27 @@ const buildVisitImagesByVisitId = async (
   }
 
   return visitImagesByVisitId;
+};
+
+export const getYearReviewImageAssetsByVisitId = async (database: Database, visitIds: number[]) => {
+  const imageRows = await getImagesForVisitIds(database, visitIds);
+  const imageAssetsByVisitId = new Map<number, YearReviewStoryImageAsset[]>();
+
+  for (const image of imageRows) {
+    const assets = imageAssetsByVisitId.get(image.visitId) ?? [];
+    assets.push({
+      alt: null,
+      fullHeight: image.fullHeight,
+      fullKey: image.fullKey,
+      fullWidth: image.fullWidth,
+      thumbHeight: image.thumbHeight,
+      thumbKey: image.thumbKey,
+      thumbWidth: image.thumbWidth
+    });
+    imageAssetsByVisitId.set(image.visitId, assets);
+  }
+
+  return imageAssetsByVisitId;
 };
 
 const buildTripStopImagesByTripStopId = async (

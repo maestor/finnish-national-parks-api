@@ -29,6 +29,16 @@ const yearReviewVisitReferenceSchema = z.object({
   visitedOn: visitDateSchema
 });
 
+const yearReviewStoryImageSchema = z.object({
+  alt: z.string().nullable(),
+  fullHeight: z.number().int().positive().nullable(),
+  fullUrl: z.string().url(),
+  fullWidth: z.number().int().positive().nullable(),
+  thumbHeight: z.number().int().positive().nullable(),
+  thumbUrl: z.string().url(),
+  thumbWidth: z.number().int().positive().nullable()
+});
+
 const yearReviewMostVisitedParkSchema = z.object({
   name: z.string(),
   slug: z.string(),
@@ -61,6 +71,7 @@ const yearReviewMilestoneCardSchema = z.object({
 });
 
 const yearReviewPhotoHighlightCardSchema = z.object({
+  featuredImage: yearReviewStoryImageSchema.nullable(),
   kind: z.literal('photo-highlight'),
   totalImageCount: z.number().int().nonnegative(),
   visit: yearReviewVisitReferenceSchema.nullable()

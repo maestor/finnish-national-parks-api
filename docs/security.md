@@ -44,6 +44,7 @@ Rules:
 - When a route mixes API-key and session requirements, document both clearly in contract and contributor docs.
 - Named-trip writes (`POST /api/trips`, `PATCH /api/trips/:id`, `DELETE /api/trips/:id`, `POST /api/trips/:id/stops`, `PATCH /api/trip-stops/:id`, `DELETE /api/trip-stops/:id`, and the trip-stop image upload/delete/reorder routes) stay on the admin-session side, while trip reads (`GET /api/trips`, `GET /api/trips/slug/:slug`, `GET /api/trips/:id`) stay read-only and API-key protected like the other frontend summary endpoints.
 - Year-review preview and publish routes (`GET /api/year-review/:year/preview`, `POST /api/year-review/:year/publish`, and `DELETE /api/year-review/:year/publish`) stay on the admin-session side, while `GET /api/year-review/shares/:shareId` stays on the API-key-protected frontend-read side for server-rendered share pages.
+- Published year-review snapshots may freeze image keys for selected story cards, but share reads must resolve fresh presigned URLs at response time instead of storing expiring URLs inside the snapshot JSON.
 
 ## Storage And Upload Rules
 

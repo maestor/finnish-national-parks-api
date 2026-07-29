@@ -57,6 +57,16 @@ export type YearReviewVisitReference = {
   visitedOn: string;
 };
 
+export type YearReviewStoryImageAsset = {
+  alt: string | null;
+  fullHeight: number | null;
+  fullKey: string;
+  fullWidth: number | null;
+  thumbHeight: number | null;
+  thumbKey: string;
+  thumbWidth: number | null;
+};
+
 export type YearReviewCard =
   | {
       kind: 'intro';
@@ -72,6 +82,7 @@ export type YearReviewCard =
       visit: YearReviewVisitReference;
     }
   | {
+      featuredImage: YearReviewStoryImageAsset | null;
       kind: 'photo-highlight';
       totalImageCount: number;
       visit: YearReviewVisitReference | null;
@@ -170,6 +181,10 @@ const toVisitReference = (visit: YearReviewTimelineVisit): YearReviewVisitRefere
   visitedOn: visit.visitedOn
 });
 
+const buildPhotoHighlightAlt = (visit: YearReviewTimelineVisit) => {
+  return `Kuva käynniltä ${visit.park.name} ${visit.visitedOn}`;
+};
+
 const buildEarliestVisitYearByPark = (visits: YearReviewTimelineVisit[]) => {
   const earliestVisitYearByPark = new Map<string, number>();
 
@@ -218,10 +233,12 @@ export const createYearReviewSharePath = (shareId: string) => `/vuosikatsaus/jak
 
 export const buildYearReviewStory = ({
   trips,
+  visitImagesByVisitId = new Map<number, YearReviewStoryImageAsset[]>(),
   visits,
   year
 }: {
   trips: YearReviewTrip[];
+  visitImagesByVisitId?: Map<number, YearReviewStoryImageAsset[]>;
   visits: YearReviewTimelineVisit[];
   year: number;
 }): YearReviewStory => {
@@ -317,6 +334,8 @@ export const buildYearReviewStory = ({
       (left, right) =>
         right.imageCount - left.imageCount || compareVisitsByNarrativeOrder(left, right)
     )[0] ?? null;
+  const photoVisitImage =
+    photoVisit === null ? null : (visitImagesByVisitId.get(photoVisit.id)?.[0] ?? null);
   const mostVisitedPark =
     [...visitsByPark.values()].sort(
       (left, right) =>
@@ -371,6 +390,13 @@ export const buildYearReviewStory = ({
   }
 
   cards.push({
+    featuredImage:
+      photoVisit && photoVisitImage
+        ? {
+            ...photoVisitImage,
+            alt: buildPhotoHighlightAlt(photoVisit)
+          }
+        : null,
     kind: 'photo-highlight',
     totalImageCount: summary.imageCount,
     visit: photoVisit ? toVisitReference(photoVisit) : null

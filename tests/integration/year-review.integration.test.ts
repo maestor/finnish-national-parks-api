@@ -1,8 +1,10 @@
+import sharp from 'sharp';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { createApp } from '../../src/app.js';
 import { createSessionToken } from '../../src/http/session.js';
 import { importParks } from '../../src/importer/import-parks.js';
+import { createMemoryStorage } from '../../src/storage/memory-storage.js';
 import { createLipasPark, parkTypeFixtures } from '../fixtures/lipas.js';
 import { createTestDatabase } from '../helpers/test-db.js';
 
@@ -140,6 +142,36 @@ describe('year review routes', () => {
     });
   };
 
+  const createTestImageBuffer = async (width = 1200, height = 800) => {
+    return sharp({
+      create: {
+        background: { b: 100, g: 150, r: 50 },
+        channels: 3,
+        height,
+        width
+      }
+    })
+      .jpeg()
+      .toBuffer();
+  };
+
+  const uploadImages = async (
+    app: ReturnType<typeof createApp>,
+    visitId: number,
+    files: File[]
+  ) => {
+    const formData = new FormData();
+
+    for (const file of files) {
+      formData.append('images', file);
+    }
+
+    return requestAsAdmin(app, `/api/visits/${visitId}/images`, {
+      body: formData,
+      method: 'POST'
+    });
+  };
+
   it('builds an admin-only preview from existing visits and trips', async () => {
     const app = createAuthedApp();
     const tripResponse = await createTrip(app, {
@@ -212,6 +244,199 @@ describe('year review routes', () => {
         'summary'
       ])
     );
+  });
+
+  it('builds a preview without photo highlight assets when the selected year has no visits', async () => {
+    const app = createAuthedApp();
+
+    const previewResponse = await requestAsAdmin(app, '/api/year-review/2027/preview');
+    const previewBody = (await previewResponse.json()) as {
+      story: {
+        cards: Array<
+          | { kind: string }
+          | {
+              featuredImage: null;
+              kind: 'photo-highlight';
+              visit: null;
+            }
+        >;
+        summary: {
+          distinctParkCount: number;
+          imageCount: number;
+          newParkCount: number;
+          visitCount: number;
+        };
+      };
+      year: number;
+    };
+
+    expect(previewResponse.status).toBe(200);
+    expect(previewBody.year).toBe(2027);
+    expect(previewBody.story.summary).toMatchObject({
+      distinctParkCount: 0,
+      imageCount: 0,
+      newParkCount: 0,
+      visitCount: 0
+    });
+
+    const photoHighlightCard = previewBody.story.cards.find(
+      (
+        card
+      ): card is Extract<(typeof previewBody.story.cards)[number], { kind: 'photo-highlight' }> =>
+        card.kind === 'photo-highlight'
+    );
+
+    expect(photoHighlightCard).toMatchObject({
+      featuredImage: null,
+      kind: 'photo-highlight',
+      visit: null
+    });
+  });
+
+  it('resolves the published photo highlight image to fresh public urls for preview and share reads', async () => {
+    const apiKey = 'test-secret-key';
+    const storage = createMemoryStorage();
+    const app = createAuthedApp({ apiKey, storage });
+
+    const visitResponse = await createVisit(app, 'akasmannyn-kansallispuisto', {
+      visitedOn: '2026-06-07'
+    });
+    const visitBody = (await visitResponse.json()) as { id: number };
+    const imageBuffer = await createTestImageBuffer();
+    const imageFile = new File([imageBuffer], 'year-review.jpg', { type: 'image/jpeg' });
+
+    const uploadResponse = await uploadImages(app, visitBody.id, [imageFile]);
+    expect(uploadResponse.status).toBe(201);
+
+    const previewResponse = await requestAsAdmin(app, '/api/year-review/2026/preview');
+    const previewBody = (await previewResponse.json()) as {
+      story: {
+        cards: Array<
+          | { kind: string }
+          | {
+              featuredImage: {
+                alt: string | null;
+                fullHeight: number | null;
+                fullUrl: string;
+                fullWidth: number | null;
+                thumbHeight: number | null;
+                thumbUrl: string;
+                thumbWidth: number | null;
+              } | null;
+              kind: 'photo-highlight';
+            }
+        >;
+      };
+    };
+    const previewPhotoCard = previewBody.story.cards.find(
+      (
+        card
+      ): card is Extract<(typeof previewBody.story.cards)[number], { kind: 'photo-highlight' }> =>
+        card.kind === 'photo-highlight'
+    );
+
+    expect(previewPhotoCard?.featuredImage).toMatchObject({
+      alt: 'Kuva käynniltä Äkäsmännyn kansallispuisto 2026-06-07',
+      fullHeight: 800,
+      fullWidth: 1200
+    });
+    expect(previewPhotoCard?.featuredImage?.fullUrl).toContain('https://memory-storage.test/');
+    expect(previewPhotoCard?.featuredImage?.thumbUrl).toContain('https://memory-storage.test/');
+
+    const publishResponse = await requestAsAdmin(app, '/api/year-review/2026/publish', {
+      method: 'POST'
+    });
+    const publishBody = (await publishResponse.json()) as {
+      shareId: string;
+    };
+
+    const shareResponse = await app.request(`/api/year-review/shares/${publishBody.shareId}`, {
+      headers: {
+        authorization: `Bearer ${apiKey}`,
+        'x-forwarded-for': '203.0.113.1'
+      }
+    });
+    const shareBody = (await shareResponse.json()) as {
+      story: {
+        cards: Array<
+          | { kind: string }
+          | {
+              featuredImage: {
+                alt: string | null;
+                fullHeight: number | null;
+                fullUrl: string;
+                fullWidth: number | null;
+                thumbHeight: number | null;
+                thumbUrl: string;
+                thumbWidth: number | null;
+              } | null;
+              kind: 'photo-highlight';
+            }
+        >;
+      };
+    };
+    const sharePhotoCard = shareBody.story.cards.find(
+      (
+        card
+      ): card is Extract<(typeof shareBody.story.cards)[number], { kind: 'photo-highlight' }> =>
+        card.kind === 'photo-highlight'
+    );
+
+    expect(shareResponse.status).toBe(200);
+    expect(sharePhotoCard?.featuredImage).toMatchObject({
+      alt: 'Kuva käynniltä Äkäsmännyn kansallispuisto 2026-06-07',
+      fullHeight: 800,
+      fullWidth: 1200
+    });
+    expect(sharePhotoCard?.featuredImage?.fullUrl).toContain('https://memory-storage.test/');
+    expect(sharePhotoCard?.featuredImage?.thumbUrl).toContain('https://memory-storage.test/');
+  });
+
+  it('drops the photo highlight image from the response when a fresh public url cannot be resolved', async () => {
+    const baseStorage = createMemoryStorage();
+    const storageWithMissingThumbUrl = {
+      ...baseStorage,
+      getPresignedUrl: async (key: string, expiresInSeconds: number) => {
+        if (key.endsWith('-thumb.jpg')) {
+          return '';
+        }
+
+        return baseStorage.getPresignedUrl(key, expiresInSeconds);
+      }
+    };
+    const app = createAuthedApp({ storage: storageWithMissingThumbUrl });
+
+    const visitResponse = await createVisit(app, 'akasmannyn-kansallispuisto', {
+      visitedOn: '2026-06-07'
+    });
+    const visitBody = (await visitResponse.json()) as { id: number };
+    const imageBuffer = await createTestImageBuffer();
+    const imageFile = new File([imageBuffer], 'year-review.jpg', { type: 'image/jpeg' });
+
+    const uploadResponse = await uploadImages(app, visitBody.id, [imageFile]);
+    expect(uploadResponse.status).toBe(201);
+
+    const previewResponse = await requestAsAdmin(app, '/api/year-review/2026/preview');
+    const previewBody = (await previewResponse.json()) as {
+      story: {
+        cards: Array<
+          | { kind: string }
+          | {
+              featuredImage: null;
+              kind: 'photo-highlight';
+            }
+        >;
+      };
+    };
+    const previewPhotoCard = previewBody.story.cards.find(
+      (
+        card
+      ): card is Extract<(typeof previewBody.story.cards)[number], { kind: 'photo-highlight' }> =>
+        card.kind === 'photo-highlight'
+    );
+
+    expect(previewResponse.status).toBe(200);
+    expect(previewPhotoCard?.featuredImage).toBeNull();
   });
 
   it('returns a published preview state and reuses the share id when republishing the same year', async () => {

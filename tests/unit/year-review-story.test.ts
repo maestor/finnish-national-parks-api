@@ -89,6 +89,7 @@ describe('year review story builder', () => {
         year: 2026
       },
       {
+        featuredImage: null,
         kind: 'photo-highlight',
         totalImageCount: 0,
         visit: null
@@ -208,6 +209,63 @@ describe('year review story builder', () => {
         winter: 0
       }
     });
+  });
+
+  it('keeps the strongest photo visit image as a stable asset reference', () => {
+    const story = buildYearReviewStory({
+      trips: [],
+      visitImagesByVisitId: new Map([
+        [
+          1,
+          [
+            {
+              alt: 'Kuva käynniltä Akasmännyn kansallispuisto 2026-03-10',
+              fullHeight: 900,
+              fullKey: 'visits/1/alpha-full.jpg',
+              fullWidth: 1400,
+              thumbHeight: 450,
+              thumbKey: 'visits/1/alpha-thumb.jpg',
+              thumbWidth: 700
+            }
+          ]
+        ]
+      ]),
+      visits: [
+        createVisit({
+          id: 1,
+          imageCount: 3,
+          visitedOn: '2026-03-10'
+        }),
+        createVisit({
+          createdAt: '2026-04-11T09:00:00.000Z',
+          id: 2,
+          imageCount: 1,
+          visitedOn: '2026-04-11'
+        })
+      ],
+      year: 2026
+    });
+
+    expect(story.cards).toEqual(
+      expect.arrayContaining([
+        {
+          featuredImage: {
+            alt: 'Kuva käynniltä Akasmännyn kansallispuisto 2026-03-10',
+            fullHeight: 900,
+            fullKey: 'visits/1/alpha-full.jpg',
+            fullWidth: 1400,
+            thumbHeight: 450,
+            thumbKey: 'visits/1/alpha-thumb.jpg',
+            thumbWidth: 700
+          },
+          kind: 'photo-highlight',
+          totalImageCount: 4,
+          visit: expect.objectContaining({
+            id: 1
+          })
+        }
+      ])
+    );
   });
 
   it('orders same-day visits deterministically and ignores missing trip records', () => {

@@ -35,6 +35,7 @@ import {
   getPublishedYearReviewShareByYear,
   getTripById,
   getVisitById,
+  getYearReviewImageAssetsByVisitId,
   listAdminParkVisibility,
   listParkSearchEntries,
   listPublicParks,
@@ -144,7 +145,12 @@ import {
 import type { StorageClient } from './storage/types.js';
 import { TripPlannerError } from './trip-planner/search.js';
 import type { TripPlannerService } from './trip-planner/types.js';
-import { buildYearReviewStory, createYearReviewSharePath } from './year-review/story.js';
+import {
+  buildYearReviewStory,
+  createYearReviewSharePath,
+  type YearReviewStory,
+  type YearReviewStoryImageAsset
+} from './year-review/story.js';
 
 type AuthConfig = {
   cookieName: string;
@@ -189,6 +195,88 @@ export const getFrontendUrl = (auth?: AuthConfig) => auth?.frontendUrl ?? 'http:
 
 const buildYearReviewPublicUrl = (frontendUrl: string, shareId: string) => {
   return `${frontendUrl}${createYearReviewSharePath(shareId)}`;
+};
+
+const resolveYearReviewStoryImageAsset = async (
+  image: YearReviewStoryImageAsset | null,
+  getImagePublicUrl: (key: string) => Promise<string>
+) => {
+  if (!image) {
+    return null;
+  }
+
+  const [fullUrl, thumbUrl] = await Promise.all([
+    getImagePublicUrl(image.fullKey),
+    getImagePublicUrl(image.thumbKey)
+  ]);
+
+  if (!fullUrl || !thumbUrl) {
+    return null;
+  }
+
+  return {
+    alt: image.alt,
+    fullHeight: image.fullHeight,
+    fullUrl,
+    fullWidth: image.fullWidth,
+    thumbHeight: image.thumbHeight,
+    thumbUrl,
+    thumbWidth: image.thumbWidth
+  };
+};
+
+const resolveYearReviewStoryForResponse = async (
+  story: YearReviewStory,
+  getImagePublicUrl: (key: string) => Promise<string>
+) => {
+  const cards = await Promise.all(
+    story.cards.map(async (card) => {
+      if (card.kind !== 'photo-highlight') {
+        return card;
+      }
+
+      return {
+        ...card,
+        featuredImage: await resolveYearReviewStoryImageAsset(card.featuredImage, getImagePublicUrl)
+      };
+    })
+  );
+
+  return {
+    ...story,
+    cards
+  };
+};
+
+const buildYearReviewStoryWithImageAssets = async ({
+  database,
+  trips,
+  visits,
+  year
+}: {
+  database: Database;
+  trips: Awaited<ReturnType<typeof listTrips>>;
+  visits: Awaited<ReturnType<typeof listVisitsTimeline>>;
+  year: number;
+}) => {
+  const draftStory = buildYearReviewStory({
+    trips,
+    visits,
+    year
+  });
+  const photoHighlightVisitId =
+    draftStory.cards.find((card) => card.kind === 'photo-highlight')?.visit?.id ?? null;
+  const visitImagesByVisitId =
+    photoHighlightVisitId === null
+      ? new Map()
+      : await getYearReviewImageAssetsByVisitId(database, [photoHighlightVisitId]);
+
+  return buildYearReviewStory({
+    trips,
+    visitImagesByVisitId,
+    visits,
+    year
+  });
 };
 
 const normalizeRouteFallbackQueries = (...queries: Array<string | null | undefined>) => {
@@ -951,7 +1039,8 @@ export const createApp = ({
         listTrips(database),
         listVisitsTimeline(database)
       ]);
-      const story = buildYearReviewStory({
+      const story = await buildYearReviewStoryWithImageAssets({
+        database,
         trips,
         visits,
         year
@@ -975,7 +1064,7 @@ export const createApp = ({
                 sharePath: null
               },
           status: existingShare ? ('published' as const) : ('draft' as const),
-          story,
+          story: await resolveYearReviewStoryForResponse(story, getImagePublicUrl),
           year
         },
         200
@@ -997,15 +1086,17 @@ export const createApp = ({
         listVisitsTimeline(database)
       ]);
       const now = new Date().toISOString();
+      const story = await buildYearReviewStoryWithImageAssets({
+        database,
+        trips,
+        visits,
+        year
+      });
       const publishedShare = await publishYearReviewShare(database, {
         generatedAt: now,
         publishedAt: now,
         shareId: existingShare?.shareId ?? randomUUID(),
-        story: buildYearReviewStory({
-          trips,
-          visits,
-          year
-        }),
+        story,
         updatedAt: now,
         year
       });
@@ -1057,7 +1148,7 @@ export const createApp = ({
         {
           publishedAt: share.publishedAt,
           shareId: share.shareId,
-          story: share.story,
+          story: await resolveYearReviewStoryForResponse(share.story, getImagePublicUrl),
           year: share.year
         },
         200
