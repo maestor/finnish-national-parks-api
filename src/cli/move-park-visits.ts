@@ -5,15 +5,18 @@ import { reassignParkVisits } from '../db/repositories.js';
 
 type ParsedArgs = {
   dryRun: boolean;
-  fromSlug: string;
   toSlug: string;
+  fromSlug?: string;
+  visitId?: number;
 };
 
-const usage = `Usage: npm run park:move-visits -- --from <source-slug> --to <target-slug> [--dry-run]`;
+const usage =
+  'Usage: npm run park:move-visits -- (--from <source-slug> | --visit-id <visit-id>) --to <target-slug> [--dry-run]';
 
 const parseArgs = (argv: string[]): ParsedArgs => {
-  let fromSlug = '';
+  let fromSlug: string | undefined;
   let toSlug = '';
+  let visitId: number | undefined;
   let dryRun = false;
 
   for (let index = 0; index < argv.length; index++) {
@@ -30,6 +33,13 @@ const parseArgs = (argv: string[]): ParsedArgs => {
       continue;
     }
 
+    if (arg === '--visit-id') {
+      const value = argv[index + 1] ?? '';
+      visitId = Number.parseInt(value, 10);
+      index += 1;
+      continue;
+    }
+
     if (arg === '--to') {
       toSlug = argv[index + 1] ?? '';
       index += 1;
@@ -39,14 +49,23 @@ const parseArgs = (argv: string[]): ParsedArgs => {
     throw new Error(`Unknown argument: ${arg}\n${usage}`);
   }
 
-  if (!fromSlug || !toSlug) {
+  if (!toSlug || (!fromSlug && visitId === undefined)) {
     throw new Error(`${usage}`);
+  }
+
+  if (fromSlug && visitId !== undefined) {
+    throw new Error(`Provide either --from or --visit-id.\n${usage}`);
+  }
+
+  if (visitId !== undefined && (!Number.isInteger(visitId) || visitId < 1)) {
+    throw new Error(`--visit-id must be a positive integer.\n${usage}`);
   }
 
   return {
     dryRun,
-    fromSlug,
-    toSlug
+    ...(fromSlug ? { fromSlug } : {}),
+    toSlug,
+    ...(visitId !== undefined ? { visitId } : {})
   };
 };
 

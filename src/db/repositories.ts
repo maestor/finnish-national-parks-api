@@ -153,8 +153,9 @@ type UpdateParkDetailsInput = {
 
 type ReassignParkVisitsInput = {
   dryRun?: boolean | undefined;
-  fromSlug: string;
+  fromSlug?: string | undefined;
   toSlug: string;
+  visitId?: number | undefined;
 };
 
 type ReassignParkVisitsResult = {
@@ -2785,22 +2786,51 @@ export const reassignParkVisits = async (
   database: Database,
   input: ReassignParkVisitsInput
 ): Promise<ReassignParkVisitsResult> => {
-  const fromSlug = input.fromSlug.trim();
+  const fromSlug = input.fromSlug?.trim() ?? '';
   const toSlug = input.toSlug.trim();
   const dryRun = input.dryRun ?? false;
+  const visitId = input.visitId;
+  const hasFromSlug = fromSlug.length > 0;
+  const hasVisitId = visitId !== undefined;
 
-  if (!fromSlug || !toSlug) {
-    throw new Error('Both fromSlug and toSlug are required.');
+  if (!toSlug || (!hasFromSlug && !hasVisitId)) {
+    throw new Error('Target park slug and either fromSlug or visitId are required.');
   }
 
-  if (fromSlug === toSlug) {
-    throw new Error('Source and target park slugs must be different.');
+  if (hasFromSlug && hasVisitId) {
+    throw new Error('Provide either fromSlug or visitId, not both.');
   }
 
-  const [fromPark] = await database.select().from(parks).where(eq(parks.slug, fromSlug)).limit(1);
+  if (hasVisitId && (!Number.isInteger(visitId) || visitId < 1)) {
+    throw new Error('visitId must be a positive integer.');
+  }
 
-  if (!fromPark) {
-    throw new Error(`Source park not found for slug "${fromSlug}".`);
+  let fromPark: typeof parks.$inferSelect | undefined;
+  let movedVisitIds: number[] = [];
+
+  if (hasVisitId) {
+    const [visitRow] = await database
+      .select({ id: parkVisits.id, parkId: parkVisits.parkId })
+      .from(parkVisits)
+      .where(eq(parkVisits.id, visitId!))
+      .limit(1);
+
+    if (!visitRow) {
+      throw new Error(`Visit not found for id ${visitId}.`);
+    }
+
+    movedVisitIds = [visitRow.id];
+    [fromPark] = await database.select().from(parks).where(eq(parks.id, visitRow.parkId)).limit(1);
+
+    if (!fromPark) {
+      throw new Error(`Source park not found for visit ${visitId}.`);
+    }
+  } else {
+    [fromPark] = await database.select().from(parks).where(eq(parks.slug, fromSlug)).limit(1);
+
+    if (!fromPark) {
+      throw new Error(`Source park not found for slug "${fromSlug}".`);
+    }
   }
 
   const [toPark] = await database.select().from(parks).where(eq(parks.slug, toSlug)).limit(1);
@@ -2813,13 +2843,19 @@ export const reassignParkVisits = async (
     throw new Error(`Target park "${toSlug}" is removed and cannot receive visits.`);
   }
 
-  const visitRows = await database
-    .select({ id: parkVisits.id })
-    .from(parkVisits)
-    .where(eq(parkVisits.parkId, fromPark.id))
-    .orderBy(asc(parkVisits.id));
+  if (fromPark.id === toPark.id) {
+    throw new Error('Source and target park slugs must be different.');
+  }
 
-  const movedVisitIds = visitRows.map((visit) => visit.id);
+  if (!hasVisitId) {
+    const visitRows = await database
+      .select({ id: parkVisits.id })
+      .from(parkVisits)
+      .where(eq(parkVisits.parkId, fromPark.id))
+      .orderBy(asc(parkVisits.id));
+
+    movedVisitIds = visitRows.map((visit) => visit.id);
+  }
   const movedVisitCount = movedVisitIds.length;
 
   const imageRows =
@@ -2842,7 +2878,7 @@ export const reassignParkVisits = async (
           parkId: toPark.id,
           updatedAt: timestamp
         })
-        .where(eq(parkVisits.parkId, fromPark.id));
+        .where(inArray(parkVisits.id, movedVisitIds));
 
       await bumpPublicVisitDataVersion(tx, timestamp);
     });

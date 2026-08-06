@@ -15,6 +15,7 @@ export const createTestDatabase = async () => {
   await migrateDatabase(client);
 
   return {
+    client,
     database: createDatabase(client),
     async dispose() {
       await client.close();

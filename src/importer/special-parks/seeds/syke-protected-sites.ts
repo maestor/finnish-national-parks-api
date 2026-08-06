@@ -263,7 +263,7 @@ export const sourceReadyDestinationAreaSeeds: SykeSpecialParkSeed[] = [
     displayTypeName: null,
     parkUrl: 'https://www.luontoon.fi/fi/kohteet/dagmarin-puisto',
     name: 'Dagmarin puisto',
-    parkTypeSlug: 'cultural-history-area',
+    parkTypeSlug: 'nature-reserve-area',
     slug: 'dagmarin-puisto',
     sourceName: 'Dagmarin puisto',
     sourceType: 'private',

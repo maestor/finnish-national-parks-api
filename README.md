@@ -35,7 +35,7 @@ npm run db:migrate
 npm run import:parks
 npm run import:special-parks
 npm run import:special-parks -- <special-park-slug> [<special-park-slug> ...]
-npm run park:move-visits -- --from <source-slug> --to <target-slug> [--dry-run]
+npm run park:move-visits -- (--from <source-slug> | --visit-id <visit-id>) --to <target-slug> [--dry-run]
 npm run park:logo -- <park-slug>
 npm run db:backup
 npm run verify
@@ -87,7 +87,7 @@ Production notes:
 - That workflow now checks production first and only takes a backup plus runs `npm run db:migrate` when unapplied SQL migration files actually exist.
 - `npm run db:backup` reads the current remote `DATABASE_URL` and `DATABASE_AUTH_TOKEN`, then writes a timestamped SQLite backup under `data/backups/`. You can append an optional label with `npm run db:backup -- before-import`.
 - `npm run db:migrate` remains available as the manual fallback or recovery path if the production workflow is unavailable.
-- `npm run park:move-visits -- --from <source-slug> --to <target-slug> [--dry-run]` reassigns all visits for one park slug to another. Visit images stay attached automatically because they belong to the visit rows.
+- `npm run park:move-visits -- (--from <source-slug> | --visit-id <visit-id>) --to <target-slug> [--dry-run]` reassigns either all visits for one park slug or one specific visit to another park. Visit images stay attached automatically because they belong to the visit rows.
 - `npm run park:logo -- <park-slug>` uploads either `data/logos/<park-slug>.png` or, when multiple parks share one `displayTypeName`, `data/logos/display-types/<normalized-display-type>.png`. Shared display-type logos are stored once under `logos/display-types/` in R2 and linked from every matching park row. When `PUBLIC_API_BASE_URL` is set, park APIs expose stable versioned logo URLs through `GET /assets/logos/*`; otherwise they fall back to presigned logo URLs.
 
 The importer's LIPAS source URL and supported type-code list are internal configuration, not a normal `.env` setting.

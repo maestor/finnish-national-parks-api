@@ -1839,6 +1839,96 @@ describe('repositories', () => {
     expect(targetParkVisits?.visits).toEqual([]);
   });
 
+  it('can move one selected visit by id without reassigning other visits from the same park', async () => {
+    await importParks({
+      database: testDatabase.database,
+      expectedActiveCount: 3,
+      now: () => '2026-05-01T10:00:00.000Z',
+      sourceUrl: 'https://example.test/lipas',
+      fetchSource: async () => ({
+        items: [
+          createLipasPark(),
+          createLipasPark({
+            'lipas-id': 99999,
+            name: 'Vallisaari',
+            type: { 'type-code': 103 },
+            www: 'https://www.luontoon.fi/vallisaari'
+          }),
+          createLipasPark({
+            'lipas-id': 440499,
+            name: 'Aleksanterin kierros',
+            type: { 'type-code': 103 },
+            www: 'https://www.luontoon.fi/aleksanterin-kierros'
+          })
+        ]
+      })
+    });
+
+    const movedVisit = await createVisit(testDatabase.database, 'aleksanterin-kierros', {
+      note: 'Move only this one',
+      visitedOn: '2026-04-10'
+    });
+    await createVisit(testDatabase.database, 'aleksanterin-kierros', {
+      note: 'Leave this one in place',
+      visitedOn: '2026-04-12'
+    });
+    await createVisit(testDatabase.database, 'vallisaari', {
+      note: 'Already on target',
+      visitedOn: '2026-04-11'
+    });
+
+    await createVisitImage(testDatabase.database, {
+      createdAt: '2026-05-01T10:00:00.000Z',
+      displayOrder: 0,
+      fullHeight: 100,
+      fullKey: 'visits/1/full.jpg',
+      fullWidth: 100,
+      mimeType: 'image/jpeg',
+      thumbHeight: 50,
+      thumbKey: 'visits/1/thumb.jpg',
+      thumbWidth: 50,
+      updatedAt: '2026-05-01T10:00:00.000Z',
+      visitId: movedVisit.id
+    });
+
+    const result = await reassignParkVisits(testDatabase.database, {
+      toSlug: 'vallisaari',
+      visitId: movedVisit.id
+    });
+
+    const sourceParkVisits = await getParkVisitsBySlug(
+      testDatabase.database,
+      'aleksanterin-kierros',
+      async () => ''
+    );
+    const targetParkVisits = await getParkVisitsBySlug(
+      testDatabase.database,
+      'vallisaari',
+      async () => ''
+    );
+
+    expect(result).toMatchObject({
+      dryRun: false,
+      fromPark: {
+        name: 'Aleksanterin kierros',
+        slug: 'aleksanterin-kierros'
+      },
+      movedImageCount: 1,
+      movedVisitCount: 1,
+      movedVisitIds: [movedVisit.id],
+      toPark: {
+        name: 'Vallisaari',
+        slug: 'vallisaari'
+      }
+    });
+    expect(sourceParkVisits?.visits).toHaveLength(1);
+    expect(sourceParkVisits?.visits[0]?.note).toBe('Leave this one in place');
+    expect(targetParkVisits?.visits).toHaveLength(2);
+    expect(targetParkVisits?.visits.find((visit) => visit.id === movedVisit.id)).toMatchObject({
+      note: 'Move only this one'
+    });
+  });
+
   it('returns a zero-move result when the source park has no visits', async () => {
     await importParks({
       database: testDatabase.database,
@@ -1871,6 +1961,44 @@ describe('repositories', () => {
     });
   });
 
+  it('rejects visit-id reassignment when the source park row is missing', async () => {
+    await importParks({
+      database: testDatabase.database,
+      expectedActiveCount: 2,
+      now: () => '2026-05-01T10:00:00.000Z',
+      sourceUrl: 'https://example.test/lipas',
+      fetchSource: async () => ({
+        items: [
+          createLipasPark(),
+          createLipasPark({
+            'lipas-id': 99999,
+            name: 'Vallisaari',
+            type: { 'type-code': 103 },
+            www: 'https://www.luontoon.fi/vallisaari'
+          })
+        ]
+      })
+    });
+
+    const sourceVisit = await createVisit(testDatabase.database, 'akasmannyn-kansallispuisto', {
+      visitedOn: '2026-04-10'
+    });
+
+    await testDatabase.client.execute('PRAGMA foreign_keys = OFF');
+    await testDatabase.database
+      .update(parkVisits)
+      .set({ parkId: 999_999 })
+      .where(eq(parkVisits.id, sourceVisit.id));
+    await testDatabase.client.execute('PRAGMA foreign_keys = ON');
+
+    await expect(
+      reassignParkVisits(testDatabase.database, {
+        toSlug: 'vallisaari',
+        visitId: sourceVisit.id
+      })
+    ).rejects.toThrow(`Source park not found for visit ${sourceVisit.id}.`);
+  });
+
   it('rejects invalid visit reassignment requests', async () => {
     await importParks({
       database: testDatabase.database,
@@ -1892,10 +2020,31 @@ describe('repositories', () => {
 
     await expect(
       reassignParkVisits(testDatabase.database, {
-        fromSlug: '   ',
         toSlug: 'vallisaari'
       })
-    ).rejects.toThrow('Both fromSlug and toSlug are required.');
+    ).rejects.toThrow('Target park slug and either fromSlug or visitId are required.');
+
+    await expect(
+      reassignParkVisits(testDatabase.database, {
+        fromSlug: 'akasmannyn-kansallispuisto',
+        toSlug: 'vallisaari',
+        visitId: 1
+      })
+    ).rejects.toThrow('Provide either fromSlug or visitId, not both.');
+
+    await expect(
+      reassignParkVisits(testDatabase.database, {
+        toSlug: 'vallisaari',
+        visitId: 0
+      })
+    ).rejects.toThrow('visitId must be a positive integer.');
+
+    await expect(
+      reassignParkVisits(testDatabase.database, {
+        toSlug: 'vallisaari',
+        visitId: 99999
+      })
+    ).rejects.toThrow('Visit not found for id 99999.');
 
     await expect(
       reassignParkVisits(testDatabase.database, {
