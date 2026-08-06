@@ -221,6 +221,33 @@ const getFeaturedImageForVisit = (
   };
 };
 
+const selectTripHighlightVisit = ({
+  excludedVisitIds,
+  strongestTripId,
+  visits
+}: {
+  excludedVisitIds: Set<number>;
+  strongestTripId: number;
+  visits: YearReviewTimelineVisit[];
+}) => {
+  const preferredVisit =
+    visits.find(
+      (visit) =>
+        visit.trip?.id === strongestTripId &&
+        visit.imageCount > 0 &&
+        !excludedVisitIds.has(visit.id)
+    ) ?? null;
+
+  if (preferredVisit) {
+    return preferredVisit;
+  }
+
+  // Fall back to any imaged visit from the selected trip so the trip card
+  // still gets a featured image when the trip's photos are already used by
+  // other cards like first/last visit or photo highlight.
+  return visits.find((visit) => visit.trip?.id === strongestTripId && visit.imageCount > 0) ?? null;
+};
+
 const buildEarliestVisitYearByPark = (visits: YearReviewTimelineVisit[]) => {
   const earliestVisitYearByPark = new Map<string, number>();
 
@@ -406,12 +433,11 @@ export const buildYearReviewStory = ({
   const tripHighlightVisit =
     strongestTripEntry === null
       ? null
-      : (yearVisits.find(
-          (visit) =>
-            visit.trip?.id === strongestTripEntry.trip.id &&
-            visit.imageCount > 0 &&
-            !tripHighlightExcludedVisitIds.has(visit.id)
-        ) ?? null);
+      : selectTripHighlightVisit({
+          excludedVisitIds: tripHighlightExcludedVisitIds,
+          strongestTripId: strongestTripEntry.trip.id,
+          visits: yearVisits
+        });
   const tripHighlightImage = getFeaturedImageForVisit(tripHighlightVisit, visitImagesByVisitId);
   const seenNewNationalParkSlugs = new Set<string>();
   const newNationalParkMoments = yearVisits.flatMap((visit) => {

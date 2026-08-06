@@ -538,4 +538,62 @@ describe('year review story builder', () => {
       ])
     );
   });
+
+  it('falls back to another highlighted trip visit image when the trip has no dedicated image visit left', () => {
+    const story = buildYearReviewStory({
+      trips: [createTrip()],
+      visitImagesByVisitId: new Map([
+        [
+          1,
+          [
+            {
+              alt: null,
+              fullHeight: 900,
+              fullKey: 'visits/1/first-full.jpg',
+              fullWidth: 1400,
+              thumbHeight: 450,
+              thumbKey: 'visits/1/first-thumb.jpg',
+              thumbWidth: 700
+            }
+          ]
+        ]
+      ]),
+      visits: [
+        createVisit({
+          id: 1,
+          imageCount: 3,
+          visitedOn: '2026-03-10'
+        }),
+        createVisit({
+          createdAt: '2026-10-02T09:00:00.000Z',
+          id: 2,
+          imageCount: 0,
+          park: {
+            name: 'Evon retkeilyalue',
+            slug: 'evon-retkeilyalue',
+            typeLabel: 'Retkeilyalue',
+            typeSlug: 'state-hiking-area'
+          },
+          visitedOn: '2026-10-02'
+        })
+      ],
+      year: 2026
+    });
+
+    expect(story.cards).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          featuredImage: expect.objectContaining({
+            alt: 'Kuva käynniltä Akasmännyn kansallispuisto 2026-03-10'
+          }),
+          kind: 'trip-highlight',
+          trip: expect.objectContaining({
+            id: 1,
+            imageCount: 3,
+            visitCount: 2
+          })
+        })
+      ])
+    );
+  });
 });
