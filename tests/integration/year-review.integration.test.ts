@@ -554,6 +554,112 @@ describe('year review routes', () => {
     ).toBe(true);
   });
 
+  it('keeps trip-highlight featuredImage populated in preview and share when the trip only has highlighted image visits', async () => {
+    const apiKey = 'test-secret-key';
+    const storage = createMemoryStorage();
+    const app = createAuthedApp({ apiKey, storage });
+    const tripResponse = await createTrip(app, {
+      description: 'Fallback image case for year review',
+      name: 'Fallback Trip 2026'
+    });
+    const trip = (await tripResponse.json()) as { id: number };
+    const imageBuffer = await createTestImageBuffer();
+    const firstImageFile = new File([imageBuffer], 'first.jpg', { type: 'image/jpeg' });
+
+    const firstVisitResponse = await createVisit(app, 'akasmannyn-kansallispuisto', {
+      tripId: trip.id,
+      tripStopOrder: 1,
+      visitedOn: '2026-03-10'
+    });
+    const firstVisit = (await firstVisitResponse.json()) as { id: number };
+
+    const lastVisitResponse = await createVisit(app, 'evon-retkeilyalue', {
+      tripId: trip.id,
+      tripStopOrder: 2,
+      visitedOn: '2026-10-02'
+    });
+    const lastVisit = (await lastVisitResponse.json()) as { id: number };
+
+    const firstUploadResponse = await uploadImages(app, firstVisit.id, [firstImageFile]);
+    expect(firstUploadResponse.status).toBe(201);
+
+    const previewResponse = await requestAsAdmin(app, '/api/year-review/2026/preview');
+    const previewBody = (await previewResponse.json()) as {
+      story: {
+        cards: Array<
+          | { kind: string }
+          | {
+              featuredImage: {
+                alt: string | null;
+                fullHeight: number | null;
+                fullUrl: string;
+                fullWidth: number | null;
+                thumbHeight: number | null;
+                thumbUrl: string;
+                thumbWidth: number | null;
+              } | null;
+              kind: 'trip-highlight';
+            }
+        >;
+      };
+    };
+    const previewTripCard = previewBody.story.cards.find(
+      (
+        card
+      ): card is Extract<(typeof previewBody.story.cards)[number], { kind: 'trip-highlight' }> =>
+        card.kind === 'trip-highlight'
+    );
+
+    expect(lastVisit.id).toBeGreaterThan(firstVisit.id);
+    expect(previewTripCard?.featuredImage).toMatchObject({
+      alt: 'Kuva käynniltä Äkäsmännyn kansallispuisto 2026-03-10',
+      fullHeight: 800,
+      fullWidth: 1200
+    });
+    expect(previewTripCard?.featuredImage?.fullUrl).toContain('https://memory-storage.test/');
+    expect(previewTripCard?.featuredImage?.thumbUrl).toContain('https://memory-storage.test/');
+
+    const publishResponse = await requestAsAdmin(app, '/api/year-review/2026/publish', {
+      method: 'POST'
+    });
+    const publishBody = (await publishResponse.json()) as {
+      shareId: string;
+    };
+
+    const shareResponse = await app.request(`/api/year-review/shares/${publishBody.shareId}`, {
+      headers: {
+        authorization: `Bearer ${apiKey}`,
+        'x-forwarded-for': '203.0.113.1'
+      }
+    });
+    const shareBody = (await shareResponse.json()) as {
+      story: {
+        cards: Array<
+          | { kind: string }
+          | {
+              featuredImage: {
+                alt: string | null;
+                fullHeight: number | null;
+                fullUrl: string;
+                fullWidth: number | null;
+                thumbHeight: number | null;
+                thumbUrl: string;
+                thumbWidth: number | null;
+              } | null;
+              kind: 'trip-highlight';
+            }
+        >;
+      };
+    };
+    const shareTripCard = shareBody.story.cards.find(
+      (card): card is Extract<(typeof shareBody.story.cards)[number], { kind: 'trip-highlight' }> =>
+        card.kind === 'trip-highlight'
+    );
+
+    expect(shareResponse.status).toBe(200);
+    expect(shareTripCard?.featuredImage).toEqual(previewTripCard?.featuredImage ?? null);
+  });
+
   it('drops the photo highlight image from the response when a fresh public url cannot be resolved', async () => {
     const baseStorage = createMemoryStorage();
     const storageWithMissingThumbUrl = {
