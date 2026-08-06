@@ -10,7 +10,7 @@ npm run db:migrate
 npm run import:parks
 npm run import:special-parks
 npm run import:special-parks -- <special-park-slug> [<special-park-slug> ...]
-npm run park:move-visits -- --from <source-slug> --to <target-slug> [--dry-run]
+npm run park:move-visits -- (--from <source-slug> | --visit-id <visit-id>) --to <target-slug> [--dry-run]
 npm run park:logo -- <park-slug>
 npm run db:backup
 npm run verify

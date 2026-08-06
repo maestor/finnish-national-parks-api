@@ -55,7 +55,7 @@ describe('manual catalog imports', () => {
       now: () => '2026-05-27T08:00:00.000Z'
     });
 
-    expect(result.results).toHaveLength(153);
+    expect(result.results).toHaveLength(154);
 
     const merenkurkku = await getParkBySlug(
       testDatabase.database,
@@ -289,7 +289,7 @@ describe('manual catalog imports', () => {
     expect(dagmarinPuisto).toMatchObject({
       lipasId: 9001028,
       name: 'Dagmarin puisto',
-      type: { slug: 'cultural-history-area' }
+      type: { slug: 'nature-reserve-area' }
     });
 
     const kuhakoski = await getParkBySlug(testDatabase.database, 'kuhakoski');
@@ -574,6 +574,16 @@ describe('manual catalog imports', () => {
         typeSlug: 'outdoor-recreation-area'
       },
       {
+        lipasId: 9002051,
+        locationLabel: 'Reimarintie 5',
+        name: 'Rosalan Viikinkikeskus',
+        parkUrl: 'https://rosala.fi/fi/',
+        postalCode: '25950',
+        postalOffice: 'Rosala',
+        slug: 'rosalan-viikinkikeskus',
+        typeSlug: 'cultural-history-area'
+      },
+      {
         lipasId: 9001085,
         name: 'Helsingin pitäjän kirkonkylä',
         parkUrl: 'https://www.rky.fi/read/asp/r_kohde_det.aspx?KOHDE_ID=1506',
@@ -783,6 +793,24 @@ describe('manual catalog imports', () => {
         (feature) => feature.geometry.type === 'Polygon'
       )
     ).toBe(true);
+
+    const rosala = await getParkBySlug(testDatabase.database, 'rosalan-viikinkikeskus');
+    expect(rosala).toMatchObject({
+      address: 'Reimarintie 5, 25950 Rosala',
+      lipasId: 9002051,
+      locationLabel: 'Reimarintie 5',
+      markerPoint: {
+        lat: 59.8522174,
+        lon: 22.4158092
+      },
+      parkUrl: 'https://rosala.fi/fi/',
+      name: 'Rosalan Viikinkikeskus',
+      postalCode: '25950',
+      postalOffice: 'Rosala',
+      type: { slug: 'cultural-history-area' }
+    });
+    expect(rosala?.boundaryGeoJson?.features).toHaveLength(1);
+    expect(rosala?.boundaryGeoJson?.features[0]?.geometry.type).toBe('Polygon');
 
     const expectedLuontoonDestinationImports: ExpectedLuontoonDestinationImport[] = [
       {
@@ -1314,7 +1342,7 @@ describe('manual catalog imports', () => {
     );
     const kevo = await getParkBySlug(testDatabase.database, 'kevon-luonnonpuisto');
 
-    expect(allParks).toHaveLength(153);
+    expect(allParks).toHaveLength(154);
     expect(merenkurkku).toMatchObject({ catalogStatus: 'active' });
     expect(kevo).toMatchObject({ catalogStatus: 'active' });
   });
@@ -1391,7 +1419,7 @@ describe('manual catalog imports', () => {
       database: testDatabase.database
     });
 
-    expect(result.results).toHaveLength(153);
+    expect(result.results).toHaveLength(154);
 
     const merenkurkku = await getParkBySlug(
       testDatabase.database,
@@ -1653,7 +1681,7 @@ describe('manual catalog imports', () => {
       now: () => '2026-05-27T08:00:00.000Z'
     });
 
-    expect(result.results).toHaveLength(153);
+    expect(result.results).toHaveLength(154);
   });
 
   it('fails clearly when a selected special-park slug is unknown', async () => {

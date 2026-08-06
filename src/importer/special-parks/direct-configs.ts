@@ -601,6 +601,23 @@ export const baseSpecialParkConfigs: SpecialParkConfig[] = [
   },
   {
     displayTypeName: null,
+    locationLabel: 'Reimarintie 5',
+    markerPoint: {
+      lat: 59.8522174,
+      lon: 22.4158092
+    },
+    parkUrl: 'https://rosala.fi/fi/',
+    name: 'Rosalan Viikinkikeskus',
+    parkTypeSlug: 'cultural-history-area',
+    postalCode: '25950',
+    postalOffice: 'Rosala',
+    responseShapeVersion: 'manual-osm-theme-park-boundary-v1',
+    slug: 'rosalan-viikinkikeskus',
+    sourceUrl: 'special://rosalan-viikinkikeskus',
+    syntheticLipasId: 9_002_051
+  },
+  {
+    displayTypeName: null,
     locationLabel: 'Hiidenkirnujentie',
     parkUrl: null,
     name: 'Askolan hiidenkirnut',
