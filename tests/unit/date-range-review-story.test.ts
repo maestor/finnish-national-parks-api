@@ -198,7 +198,8 @@ describe('date range review story builder', () => {
       'new-parks',
       'revisited-parks',
       'trip-summary',
-      'trip-summary'
+      'trip-summary',
+      'other-visits'
     ]);
     expect(story.cards[0]).toEqual({
       dateRange: {
@@ -261,6 +262,26 @@ describe('date range review story builder', () => {
         imageCount: 3,
         name: 'Summer Escape',
         slug: 'summer-escape',
+        visits: [
+          {
+            park: {
+              name: 'Aulangon kansallispuisto',
+              slug: 'aulangon-kansallispuisto',
+              typeLabel: 'Kansallispuisto',
+              typeSlug: 'national-park'
+            },
+            visitedOn: '2026-06-10'
+          },
+          {
+            park: {
+              name: 'Seitsemisen kansallispuisto',
+              slug: 'seitsemisen-kansallispuisto',
+              typeLabel: 'Kansallispuisto',
+              typeSlug: 'national-park'
+            },
+            visitedOn: '2026-06-12'
+          }
+        ],
         visitCount: 2
       }
     });
@@ -276,8 +297,33 @@ describe('date range review story builder', () => {
         imageCount: 1,
         name: 'July Sprint',
         slug: 'july-sprint',
+        visits: [
+          {
+            park: {
+              name: 'Sallan kansallispuisto',
+              slug: 'sallan-kansallispuisto',
+              typeLabel: 'Kansallispuisto',
+              typeSlug: 'national-park'
+            },
+            visitedOn: '2026-07-01'
+          }
+        ],
         visitCount: 1
       }
+    });
+    expect(story.cards[6]).toEqual({
+      kind: 'other-visits',
+      visits: [
+        {
+          park: {
+            name: 'Evon retkeilyalue',
+            slug: 'evon-retkeilyalue',
+            typeLabel: 'Retkeilyalue',
+            typeSlug: 'hiking-area'
+          },
+          visitedOn: '2026-06-20'
+        }
+      ]
     });
   });
 
@@ -342,6 +388,29 @@ describe('date range review story builder', () => {
 
     expect(story.summary.tripCount).toBe(0);
     expect(story.cards.find((card) => card.kind === 'trip-summary')).toBeUndefined();
+    expect(story.cards.find((card) => card.kind === 'other-visits')).toEqual({
+      kind: 'other-visits',
+      visits: [
+        {
+          park: {
+            name: 'Aulangon kansallispuisto',
+            slug: 'aulangon-kansallispuisto',
+            typeLabel: 'Kansallispuisto',
+            typeSlug: 'national-park'
+          },
+          visitedOn: '2026-06-11'
+        },
+        {
+          park: {
+            name: 'Salamanperan kansallispuisto',
+            slug: 'salamanperan-kansallispuisto',
+            typeLabel: 'Kansallispuisto',
+            typeSlug: 'national-park'
+          },
+          visitedOn: '2026-06-13'
+        }
+      ]
+    });
     expect(story.cards.find((card) => card.kind === 'new-parks')).toEqual({
       kind: 'new-parks',
       parks: [
@@ -555,6 +624,26 @@ describe('date range review story builder', () => {
           imageCount: 2,
           name: 'Alpha Escape',
           slug: 'alpha-escape',
+          visits: [
+            {
+              park: {
+                name: 'Repoveden kansallispuisto',
+                slug: 'repoveden-kansallispuisto',
+                typeLabel: 'Kansallispuisto',
+                typeSlug: 'national-park'
+              },
+              visitedOn: '2026-06-10'
+            },
+            {
+              park: {
+                name: 'Patvinsuon kansallispuisto',
+                slug: 'patvinsuon-kansallispuisto',
+                typeLabel: 'Kansallispuisto',
+                typeSlug: 'national-park'
+              },
+              visitedOn: '2026-06-10'
+            }
+          ],
           visitCount: 2
         }
       },
@@ -578,6 +667,26 @@ describe('date range review story builder', () => {
           imageCount: 2,
           name: 'Beta Escape',
           slug: 'beta-escape',
+          visits: [
+            {
+              park: {
+                name: 'Kolin kansallispuisto',
+                slug: 'kolin-kansallispuisto',
+                typeLabel: 'Kansallispuisto',
+                typeSlug: 'national-park'
+              },
+              visitedOn: '2026-06-10'
+            },
+            {
+              park: {
+                name: 'Helvetinjarven kansallispuisto',
+                slug: 'helvetinjarven-kansallispuisto',
+                typeLabel: 'Kansallispuisto',
+                typeSlug: 'national-park'
+              },
+              visitedOn: '2026-06-10'
+            }
+          ],
           visitCount: 2
         }
       }

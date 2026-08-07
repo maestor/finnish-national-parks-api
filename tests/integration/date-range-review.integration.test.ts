@@ -238,6 +238,63 @@ describe('date range review routes', () => {
     });
   });
 
+  it('rejects reusing a published overview name with a different date range', async () => {
+    const app = createAuthedApp();
+
+    await createVisit(app, 'akasmannyn-kansallispuisto', {
+      visitedOn: '2026-06-10'
+    });
+    await createVisit(app, 'seitsemisen-kansallispuisto', {
+      visitedOn: '2026-06-12'
+    });
+    await createVisit(app, 'evon-retkeilyalue', {
+      visitedOn: '2026-06-18'
+    });
+
+    const firstPublishResponse = await requestAsAdmin(app, '/api/date-range-review/publish', {
+      method: 'POST',
+      body: JSON.stringify({
+        endDate: '2026-06-30',
+        name: 'Summer Vacation',
+        startDate: '2026-06-01'
+      }),
+      headers: {
+        'content-type': 'application/json'
+      }
+    });
+
+    expect(firstPublishResponse.status).toBe(200);
+
+    const conflictingPreviewResponse = await requestAsAdmin(
+      app,
+      '/api/date-range-review/preview?name=Summer%20Vacation&startDate=2026-07-01&endDate=2026-07-31'
+    );
+    const conflictingPreviewBody = (await conflictingPreviewResponse.json()) as { error: string };
+
+    expect(conflictingPreviewResponse.status).toBe(409);
+    expect(conflictingPreviewBody).toEqual({
+      error: 'Overview name "Summer Vacation" is already bound to 2026-06-01 - 2026-06-30.'
+    });
+
+    const conflictingPublishResponse = await requestAsAdmin(app, '/api/date-range-review/publish', {
+      method: 'POST',
+      body: JSON.stringify({
+        endDate: '2026-07-31',
+        name: 'Summer Vacation',
+        startDate: '2026-07-01'
+      }),
+      headers: {
+        'content-type': 'application/json'
+      }
+    });
+    const conflictingPublishBody = (await conflictingPublishResponse.json()) as { error: string };
+
+    expect(conflictingPublishResponse.status).toBe(409);
+    expect(conflictingPublishBody).toEqual({
+      error: 'Overview name "Summer Vacation" is already bound to 2026-06-01 - 2026-06-30.'
+    });
+  });
+
   it('requires an admin session and validates publish payloads', async () => {
     const app = createAuthedApp();
 
@@ -382,7 +439,28 @@ describe('date range review routes', () => {
           trip: {
             id: number;
             slug: string;
+            visits: Array<{
+              park: {
+                name: string;
+                slug: string;
+                typeLabel: string;
+                typeSlug: string;
+              };
+              visitedOn: string;
+            }>;
           };
+        }
+      | {
+          kind: 'other-visits';
+          visits: Array<{
+            park: {
+              name: string;
+              slug: string;
+              typeLabel: string;
+              typeSlug: string;
+            };
+            visitedOn: string;
+          }>;
         };
 
     const tripResponse = await createTrip(app, {
@@ -490,7 +568,8 @@ describe('date range review routes', () => {
       'photo-highlight',
       'new-parks',
       'revisited-parks',
-      'trip-summary'
+      'trip-summary',
+      'other-visits'
     ]);
 
     const previewPhotoCard = previewBody.story.cards.find(
@@ -513,6 +592,10 @@ describe('date range review routes', () => {
       (card): card is Extract<(typeof previewBody.story.cards)[number], { kind: 'trip-summary' }> =>
         card.kind === 'trip-summary'
     );
+    const previewOtherVisitsCard = previewBody.story.cards.find(
+      (card): card is Extract<(typeof previewBody.story.cards)[number], { kind: 'other-visits' }> =>
+        card.kind === 'other-visits'
+    );
 
     expect(previewPhotoCard?.featuredImage?.fullUrl).toContain('https://memory-storage.test/');
     expect(previewNewParksCard?.parks[0]?.featuredImage?.thumbUrl).toContain(
@@ -524,6 +607,37 @@ describe('date range review routes', () => {
       visitedOn: '2026-06-10'
     });
     expect(previewTripCard?.featuredImage?.fullUrl).toContain('https://memory-storage.test/');
+    expect(previewTripCard?.trip.visits).toEqual([
+      {
+        park: {
+          name: 'Äkäsmännyn kansallispuisto',
+          slug: 'akasmannyn-kansallispuisto',
+          typeLabel: 'Kansallispuisto',
+          typeSlug: 'national-park'
+        },
+        visitedOn: '2026-06-10'
+      },
+      {
+        park: {
+          name: 'Seitsemisen kansallispuisto',
+          slug: 'seitsemisen-kansallispuisto',
+          typeLabel: 'Kansallispuisto',
+          typeSlug: 'national-park'
+        },
+        visitedOn: '2026-06-12'
+      }
+    ]);
+    expect(previewOtherVisitsCard?.visits).toEqual([
+      {
+        park: {
+          name: 'Evon retkeilyalue',
+          slug: 'evon-retkeilyalue',
+          typeLabel: 'Valtion retkeilyalue',
+          typeSlug: 'hiking-area'
+        },
+        visitedOn: '2026-06-18'
+      }
+    ]);
 
     const publishResponse = await requestAsAdmin(app, '/api/date-range-review/publish', {
       method: 'POST',
@@ -589,6 +703,10 @@ describe('date range review routes', () => {
       (card): card is Extract<(typeof shareBody.story.cards)[number], { kind: 'trip-summary' }> =>
         card.kind === 'trip-summary'
     );
+    const shareOtherVisitsCard = shareBody.story.cards.find(
+      (card): card is Extract<(typeof shareBody.story.cards)[number], { kind: 'other-visits' }> =>
+        card.kind === 'other-visits'
+    );
 
     expect(shareResponse.status).toBe(200);
     expect(shareBody.overview).toEqual({
@@ -598,6 +716,8 @@ describe('date range review routes', () => {
       startDate: '2026-06-01'
     });
     expect(shareTripCard?.featuredImage?.thumbUrl).toContain('https://memory-storage.test/');
+    expect(shareTripCard?.trip.visits).toEqual(previewTripCard?.trip.visits);
+    expect(shareOtherVisitsCard?.visits).toEqual(previewOtherVisitsCard?.visits);
 
     const unpublishResponse = await requestAsAdmin(
       app,

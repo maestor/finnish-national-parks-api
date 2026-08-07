@@ -617,6 +617,27 @@ const toPublicTripRouteErrorResponse = (
   };
 };
 
+const getDateRangeReviewNameConflictError = (
+  existingShare: {
+    endDate: string;
+    name: string;
+    startDate: string;
+  },
+  requestedRange: {
+    endDate: string;
+    startDate: string;
+  }
+) => {
+  if (
+    existingShare.startDate === requestedRange.startDate &&
+    existingShare.endDate === requestedRange.endDate
+  ) {
+    return null;
+  }
+
+  return `Overview name "${existingShare.name}" is already bound to ${existingShare.startDate} - ${existingShare.endDate}.`;
+};
+
 const requireAdminSession = async (context: SessionContext, auth?: AuthConfig) => {
   if (!auth) {
     return context.json({ error: 'OAuth not configured.' }, 503);
@@ -1204,6 +1225,15 @@ export const createApp = ({
         listTrips(database),
         listYearReviewTimelineVisits(database)
       ]);
+
+      const nameConflictError = existingShare
+        ? getDateRangeReviewNameConflictError(existingShare, { endDate, startDate })
+        : null;
+
+      if (nameConflictError) {
+        return context.json({ error: nameConflictError }, 409);
+      }
+
       const story = await buildDateRangeReviewStoryWithImageAssets({
         database,
         endDate,
@@ -1275,6 +1305,15 @@ export const createApp = ({
         listTrips(database),
         listYearReviewTimelineVisits(database)
       ]);
+
+      const nameConflictError = existingShare
+        ? getDateRangeReviewNameConflictError(existingShare, { endDate, startDate })
+        : null;
+
+      if (nameConflictError) {
+        return context.json({ error: nameConflictError }, 409);
+      }
+
       const story = await buildDateRangeReviewStoryWithImageAssets({
         database,
         endDate,
