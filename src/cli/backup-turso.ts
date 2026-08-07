@@ -3,8 +3,8 @@ import { basename, relative, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 import { createClient } from '@libsql/client';
-
 import { getEnv } from '../env.js';
+import { openBackupReplicaClient } from './backup-turso-lib.js';
 
 const backupDirectoryPath = resolve('data/backups');
 
@@ -99,22 +99,35 @@ const replicaDirectoryPath = mkdtempSync(resolve(backupDirectoryPath, '.turso-ba
 const replicaFilePath = resolve(replicaDirectoryPath, 'replica.db');
 const replicaFileUrl = pathToFileURL(replicaFilePath).toString();
 
-const client = createClient({
-  authToken,
-  syncUrl: env.DATABASE_URL,
-  url: replicaFileUrl
-});
+let client: ReturnType<typeof createClient> | undefined;
 
 try {
-  const replication = await client.sync();
-  const quickCheck = await client.execute('PRAGMA quick_check');
+  const openedReplica = await openBackupReplicaClient({
+    createReplicaClient: () =>
+      createClient({
+        authToken,
+        syncUrl: env.DATABASE_URL,
+        url: replicaFileUrl
+      }),
+    onRetry: ({ attempt, delayMs, error, maxAttempts }) => {
+      const message = error instanceof Error ? error.message : String(error);
+      console.warn(
+        `Replica bootstrap attempt ${attempt} of ${maxAttempts} failed: ${message}. Retrying in ${delayMs}ms.`
+      );
+    }
+  });
+
+  client = openedReplica.client;
+  const activeClient = openedReplica.client;
+  const { replication } = openedReplica;
+  const quickCheck = await activeClient.execute('PRAGMA quick_check');
   const quickCheckResult = quickCheck.rows[0]?.quick_check;
 
   if (quickCheckResult !== 'ok') {
     throw new Error(`Backup quick_check failed with result: ${String(quickCheckResult)}`);
   }
 
-  await client.execute(`VACUUM INTO '${escapeSqliteString(backupFilePath)}'`);
+  await activeClient.execute(`VACUUM INTO '${escapeSqliteString(backupFilePath)}'`);
 
   const backupFileStats = statSync(backupFilePath);
   const backupFileLabel = relative(process.cwd(), backupFilePath) || basename(backupFilePath);
@@ -127,6 +140,6 @@ try {
   rmSync(backupFilePath, { force: true });
   throw error;
 } finally {
-  client.close();
+  client?.close();
   rmSync(replicaDirectoryPath, { force: true, recursive: true });
 }
