@@ -47,6 +47,7 @@ import {
   listAdminParkVisibility,
   listParkSearchEntries,
   listPublicParks,
+  listPublishedDateRangeReviewShares,
   listTrips,
   listVisits,
   listVisitsTimeline,
@@ -58,9 +59,11 @@ import {
   reorderTripStopImages,
   reorderVisitImages,
   unpublishDateRangeReviewShare,
+  unpublishDateRangeReviewShareByShareId,
   unpublishYearReviewShare,
   updateParkDetails,
   updateParkRemoved,
+  updatePublishedDateRangeReviewShareByShareId,
   updateTrip,
   updateTripStop,
   updateVisit
@@ -105,10 +108,13 @@ import {
   postAuthLogoutRoute
 } from './routes/auth.js';
 import {
+  deleteAdminDateRangeReviewShareRoute,
   getDateRangeReviewPreviewRoute,
   getDateRangeReviewShareRoute,
+  listAdminDateRangeReviewSharesRoute,
   publishDateRangeReviewRoute,
-  unpublishDateRangeReviewRoute
+  unpublishDateRangeReviewRoute,
+  updateAdminDateRangeReviewShareRoute
 } from './routes/date-range-review.js';
 import { healthRoute } from './routes/health.js';
 import {
@@ -217,6 +223,40 @@ const buildYearReviewPublicUrl = (frontendUrl: string, shareId: string) => {
 
 const buildDateRangeReviewPublicUrl = (frontendUrl: string, shareId: string) => {
   return `${frontendUrl}${createDateRangeReviewSharePath(shareId)}`;
+};
+
+const buildAdminDateRangeReviewShare = ({
+  frontendUrl,
+  share
+}: {
+  frontendUrl: string;
+  share: {
+    endDate: string;
+    generatedAt: string;
+    name: string;
+    overviewSlug: string;
+    publishedAt: string;
+    shareId: string;
+    startDate: string;
+    story: DateRangeReviewStory;
+    updatedAt: string;
+  };
+}) => {
+  return {
+    generatedAt: share.generatedAt,
+    overview: buildDateRangeReviewOverview({
+      endDate: share.endDate,
+      name: share.name,
+      shareSlug: share.overviewSlug,
+      startDate: share.startDate
+    }),
+    publicUrl: buildDateRangeReviewPublicUrl(frontendUrl, share.shareId),
+    publishedAt: share.publishedAt,
+    shareId: share.shareId,
+    sharePath: createDateRangeReviewSharePath(share.shareId),
+    storySummary: share.story.summary,
+    updatedAt: share.updatedAt
+  };
 };
 
 const resolveYearReviewStoryImageAsset = async (
@@ -632,6 +672,22 @@ const getDateRangeReviewNameConflictError = (
     existingShare.startDate === requestedRange.startDate &&
     existingShare.endDate === requestedRange.endDate
   ) {
+    return null;
+  }
+
+  return `Overview name "${existingShare.name}" is already bound to ${existingShare.startDate} - ${existingShare.endDate}.`;
+};
+
+const getDateRangeReviewNameConflictAgainstAnotherShareError = (
+  existingShare: {
+    endDate: string;
+    name: string;
+    shareId: string;
+    startDate: string;
+  } | null,
+  currentShareId: string
+) => {
+  if (!existingShare || existingShare.shareId === currentShareId) {
     return null;
   }
 
@@ -1370,6 +1426,131 @@ export const createApp = ({
 
       const { name } = context.req.valid('query');
       const removed = await unpublishDateRangeReviewShare(database, name);
+
+      if (!removed) {
+        return context.json(jsonNotFound('Published date range review share not found.'), 404);
+      }
+
+      return new Response(null, {
+        headers: context.res.headers,
+        status: 204
+      });
+    });
+
+    app.openapi(listAdminDateRangeReviewSharesRoute, async (context) => {
+      context.header('Cache-Control', PRIVATE_CACHE_CONTROL);
+      const authFailure = await requireAdminSession(context, auth);
+
+      if (authFailure) {
+        return authFailure;
+      }
+
+      const frontendUrl = getFrontendUrl(auth);
+      const shares = await listPublishedDateRangeReviewShares(database);
+
+      return context.json(
+        {
+          shares: shares.map((share) =>
+            buildAdminDateRangeReviewShare({
+              frontendUrl,
+              share
+            })
+          )
+        },
+        200
+      );
+    });
+
+    app.openapi(updateAdminDateRangeReviewShareRoute, async (context) => {
+      context.header('Cache-Control', PRIVATE_CACHE_CONTROL);
+      const authFailure = await requireAdminSession(context, auth);
+
+      if (authFailure) {
+        return authFailure;
+      }
+
+      const { shareId } = context.req.valid('param');
+      const { endDate, name, startDate } = context.req.valid('json');
+      const validationError = validateDateRangeReviewRequest({
+        endDate,
+        startDate
+      });
+
+      if (validationError) {
+        return context.json({ error: validationError }, 422);
+      }
+
+      const [existingShare, conflictingShare, trips, visits] = await Promise.all([
+        getPublishedDateRangeReviewShareByShareId(database, shareId),
+        getPublishedDateRangeReviewShareByName(database, name),
+        listTrips(database),
+        listYearReviewTimelineVisits(database)
+      ]);
+
+      if (!existingShare) {
+        return context.json(jsonNotFound('Published date range review share not found.'), 404);
+      }
+
+      const nameConflictError = getDateRangeReviewNameConflictAgainstAnotherShareError(
+        conflictingShare,
+        shareId
+      );
+
+      if (nameConflictError) {
+        return context.json({ error: nameConflictError }, 409);
+      }
+
+      const story = await buildDateRangeReviewStoryWithImageAssets({
+        database,
+        endDate,
+        name,
+        startDate,
+        trips,
+        visits
+      });
+
+      if (story.summary.visitCount < 3) {
+        return context.json(
+          { error: 'At least 3 visits are required to build a date range review.' },
+          422
+        );
+      }
+
+      const now = new Date().toISOString();
+      const updatedShare = await updatePublishedDateRangeReviewShareByShareId(database, {
+        endDate,
+        generatedAt: now,
+        name,
+        publishedAt: now,
+        shareId,
+        startDate,
+        story,
+        updatedAt: now
+      });
+
+      if (!updatedShare) {
+        return context.json(jsonNotFound('Published date range review share not found.'), 404);
+      }
+
+      return context.json(
+        buildAdminDateRangeReviewShare({
+          frontendUrl: getFrontendUrl(auth),
+          share: updatedShare
+        }),
+        200
+      );
+    });
+
+    app.openapi(deleteAdminDateRangeReviewShareRoute, async (context) => {
+      context.header('Cache-Control', PRIVATE_CACHE_CONTROL);
+      const authFailure = await requireAdminSession(context, auth);
+
+      if (authFailure) {
+        return authFailure;
+      }
+
+      const { shareId } = context.req.valid('param');
+      const removed = await unpublishDateRangeReviewShareByShareId(database, shareId);
 
       if (!removed) {
         return context.json(jsonNotFound('Published date range review share not found.'), 404);

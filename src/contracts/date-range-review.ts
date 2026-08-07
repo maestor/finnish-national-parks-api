@@ -66,6 +66,7 @@ const namedDateRangeReviewInputSchema = z.object({
 
 export const dateRangeReviewPreviewQuerySchema = namedDateRangeReviewInputSchema;
 export const dateRangeReviewPublishRequestSchema = namedDateRangeReviewInputSchema;
+export const dateRangeReviewAdminUpdateRequestSchema = namedDateRangeReviewInputSchema;
 export const dateRangeReviewUnpublishQuerySchema = z.object({
   name: z.string().trim().min(1).max(120)
 });
@@ -185,4 +186,19 @@ export const dateRangeReviewShareResponseSchema = z.object({
   publishedAt: z.string().datetime(),
   shareId: z.string().uuid(),
   story: dateRangeReviewStorySchema
+});
+
+export const dateRangeReviewAdminShareSchema = z.object({
+  generatedAt: z.string().datetime(),
+  overview: dateRangeReviewOverviewSchema,
+  publicUrl: z.string().url(),
+  publishedAt: z.string().datetime(),
+  shareId: z.string().uuid(),
+  sharePath: z.string(),
+  storySummary: dateRangeReviewSummarySchema,
+  updatedAt: z.string().datetime()
+});
+
+export const dateRangeReviewAdminListResponseSchema = z.object({
+  shares: z.array(dateRangeReviewAdminShareSchema)
 });

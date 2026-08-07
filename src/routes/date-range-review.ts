@@ -2,6 +2,9 @@ import { createRoute, z } from '@hono/zod-openapi';
 
 import { errorSchema } from '../contracts/common.js';
 import {
+  dateRangeReviewAdminListResponseSchema,
+  dateRangeReviewAdminShareSchema,
+  dateRangeReviewAdminUpdateRequestSchema,
   dateRangeReviewPreviewQuerySchema,
   dateRangeReviewPreviewSchema,
   dateRangeReviewPublishRequestSchema,
@@ -188,6 +191,149 @@ export const getDateRangeReviewShareRoute = createRoute({
     },
     404: {
       description: 'Published date range review share was not found',
+      content: {
+        'application/json': {
+          schema: errorSchema
+        }
+      }
+    }
+  }
+});
+
+export const listAdminDateRangeReviewSharesRoute = createRoute({
+  method: 'get',
+  path: '/api/admin/date-range-review/shares',
+  tags: ['Date Range Review'],
+  security: [{ bearerAuth: [], sessionAuth: [] }],
+  responses: {
+    200: {
+      description: 'Listed published date range review shares for admin management',
+      content: {
+        'application/json': {
+          schema: dateRangeReviewAdminListResponseSchema
+        }
+      }
+    },
+    401: {
+      description: 'Admin session required',
+      content: {
+        'application/json': {
+          schema: errorSchema
+        }
+      }
+    },
+    503: {
+      description: 'OAuth not configured',
+      content: {
+        'application/json': {
+          schema: errorSchema
+        }
+      }
+    }
+  }
+});
+
+export const updateAdminDateRangeReviewShareRoute = createRoute({
+  method: 'patch',
+  path: '/api/admin/date-range-review/shares/{shareId}',
+  tags: ['Date Range Review'],
+  security: [{ bearerAuth: [], sessionAuth: [] }],
+  request: {
+    params: z.object({
+      shareId: z.string().uuid()
+    }),
+    body: {
+      content: {
+        'application/json': {
+          schema: dateRangeReviewAdminUpdateRequestSchema
+        }
+      }
+    }
+  },
+  responses: {
+    200: {
+      description: 'Updated one published date range review share for admin management',
+      content: {
+        'application/json': {
+          schema: dateRangeReviewAdminShareSchema
+        }
+      }
+    },
+    401: {
+      description: 'Admin session required',
+      content: {
+        'application/json': {
+          schema: errorSchema
+        }
+      }
+    },
+    404: {
+      description: 'Published date range review share was not found',
+      content: {
+        'application/json': {
+          schema: errorSchema
+        }
+      }
+    },
+    409: {
+      description: 'Overview name is already bound to a different published share',
+      content: {
+        'application/json': {
+          schema: errorSchema
+        }
+      }
+    },
+    422: {
+      description: 'Date range review request is not valid for generation',
+      content: {
+        'application/json': {
+          schema: errorSchema
+        }
+      }
+    },
+    503: {
+      description: 'OAuth not configured',
+      content: {
+        'application/json': {
+          schema: errorSchema
+        }
+      }
+    }
+  }
+});
+
+export const deleteAdminDateRangeReviewShareRoute = createRoute({
+  method: 'delete',
+  path: '/api/admin/date-range-review/shares/{shareId}',
+  tags: ['Date Range Review'],
+  security: [{ bearerAuth: [], sessionAuth: [] }],
+  request: {
+    params: z.object({
+      shareId: z.string().uuid()
+    })
+  },
+  responses: {
+    204: {
+      description: 'Removed one published date range review share by share id'
+    },
+    401: {
+      description: 'Admin session required',
+      content: {
+        'application/json': {
+          schema: errorSchema
+        }
+      }
+    },
+    404: {
+      description: 'Published date range review share was not found',
+      content: {
+        'application/json': {
+          schema: errorSchema
+        }
+      }
+    },
+    503: {
+      description: 'OAuth not configured',
       content: {
         'application/json': {
           schema: errorSchema
