@@ -1,5 +1,5 @@
 import { and, asc, desc, eq, gt, gte, inArray, lt, lte, notInArray, sql } from 'drizzle-orm';
-
+import type { DateRangeReviewStory } from '../date-range-review/story.js';
 import type { GeoJsonFeatureCollection } from '../importer/geometry.js';
 import { deriveDisplayNameFromLabel } from '../location-display.js';
 import { createParkSlug, createSlug, normalizeParkUrl } from '../parks/park-normalization.js';
@@ -16,6 +16,7 @@ import type { YearReviewStory, YearReviewStoryImageAsset } from '../year-review/
 import type { Database, DbClient } from './database.js';
 import {
   admins,
+  dateRangeReviewShares,
   importRuns,
   parks,
   parkTypes,
@@ -129,6 +130,18 @@ export type PublishedYearReviewShare = {
   story: YearReviewStory;
   updatedAt: string;
   year: number;
+};
+
+export type PublishedDateRangeReviewShare = {
+  endDate: string;
+  generatedAt: string;
+  name: string;
+  overviewSlug: string;
+  publishedAt: string;
+  shareId: string;
+  startDate: string;
+  story: DateRangeReviewStory;
+  updatedAt: string;
 };
 
 type UpdateParkDetailsInput = {
@@ -406,6 +419,9 @@ const normalizeRequiredText = (value: string, fieldName: string) => {
 
   return normalized;
 };
+
+const normalizeDateRangeReviewName = (value: string) =>
+  normalizeRequiredText(value, 'Overview name');
 
 const toTripStartingPoint = (row: {
   startingPointLabel: string | null;
@@ -1990,6 +2006,20 @@ const toPublishedYearReviewShare = (
   year: row.year
 });
 
+const toPublishedDateRangeReviewShare = (
+  row: typeof dateRangeReviewShares.$inferSelect
+): PublishedDateRangeReviewShare => ({
+  endDate: row.endDate,
+  generatedAt: row.generatedAt,
+  name: row.name,
+  overviewSlug: row.overviewSlug,
+  publishedAt: row.publishedAt,
+  shareId: row.shareId,
+  startDate: row.startDate,
+  story: JSON.parse(row.storyJson) as DateRangeReviewStory,
+  updatedAt: row.updatedAt
+});
+
 const buildPublicVisitDataVersionRecordQuery = (database: Database) => {
   return database
     .select({
@@ -2021,6 +2051,36 @@ export const getPublishedYearReviewShareByShareId = async (database: Database, s
     )[0] ?? null;
 
   return row ? toPublishedYearReviewShare(row) : null;
+};
+
+export const getPublishedDateRangeReviewShareByName = async (database: Database, name: string) => {
+  const overviewSlug = createSlug(normalizeDateRangeReviewName(name), 'overview');
+  const row =
+    (
+      await database
+        .select()
+        .from(dateRangeReviewShares)
+        .where(eq(dateRangeReviewShares.overviewSlug, overviewSlug))
+        .limit(1)
+    )[0] ?? null;
+
+  return row ? toPublishedDateRangeReviewShare(row) : null;
+};
+
+export const getPublishedDateRangeReviewShareByShareId = async (
+  database: Database,
+  shareId: string
+) => {
+  const row =
+    (
+      await database
+        .select()
+        .from(dateRangeReviewShares)
+        .where(eq(dateRangeReviewShares.shareId, shareId))
+        .limit(1)
+    )[0] ?? null;
+
+  return row ? toPublishedDateRangeReviewShare(row) : null;
 };
 
 export const publishYearReviewShare = async (
@@ -2059,8 +2119,63 @@ export const publishYearReviewShare = async (
   return (await getPublishedYearReviewShareByYear(database, input.year))!;
 };
 
+export const publishDateRangeReviewShare = async (
+  database: Database,
+  input: {
+    endDate: string;
+    generatedAt: string;
+    name: string;
+    publishedAt: string;
+    shareId: string;
+    startDate: string;
+    story: DateRangeReviewStory;
+    updatedAt: string;
+  }
+) => {
+  const name = normalizeDateRangeReviewName(input.name);
+  const overviewSlug = createSlug(name, 'overview');
+
+  await database
+    .insert(dateRangeReviewShares)
+    .values({
+      createdAt: input.updatedAt,
+      endDate: input.endDate,
+      generatedAt: input.generatedAt,
+      name,
+      overviewSlug,
+      publishedAt: input.publishedAt,
+      shareId: input.shareId,
+      startDate: input.startDate,
+      storyJson: JSON.stringify(input.story),
+      updatedAt: input.updatedAt
+    })
+    .onConflictDoUpdate({
+      set: {
+        endDate: input.endDate,
+        generatedAt: input.generatedAt,
+        name,
+        publishedAt: input.publishedAt,
+        shareId: input.shareId,
+        startDate: input.startDate,
+        storyJson: JSON.stringify(input.story),
+        updatedAt: input.updatedAt
+      },
+      target: dateRangeReviewShares.overviewSlug
+    });
+
+  return (await getPublishedDateRangeReviewShareByName(database, name))!;
+};
+
 export const unpublishYearReviewShare = async (database: Database, year: number) => {
   const result = await database.delete(yearReviewShares).where(eq(yearReviewShares.year, year));
+  return Number(result.rowsAffected ?? 0) > 0;
+};
+
+export const unpublishDateRangeReviewShare = async (database: Database, name: string) => {
+  const overviewSlug = createSlug(normalizeDateRangeReviewName(name), 'overview');
+  const result = await database
+    .delete(dateRangeReviewShares)
+    .where(eq(dateRangeReviewShares.overviewSlug, overviewSlug));
   return Number(result.rowsAffected ?? 0) > 0;
 };
 

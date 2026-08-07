@@ -238,6 +238,29 @@ export const yearReviewShares = sqliteTable(
   })
 );
 
+export const dateRangeReviewShares = sqliteTable(
+  'date_range_review_shares',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    name: text('name').notNull(),
+    overviewSlug: text('overview_slug').notNull(),
+    startDate: text('start_date').notNull(),
+    endDate: text('end_date').notNull(),
+    shareId: text('share_id').notNull(),
+    storyJson: text('story_json').notNull(),
+    generatedAt: text('generated_at').notNull(),
+    publishedAt: text('published_at').notNull(),
+    createdAt: text('created_at').notNull(),
+    updatedAt: text('updated_at').notNull()
+  },
+  (table) => ({
+    overviewSlugIndex: uniqueIndex('date_range_review_shares_overview_slug_idx').on(
+      table.overviewSlug
+    ),
+    shareIdIndex: uniqueIndex('date_range_review_shares_share_id_idx').on(table.shareId)
+  })
+);
+
 export const admins = sqliteTable(
   'admins',
   {

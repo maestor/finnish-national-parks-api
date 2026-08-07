@@ -3,6 +3,12 @@ import { randomUUID } from 'node:crypto';
 import { OpenAPIHono } from '@hono/zod-openapi';
 import { cors } from 'hono/cors';
 
+import {
+  buildDateRangeReviewStory,
+  createDateRangeReviewSharePath,
+  type DateRangeReviewStory
+} from './date-range-review/story.js';
+import { validateDateRangeReviewRequest } from './date-range-review/validation.js';
 import type { Database } from './db/database.js';
 import {
   countTripStopImages,
@@ -31,6 +37,8 @@ import {
   getPublicTripBySlug,
   getPublicVisitDataVersion,
   getPublicVisitSummaryEtagSeed,
+  getPublishedDateRangeReviewShareByName,
+  getPublishedDateRangeReviewShareByShareId,
   getPublishedYearReviewShareByShareId,
   getPublishedYearReviewShareByYear,
   getTripById,
@@ -43,11 +51,13 @@ import {
   listVisits,
   listVisitsTimeline,
   listYearReviewTimelineVisits,
+  publishDateRangeReviewShare,
   publishYearReviewShare,
   RepositoryNotFoundError,
   RepositoryValidationError,
   reorderTripStopImages,
   reorderVisitImages,
+  unpublishDateRangeReviewShare,
   unpublishYearReviewShare,
   updateParkDetails,
   updateParkRemoved,
@@ -87,12 +97,19 @@ import {
   setSessionCookie,
   verifySessionToken
 } from './http/session.js';
+import { createSlug } from './parks/park-normalization.js';
 import {
   getAuthMeRoute,
   googleAuthCallbackRoute,
   googleAuthRoute,
   postAuthLogoutRoute
 } from './routes/auth.js';
+import {
+  getDateRangeReviewPreviewRoute,
+  getDateRangeReviewShareRoute,
+  publishDateRangeReviewRoute,
+  unpublishDateRangeReviewRoute
+} from './routes/date-range-review.js';
 import { healthRoute } from './routes/health.js';
 import {
   completeVisitImageUploadRoute,
@@ -198,6 +215,10 @@ const buildYearReviewPublicUrl = (frontendUrl: string, shareId: string) => {
   return `${frontendUrl}${createYearReviewSharePath(shareId)}`;
 };
 
+const buildDateRangeReviewPublicUrl = (frontendUrl: string, shareId: string) => {
+  return `${frontendUrl}${createDateRangeReviewSharePath(shareId)}`;
+};
+
 const resolveYearReviewStoryImageAsset = async (
   image: YearReviewStoryImageAsset | null,
   getImagePublicUrl: (key: string) => Promise<string>
@@ -282,6 +303,60 @@ const resolveYearReviewStoryForResponse = async (
   };
 };
 
+const resolveDateRangeReviewStoryForResponse = async (
+  story: DateRangeReviewStory,
+  getImagePublicUrl: (key: string) => Promise<string>
+) => {
+  const cards = await Promise.all(
+    story.cards.map(async (card) => {
+      switch (card.kind) {
+        case 'photo-highlight':
+        case 'trip-summary':
+          return {
+            ...card,
+            featuredImage: await resolveYearReviewStoryImageAsset(
+              card.featuredImage,
+              getImagePublicUrl
+            )
+          };
+        case 'new-parks':
+          return {
+            ...card,
+            parks: await Promise.all(
+              card.parks.map(async (parkMoment) => ({
+                ...parkMoment,
+                featuredImage: await resolveYearReviewStoryImageAsset(
+                  parkMoment.featuredImage,
+                  getImagePublicUrl
+                )
+              }))
+            )
+          };
+        case 'revisited-parks':
+          return {
+            ...card,
+            parks: await Promise.all(
+              card.parks.map(async (parkMoment) => ({
+                ...parkMoment,
+                featuredImage: await resolveYearReviewStoryImageAsset(
+                  parkMoment.featuredImage,
+                  getImagePublicUrl
+                )
+              }))
+            )
+          };
+        default:
+          return card;
+      }
+    })
+  );
+
+  return {
+    ...story,
+    cards
+  };
+};
+
 const buildYearReviewStoryWithImageAssets = async ({
   database,
   trips,
@@ -308,6 +383,57 @@ const buildYearReviewStoryWithImageAssets = async ({
     year
   });
 };
+
+const buildDateRangeReviewStoryWithImageAssets = async ({
+  database,
+  endDate,
+  name,
+  startDate,
+  trips,
+  visits
+}: {
+  database: Database;
+  endDate: string;
+  name: string;
+  startDate: string;
+  trips: Awaited<ReturnType<typeof listTrips>>;
+  visits: Awaited<ReturnType<typeof listYearReviewTimelineVisits>>;
+}) => {
+  const rangeVisitIds = visits
+    .filter((visit) => visit.visitedOn >= startDate && visit.visitedOn <= endDate)
+    .map((visit) => visit.id);
+  const visitImagesByVisitId =
+    rangeVisitIds.length === 0
+      ? new Map()
+      : await getYearReviewImageAssetsByVisitId(database, rangeVisitIds);
+
+  return buildDateRangeReviewStory({
+    endDate,
+    name,
+    overviewSlug: createSlug(name, 'overview'),
+    startDate,
+    trips,
+    visitImagesByVisitId,
+    visits
+  });
+};
+
+const buildDateRangeReviewOverview = ({
+  endDate,
+  name,
+  shareSlug,
+  startDate
+}: {
+  endDate: string;
+  name: string;
+  shareSlug: string;
+  startDate: string;
+}) => ({
+  endDate,
+  name,
+  shareSlug,
+  startDate
+});
 
 const normalizeRouteFallbackQueries = (...queries: Array<string | null | undefined>) => {
   const normalizedQueries = Array.from(
@@ -1053,6 +1179,193 @@ export const createApp = ({
       const trips = await listTrips(database);
 
       return context.json({ trips }, 200);
+    });
+
+    app.openapi(getDateRangeReviewPreviewRoute, async (context) => {
+      context.header('Cache-Control', PRIVATE_CACHE_CONTROL);
+      const authFailure = await requireAdminSession(context, auth);
+
+      if (authFailure) {
+        return authFailure;
+      }
+
+      const { endDate, name, startDate } = context.req.valid('query');
+      const validationError = validateDateRangeReviewRequest({
+        endDate,
+        startDate
+      });
+
+      if (validationError) {
+        return context.json({ error: validationError }, 422);
+      }
+
+      const [existingShare, trips, visits] = await Promise.all([
+        getPublishedDateRangeReviewShareByName(database, name),
+        listTrips(database),
+        listYearReviewTimelineVisits(database)
+      ]);
+      const story = await buildDateRangeReviewStoryWithImageAssets({
+        database,
+        endDate,
+        name,
+        startDate,
+        trips,
+        visits
+      });
+
+      if (story.summary.visitCount < 3) {
+        return context.json(
+          { error: 'At least 3 visits are required to build a date range review.' },
+          422
+        );
+      }
+
+      const frontendUrl = getFrontendUrl(auth);
+      const shareSlug = createSlug(name, 'overview');
+
+      return context.json(
+        {
+          generatedAt: new Date().toISOString(),
+          overview: buildDateRangeReviewOverview({
+            endDate,
+            name,
+            shareSlug,
+            startDate
+          }),
+          publishInfo: existingShare
+            ? {
+                publicUrl: buildDateRangeReviewPublicUrl(frontendUrl, existingShare.shareId),
+                publishedAt: existingShare.publishedAt,
+                publishedShareId: existingShare.shareId,
+                sharePath: createDateRangeReviewSharePath(existingShare.shareId)
+              }
+            : {
+                publicUrl: null,
+                publishedAt: null,
+                publishedShareId: null,
+                sharePath: null
+              },
+          status: existingShare ? ('published' as const) : ('draft' as const),
+          story: await resolveDateRangeReviewStoryForResponse(story, getImagePublicUrl)
+        },
+        200
+      );
+    });
+
+    app.openapi(publishDateRangeReviewRoute, async (context) => {
+      context.header('Cache-Control', PRIVATE_CACHE_CONTROL);
+      const authFailure = await requireAdminSession(context, auth);
+
+      if (authFailure) {
+        return authFailure;
+      }
+
+      const { endDate, name, startDate } = context.req.valid('json');
+      const validationError = validateDateRangeReviewRequest({
+        endDate,
+        startDate
+      });
+
+      if (validationError) {
+        return context.json({ error: validationError }, 422);
+      }
+
+      const [existingShare, trips, visits] = await Promise.all([
+        getPublishedDateRangeReviewShareByName(database, name),
+        listTrips(database),
+        listYearReviewTimelineVisits(database)
+      ]);
+      const story = await buildDateRangeReviewStoryWithImageAssets({
+        database,
+        endDate,
+        name,
+        startDate,
+        trips,
+        visits
+      });
+
+      if (story.summary.visitCount < 3) {
+        return context.json(
+          { error: 'At least 3 visits are required to build a date range review.' },
+          422
+        );
+      }
+
+      const now = new Date().toISOString();
+      const publishedShare = await publishDateRangeReviewShare(database, {
+        endDate,
+        generatedAt: now,
+        name,
+        publishedAt: now,
+        shareId: existingShare?.shareId ?? randomUUID(),
+        startDate,
+        story,
+        updatedAt: now
+      });
+      const frontendUrl = getFrontendUrl(auth);
+
+      return context.json(
+        {
+          overview: buildDateRangeReviewOverview({
+            endDate: publishedShare.endDate,
+            name: publishedShare.name,
+            shareSlug: publishedShare.overviewSlug,
+            startDate: publishedShare.startDate
+          }),
+          publicUrl: buildDateRangeReviewPublicUrl(frontendUrl, publishedShare.shareId),
+          publishedAt: publishedShare.publishedAt,
+          shareId: publishedShare.shareId,
+          sharePath: createDateRangeReviewSharePath(publishedShare.shareId)
+        },
+        200
+      );
+    });
+
+    app.openapi(unpublishDateRangeReviewRoute, async (context) => {
+      context.header('Cache-Control', PRIVATE_CACHE_CONTROL);
+      const authFailure = await requireAdminSession(context, auth);
+
+      if (authFailure) {
+        return authFailure;
+      }
+
+      const { name } = context.req.valid('query');
+      const removed = await unpublishDateRangeReviewShare(database, name);
+
+      if (!removed) {
+        return context.json(jsonNotFound('Published date range review share not found.'), 404);
+      }
+
+      return new Response(null, {
+        headers: context.res.headers,
+        status: 204
+      });
+    });
+
+    app.openapi(getDateRangeReviewShareRoute, async (context) => {
+      context.header('Cache-Control', PUBLIC_SUMMARY_CACHE_CONTROL);
+
+      const { shareId } = context.req.valid('param');
+      const share = await getPublishedDateRangeReviewShareByShareId(database, shareId);
+
+      if (!share) {
+        return context.json(jsonNotFound('Published date range review share not found.'), 404);
+      }
+
+      return context.json(
+        {
+          overview: buildDateRangeReviewOverview({
+            endDate: share.endDate,
+            name: share.name,
+            shareSlug: share.overviewSlug,
+            startDate: share.startDate
+          }),
+          publishedAt: share.publishedAt,
+          shareId: share.shareId,
+          story: await resolveDateRangeReviewStoryForResponse(share.story, getImagePublicUrl)
+        },
+        200
+      );
     });
 
     app.openapi(getYearReviewPreviewRoute, async (context) => {
