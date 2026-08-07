@@ -37,6 +37,18 @@ const dateRangeReviewStoryImageSchema = z.object({
   thumbWidth: z.number().int().positive().nullable()
 });
 
+const dateRangeReviewParkSummarySchema = z.object({
+  name: z.string(),
+  slug: z.string(),
+  typeLabel: z.string(),
+  typeSlug: z.string()
+});
+
+const dateRangeReviewParkVisitSummarySchema = z.object({
+  park: dateRangeReviewParkSummarySchema,
+  visitedOn: visitDateSchema
+});
+
 const dateRangeReviewSummarySchema = z.object({
   distinctParkCount: z.number().int().nonnegative(),
   imageCount: z.number().int().nonnegative(),
@@ -123,8 +135,14 @@ const dateRangeReviewTripSummaryCardSchema = z.object({
     imageCount: z.number().int().nonnegative(),
     name: z.string(),
     slug: z.string(),
+    visits: z.array(dateRangeReviewParkVisitSummarySchema),
     visitCount: z.number().int().nonnegative()
   })
+});
+
+const dateRangeReviewOtherVisitsCardSchema = z.object({
+  kind: z.literal('other-visits'),
+  visits: z.array(dateRangeReviewParkVisitSummarySchema)
 });
 
 export const dateRangeReviewCardSchema = z.discriminatedUnion('kind', [
@@ -132,7 +150,8 @@ export const dateRangeReviewCardSchema = z.discriminatedUnion('kind', [
   dateRangeReviewPhotoHighlightCardSchema,
   dateRangeReviewNewParksCardSchema,
   dateRangeReviewRevisitedParksCardSchema,
-  dateRangeReviewTripSummaryCardSchema
+  dateRangeReviewTripSummaryCardSchema,
+  dateRangeReviewOtherVisitsCardSchema
 ]);
 
 export const dateRangeReviewStorySchema = z.object({

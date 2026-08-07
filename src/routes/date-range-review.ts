@@ -35,6 +35,14 @@ export const getDateRangeReviewPreviewRoute = createRoute({
         }
       }
     },
+    409: {
+      description: 'Overview name is already bound to a different date range',
+      content: {
+        'application/json': {
+          schema: errorSchema
+        }
+      }
+    },
     422: {
       description: 'Date range review request is not valid for generation',
       content: {
@@ -79,6 +87,14 @@ export const publishDateRangeReviewRoute = createRoute({
     },
     401: {
       description: 'Admin session required',
+      content: {
+        'application/json': {
+          schema: errorSchema
+        }
+      }
+    },
+    409: {
+      description: 'Overview name is already bound to a different date range',
       content: {
         'application/json': {
           schema: errorSchema

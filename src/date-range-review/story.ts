@@ -57,6 +57,16 @@ export type DateRangeReviewVisitReference = {
   visitedOn: string;
 };
 
+export type DateRangeReviewParkVisitSummary = {
+  park: {
+    name: string;
+    slug: string;
+    typeLabel: string;
+    typeSlug: string;
+  };
+  visitedOn: string;
+};
+
 export type DateRangeReviewCard =
   | {
       dateRange: {
@@ -113,8 +123,13 @@ export type DateRangeReviewCard =
         imageCount: number;
         name: string;
         slug: string;
+        visits: DateRangeReviewParkVisitSummary[];
         visitCount: number;
       };
+    }
+  | {
+      kind: 'other-visits';
+      visits: DateRangeReviewParkVisitSummary[];
     };
 
 export type DateRangeReviewStory = {
@@ -144,6 +159,18 @@ const toVisitReference = (visit: DateRangeReviewTimelineVisit): DateRangeReviewV
   },
   route: visit.route,
   trip: visit.trip,
+  visitedOn: visit.visitedOn
+});
+
+const toParkVisitSummary = (
+  visit: DateRangeReviewTimelineVisit
+): DateRangeReviewParkVisitSummary => ({
+  park: {
+    name: visit.park.name,
+    slug: visit.park.slug,
+    typeLabel: visit.park.typeLabel,
+    typeSlug: visit.park.typeSlug
+  },
   visitedOn: visit.visitedOn
 });
 
@@ -243,6 +270,7 @@ export const buildDateRangeReviewStory = ({
       imageCount: number;
       lastVisitedOn: string;
       trip: DateRangeReviewTrip;
+      visits: DateRangeReviewTimelineVisit[];
       visitCount: number;
     }
   >();
@@ -267,6 +295,7 @@ export const buildDateRangeReviewStory = ({
         if (existing) {
           existing.lastVisitedOn = visit.visitedOn;
           existing.imageCount += visit.imageCount;
+          existing.visits.push(visit);
           existing.visitCount += 1;
         } else {
           tripStatsByTripId.set(trip.id, {
@@ -274,6 +303,7 @@ export const buildDateRangeReviewStory = ({
             imageCount: visit.imageCount,
             lastVisitedOn: visit.visitedOn,
             trip,
+            visits: [visit],
             visitCount: 1
           });
         }
@@ -305,6 +335,7 @@ export const buildDateRangeReviewStory = ({
           name: visit.park.name,
           slug: visit.park.slug
         },
+        visitId: visit.id,
         visitedOn: visit.visitedOn
       }
     ];
@@ -333,6 +364,7 @@ export const buildDateRangeReviewStory = ({
         },
         previousVisitDate,
         revisitCount,
+        visitId: visit.id,
         visitedOn: visit.visitedOn
       }
     ];
@@ -372,15 +404,35 @@ export const buildDateRangeReviewStory = ({
   if (newNationalParkMoments.length > 0) {
     cards.push({
       kind: 'new-parks',
-      parks: newNationalParkMoments
+      parks: newNationalParkMoments.map(({ visitId: _visitId, ...parkMoment }) => parkMoment)
     });
   }
 
   if (revisitedParkMoments.length > 0) {
     cards.push({
       kind: 'revisited-parks',
-      parks: revisitedParkMoments
+      parks: revisitedParkMoments.map(({ visitId: _visitId, ...parkMoment }) => parkMoment)
     });
+  }
+
+  const coveredVisitIds = new Set<number>();
+
+  if (photoVisit) {
+    coveredVisitIds.add(photoVisit.id);
+  }
+
+  for (const visit of rangeVisits) {
+    if (visit.trip && tripStatsByTripId.has(visit.trip.id)) {
+      coveredVisitIds.add(visit.id);
+    }
+  }
+
+  for (const parkMoment of newNationalParkMoments) {
+    coveredVisitIds.add(parkMoment.visitId);
+  }
+
+  for (const parkMoment of revisitedParkMoments) {
+    coveredVisitIds.add(parkMoment.visitId);
   }
 
   const tripCards = [...tripStatsByTripId.values()]
@@ -409,12 +461,24 @@ export const buildDateRangeReviewStory = ({
           imageCount: entry.imageCount,
           name: entry.trip.name,
           slug: entry.trip.slug,
+          visits: [...entry.visits].sort(compareVisitsByNarrativeOrder).map(toParkVisitSummary),
           visitCount: entry.visitCount
         }
       };
     });
 
   cards.push(...tripCards);
+
+  const otherVisits = rangeVisits
+    .filter((visit) => !coveredVisitIds.has(visit.id))
+    .map(toParkVisitSummary);
+
+  if (otherVisits.length > 0) {
+    cards.push({
+      kind: 'other-visits',
+      visits: otherVisits
+    });
+  }
 
   return {
     cards,
