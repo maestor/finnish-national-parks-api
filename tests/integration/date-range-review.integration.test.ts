@@ -1,7 +1,8 @@
 import sharp from 'sharp';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { createApp } from '../../src/app.js';
+import * as repositories from '../../src/db/repositories.js';
 import { createSessionToken } from '../../src/http/session.js';
 import { importParks } from '../../src/importer/import-parks.js';
 import { createMemoryStorage } from '../../src/storage/memory-storage.js';
@@ -238,6 +239,183 @@ describe('date range review routes', () => {
     });
   });
 
+  it('lists, updates, and deletes published shares by share id for admin management', async () => {
+    const app = createAuthedApp({ apiKey: 'test-secret-key' });
+
+    await createVisit(app, 'akasmannyn-kansallispuisto', {
+      visitedOn: '2026-06-10'
+    });
+    await createVisit(app, 'seitsemisen-kansallispuisto', {
+      visitedOn: '2026-06-12'
+    });
+    await createVisit(app, 'evon-retkeilyalue', {
+      visitedOn: '2026-06-18'
+    });
+    await createVisit(app, 'akasmannyn-kansallispuisto', {
+      visitedOn: '2026-07-10'
+    });
+    await createVisit(app, 'seitsemisen-kansallispuisto', {
+      visitedOn: '2026-07-12'
+    });
+    await createVisit(app, 'evon-retkeilyalue', {
+      visitedOn: '2026-07-18'
+    });
+
+    const firstPublishResponse = await requestAsAdmin(app, '/api/date-range-review/publish', {
+      method: 'POST',
+      body: JSON.stringify({
+        endDate: '2026-06-30',
+        name: 'Summer Vacation',
+        startDate: '2026-06-01'
+      }),
+      headers: {
+        'content-type': 'application/json'
+      }
+    });
+    const firstPublishBody = (await firstPublishResponse.json()) as { shareId: string };
+
+    expect(firstPublishResponse.status).toBe(200);
+
+    const secondPublishResponse = await requestAsAdmin(app, '/api/date-range-review/publish', {
+      method: 'POST',
+      body: JSON.stringify({
+        endDate: '2026-06-30',
+        name: 'June Highlights',
+        startDate: '2026-06-01'
+      }),
+      headers: {
+        'content-type': 'application/json'
+      }
+    });
+    const secondPublishBody = (await secondPublishResponse.json()) as { shareId: string };
+
+    expect(secondPublishResponse.status).toBe(200);
+
+    const listResponse = await requestAsAdmin(app, '/api/admin/date-range-review/shares');
+    const listBody = (await listResponse.json()) as {
+      shares: Array<{
+        overview: {
+          endDate: string;
+          name: string;
+          shareSlug: string;
+          startDate: string;
+        };
+        publicUrl: string;
+        shareId: string;
+        sharePath: string;
+        storySummary: {
+          tripCount: number;
+          visitCount: number;
+        };
+      }>;
+    };
+
+    expect(listResponse.status).toBe(200);
+    expect(listBody.shares).toHaveLength(2);
+    expect(listBody.shares.map((share) => share.shareId)).toEqual([
+      secondPublishBody.shareId,
+      firstPublishBody.shareId
+    ]);
+    expect(listBody.shares.map((share) => share.overview.name)).toEqual([
+      'June Highlights',
+      'Summer Vacation'
+    ]);
+    expect(listBody.shares[0]?.sharePath).toContain('/ajanjaksokatsaus/jako/');
+    expect(listBody.shares[0]?.publicUrl).toContain('http://localhost:4300/ajanjaksokatsaus/jako/');
+    expect(listBody.shares[0]?.storySummary.visitCount).toBe(3);
+
+    const updateResponse = await requestAsAdmin(
+      app,
+      `/api/admin/date-range-review/shares/${firstPublishBody.shareId}`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify({
+          endDate: '2026-07-31',
+          name: 'July Vacation',
+          startDate: '2026-07-01'
+        }),
+        headers: {
+          'content-type': 'application/json'
+        }
+      }
+    );
+    const updateBody = (await updateResponse.json()) as {
+      overview: {
+        endDate: string;
+        name: string;
+        shareSlug: string;
+        startDate: string;
+      };
+      shareId: string;
+      storySummary: {
+        tripCount: number;
+        visitCount: number;
+      };
+    };
+
+    expect(updateResponse.status).toBe(200);
+    expect(updateBody.shareId).toBe(firstPublishBody.shareId);
+    expect(updateBody.overview).toEqual({
+      endDate: '2026-07-31',
+      name: 'July Vacation',
+      shareSlug: 'july-vacation',
+      startDate: '2026-07-01'
+    });
+    expect(updateBody.storySummary.visitCount).toBe(3);
+
+    const updatedPublicShareResponse = await app.request(
+      `/api/date-range-review/shares/${firstPublishBody.shareId}`,
+      {
+        headers: {
+          authorization: 'Bearer test-secret-key',
+          'x-forwarded-for': '203.0.113.1'
+        }
+      }
+    );
+    const updatedPublicShareBody = (await updatedPublicShareResponse.json()) as {
+      overview: {
+        endDate: string;
+        name: string;
+        shareSlug: string;
+        startDate: string;
+      };
+    };
+
+    expect(updatedPublicShareResponse.status).toBe(200);
+    expect(updatedPublicShareBody.overview).toEqual({
+      endDate: '2026-07-31',
+      name: 'July Vacation',
+      shareSlug: 'july-vacation',
+      startDate: '2026-07-01'
+    });
+
+    const deleteResponse = await requestAsAdmin(
+      app,
+      `/api/admin/date-range-review/shares/${secondPublishBody.shareId}`,
+      {
+        method: 'DELETE'
+      }
+    );
+
+    expect(deleteResponse.status).toBe(204);
+
+    const deletedPublicShareResponse = await app.request(
+      `/api/date-range-review/shares/${secondPublishBody.shareId}`,
+      {
+        headers: {
+          authorization: 'Bearer test-secret-key',
+          'x-forwarded-for': '203.0.113.1'
+        }
+      }
+    );
+    const deletedPublicShareBody = (await deletedPublicShareResponse.json()) as { error: string };
+
+    expect(deletedPublicShareResponse.status).toBe(404);
+    expect(deletedPublicShareBody).toEqual({
+      error: 'Published date range review share not found.'
+    });
+  });
+
   it('rejects reusing a published overview name with a different date range', async () => {
     const app = createAuthedApp();
 
@@ -292,6 +470,258 @@ describe('date range review routes', () => {
     expect(conflictingPublishResponse.status).toBe(409);
     expect(conflictingPublishBody).toEqual({
       error: 'Overview name "Summer Vacation" is already bound to 2026-06-01 - 2026-06-30.'
+    });
+  });
+
+  it('protects and validates admin share management routes', async () => {
+    const app = createAuthedApp();
+
+    const unauthenticatedListResponse = await app.request('/api/admin/date-range-review/shares');
+    const unauthenticatedPatchResponse = await app.request(
+      '/api/admin/date-range-review/shares/11111111-1111-4111-8111-111111111111',
+      {
+        method: 'PATCH',
+        body: JSON.stringify({
+          endDate: '2026-06-30',
+          name: 'Summer Vacation',
+          startDate: '2026-06-01'
+        }),
+        headers: {
+          'content-type': 'application/json'
+        }
+      }
+    );
+    const unauthenticatedDeleteResponse = await app.request(
+      '/api/admin/date-range-review/shares/11111111-1111-4111-8111-111111111111',
+      {
+        method: 'DELETE'
+      }
+    );
+
+    expect(unauthenticatedListResponse.status).toBe(401);
+    expect(unauthenticatedPatchResponse.status).toBe(401);
+    expect(unauthenticatedDeleteResponse.status).toBe(401);
+
+    await createVisit(app, 'akasmannyn-kansallispuisto', {
+      visitedOn: '2026-06-10'
+    });
+    await createVisit(app, 'seitsemisen-kansallispuisto', {
+      visitedOn: '2026-06-12'
+    });
+    await createVisit(app, 'evon-retkeilyalue', {
+      visitedOn: '2026-06-18'
+    });
+
+    const firstPublishResponse = await requestAsAdmin(app, '/api/date-range-review/publish', {
+      method: 'POST',
+      body: JSON.stringify({
+        endDate: '2026-06-30',
+        name: 'Summer Vacation',
+        startDate: '2026-06-01'
+      }),
+      headers: {
+        'content-type': 'application/json'
+      }
+    });
+    const firstPublishBody = (await firstPublishResponse.json()) as { shareId: string };
+
+    const secondPublishResponse = await requestAsAdmin(app, '/api/date-range-review/publish', {
+      method: 'POST',
+      body: JSON.stringify({
+        endDate: '2026-06-30',
+        name: 'June Highlights',
+        startDate: '2026-06-01'
+      }),
+      headers: {
+        'content-type': 'application/json'
+      }
+    });
+    const secondPublishBody = (await secondPublishResponse.json()) as { shareId: string };
+
+    const conflictingPatchResponse = await requestAsAdmin(
+      app,
+      `/api/admin/date-range-review/shares/${firstPublishBody.shareId}`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify({
+          endDate: '2026-06-30',
+          name: 'June Highlights',
+          startDate: '2026-06-01'
+        }),
+        headers: {
+          'content-type': 'application/json'
+        }
+      }
+    );
+    const conflictingPatchBody = (await conflictingPatchResponse.json()) as { error: string };
+
+    expect(conflictingPatchResponse.status).toBe(409);
+    expect(conflictingPatchBody).toEqual({
+      error: 'Overview name "June Highlights" is already bound to 2026-06-01 - 2026-06-30.'
+    });
+
+    const missingPatchResponse = await requestAsAdmin(
+      app,
+      '/api/admin/date-range-review/shares/11111111-1111-4111-8111-111111111111',
+      {
+        method: 'PATCH',
+        body: JSON.stringify({
+          endDate: '2026-06-30',
+          name: 'Missing Overview',
+          startDate: '2026-06-01'
+        }),
+        headers: {
+          'content-type': 'application/json'
+        }
+      }
+    );
+    const missingPatchBody = (await missingPatchResponse.json()) as { error: string };
+
+    expect(missingPatchResponse.status).toBe(404);
+    expect(missingPatchBody).toEqual({
+      error: 'Published date range review share not found.'
+    });
+
+    const missingDeleteResponse = await requestAsAdmin(
+      app,
+      '/api/admin/date-range-review/shares/11111111-1111-4111-8111-111111111111',
+      {
+        method: 'DELETE'
+      }
+    );
+    const missingDeleteBody = (await missingDeleteResponse.json()) as { error: string };
+
+    expect(missingDeleteResponse.status).toBe(404);
+    expect(missingDeleteBody).toEqual({
+      error: 'Published date range review share not found.'
+    });
+
+    expect(secondPublishBody.shareId).not.toBe(firstPublishBody.shareId);
+  });
+
+  it('validates admin share patch payloads and range worthiness', async () => {
+    const app = createAuthedApp();
+
+    await createVisit(app, 'akasmannyn-kansallispuisto', {
+      visitedOn: '2026-06-10'
+    });
+    await createVisit(app, 'seitsemisen-kansallispuisto', {
+      visitedOn: '2026-06-12'
+    });
+    await createVisit(app, 'evon-retkeilyalue', {
+      visitedOn: '2026-06-18'
+    });
+
+    const publishResponse = await requestAsAdmin(app, '/api/date-range-review/publish', {
+      method: 'POST',
+      body: JSON.stringify({
+        endDate: '2026-06-30',
+        name: 'Summer Vacation',
+        startDate: '2026-06-01'
+      }),
+      headers: {
+        'content-type': 'application/json'
+      }
+    });
+    const publishBody = (await publishResponse.json()) as { shareId: string };
+
+    const invalidPatchResponse = await requestAsAdmin(
+      app,
+      `/api/admin/date-range-review/shares/${publishBody.shareId}`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify({
+          endDate: '2026-13-30',
+          name: 'Summer Vacation',
+          startDate: '2026-06-01'
+        }),
+        headers: {
+          'content-type': 'application/json'
+        }
+      }
+    );
+    const invalidPatchBody = (await invalidPatchResponse.json()) as { error: string };
+
+    expect(invalidPatchResponse.status).toBe(422);
+    expect(invalidPatchBody).toEqual({
+      error: 'Start date and end date must be valid calendar dates.'
+    });
+
+    const tooSmallPatchResponse = await requestAsAdmin(
+      app,
+      `/api/admin/date-range-review/shares/${publishBody.shareId}`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify({
+          endDate: '2026-06-15',
+          name: 'Summer Vacation',
+          startDate: '2026-06-01'
+        }),
+        headers: {
+          'content-type': 'application/json'
+        }
+      }
+    );
+    const tooSmallPatchBody = (await tooSmallPatchResponse.json()) as { error: string };
+
+    expect(tooSmallPatchResponse.status).toBe(422);
+    expect(tooSmallPatchBody).toEqual({
+      error: 'At least 3 visits are required to build a date range review.'
+    });
+  });
+
+  it('returns not found if an admin patch loses the share during update', async () => {
+    const app = createAuthedApp();
+
+    await createVisit(app, 'akasmannyn-kansallispuisto', {
+      visitedOn: '2026-06-10'
+    });
+    await createVisit(app, 'seitsemisen-kansallispuisto', {
+      visitedOn: '2026-06-12'
+    });
+    await createVisit(app, 'evon-retkeilyalue', {
+      visitedOn: '2026-06-18'
+    });
+
+    const publishResponse = await requestAsAdmin(app, '/api/date-range-review/publish', {
+      method: 'POST',
+      body: JSON.stringify({
+        endDate: '2026-06-30',
+        name: 'Summer Vacation',
+        startDate: '2026-06-01'
+      }),
+      headers: {
+        'content-type': 'application/json'
+      }
+    });
+    const publishBody = (await publishResponse.json()) as { shareId: string };
+
+    const updateSpy = vi
+      .spyOn(repositories, 'updatePublishedDateRangeReviewShareByShareId')
+      .mockResolvedValueOnce(null);
+
+    const response = await requestAsAdmin(
+      app,
+      `/api/admin/date-range-review/shares/${publishBody.shareId}`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify({
+          endDate: '2026-06-30',
+          name: 'Summer Vacation',
+          startDate: '2026-06-01'
+        }),
+        headers: {
+          'content-type': 'application/json'
+        }
+      }
+    );
+    const body = (await response.json()) as { error: string };
+
+    updateSpy.mockRestore();
+
+    expect(response.status).toBe(404);
+    expect(body).toEqual({
+      error: 'Published date range review share not found.'
     });
   });
 

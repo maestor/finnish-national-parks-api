@@ -2083,6 +2083,15 @@ export const getPublishedDateRangeReviewShareByShareId = async (
   return row ? toPublishedDateRangeReviewShare(row) : null;
 };
 
+export const listPublishedDateRangeReviewShares = async (database: Database) => {
+  const rows = await database
+    .select()
+    .from(dateRangeReviewShares)
+    .orderBy(desc(dateRangeReviewShares.publishedAt), desc(dateRangeReviewShares.id));
+
+  return rows.map(toPublishedDateRangeReviewShare);
+};
+
 export const publishYearReviewShare = async (
   database: Database,
   input: {
@@ -2166,6 +2175,43 @@ export const publishDateRangeReviewShare = async (
   return (await getPublishedDateRangeReviewShareByName(database, name))!;
 };
 
+export const updatePublishedDateRangeReviewShareByShareId = async (
+  database: Database,
+  input: {
+    endDate: string;
+    generatedAt: string;
+    name: string;
+    publishedAt: string;
+    shareId: string;
+    startDate: string;
+    story: DateRangeReviewStory;
+    updatedAt: string;
+  }
+) => {
+  const name = normalizeDateRangeReviewName(input.name);
+  const overviewSlug = createSlug(name, 'overview');
+
+  const result = await database
+    .update(dateRangeReviewShares)
+    .set({
+      endDate: input.endDate,
+      generatedAt: input.generatedAt,
+      name,
+      overviewSlug,
+      publishedAt: input.publishedAt,
+      startDate: input.startDate,
+      storyJson: JSON.stringify(input.story),
+      updatedAt: input.updatedAt
+    })
+    .where(eq(dateRangeReviewShares.shareId, input.shareId));
+
+  if (Number(result.rowsAffected ?? 0) === 0) {
+    return null;
+  }
+
+  return await getPublishedDateRangeReviewShareByShareId(database, input.shareId);
+};
+
 export const unpublishYearReviewShare = async (database: Database, year: number) => {
   const result = await database.delete(yearReviewShares).where(eq(yearReviewShares.year, year));
   return Number(result.rowsAffected ?? 0) > 0;
@@ -2176,6 +2222,16 @@ export const unpublishDateRangeReviewShare = async (database: Database, name: st
   const result = await database
     .delete(dateRangeReviewShares)
     .where(eq(dateRangeReviewShares.overviewSlug, overviewSlug));
+  return Number(result.rowsAffected ?? 0) > 0;
+};
+
+export const unpublishDateRangeReviewShareByShareId = async (
+  database: Database,
+  shareId: string
+) => {
+  const result = await database
+    .delete(dateRangeReviewShares)
+    .where(eq(dateRangeReviewShares.shareId, shareId));
   return Number(result.rowsAffected ?? 0) > 0;
 };
 
