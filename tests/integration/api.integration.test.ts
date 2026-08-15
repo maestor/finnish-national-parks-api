@@ -208,6 +208,7 @@ describe('API routes', () => {
     app: ReturnType<typeof createApp>,
     tripId: number,
     body: {
+      displayName?: string | null;
       location: {
         coordinate: {
           lat: number;
@@ -230,6 +231,7 @@ describe('API routes', () => {
 
     return {
       body: (await response.json()) as {
+        displayName: string | null;
         id: number;
         location: {
           coordinate: {
@@ -2297,6 +2299,7 @@ describe('API routes', () => {
       visitedOn: '2026-06-07'
     });
     const { body: stop, response: createStopResponse } = await createTripStop(app, trip.id, {
+      displayName: 'Huittisten ABC',
       location: {
         coordinate: {
           lat: 61.3167,
@@ -2310,6 +2313,7 @@ describe('API routes', () => {
     });
 
     expect(createStopResponse.status).toBe(201);
+    expect(stop.displayName).toBe('Huittisten ABC');
     expect(stop.tripStopOrder).toBe(2);
     expect(stop.visitedOn).toBe('2026-06-07');
 
@@ -2320,6 +2324,7 @@ describe('API routes', () => {
             kind: 'stop';
             tripStopOrder: number;
             stop: {
+              displayName: string | null;
               id: number;
               note: string | null;
             };
@@ -2347,6 +2352,7 @@ describe('API routes', () => {
         kind: 'stop',
         tripStopOrder: 2,
         stop: expect.objectContaining({
+          displayName: 'Huittisten ABC',
           id: stop.id,
           note: 'Lunch break',
           visitedOn: '2026-06-07'
@@ -2364,6 +2370,7 @@ describe('API routes', () => {
     const updateStopResponse = await requestAsAdmin(app, `/api/trip-stops/${stop.id}`, {
       method: 'PATCH',
       body: JSON.stringify({
+        displayName: 'Huittinen ABC lounas',
         note: 'Coffee break',
         tripStopOrder: 1
       }),
@@ -2372,6 +2379,7 @@ describe('API routes', () => {
       }
     });
     const updateStopBody = (await updateStopResponse.json()) as {
+      displayName: string | null;
       note: string | null;
       tripStopOrder: number;
     };
@@ -2385,6 +2393,7 @@ describe('API routes', () => {
 
     expect(updateStopResponse.status).toBe(200);
     expect(updateStopBody).toMatchObject({
+      displayName: 'Huittinen ABC lounas',
       note: 'Coffee break',
       tripStopOrder: 1
     });

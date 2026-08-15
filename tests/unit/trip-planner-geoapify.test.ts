@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { createGeoapifyClient } from '../../src/trip-planner/geoapify.js';
 
 describe('geoapify client', () => {
-  it('geocodes with a Finland bias and normalizes the best result', async () => {
+  it('geocodes with a Finland, Sweden, and Norway bias and filter, then normalizes the best result', async () => {
     const fetchFn = vi.fn().mockResolvedValue(
       new Response(
         JSON.stringify({
@@ -33,7 +33,8 @@ describe('geoapify client', () => {
 
     expect(requestUrl.pathname).toBe('/v1/geocode/search');
     expect(requestUrl.searchParams.get('text')).toBe('Helsinki');
-    expect(requestUrl.searchParams.get('bias')).toBe('countrycode:fi');
+    expect(requestUrl.searchParams.get('bias')).toBe('countrycode:fi,se,no');
+    expect(requestUrl.searchParams.get('filter')).toBe('countrycode:fi,se,no');
     expect(requestUrl.searchParams.get('lang')).toBe('fi');
     expect(result).toEqual({
       coordinate: {
@@ -45,7 +46,7 @@ describe('geoapify client', () => {
     });
   });
 
-  it('autocompletes with a Finland filter and returns the best three matches', async () => {
+  it('autocompletes with Finland, Sweden, and Norway results and returns the best three matches', async () => {
     const fetchFn = vi.fn().mockResolvedValue(
       new Response(
         JSON.stringify({
@@ -91,7 +92,8 @@ describe('geoapify client', () => {
 
     expect(requestUrl.pathname).toBe('/v1/geocode/autocomplete');
     expect(requestUrl.searchParams.get('text')).toBe('He');
-    expect(requestUrl.searchParams.get('filter')).toBe('countrycode:fi');
+    expect(requestUrl.searchParams.get('bias')).toBe('countrycode:fi,se,no');
+    expect(requestUrl.searchParams.get('filter')).toBe('countrycode:fi,se,no');
     expect(requestUrl.searchParams.get('lang')).toBe('fi');
     expect(requestUrl.searchParams.get('limit')).toBe('3');
     expect(result).toEqual([

@@ -156,6 +156,7 @@ export const tripSchema = z.object({
 
 export const tripStopSchema = z.object({
   createdAt: z.string().datetime(),
+  displayName: z.string().nullable(),
   id: z.number().int(),
   images: z.array(visitImageSchema),
   location: labeledPointSchema,
@@ -458,6 +459,7 @@ export const createTripRequestSchema = z.object({
 });
 
 export const createTripStopRequestSchema = z.object({
+  displayName: z.string().trim().min(1).max(120).nullable().optional(),
   location: labeledPointInputSchema,
   note: z.string().max(5000).nullable().optional(),
   tripStopOrder: z.number().int().positive().optional(),
@@ -534,6 +536,7 @@ export const updateTripStopRequestSchema = createTripStopRequestSchema
   .partial()
   .refine(
     (input) =>
+      input.displayName !== undefined ||
       input.location !== undefined ||
       input.note !== undefined ||
       input.tripStopOrder !== undefined ||

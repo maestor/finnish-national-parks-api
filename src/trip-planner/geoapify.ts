@@ -55,6 +55,7 @@ const DEFAULT_GEOCODE_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
 const DEFAULT_ROUTE_CACHE_TTL_MS = 30 * 60 * 1000;
 const DEFAULT_SUGGESTION_CACHE_TTL_MS = 60 * 60 * 1000;
 const DEFAULT_SUGGESTION_LIMIT = 3;
+const GEOAPIFY_NORDIC_COUNTRY_CODES = 'countrycode:fi,se,no';
 
 type CacheEntry<T> = {
   expiresAt: number;
@@ -64,7 +65,8 @@ type CacheEntry<T> = {
 const buildGeocodeUrl = (apiKey: string, query: string) => {
   const params = new URLSearchParams({
     apiKey,
-    bias: 'countrycode:fi',
+    bias: GEOAPIFY_NORDIC_COUNTRY_CODES,
+    filter: GEOAPIFY_NORDIC_COUNTRY_CODES,
     format: 'json',
     lang: 'fi',
     limit: '1',
@@ -77,7 +79,8 @@ const buildGeocodeUrl = (apiKey: string, query: string) => {
 const buildAutocompleteUrl = (apiKey: string, query: string) => {
   const params = new URLSearchParams({
     apiKey,
-    filter: 'countrycode:fi',
+    bias: GEOAPIFY_NORDIC_COUNTRY_CODES,
+    filter: GEOAPIFY_NORDIC_COUNTRY_CODES,
     format: 'json',
     lang: 'fi',
     limit: String(DEFAULT_SUGGESTION_LIMIT),

@@ -12,10 +12,12 @@ It is meant to answer two questions quickly:
 - `POST /api/trip-planner/suggestions`
   - accepts `{ query }`
   - returns up to three Geoapify-backed place suggestions with `label` and `coordinate`
+  - limits Geoapify free-text fallback to Finland, Sweden, and Norway
 - `POST /api/trip-planner/search`
   - accepts `originQuery`, `destinationQuery`, `mode`, and optional `maxDistanceKm`
   - first resolves exact known park and trail names from the local catalog
   - geocodes only unmatched free-text endpoints server-side
+  - limits Geoapify free-text fallback to Finland, Sweden, and Norway
   - fetches a real driving route from Geoapify
   - returns visible catalog parks near that route
   - returns response-level `maxDistanceKm` and `defaultDistanceKm` values for frontend distance filters
@@ -24,11 +26,12 @@ It is meant to answer two questions quickly:
   - accepts `originQuery` and optional `maxDistanceKm`
   - first resolves exact known park and trail names from the local catalog
   - geocodes only unmatched free-text origins server-side
+  - limits Geoapify free-text fallback to Finland, Sweden, and Norway
   - returns visible catalog parks near that point
   - returns a `searchArea` bounding box and center for map rendering without route geometry
   - returns the same response-level `maxDistanceKm` and `defaultDistanceKm` fields as route search
 
-Both endpoints require the existing backend auth boundary outside localhost and depend on `GEOAPIFY_API_KEY`.
+All three endpoints require the existing backend auth boundary outside localhost and depend on `GEOAPIFY_API_KEY`.
 
 ## Core Definitions
 

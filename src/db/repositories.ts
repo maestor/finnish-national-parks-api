@@ -96,6 +96,7 @@ type UpdateTripInput = {
 };
 
 type PutTripStopInput = {
+  displayName?: string | null | undefined;
   location: {
     coordinate: {
       lat: number;
@@ -109,6 +110,7 @@ type PutTripStopInput = {
 };
 
 type UpdateTripStopInput = {
+  displayName?: string | null | undefined;
   location?:
     | {
         coordinate: {
@@ -985,6 +987,7 @@ const toTrip = (row: TripRow) => {
 const toTripStop = (row: TripStopRow, images: VisitImage[] = []) => {
   return {
     createdAt: row.createdAt,
+    displayName: row.displayName,
     id: row.id,
     images,
     location: toTripStopLocation(row),
@@ -2888,6 +2891,7 @@ export const createTripStop = async (
         .insert(tripStops)
         .values({
           createdAt: timestamp,
+          displayName: normalizeOptionalText(input.displayName),
           label: location.label,
           lat: location.lat,
           lon: location.lon,
@@ -3325,6 +3329,10 @@ export const updateTripStop = async (
     await tx
       .update(tripStops)
       .set({
+        displayName:
+          input.displayName === undefined
+            ? existingTripStop.displayName
+            : normalizeOptionalText(input.displayName),
         label: nextLocation?.label ?? existingTripStop.label,
         lat: nextLocation?.lat ?? existingTripStop.lat,
         lon: nextLocation?.lon ?? existingTripStop.lon,
