@@ -117,6 +117,7 @@ export const tripStops = sqliteTable(
     tripStopOrder: integer('trip_stop_order').notNull(),
     visitedOn: text('visited_on').notNull(),
     label: text('label').notNull(),
+    displayName: text('display_name'),
     lat: real('lat').notNull(),
     lon: real('lon').notNull(),
     note: text('note'),

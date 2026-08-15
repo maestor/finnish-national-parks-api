@@ -65,7 +65,8 @@ describe('migrateDatabase', () => {
       '0024_trip_stop_images.sql',
       '0025_park_magnets.sql',
       '0026_year_review_shares.sql',
-      '0027_date_range_review_shares.sql'
+      '0027_date_range_review_shares.sql',
+      '0028_trip_stop_display_name.sql'
     ]);
     expect(parkTypes.rows.map((row) => String(row.slug))).toEqual([
       'outdoor-recreation-area',
@@ -113,6 +114,7 @@ describe('migrateDatabase', () => {
     expect(tripStopColumns.rows.some((row) => String(row.name) === 'lat')).toBe(true);
     expect(tripStopColumns.rows.some((row) => String(row.name) === 'lon')).toBe(true);
     expect(tripStopColumns.rows.some((row) => String(row.name) === 'note')).toBe(true);
+    expect(tripStopColumns.rows.some((row) => String(row.name) === 'display_name')).toBe(true);
     expect(tripVisitColumns.rows.some((row) => String(row.name) === 'trip_id')).toBe(true);
     expect(tripVisitColumns.rows.some((row) => String(row.name) === 'trip_stop_order')).toBe(true);
     expect(tripVisitColumns.rows.some((row) => String(row.name) === 'exclude_from_route')).toBe(
@@ -163,7 +165,8 @@ describe('migrateDatabase', () => {
       '0024_trip_stop_images.sql',
       '0025_park_magnets.sql',
       '0026_year_review_shares.sql',
-      '0027_date_range_review_shares.sql'
+      '0027_date_range_review_shares.sql',
+      '0028_trip_stop_display_name.sql'
     ]);
     expect(schemaMigrationTableBeforeApply.rows).toEqual([]);
     expect(pendingAfterApply).toEqual([]);

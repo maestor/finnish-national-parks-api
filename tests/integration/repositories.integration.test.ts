@@ -679,6 +679,7 @@ describe('repositories', () => {
     });
 
     const stop = await createTripStop(testDatabase.database, trip.id, {
+      displayName: 'Huittisten ABC',
       location: {
         coordinate: {
           lat: 61.3167,
@@ -693,6 +694,7 @@ describe('repositories', () => {
     const tripDetail = await getTripById(testDatabase.database, trip.id, getImagePublicUrl);
 
     expect(stop).toMatchObject({
+      displayName: 'Huittisten ABC',
       location: {
         coordinate: {
           lat: 61.3167,
@@ -734,6 +736,7 @@ describe('repositories', () => {
     });
 
     const relocatedStop = await updateTripStop(testDatabase.database, stop.id, {
+      displayName: 'Tampereen yopyminen',
       location: {
         coordinate: {
           lat: 61.451,
@@ -744,6 +747,7 @@ describe('repositories', () => {
     });
 
     expect(relocatedStop).toMatchObject({
+      displayName: 'Tampereen yopyminen',
       location: {
         coordinate: {
           lat: 61.451,
@@ -756,12 +760,14 @@ describe('repositories', () => {
     });
 
     const movedStop = await updateTripStop(testDatabase.database, stop.id, {
+      displayName: null,
       note: 'Coffee break',
       tripStopOrder: 1
     });
     const movedTripDetail = await getTripById(testDatabase.database, trip.id, getImagePublicUrl);
 
     expect(movedStop).toMatchObject({
+      displayName: null,
       note: 'Coffee break',
       tripStopOrder: 1
     });

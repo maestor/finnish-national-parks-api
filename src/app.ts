@@ -515,7 +515,7 @@ const buildPublicTripRouteWaypoints = async (database: Database, trip: PublicTri
 
       return {
         coordinate: entry.stop.location.coordinate,
-        displayName: entry.stop.location.displayName,
+        displayName: entry.stop.displayName ?? entry.stop.location.displayName,
         label: entry.stop.location.label,
         routeFallbackQueries: normalizeRouteFallbackQueries(entry.stop.location.label)
       };
