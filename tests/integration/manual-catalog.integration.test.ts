@@ -55,7 +55,7 @@ describe('manual catalog imports', () => {
       now: () => '2026-05-27T08:00:00.000Z'
     });
 
-    expect(result.results).toHaveLength(154);
+    expect(result.results).toHaveLength(155);
 
     const merenkurkku = await getParkBySlug(
       testDatabase.database,
@@ -1342,7 +1342,7 @@ describe('manual catalog imports', () => {
     );
     const kevo = await getParkBySlug(testDatabase.database, 'kevon-luonnonpuisto');
 
-    expect(allParks).toHaveLength(154);
+    expect(allParks).toHaveLength(155);
     expect(merenkurkku).toMatchObject({ catalogStatus: 'active' });
     expect(kevo).toMatchObject({ catalogStatus: 'active' });
   });
@@ -1419,7 +1419,7 @@ describe('manual catalog imports', () => {
       database: testDatabase.database
     });
 
-    expect(result.results).toHaveLength(154);
+    expect(result.results).toHaveLength(155);
 
     const merenkurkku = await getParkBySlug(
       testDatabase.database,
@@ -1560,6 +1560,38 @@ describe('manual catalog imports', () => {
     expect(tammionSaaristokyla?.boundingBox.maxLon).toBeLessThan(27.43);
   });
 
+  it('can import Isohaaran voimalaitos from the RKY source set', async () => {
+    const result = await importSpecialParks({
+      database: testDatabase.database,
+      fetchSource: createSpecialParksSource(),
+      includeSlugs: ['isohaaran-voimalaitos'],
+      now: () => '2026-05-27T08:00:00.000Z'
+    });
+
+    expect(result.results).toEqual([
+      {
+        featureCount: 1,
+        importRunId: 1,
+        name: 'Isohaaran voimalaitos',
+        slug: 'isohaaran-voimalaitos'
+      }
+    ]);
+
+    const isohaaranVoimalaitos = await getParkBySlug(
+      testDatabase.database,
+      'isohaaran-voimalaitos'
+    );
+    expect(isohaaranVoimalaitos).toMatchObject({
+      lipasId: 9001090,
+      locationLabel: 'Torniontie 1',
+      postalCode: '94450',
+      postalOffice: 'Keminmaa',
+      parkUrl: 'https://www.rky.fi/read/asp/r_kohde_det.aspx?KOHDE_ID=2242',
+      name: 'Isohaaran voimalaitos',
+      type: { slug: 'cultural-history-area' }
+    });
+  });
+
   it('re-imports Viikin luontoalue in place when stale imported metadata exists', async () => {
     await importSpecialParks({
       database: testDatabase.database,
@@ -1681,7 +1713,7 @@ describe('manual catalog imports', () => {
       now: () => '2026-05-27T08:00:00.000Z'
     });
 
-    expect(result.results).toHaveLength(154);
+    expect(result.results).toHaveLength(155);
   });
 
   it('fails clearly when a selected special-park slug is unknown', async () => {

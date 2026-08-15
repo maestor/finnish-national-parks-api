@@ -231,6 +231,18 @@ export const sourceReadyHistoryRkyAreaSeeds: MuseovirastoRkyAreaSeed[] = [
     slug: 'hakansbolen-kartano',
     sourceName: 'Sotungin kylä ja Håkansböle',
     syntheticLipasId: 9_001_087
+  },
+  {
+    displayTypeName: null,
+    locationLabel: 'Torniontie 1',
+    parkUrl: 'https://www.rky.fi/read/asp/r_kohde_det.aspx?KOHDE_ID=2242',
+    name: 'Isohaaran voimalaitos',
+    parkTypeSlug: 'cultural-history-area',
+    postalCode: '94450',
+    postalOffice: 'Keminmaa',
+    slug: 'isohaaran-voimalaitos',
+    sourceName: 'Isohaaran voimalaitos ja Vallitunsaaren voimalaitosyhdyskunta',
+    syntheticLipasId: 9_001_090
   }
 ];
 
