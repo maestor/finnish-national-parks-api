@@ -5,6 +5,7 @@ export type YearReviewTimelineVisit = {
   id: number;
   imageCount: number;
   park: {
+    hasMagnet: boolean;
     name: string;
     slug: string;
     typeLabel: string;
@@ -184,6 +185,9 @@ const compareCountsAscendingKey = <Key extends string | number>(
 };
 
 const NATIONAL_PARK_TYPE_SLUG = 'national-park';
+
+const isIncludedInNewParksDataset = (park: YearReviewTimelineVisit['park']) =>
+  park.typeSlug === NATIONAL_PARK_TYPE_SLUG || park.hasMagnet;
 
 const toVisitReference = (visit: YearReviewTimelineVisit): YearReviewVisitReference => ({
   id: visit.id,
@@ -442,7 +446,7 @@ export const buildYearReviewStory = ({
   const seenNewNationalParkSlugs = new Set<string>();
   const newNationalParkMoments = yearVisits.flatMap((visit) => {
     if (
-      visit.park.typeSlug !== NATIONAL_PARK_TYPE_SLUG ||
+      !isIncludedInNewParksDataset(visit.park) ||
       earliestVisitYearByPark.get(visit.park.slug) !== year ||
       seenNewNationalParkSlugs.has(visit.park.slug)
     ) {

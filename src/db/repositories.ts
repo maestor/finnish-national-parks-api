@@ -364,6 +364,7 @@ type VisitTimelineRow = {
   displayTypeName: string | null;
   id: number;
   imageCount: number;
+  parkHasMagnet: boolean;
   parkName: string;
   parkSlug: string;
   route: string | null;
@@ -1703,6 +1704,7 @@ const listVisitTimelineRows = async (database: Database): Promise<VisitTimelineR
       displayTypeName: parks.displayTypeName,
       id: parkVisits.id,
       imageCount: sql<number>`COUNT(${visitImages.id})`,
+      parkHasMagnet: parks.hasMagnet,
       parkName: parks.name,
       parkSlug: parks.slug,
       route: parkVisits.route,
@@ -1728,6 +1730,7 @@ const listVisitTimelineRows = async (database: Database): Promise<VisitTimelineR
       parkVisits.tripStopOrder,
       parkVisits.visitedOn,
       parks.displayTypeName,
+      parks.hasMagnet,
       parks.name,
       parks.slug,
       trips.id,
@@ -2784,6 +2787,7 @@ export const listYearReviewTimelineVisits = async (database: Database) => {
     id: visit.id,
     imageCount: visit.imageCount,
     park: {
+      hasMagnet: visit.parkHasMagnet,
       name: visit.parkName,
       slug: visit.parkSlug,
       typeLabel: resolveTypeLabel(visit),

@@ -30,6 +30,7 @@ const createVisit = (
     id: 1,
     imageCount: 0,
     park: {
+      hasMagnet: true,
       name: 'Aulangon kansallispuisto',
       slug: 'aulangon-kansallispuisto',
       typeLabel: 'Kansallispuisto',
@@ -138,6 +139,7 @@ describe('date range review story builder', () => {
           id: 2,
           imageCount: 2,
           park: {
+            hasMagnet: true,
             name: 'Seitsemisen kansallispuisto',
             slug: 'seitsemisen-kansallispuisto',
             typeLabel: 'Kansallispuisto',
@@ -155,6 +157,7 @@ describe('date range review story builder', () => {
           id: 3,
           imageCount: 0,
           park: {
+            hasMagnet: false,
             name: 'Evon retkeilyalue',
             slug: 'evon-retkeilyalue',
             typeLabel: 'Retkeilyalue',
@@ -168,6 +171,7 @@ describe('date range review story builder', () => {
           id: 4,
           imageCount: 1,
           park: {
+            hasMagnet: true,
             name: 'Sallan kansallispuisto',
             slug: 'sallan-kansallispuisto',
             typeLabel: 'Kansallispuisto',
@@ -361,6 +365,7 @@ describe('date range review story builder', () => {
           id: 3,
           imageCount: 0,
           park: {
+            hasMagnet: true,
             name: 'Salamanperan kansallispuisto',
             slug: 'salamanperan-kansallispuisto',
             typeLabel: 'Kansallispuisto',
@@ -374,6 +379,7 @@ describe('date range review story builder', () => {
           id: 4,
           imageCount: 0,
           park: {
+            hasMagnet: true,
             name: 'Salamanperan kansallispuisto',
             slug: 'salamanperan-kansallispuisto',
             typeLabel: 'Kansallispuisto',
@@ -518,6 +524,7 @@ describe('date range review story builder', () => {
           id: 30,
           imageCount: 1,
           park: {
+            hasMagnet: true,
             name: 'Helvetinjarven kansallispuisto',
             slug: 'helvetinjarven-kansallispuisto',
             typeLabel: 'Kansallispuisto',
@@ -535,6 +542,7 @@ describe('date range review story builder', () => {
           id: 31,
           imageCount: 1,
           park: {
+            hasMagnet: true,
             name: 'Kolin kansallispuisto',
             slug: 'kolin-kansallispuisto',
             typeLabel: 'Kansallispuisto',
@@ -552,6 +560,7 @@ describe('date range review story builder', () => {
           id: 40,
           imageCount: 1,
           park: {
+            hasMagnet: true,
             name: 'Patvinsuon kansallispuisto',
             slug: 'patvinsuon-kansallispuisto',
             typeLabel: 'Kansallispuisto',
@@ -569,6 +578,7 @@ describe('date range review story builder', () => {
           id: 39,
           imageCount: 1,
           park: {
+            hasMagnet: true,
             name: 'Repoveden kansallispuisto',
             slug: 'repoveden-kansallispuisto',
             typeLabel: 'Kansallispuisto',
@@ -691,5 +701,88 @@ describe('date range review story builder', () => {
         }
       }
     ]);
+  });
+
+  it('includes new magnet parks in the new-parks dataset even when they are not national parks', () => {
+    const story = buildDateRangeReviewStory({
+      endDate: '2026-06-30',
+      name: 'Magnet Mix',
+      overviewSlug: 'magnet-mix',
+      trips: [],
+      visits: [
+        createVisit({
+          createdAt: '2026-05-28T09:00:00.000Z',
+          id: 90,
+          visitedOn: '2026-05-28'
+        }),
+        createVisit({
+          id: 1,
+          visitedOn: '2026-06-10'
+        }),
+        createVisit({
+          createdAt: '2026-06-18T09:00:00.000Z',
+          id: 2,
+          park: {
+            hasMagnet: true,
+            name: 'Evon retkeilyalue',
+            slug: 'evon-retkeilyalue',
+            typeLabel: 'Retkeilyalue',
+            typeSlug: 'hiking-area'
+          },
+          trip: null,
+          visitedOn: '2026-06-18'
+        }),
+        createVisit({
+          createdAt: '2026-06-22T09:00:00.000Z',
+          id: 3,
+          park: {
+            hasMagnet: false,
+            name: 'Porkkalan virkistysalue',
+            slug: 'porkkalan-virkistysalue',
+            typeLabel: 'Virkistysalue',
+            typeSlug: 'recreation-area'
+          },
+          trip: null,
+          visitedOn: '2026-06-22'
+        }),
+        createVisit({
+          createdAt: '2026-06-25T09:00:00.000Z',
+          id: 4,
+          park: {
+            hasMagnet: true,
+            name: 'Sallan kansallispuisto',
+            slug: 'sallan-kansallispuisto',
+            typeLabel: 'Kansallispuisto',
+            typeSlug: 'national-park'
+          },
+          trip: null,
+          visitedOn: '2026-06-25'
+        })
+      ],
+      startDate: '2026-06-01'
+    });
+
+    expect(story.summary.newNationalParkCount).toBe(2);
+    expect(story.cards.find((card) => card.kind === 'new-parks')).toEqual({
+      kind: 'new-parks',
+      parks: [
+        {
+          featuredImage: null,
+          park: {
+            name: 'Evon retkeilyalue',
+            slug: 'evon-retkeilyalue'
+          },
+          visitedOn: '2026-06-18'
+        },
+        {
+          featuredImage: null,
+          park: {
+            name: 'Sallan kansallispuisto',
+            slug: 'sallan-kansallispuisto'
+          },
+          visitedOn: '2026-06-25'
+        }
+      ]
+    });
   });
 });
