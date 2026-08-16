@@ -5,6 +5,7 @@ export type DateRangeReviewTimelineVisit = {
   id: number;
   imageCount: number;
   park: {
+    hasMagnet: boolean;
     name: string;
     slug: string;
     typeLabel: string;
@@ -138,6 +139,9 @@ export type DateRangeReviewStory = {
 };
 
 const NATIONAL_PARK_TYPE_SLUG = 'national-park';
+
+const isIncludedInNewParksDataset = (park: DateRangeReviewTimelineVisit['park']) =>
+  park.typeSlug === NATIONAL_PARK_TYPE_SLUG || park.hasMagnet;
 
 const compareVisitsByNarrativeOrder = (
   left: DateRangeReviewTimelineVisit,
@@ -319,7 +323,7 @@ export const buildDateRangeReviewStory = ({
   const seenNewNationalParkSlugs = new Set<string>();
   const newNationalParkMoments = rangeVisits.flatMap((visit) => {
     if (
-      visit.park.typeSlug !== NATIONAL_PARK_TYPE_SLUG ||
+      !isIncludedInNewParksDataset(visit.park) ||
       earliestVisitDateByPark.get(visit.park.slug) !== visit.visitedOn ||
       seenNewNationalParkSlugs.has(visit.park.slug)
     ) {

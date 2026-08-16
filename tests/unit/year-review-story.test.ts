@@ -28,6 +28,7 @@ const createVisit = (overrides: Partial<YearReviewTimelineVisit> = {}): YearRevi
     id: 1,
     imageCount: 0,
     park: {
+      hasMagnet: true,
       name: 'Akasmännyn kansallispuisto',
       slug: 'akasmannyn-kansallispuisto',
       typeLabel: 'Kansallispuisto',
@@ -137,6 +138,7 @@ describe('year review story builder', () => {
         createdAt: '2025-08-20T09:00:00.000Z',
         id: 10,
         park: {
+          hasMagnet: true,
           name: 'Akasmännyn kansallispuisto',
           slug: 'akasmannyn-kansallispuisto',
           typeLabel: 'Kansallispuisto',
@@ -158,6 +160,7 @@ describe('year review story builder', () => {
         id: 12,
         imageCount: 0,
         park: {
+          hasMagnet: true,
           name: 'Seitsemisen kansallispuisto',
           slug: 'seitsemisen-kansallispuisto',
           typeLabel: 'Kansallispuisto',
@@ -306,6 +309,7 @@ describe('year review story builder', () => {
           createdAt: '2026-06-10T10:00:00.000Z',
           id: 1,
           park: {
+            hasMagnet: true,
             name: 'Seitsemisen kansallispuisto',
             slug: 'seitsemisen-kansallispuisto',
             typeLabel: 'Kansallispuisto',
@@ -417,6 +421,7 @@ describe('year review story builder', () => {
           id: 2,
           imageCount: 4,
           park: {
+            hasMagnet: true,
             name: 'Helvetinjärven kansallispuisto',
             slug: 'helvetinjarven-kansallispuisto',
             typeLabel: 'Kansallispuisto',
@@ -429,6 +434,7 @@ describe('year review story builder', () => {
           id: 3,
           imageCount: 2,
           park: {
+            hasMagnet: true,
             name: 'Seitsemisen kansallispuisto',
             slug: 'seitsemisen-kansallispuisto',
             typeLabel: 'Kansallispuisto',
@@ -441,6 +447,7 @@ describe('year review story builder', () => {
           id: 4,
           imageCount: 1,
           park: {
+            hasMagnet: false,
             name: 'Evon retkeilyalue',
             slug: 'evon-retkeilyalue',
             typeLabel: 'Retkeilyalue',
@@ -453,6 +460,7 @@ describe('year review story builder', () => {
           id: 99,
           imageCount: 1,
           park: {
+            hasMagnet: true,
             name: 'Helvetinjärven kansallispuisto',
             slug: 'helvetinjarven-kansallispuisto',
             typeLabel: 'Kansallispuisto',
@@ -539,6 +547,67 @@ describe('year review story builder', () => {
     );
   });
 
+  it('includes new magnet parks in the new-parks dataset even when they are not national parks', () => {
+    const story = buildYearReviewStory({
+      trips: [],
+      visits: [
+        createVisit({
+          id: 1,
+          visitedOn: '2026-03-10'
+        }),
+        createVisit({
+          createdAt: '2026-04-12T09:00:00.000Z',
+          id: 2,
+          park: {
+            hasMagnet: true,
+            name: 'Evon retkeilyalue',
+            slug: 'evon-retkeilyalue',
+            typeLabel: 'Retkeilyalue',
+            typeSlug: 'state-hiking-area'
+          },
+          trip: null,
+          visitedOn: '2026-04-12'
+        }),
+        createVisit({
+          createdAt: '2026-05-18T09:00:00.000Z',
+          id: 3,
+          park: {
+            hasMagnet: false,
+            name: 'Porkkalan virkistysalue',
+            slug: 'porkkalan-virkistysalue',
+            typeLabel: 'Virkistysalue',
+            typeSlug: 'recreation-area'
+          },
+          trip: null,
+          visitedOn: '2026-05-18'
+        })
+      ],
+      year: 2026
+    });
+
+    expect(story.cards.find((card) => card.kind === 'new-parks')).toEqual({
+      kind: 'new-parks',
+      parks: [
+        {
+          featuredImage: null,
+          park: {
+            name: 'Akasmännyn kansallispuisto',
+            slug: 'akasmannyn-kansallispuisto'
+          },
+          visitedOn: '2026-03-10'
+        },
+        {
+          featuredImage: null,
+          park: {
+            name: 'Evon retkeilyalue',
+            slug: 'evon-retkeilyalue'
+          },
+          visitedOn: '2026-04-12'
+        }
+      ]
+    });
+  });
+
   it('falls back to another highlighted trip visit image when the trip has no dedicated image visit left', () => {
     const story = buildYearReviewStory({
       trips: [createTrip()],
@@ -569,6 +638,7 @@ describe('year review story builder', () => {
           id: 2,
           imageCount: 0,
           park: {
+            hasMagnet: false,
             name: 'Evon retkeilyalue',
             slug: 'evon-retkeilyalue',
             typeLabel: 'Retkeilyalue',
