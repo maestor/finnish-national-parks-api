@@ -1,0 +1,27 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Saana ja Kilpisjärvi",
+        "source": "Luontoon public.destinations_details_view",
+        "surfaceArea": 34149094.03054047
+      },
+      "geometry": {
+        "type": "MultiPolygon",
+        "coordinates": [
+          [
+            [
+              [20.87895025, 68.999621211],
+              [20.736343101, 69.050989986],
+              [20.811564733, 69.07777666],
+              [20.954174682, 69.026345249],
+              [20.87895025, 68.999621211]
+            ]
+          ]
+        ]
+      }
+    }
+  ]
+}
