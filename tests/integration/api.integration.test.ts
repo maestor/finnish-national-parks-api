@@ -11,8 +11,8 @@ const authConfig = {
 
 import { createApp } from '../../src/app.js';
 import * as repositories from '../../src/db/repositories.js';
-import { createVisitImage, getParkBySlug } from '../../src/db/repositories.js';
-import { parks } from '../../src/db/schema.js';
+import { createTripStopImage, createVisitImage, getParkBySlug } from '../../src/db/repositories.js';
+import { parks, trips } from '../../src/db/schema.js';
 import { createSessionToken } from '../../src/http/session.js';
 import { importParks } from '../../src/importer/import-parks.js';
 import { importSpecialParks } from '../../src/importer/import-special-parks.js';
@@ -302,6 +302,196 @@ describe('API routes', () => {
     });
     expect(body.stories.find((story) => story.name === 'Julkaisematon retki')).toBeUndefined();
     expect(unpublished.body.id).not.toBe(published.body.id);
+  });
+
+  it('returns publication errors for missing trips and invalid publication metadata', async () => {
+    const app = createAuthedApp();
+    const anonymousResponse = await app.request('/api/trips/99999/publication', {
+      method: 'PATCH',
+      body: JSON.stringify({ status: 'published' }),
+      headers: { 'content-type': 'application/json' }
+    });
+    const missingResponse = await requestAsAdmin(app, '/api/trips/99999/publication', {
+      method: 'PATCH',
+      body: JSON.stringify({ status: 'published' }),
+      headers: { 'content-type': 'application/json' }
+    });
+    const trip = await createTrip(app, { name: 'Julkaisematon virhetesti' });
+    const featuredResponse = await requestAsAdmin(app, `/api/trips/${trip.body.id}/publication`, {
+      method: 'PATCH',
+      body: JSON.stringify({ featured: true }),
+      headers: { 'content-type': 'application/json' }
+    });
+    const coverResponse = await requestAsAdmin(app, `/api/trips/${trip.body.id}/publication`, {
+      method: 'PATCH',
+      body: JSON.stringify({
+        cover: { imageId: 99999, source: 'trip-stop-image' },
+        status: 'published'
+      }),
+      headers: { 'content-type': 'application/json' }
+    });
+    const visitCoverResponse = await requestAsAdmin(app, `/api/trips/${trip.body.id}/publication`, {
+      method: 'PATCH',
+      body: JSON.stringify({
+        cover: { imageId: 99999, source: 'visit-image' },
+        status: 'published'
+      }),
+      headers: { 'content-type': 'application/json' }
+    });
+
+    expect(missingResponse.status).toBe(404);
+    expect(anonymousResponse.status).toBe(401);
+    await expect(missingResponse.json()).resolves.toEqual({ error: 'Trip not found.' });
+    expect(featuredResponse.status).toBe(422);
+    await expect(featuredResponse.json()).resolves.toEqual({
+      error: 'An unlisted trip cannot be featured.'
+    });
+    expect(coverResponse.status).toBe(422);
+    await expect(coverResponse.json()).resolves.toEqual({
+      error: 'Cover image does not belong to this trip.'
+    });
+    expect(visitCoverResponse.status).toBe(422);
+    await expect(visitCoverResponse.json()).resolves.toEqual({
+      error: 'Cover image does not belong to this trip.'
+    });
+
+    const publishResponse = await requestAsAdmin(app, `/api/trips/${trip.body.id}/publication`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status: 'published' }),
+      headers: { 'content-type': 'application/json' }
+    });
+    const unlistResponse = await requestAsAdmin(app, `/api/trips/${trip.body.id}/publication`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status: 'unlisted' }),
+      headers: { 'content-type': 'application/json' }
+    });
+    expect(publishResponse.status).toBe(200);
+    expect(unlistResponse.status).toBe(200);
+
+    const unexpectedError = new Error('publication failure');
+    const updatePublication = vi
+      .spyOn(repositories, 'updateTripPublication')
+      .mockRejectedValueOnce(unexpectedError);
+    const errorResponse = await requestAsAdmin(app, '/api/trips/1/publication', {
+      method: 'PATCH',
+      body: JSON.stringify({ status: 'published' }),
+      headers: { 'content-type': 'application/json' }
+    });
+
+    expect(errorResponse.status).toBe(500);
+    expect(updatePublication).toHaveBeenCalledOnce();
+    updatePublication.mockRestore();
+  });
+
+  it('sorts and derives multiple published trip stories', async () => {
+    const app = createAuthedApp();
+    const first = await createTrip(app, { name: 'Ensimmäinen retki', slug: 'ensimmainen-retki' });
+    const second = await createTrip(app, { name: 'Toinen retki', slug: 'toinen-retki' });
+
+    const firstVisit = await createVisit(app, 'akasmannyn-kansallispuisto', {
+      tripId: first.body.id,
+      visitedOn: '2025-04-10'
+    });
+    await createVisit(app, 'seitsemisen-kansallispuisto', {
+      tripId: first.body.id,
+      visitedOn: '2024-05-10'
+    });
+    const secondVisit = await createVisit(app, 'seitsemisen-kansallispuisto', {
+      tripId: second.body.id,
+      visitedOn: '2026-10-10'
+    });
+    const firstStop = await createTripStop(app, first.body.id, {
+      location: {
+        coordinate: { lat: 61.3167, lon: 22.1333 },
+        label: 'ABC Huittinen'
+      },
+      visitedOn: '2025-04-10'
+    });
+    const secondStop = await createTripStop(app, second.body.id, {
+      location: {
+        coordinate: { lat: 61.5, lon: 23.5 },
+        label: 'Toinen pysähdys'
+      },
+      visitedOn: '2026-10-10'
+    });
+    const timestamp = new Date().toISOString();
+    const firstImage = await createVisitImage(testDatabase.database, {
+      createdAt: timestamp,
+      displayOrder: 0,
+      fullKey: 'visits/multiple/full.jpg',
+      mimeType: 'image/jpeg',
+      originalName: 'multiple.jpg',
+      thumbKey: 'visits/multiple/thumb.jpg',
+      updatedAt: timestamp,
+      visitId: firstVisit.body.id
+    });
+    await createTripStopImage(testDatabase.database, {
+      createdAt: timestamp,
+      displayOrder: 0,
+      fullHeight: 100,
+      fullKey: 'trip-stops/multiple/full.jpg',
+      fullWidth: 100,
+      mimeType: 'image/jpeg',
+      thumbHeight: 50,
+      thumbKey: 'trip-stops/multiple/thumb.jpg',
+      thumbWidth: 50,
+      tripStopId: secondStop.body.id,
+      updatedAt: timestamp
+    });
+    for (const trip of [first, second]) {
+      const response = await requestAsAdmin(app, `/api/trips/${trip.body.id}/publication`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          cover:
+            trip.body.id === first.body.id
+              ? { imageId: firstImage.id, source: 'visit-image' }
+              : { imageId: 1, source: 'trip-stop-image' },
+          status: 'published'
+        }),
+        headers: { 'content-type': 'application/json' }
+      });
+      expect(response.status).toBe(200);
+    }
+
+    const response = await app.request('/api/trip-stories');
+    const body = (await response.json()) as { stories: Array<{ name: string; places: unknown[] }> };
+
+    expect(firstStop.body.id).not.toBe(secondStop.body.id);
+    expect(secondVisit.body.id).not.toBe(firstVisit.body.id);
+    expect(body.stories.map((story) => story.name)).toEqual(['Toinen retki', 'Ensimmäinen retki']);
+    expect(body.stories.map((story) => story.places.length)).toEqual([1, 2]);
+    const publicDetailResponse = await app.request(`/api/trips/slug/${second.body.slug}`);
+    expect(publicDetailResponse.status).toBe(200);
+  });
+
+  it('returns a published trip without itinerary dates with an empty date range', async () => {
+    const app = createAuthedApp();
+    const trip = await createTrip(app, { name: 'Tyhjä julkaistu retki' });
+    const secondTrip = await createTrip(app, { name: 'Toinen tyhjä julkaistu retki' });
+    const publicationResponses = await Promise.all(
+      [trip, secondTrip].map(({ body: createdTrip }) =>
+        requestAsAdmin(app, `/api/trips/${createdTrip.id}/publication`, {
+          method: 'PATCH',
+          body: JSON.stringify({ status: 'published' }),
+          headers: { 'content-type': 'application/json' }
+        })
+      )
+    );
+    await testDatabase.database
+      .update(trips)
+      .set({ publishedAt: '2026-01-01T00:00:00.000Z' })
+      .where(eq(trips.id, trip.body.id));
+    await testDatabase.database
+      .update(trips)
+      .set({ publishedAt: '2026-01-01T00:00:00.000Z' })
+      .where(eq(trips.id, secondTrip.body.id));
+    const response = await app.request('/api/trip-stories');
+    const body = (await response.json()) as {
+      stories: Array<{ dateRange: { end: string; start: string } | null; name: string }>;
+    };
+
+    expect(publicationResponses.every((response) => response.status === 200)).toBe(true);
+    expect(body.stories.find((story) => story.name === trip.body.name)?.dateRange).toBeNull();
   });
 
   it('serves the public park list without boundary geometry and with cache validators', async () => {

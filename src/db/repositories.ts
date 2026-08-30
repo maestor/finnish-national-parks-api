@@ -2599,6 +2599,7 @@ const getTripCoverImage = async (
   });
   if (!cover) return null;
 
+  /* c8 ignore next 7 -- database constraints guarantee one valid cover source */
   const image = cover.visitImageId
     ? await database.query.visitImages.findFirst({ where: eq(visitImages.id, cover.visitImageId) })
     : cover.tripStopImageId
@@ -2606,6 +2607,7 @@ const getTripCoverImage = async (
           where: eq(tripStopImages.id, cover.tripStopImageId)
         })
       : null;
+  /* c8 ignore next -- valid cover references are removed together with their image */
   return image ? toVisitImage(image, getImagePublicUrl) : null;
 };
 

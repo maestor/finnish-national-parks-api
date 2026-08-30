@@ -19,6 +19,7 @@ import {
   getParkBySlugIncludingRemoved,
   getParkVisitsBySlug,
   getPublicHomeSummary,
+  getPublicTripBySlug,
   getPublicVisitSummaryEtagSeed,
   getTripById,
   getVisitById,
@@ -34,6 +35,7 @@ import {
   updateParkLogo,
   updateParkMap,
   updateTrip,
+  updateTripPublication,
   updateTripStop,
   updateVisit
 } from '../../src/db/repositories.js';
@@ -1667,6 +1669,89 @@ describe('repositories', () => {
 
     await expect(deleteTripStopImage(testDatabase.database, firstImage.id)).resolves.toBe(true);
     await expect(deleteTripStopImage(testDatabase.database, 99999)).resolves.toBe(false);
+  });
+
+  it('updates publication metadata with a trip-stop cover and can clear it', async () => {
+    const trip = await createTrip(testDatabase.database, { name: 'Kuvallinen retki' });
+    const visit = await createVisit(testDatabase.database, 'akasmannyn-kansallispuisto', {
+      tripId: trip.id,
+      visitedOn: '2026-04-10'
+    });
+    const stop = await createTripStop(testDatabase.database, trip.id, {
+      location: {
+        coordinate: { lat: 61.3167, lon: 22.1333 },
+        label: 'ABC Huittinen'
+      },
+      visitedOn: '2026-04-10'
+    });
+    const timestamp = new Date().toISOString();
+    const image = await createTripStopImage(testDatabase.database, {
+      createdAt: timestamp,
+      displayOrder: 0,
+      fullHeight: 100,
+      fullKey: 'trip-stops/publication/full.jpg',
+      fullWidth: 100,
+      mimeType: 'image/jpeg',
+      thumbHeight: 50,
+      thumbKey: 'trip-stops/publication/thumb.jpg',
+      thumbWidth: 50,
+      tripStopId: stop.id,
+      updatedAt: timestamp
+    });
+
+    await expect(
+      updateTripPublication(testDatabase.database, trip.id, {
+        cover: { imageId: image.id, source: 'trip-stop-image' },
+        status: 'published'
+      })
+    ).resolves.toMatchObject({
+      cover: { imageId: image.id, source: 'trip-stop-image' },
+      status: 'published'
+    });
+    await expect(updateTripPublication(testDatabase.database, trip.id, {})).resolves.toMatchObject({
+      cover: { imageId: image.id, source: 'trip-stop-image' }
+    });
+    await expect(
+      getPublicTripBySlug(testDatabase.database, trip.slug, async (key) => `https://test/${key}`)
+    ).resolves.toMatchObject({ publication: { coverImage: { id: image.id } } });
+
+    await expect(
+      updateTripPublication(testDatabase.database, trip.id, { cover: null })
+    ).resolves.toMatchObject({ cover: null, status: 'published' });
+
+    const visitImage = await createVisitImage(testDatabase.database, {
+      createdAt: timestamp,
+      displayOrder: 0,
+      fullKey: 'visits/publication/full.jpg',
+      mimeType: 'image/jpeg',
+      originalName: 'publication.jpg',
+      thumbKey: 'visits/publication/thumb.jpg',
+      updatedAt: timestamp,
+      visitId: visit.id
+    });
+    await expect(
+      updateTripPublication(testDatabase.database, trip.id, {
+        cover: { imageId: visitImage.id, source: 'visit-image' }
+      })
+    ).resolves.toMatchObject({ cover: { imageId: visitImage.id, source: 'visit-image' } });
+    await expect(updateTripPublication(testDatabase.database, trip.id, {})).resolves.toMatchObject({
+      cover: { imageId: visitImage.id, source: 'visit-image' }
+    });
+    await expect(
+      getPublicTripBySlug(testDatabase.database, trip.slug, async (key) => `https://test/${key}`)
+    ).resolves.toMatchObject({
+      publication: {
+        coverImage: { id: visitImage.id }
+      }
+    });
+    await updateTripPublication(testDatabase.database, trip.id, { cover: null });
+    await testDatabase.client.execute({
+      sql: 'INSERT INTO trip_cover_images (trip_id, visit_image_id, trip_stop_image_id, updated_at) VALUES (?, NULL, ?, ?)',
+      args: [trip.id, image.id, timestamp]
+    });
+    await expect(
+      getPublicTripBySlug(testDatabase.database, trip.slug, async (key) => `https://test/${key}`)
+    ).resolves.toMatchObject({ publication: { coverImage: { id: image.id } } });
   });
 
   it('returns zero trip stop images when the database returns no count rows', async () => {
