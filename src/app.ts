@@ -48,6 +48,7 @@ import {
   listParkSearchEntries,
   listPublicParks,
   listPublishedDateRangeReviewShares,
+  listPublishedTripStories,
   listTrips,
   listVisits,
   listVisitsTimeline,
@@ -155,6 +156,7 @@ import {
   deleteTripStopRoute,
   getTripBySlugRoute,
   getTripRoute,
+  listTripStoriesRoute,
   listTripsRoute,
   reorderTripStopImagesRoute,
   updateTripPublicationRoute,
@@ -1258,6 +1260,12 @@ export const createApp = ({
       const trips = await listTrips(database);
 
       return context.json({ trips }, 200);
+    });
+
+    app.openapi(listTripStoriesRoute, async (context) => {
+      const stories = await listPublishedTripStories(database, getImagePublicUrl);
+      context.header('Cache-Control', PRIVATE_CACHE_CONTROL);
+      return context.json({ stories }, 200);
     });
 
     app.openapi(getDateRangeReviewPreviewRoute, async (context) => {

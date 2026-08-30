@@ -28,7 +28,7 @@ Every route must fit one explicit access class:
 Rules:
 
 - Do not describe a route as public unless it is anonymously accessible over the network.
-- Frontend-facing `GET` routes such as `/api/home-summary`, `/api/map-summary`, `/api/trips`, `/api/trips/slug/:slug`, `/api/trips/:id`, `/api/visits-timeline`, `/api/date-range-review/shares/:shareId`, and `/api/year-review/shares/:shareId` still require the API key outside localhost, while admin routes require a valid admin session.
+- Frontend-facing `GET` routes such as `/api/home-summary`, `/api/map-summary`, `/api/trips`, `/api/trip-stories`, `/api/trips/slug/:slug`, `/api/trips/:id`, `/api/visits-timeline`, `/api/date-range-review/shares/:shareId`, and `/api/year-review/shares/:shareId` still require the API key outside localhost, while admin routes require a valid admin session.
 - New anonymously accessible routes must define cache policy, abuse controls, and the reason they are safe to expose.
 - Removing an unused admin endpoint is preferred over leaving it available behind auth.
 

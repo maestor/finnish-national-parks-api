@@ -15,6 +15,7 @@ import {
   tripPublicationSchema,
   tripSchema,
   tripStopSchema,
+  tripStoryListResponseSchema,
   updateTripPublicationRequestSchema,
   updateTripRequestSchema,
   updateTripStopRequestSchema,
@@ -70,6 +71,19 @@ export const listTripsRoute = createRoute({
     },
     304: {
       description: 'Trip list not modified'
+    }
+  }
+});
+
+export const listTripStoriesRoute = createRoute({
+  method: 'get',
+  path: '/api/trip-stories',
+  tags: ['Trips'],
+  security: [{ bearerAuth: [] }],
+  responses: {
+    200: {
+      description: 'Published trip stories',
+      content: { 'application/json': { schema: tripStoryListResponseSchema } }
     }
   }
 });

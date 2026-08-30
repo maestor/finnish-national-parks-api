@@ -343,8 +343,32 @@ export const publicTripItineraryEntrySchema = z.union([
 export const publicTripDetailSchema = tripSchema.extend({
   imageCount: z.number().int(),
   itinerary: z.array(publicTripItineraryEntrySchema),
+  publication: tripPublicationSchema.extend({ coverImage: visitImageSchema.nullable() }),
   route: publicTripRouteStateSchema,
   stopCount: z.number().int()
+});
+
+export const tripStorySeasonSchema = z.enum(['autumn', 'spring', 'summer', 'winter']);
+
+export const tripStorySummarySchema = z.object({
+  coverImage: visitImageSchema.nullable(),
+  dateRange: tripDateRangeSchema.nullable(),
+  featured: z.boolean(),
+  imageCount: z.number().int(),
+  name: z.string(),
+  places: z.array(z.object({ name: z.string(), slug: z.string() })),
+  publishedAt: z.string().datetime(),
+  seasons: z.array(tripStorySeasonSchema),
+  slug: z.string(),
+  stopCount: z.number().int(),
+  summary: z.string().nullable(),
+  updatedAt: z.string().datetime(),
+  visitCount: z.number().int(),
+  years: z.array(z.number().int())
+});
+
+export const tripStoryListResponseSchema = z.object({
+  stories: z.array(tripStorySummarySchema)
 });
 
 export const visitWithParkSchema = visitSchema.extend({

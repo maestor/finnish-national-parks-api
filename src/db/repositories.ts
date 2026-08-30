@@ -2475,6 +2475,140 @@ export const listTrips = async (database: Database) => {
   return rows.map((row) => toTrip(row));
 };
 
+export const listPublishedTripStories = async (
+  database: Database,
+  getImagePublicUrl: (key: string) => Promise<string>
+) => {
+  const tripRows = (await listTripRows(database)).filter((row) => row.publishedAt !== null);
+  const [visitRows, stopRows, visitImageRows, stopImageRows, coverRows] = await Promise.all([
+    database
+      .select({
+        parkName: parks.name,
+        parkSlug: parks.slug,
+        tripId: parkVisits.tripId,
+        visitedOn: parkVisits.visitedOn
+      })
+      .from(parkVisits)
+      .innerJoin(parks, eq(parkVisits.parkId, parks.id))
+      .where(and(eq(parks.removed, false), sql`${parkVisits.tripId} IS NOT NULL`)),
+    database.query.tripStops.findMany(),
+    database
+      .select({
+        createdAt: visitImages.createdAt,
+        displayOrder: visitImages.displayOrder,
+        fullHeight: visitImages.fullHeight,
+        fullKey: visitImages.fullKey,
+        fullWidth: visitImages.fullWidth,
+        id: visitImages.id,
+        originalName: visitImages.originalName,
+        thumbHeight: visitImages.thumbHeight,
+        thumbKey: visitImages.thumbKey,
+        thumbWidth: visitImages.thumbWidth,
+        tripId: parkVisits.tripId
+      })
+      .from(visitImages)
+      .innerJoin(parkVisits, eq(visitImages.visitId, parkVisits.id))
+      .innerJoin(parks, eq(parkVisits.parkId, parks.id))
+      .where(and(eq(parks.removed, false), sql`${parkVisits.tripId} IS NOT NULL`)),
+    database
+      .select({
+        createdAt: tripStopImages.createdAt,
+        displayOrder: tripStopImages.displayOrder,
+        fullHeight: tripStopImages.fullHeight,
+        fullKey: tripStopImages.fullKey,
+        fullWidth: tripStopImages.fullWidth,
+        id: tripStopImages.id,
+        originalName: tripStopImages.originalName,
+        thumbHeight: tripStopImages.thumbHeight,
+        thumbKey: tripStopImages.thumbKey,
+        thumbWidth: tripStopImages.thumbWidth,
+        tripId: tripStops.tripId
+      })
+      .from(tripStopImages)
+      .innerJoin(tripStops, eq(tripStopImages.tripStopId, tripStops.id)),
+    database.query.tripCoverImages.findMany()
+  ]);
+
+  return Promise.all(
+    tripRows
+      .sort(
+        (a, b) =>
+          (b.endVisitedOn ?? '').localeCompare(a.endVisitedOn ?? '') ||
+          (b.publishedAt ?? '').localeCompare(a.publishedAt ?? '') ||
+          a.name.localeCompare(b.name, 'fi-FI')
+      )
+      .map(async (trip) => {
+        const visits = visitRows.filter((visit) => visit.tripId === trip.id);
+        const stops = stopRows.filter((stop) => stop.tripId === trip.id);
+        const dates = [
+          ...visits.map((visit) => visit.visitedOn),
+          ...stops.map((stop) => stop.visitedOn)
+        ].sort();
+        const seasons = [...new Set(dates.map(getSeasonFromVisitedOn))].sort();
+        const years = [...new Set(dates.map((date) => Number(date.slice(0, 4))))].sort(
+          (a, b) => b - a
+        );
+        const places = [
+          ...new Map(
+            visits.map((visit) => [visit.parkSlug, { name: visit.parkName, slug: visit.parkSlug }])
+          ).values()
+        ].sort((a, b) => a.name.localeCompare(b.name, 'fi-FI'));
+        const cover = coverRows.find((row) => row.tripId === trip.id);
+        const coverSource = cover?.visitImageId
+          ? visitImageRows.find(
+              (image) => image.id === cover.visitImageId && image.tripId === trip.id
+            )
+          : cover?.tripStopImageId
+            ? stopImageRows.find(
+                (image) => image.id === cover.tripStopImageId && image.tripId === trip.id
+              )
+            : undefined;
+
+        return {
+          coverImage: coverSource ? await toVisitImage(coverSource, getImagePublicUrl) : null,
+          dateRange:
+            trip.startVisitedOn && trip.endVisitedOn
+              ? { end: trip.endVisitedOn, start: trip.startVisitedOn }
+              : null,
+          featured: trip.featuredAt !== null,
+          imageCount:
+            visitImageRows.filter((image) => image.tripId === trip.id).length +
+            stopImageRows.filter((image) => image.tripId === trip.id).length,
+          name: trip.name,
+          places,
+          publishedAt: trip.publishedAt!,
+          seasons,
+          slug: trip.slug,
+          stopCount: stops.length,
+          summary: trip.summary,
+          updatedAt: trip.updatedAt,
+          visitCount: visits.length,
+          years
+        };
+      })
+  );
+};
+
+const getTripCoverImage = async (
+  database: Database,
+  tripId: number,
+  getImagePublicUrl: (key: string) => Promise<string>
+) => {
+  const cover = await database.query.tripCoverImages.findFirst({
+    where: eq(tripCoverImages.tripId, tripId)
+  });
+  if (!cover) return null;
+
+  const image = cover.visitImageId
+    ? await database.query.visitImages.findFirst({ where: eq(visitImages.id, cover.visitImageId) })
+    : cover.tripStopImageId
+      ? await database.query.tripStopImages.findFirst({
+          where: eq(tripStopImages.id, cover.tripStopImageId)
+        })
+      : null;
+  return image ? toVisitImage(image, getImagePublicUrl) : null;
+};
+
 export const getTripById = async (
   database: Database,
   tripId: number,
@@ -2503,7 +2637,6 @@ export const getTripById = async (
       toTripItineraryStopEntry(row, tripStopImagesByTripStopId.get(row.id))
     )
   ].sort((a, b) => a.tripStopOrder - b.tripStopOrder);
-
   return {
     ...toTrip(trip),
     itinerary
@@ -2539,6 +2672,7 @@ export const getPublicTripBySlug = async (
       toTripItineraryStopEntry(row, tripStopImagesByTripStopId.get(row.id))
     )
   ].sort((a, b) => a.tripStopOrder - b.tripStopOrder);
+  const coverImage = await getTripCoverImage(database, tripRecord.id, getImagePublicUrl);
 
   return {
     ...toTrip(trip),
@@ -2549,6 +2683,7 @@ export const getPublicTripBySlug = async (
         0
       ),
     itinerary,
+    publication: { ...toTrip(trip).publication, coverImage },
     stopCount: tripStopRows.length
   };
 };

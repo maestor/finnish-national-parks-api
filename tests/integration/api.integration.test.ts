@@ -248,6 +248,62 @@ describe('API routes', () => {
     };
   };
 
+  it('lists only published trip stories with derived itinerary summary fields', async () => {
+    const app = createAuthedApp();
+    const unpublished = await createTrip(app, {
+      name: 'Julkaisematon retki',
+      slug: 'julkaisematon-retki'
+    });
+    const published = await createTrip(app, { name: 'Julkaistu retki', slug: 'julkaistu-retki' });
+
+    await createVisit(app, 'akasmannyn-kansallispuisto', {
+      tripId: published.body.id,
+      tripStopOrder: 1,
+      visitedOn: '2026-07-12'
+    });
+    const publicationResponse = await requestAsAdmin(
+      app,
+      `/api/trips/${published.body.id}/publication`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify({
+          status: 'published',
+          featured: true,
+          summary: 'Kesäinen retkitarina'
+        }),
+        headers: { 'content-type': 'application/json' }
+      }
+    );
+    const response = await app.request('/api/trip-stories');
+    const body = (await response.json()) as {
+      stories: Array<{
+        featured: boolean;
+        name: string;
+        places: Array<{ slug: string }>;
+        seasons: string[];
+        summary: string | null;
+        visitCount: number;
+        years: number[];
+      }>;
+    };
+
+    expect(publicationResponse.status).toBe(200);
+    expect(response.status).toBe(200);
+    expect(response.headers.get('cache-control')).toBe('private, no-store');
+    expect(body.stories).toHaveLength(1);
+    expect(body.stories[0]).toMatchObject({
+      featured: true,
+      name: 'Julkaistu retki',
+      places: [{ slug: 'akasmannyn-kansallispuisto' }],
+      seasons: ['summer'],
+      summary: 'Kesäinen retkitarina',
+      visitCount: 1,
+      years: [2026]
+    });
+    expect(body.stories.find((story) => story.name === 'Julkaisematon retki')).toBeUndefined();
+    expect(unpublished.body.id).not.toBe(published.body.id);
+  });
+
   it('serves the public park list without boundary geometry and with cache validators', async () => {
     const app = createAuthedApp();
     const response = await app.request('/api/parks');
