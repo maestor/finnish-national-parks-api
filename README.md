@@ -2,7 +2,7 @@
 
 A local-first TypeScript API for Finnish park and outdoor-area catalog data and personal visit tracking.
 
-The API imports selected park and outdoor-area data from the open LIPAS API into an owned SQLite/libSQL database, then serves it for a future personal map application where places can have notes and visit history.
+The API imports selected park and outdoor-area data from the open LIPAS API into an owned SQLite/libSQL database, then serves it to the paired [Reissuvihko UI](https://github.com/maestor/finnish-national-parks-ui), where places can have notes and visit history.
 
 ## Goals
 
@@ -93,6 +93,8 @@ Production notes:
 The importer's LIPAS source URL and supported type-code list are internal configuration, not a normal `.env` setting.
 
 ## API Shape
+
+The paired UI presents catalog and visit `GET` data publicly to end users without login. Direct backend access is a separate boundary: outside localhost, `/api/*` routes generally require the server-side `API_KEY`; `GET /health`, `GET /openapi.json`, and `GET /assets/logos/*` are anonymous backend reads, while `/auth/*` is anonymous login control flow. The Zod/OpenAPI definitions in this repository are the contract source of truth for the frontend's generated types.
 
 - `GET /health`
 - `GET /openapi.json`

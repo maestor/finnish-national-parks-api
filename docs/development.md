@@ -28,7 +28,8 @@ The deployment guardrail test for this lives in `tests/integration/vercel-entry.
 
 ## Security And Sustainability Baseline
 
-- Route naming is not the auth policy. Frontend-facing `GET` routes still require the API key outside localhost when `API_KEY` is configured, including `GET /api/year-review/shares/:shareId` for server-rendered share pages.
+- Route naming is not the auth policy. Catalog and visit `GET` data is public from an end-user perspective when accessed through the Reissuvihko UI, but the backend remains a separate API boundary: frontend-facing `/api/*` routes generally require the server-side API key outside localhost when `API_KEY` is configured, including `GET /api/year-review/shares/:shareId` for server-rendered share pages.
+- `GET /health`, `GET /openapi.json`, and `GET /assets/logos/*` are the anonymous backend reads today. `/auth/*` is anonymous login control flow, not anonymous data access. The public UI can expose catalog and visit data without login because it calls the backend through its server-side API-key boundary. Do not describe other backend routes as anonymously public unless middleware and tests prove that policy.
 - Do not expose the shared `API_KEY` in browser-delivered code.
 - All write routes and `GET /api/admin/parks/visibility` should stay admin-session protected.
 - When adding or changing an env var, update `src/env.ts`, `.env.example`, `README.md`, and the relevant docs in the same change.
@@ -47,6 +48,11 @@ The deployment guardrail test for this lives in `tests/integration/vercel-entry.
 - Ensure focused verification is complete before requesting review, then run and pass `npm run verify` after user acceptance and before the PR-ready handoff.
 - User review and explicit acceptance are required before merging.
 - Do not push directly to `main`.
+
+### Paired UI/API changes
+
+- The companion frontend repository is [finnish-national-parks-ui](https://github.com/maestor/finnish-national-parks-ui). Keep the backend contract source, generated OpenAPI, runtime handlers, and integration tests aligned here before updating frontend consumers.
+- For cross-repository work, use matching branch suffixes but separate Git histories, commits, and pull requests. Run focused checks during implementation, pause for review, then run `npm run verify` after acceptance in each affected repository. Cross-link dependent pull requests and document merge order.
 
 ## Environment
 
@@ -295,7 +301,7 @@ Key route behavior:
 - `POST /api/parks/:slug/visits` and `PATCH /api/visits/:id` accept `tripId`, with `null` clearing an existing trip assignment, plus optional `tripStopOrder` for explicit stop ordering inside a named trip and optional `excludeFromRoute` when a visit should remain visible without participating in route generation.
 - Timeline and visit list responses expose `tripStopOrder`, and same-day visits from the same trip use that field to preserve the real stop sequence instead of sorting by entry creation time.
 - Auth routes (`/auth/*`) bypass API key authentication so the OAuth flow can complete without a bearer token.
-- `GET /health` and `GET /openapi.json` are the only anonymous data endpoints.
+- `GET /health`, `GET /openapi.json`, and `GET /assets/logos/*` are the anonymous backend read endpoints.
 - `/auth/*` routes are anonymous control-flow endpoints for login, not anonymous data endpoints.
 - All `/api/*` endpoints currently require the API key outside localhost unless they use admin-session auth instead.
 - Image routes are only registered when R2 credentials (or `MEMORY_STORAGE=true`) are configured.
