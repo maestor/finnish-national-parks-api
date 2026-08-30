@@ -45,6 +45,13 @@ This repository is a local-first TypeScript API that imports Finnish park, prote
 - Do not describe a route as public in docs unless middleware and tests prove anonymous remote access.
 - New anonymously accessible endpoints must define cache policy, abuse-control expectations, and the reason they are safe to expose without API-key or session auth.
 
+## Cross-Repository Reissuvihko Workflow
+- The companion frontend repository is `finnish-national-parks-ui` ([GitHub](https://github.com/maestor/finnish-national-parks-ui)). This repository owns Zod/OpenAPI schemas, persistence, authentication policy, imports, caching, storage, and API runtime behavior; the frontend owns UI, browser behavior, translations, proxy routes, and generated API consumers.
+- For a task that may affect both repositories, classify the scope first, read both repositories' `AGENTS.md` and relevant development/testing docs, and keep one combined plan with explicit ownership per step.
+- Change the contract source here first, then have the frontend regenerate `src/lib/api-types.ts`, update consumers and fixtures, and verify runtime behavior in both repositories. Generated frontend API types must not be hand-edited.
+- Use matching branch suffixes in the two repositories while keeping separate Git histories, commits, and pull requests. Cross-link the pull requests and state the merge or deployment order when one depends on the other.
+- Use focused checks during implementation, pause for user review, then run `npm run verify` after acceptance in every affected repository before committing and pushing.
+
 ## Security And Sustainability Rules
 - Prefer owned data and local verification over new live third-party request-path dependencies. If a live dependency is necessary, document its timeout, caching, and failure behavior.
 - Never expose the shared `API_KEY` in browser-delivered code.
