@@ -688,5 +688,24 @@ export const baseSpecialParkConfigs: SpecialParkConfig[] = [
       'Isokankaan luonnonsuojelualue'
     ]),
     syntheticLipasId: 9_001_041
+  },
+  {
+    displayTypeName: null,
+    extractMetadata: extractLuontoonDestinationMetadata,
+    locationLabel: 'Käsivarrentie 14145',
+    markerPoint: {
+      lat: 69.03868956629405,
+      lon: 20.84524850154123
+    },
+    parkUrl: 'https://www.luontoon.fi/fi/kohteet/saana-ja-kilpisjarvi',
+    name: 'Saana ja Kilpisjärvi',
+    parkTypeSlug: 'hiking-area',
+    postalCode: '99490',
+    postalOffice: 'Kilpisjärvi',
+    responseShapeVersion: 'luontoon-destination-area-v1',
+    slug: 'saana-ja-kilpisjarvi',
+    sourceParser: 'geojson',
+    sourceUrl: 'special://saana-ja-kilpisjarvi',
+    syntheticLipasId: 9_002_052
   }
 ];

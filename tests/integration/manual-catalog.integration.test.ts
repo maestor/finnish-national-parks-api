@@ -55,7 +55,7 @@ describe('manual catalog imports', () => {
       now: () => '2026-05-27T08:00:00.000Z'
     });
 
-    expect(result.results).toHaveLength(155);
+    expect(result.results).toHaveLength(156);
 
     const merenkurkku = await getParkBySlug(
       testDatabase.database,
@@ -320,6 +320,25 @@ describe('manual catalog imports', () => {
     });
     expect(paistjarvi?.boundaryGeoJson?.features).toHaveLength(1);
     expect(paistjarvi?.boundaryGeoJson?.features[0]?.geometry.type).toBe('Polygon');
+
+    const saanaJaKilpisjarvi = await getParkBySlug(testDatabase.database, 'saana-ja-kilpisjarvi');
+    expect(saanaJaKilpisjarvi).toMatchObject({
+      address: 'Käsivarrentie 14145, 99490 Kilpisjärvi',
+      lipasId: 9002052,
+      locationLabel: 'Käsivarrentie 14145',
+      name: 'Saana ja Kilpisjärvi',
+      parkUrl: 'https://www.luontoon.fi/fi/kohteet/saana-ja-kilpisjarvi',
+      postalCode: '99490',
+      postalOffice: 'Kilpisjärvi',
+      type: { slug: 'hiking-area' }
+    });
+    expect(saanaJaKilpisjarvi?.areaKm2).toBe(34.15);
+    expect(saanaJaKilpisjarvi?.markerPoint).toEqual({
+      lat: 69.03868956629405,
+      lon: 20.84524850154123
+    });
+    expect(saanaJaKilpisjarvi?.boundaryGeoJson?.features).toHaveLength(1);
+    expect(saanaJaKilpisjarvi?.boundaryGeoJson?.features[0]?.geometry.type).toBe('Polygon');
 
     const kalajoenHiekkasarkat = await getParkBySlug(
       testDatabase.database,
@@ -1342,7 +1361,7 @@ describe('manual catalog imports', () => {
     );
     const kevo = await getParkBySlug(testDatabase.database, 'kevon-luonnonpuisto');
 
-    expect(allParks).toHaveLength(155);
+    expect(allParks).toHaveLength(156);
     expect(merenkurkku).toMatchObject({ catalogStatus: 'active' });
     expect(kevo).toMatchObject({ catalogStatus: 'active' });
   });
@@ -1419,7 +1438,7 @@ describe('manual catalog imports', () => {
       database: testDatabase.database
     });
 
-    expect(result.results).toHaveLength(155);
+    expect(result.results).toHaveLength(156);
 
     const merenkurkku = await getParkBySlug(
       testDatabase.database,
@@ -1713,7 +1732,7 @@ describe('manual catalog imports', () => {
       now: () => '2026-05-27T08:00:00.000Z'
     });
 
-    expect(result.results).toHaveLength(155);
+    expect(result.results).toHaveLength(156);
   });
 
   it('fails clearly when a selected special-park slug is unknown', async () => {
