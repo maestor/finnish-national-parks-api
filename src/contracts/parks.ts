@@ -134,8 +134,33 @@ export const visitImageSchema = z.object({
 export const visitTripSchema = z.object({
   id: z.number().int(),
   name: z.string(),
+  published: z.boolean(),
   slug: z.string()
 });
+
+export const tripCoverReferenceSchema = z.union([
+  z.object({ imageId: z.number().int().positive(), source: z.literal('visit-image') }),
+  z.object({ imageId: z.number().int().positive(), source: z.literal('trip-stop-image') })
+]);
+
+export const tripPublicationSchema = z.object({
+  cover: tripCoverReferenceSchema.nullable(),
+  featured: z.boolean(),
+  publishedAt: z.string().datetime().nullable(),
+  status: z.enum(['unlisted', 'published']),
+  summary: z.string().nullable()
+});
+
+export const updateTripPublicationRequestSchema = z
+  .object({
+    cover: tripCoverReferenceSchema.nullable().optional(),
+    featured: z.boolean().optional(),
+    status: z.enum(['unlisted', 'published']).optional(),
+    summary: z.string().trim().max(320).nullable().optional()
+  })
+  .refine((input) => Object.keys(input).length > 0, {
+    message: 'Provide at least one publication field to update.'
+  });
 
 export const tripDateRangeSchema = z.object({
   end: visitDateSchema,
@@ -148,6 +173,7 @@ export const tripSchema = z.object({
   description: z.string().nullable(),
   id: z.number().int(),
   name: z.string(),
+  publication: tripPublicationSchema,
   slug: z.string(),
   startingPoint: labeledPointSchema.nullable(),
   updatedAt: z.string().datetime(),

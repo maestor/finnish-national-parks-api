@@ -65,6 +65,7 @@ import {
   updateParkRemoved,
   updatePublishedDateRangeReviewShareByShareId,
   updateTrip,
+  updateTripPublication,
   updateTripStop,
   updateVisit
 } from './db/repositories.js';
@@ -156,6 +157,7 @@ import {
   getTripRoute,
   listTripsRoute,
   reorderTripStopImagesRoute,
+  updateTripPublicationRoute,
   updateTripRoute,
   updateTripStopRoute,
   uploadTripStopImagesRoute
@@ -1994,6 +1996,33 @@ export const createApp = ({
       }
 
       return context.json(trip, 200);
+    });
+
+    app.openapi(updateTripPublicationRoute, async (context) => {
+      context.header('Cache-Control', PRIVATE_CACHE_CONTROL);
+      const authFailure = await requireAdminSession(context, auth);
+
+      if (authFailure) {
+        return authFailure;
+      }
+
+      const { id } = context.req.valid('param');
+      const body = context.req.valid('json');
+
+      try {
+        const publication = await updateTripPublication(database, id, body);
+        if (!publication) {
+          return context.json(jsonNotFound('Trip not found.'), 404);
+        }
+
+        return context.json(publication, 200);
+      } catch (error) {
+        if (error instanceof RepositoryValidationError) {
+          return context.json({ error: error.message }, 422);
+        }
+
+        throw error;
+      }
     });
 
     app.openapi(updateTripStopRoute, async (context) => {

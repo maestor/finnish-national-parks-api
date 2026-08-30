@@ -12,12 +12,47 @@ import {
   reorderVisitImagesRequestSchema,
   tripDetailSchema,
   tripListResponseSchema,
+  tripPublicationSchema,
   tripSchema,
   tripStopSchema,
+  updateTripPublicationRequestSchema,
   updateTripRequestSchema,
   updateTripStopRequestSchema,
   visitImageSchema
 } from '../contracts/parks.js';
+
+export const updateTripPublicationRoute = createRoute({
+  method: 'patch',
+  path: '/api/trips/{id}/publication',
+  tags: ['Trips'],
+  security: [{ bearerAuth: [], sessionAuth: [] }],
+  request: {
+    params: z.object({ id: z.coerce.number().int() }),
+    body: { content: { 'application/json': { schema: updateTripPublicationRequestSchema } } }
+  },
+  responses: {
+    200: {
+      description: 'Updated trip publication metadata',
+      content: { 'application/json': { schema: tripPublicationSchema } }
+    },
+    404: {
+      description: 'Trip or cover image was not found',
+      content: { 'application/json': { schema: errorSchema } }
+    },
+    422: {
+      description: 'Publication metadata was invalid',
+      content: { 'application/json': { schema: errorSchema } }
+    },
+    401: {
+      description: 'Admin session required',
+      content: { 'application/json': { schema: errorSchema } }
+    },
+    503: {
+      description: 'OAuth not configured',
+      content: { 'application/json': { schema: errorSchema } }
+    }
+  }
+});
 
 export const listTripsRoute = createRoute({
   method: 'get',

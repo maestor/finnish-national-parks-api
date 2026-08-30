@@ -22,6 +22,7 @@ import {
   parkTypes,
   parkVisits,
   publicDataVersions,
+  tripCoverImages,
   tripStopImages,
   tripStops,
   trips,
@@ -93,6 +94,13 @@ type UpdateTripInput = {
       }
     | null
     | undefined;
+};
+
+type UpdateTripPublicationInput = {
+  cover?: { imageId: number; source: 'visit-image' | 'trip-stop-image' } | null | undefined;
+  featured?: boolean | undefined;
+  status?: 'unlisted' | 'published' | undefined;
+  summary?: string | null | undefined;
 };
 
 type PutTripStopInput = {
@@ -230,6 +238,7 @@ type TypedParkRow = {
 type TripReference = {
   id: number;
   name: string;
+  published: boolean;
   slug: string;
 };
 
@@ -244,6 +253,9 @@ type TripRow = {
   endVisitedOn: string | null;
   id: number;
   name: string;
+  publishedAt: string | null;
+  featuredAt: string | null;
+  summary: string | null;
   slug: string;
   startingPointLabel: string | null;
   startingPointLat: number | null;
@@ -370,6 +382,7 @@ type VisitTimelineRow = {
   route: string | null;
   tripId: number | null;
   tripName: string | null;
+  tripPublished: number | null;
   tripSlug: string | null;
   tripStopOrder: number | null;
   typeName: string;
@@ -961,6 +974,7 @@ const toTripReference = (row: typeof trips.$inferSelect): TripReference => {
   return {
     id: row.id,
     name: row.name,
+    published: row.publishedAt !== null,
     slug: row.slug
   };
 };
@@ -978,6 +992,13 @@ const toTrip = (row: TripRow) => {
     description: row.description,
     id: row.id,
     name: row.name,
+    publication: {
+      cover: null,
+      featured: row.featuredAt !== null,
+      publishedAt: row.publishedAt,
+      status: (row.publishedAt === null ? 'unlisted' : 'published') as 'unlisted' | 'published',
+      summary: row.summary
+    },
     slug: row.slug,
     startingPoint: toTripStartingPoint(row),
     updatedAt: row.updatedAt,
@@ -1590,7 +1611,10 @@ const listTripRows = async (database: Database): Promise<TripRow[]> => {
       END`,
       id: trips.id,
       name: trips.name,
+      publishedAt: trips.publishedAt,
+      featuredAt: trips.featuredAt,
       slug: trips.slug,
+      summary: trips.summary,
       startingPointLabel: trips.startingPointLabel,
       startingPointLat: trips.startingPointLat,
       startingPointLon: trips.startingPointLon,
@@ -1710,6 +1734,7 @@ const listVisitTimelineRows = async (database: Database): Promise<VisitTimelineR
       route: parkVisits.route,
       tripId: trips.id,
       tripName: trips.name,
+      tripPublished: sql<number | null>`${trips.publishedAt} IS NOT NULL`,
       tripSlug: trips.slug,
       tripStopOrder: parkVisits.tripStopOrder,
       typeName: parkTypes.name,
@@ -2772,6 +2797,7 @@ export const listVisitsTimeline = async (database: Database) => {
         : {
             id: visit.tripId,
             name: visit.tripName,
+            published: Boolean(visit.tripPublished),
             slug: visit.tripSlug
           },
     tripStopOrder: visit.tripStopOrder,
@@ -2800,6 +2826,7 @@ export const listYearReviewTimelineVisits = async (database: Database) => {
         : {
             id: visit.tripId,
             name: visit.tripName,
+            published: Boolean(visit.tripPublished),
             slug: visit.tripSlug
           },
     tripStopOrder: visit.tripStopOrder,
@@ -2839,11 +2866,14 @@ export const createTrip = async (database: Database, input: PutTripInput) => {
       .values({
         createdAt: timestamp,
         description: normalizeOptionalText(input.description),
+        featuredAt: null,
         name,
+        publishedAt: null,
         slug,
         startingPointLabel: startingPoint?.label ?? null,
         startingPointLat: startingPoint?.lat ?? null,
         startingPointLon: startingPoint?.lon ?? null,
+        summary: null,
         updatedAt: timestamp
       })
       .returning()
@@ -2857,6 +2887,9 @@ export const createTrip = async (database: Database, input: PutTripInput) => {
     endVisitedOn: null,
     id: row.id,
     name: row.name,
+    publishedAt: null,
+    featuredAt: null,
+    summary: null,
     slug: row.slug,
     startingPointLabel: row.startingPointLabel,
     startingPointLat: row.startingPointLat,
@@ -3296,6 +3329,101 @@ export const updateTrip = async (database: Database, tripId: number, input: Upda
   const row = (await listTripRows(database)).find((trip) => trip.id === tripId)!;
 
   return toTrip(row);
+};
+
+export const updateTripPublication = async (
+  database: Database,
+  tripId: number,
+  input: UpdateTripPublicationInput
+) => {
+  return database.transaction(async (tx) => {
+    const trip = await getTripRecordById(tx, tripId);
+
+    if (!trip) {
+      return null;
+    }
+
+    const currentCover =
+      (await tx.select().from(tripCoverImages).where(eq(tripCoverImages.tripId, tripId)))[0] ??
+      null;
+    const publishedAt =
+      input.status === undefined
+        ? trip.publishedAt
+        : input.status === 'published'
+          ? new Date().toISOString()
+          : null;
+    const featured = input.featured ?? trip.featuredAt !== null;
+
+    if (featured && publishedAt === null) {
+      throw new RepositoryValidationError('An unlisted trip cannot be featured.');
+    }
+
+    if (input.cover?.source === 'visit-image') {
+      const image = await tx
+        .select({ id: visitImages.id })
+        .from(visitImages)
+        .innerJoin(parkVisits, eq(visitImages.visitId, parkVisits.id))
+        .where(and(eq(visitImages.id, input.cover.imageId), eq(parkVisits.tripId, tripId)));
+      if (image.length === 0) {
+        throw new RepositoryValidationError('Cover image does not belong to this trip.');
+      }
+    }
+
+    if (input.cover?.source === 'trip-stop-image') {
+      const image = await tx
+        .select({ id: tripStopImages.id })
+        .from(tripStopImages)
+        .innerJoin(tripStops, eq(tripStopImages.tripStopId, tripStops.id))
+        .where(and(eq(tripStopImages.id, input.cover.imageId), eq(tripStops.tripId, tripId)));
+      if (image.length === 0) {
+        throw new RepositoryValidationError('Cover image does not belong to this trip.');
+      }
+    }
+
+    const timestamp = new Date().toISOString();
+    if (featured) {
+      await tx.update(trips).set({ featuredAt: null }).where(sql`${trips.featuredAt} IS NOT NULL`);
+    }
+
+    await tx
+      .update(trips)
+      .set({
+        featuredAt: featured ? timestamp : null,
+        publishedAt,
+        summary: input.summary === undefined ? trip.summary : normalizeOptionalText(input.summary),
+        updatedAt: timestamp
+      })
+      .where(eq(trips.id, tripId));
+
+    if (input.cover !== undefined) {
+      await tx.delete(tripCoverImages).where(eq(tripCoverImages.tripId, tripId));
+      if (input.cover) {
+        await tx.insert(tripCoverImages).values({
+          tripId,
+          tripStopImageId: input.cover.source === 'trip-stop-image' ? input.cover.imageId : null,
+          updatedAt: timestamp,
+          visitImageId: input.cover.source === 'visit-image' ? input.cover.imageId : null
+        });
+      }
+    }
+
+    await bumpPublicVisitDataVersion(tx, timestamp);
+
+    return {
+      cover:
+        input.cover === undefined
+          ? currentCover?.visitImageId
+            ? { imageId: currentCover.visitImageId, source: 'visit-image' as const }
+            : currentCover?.tripStopImageId
+              ? { imageId: currentCover.tripStopImageId, source: 'trip-stop-image' as const }
+              : null
+          : input.cover,
+      featured,
+      publishedAt,
+      status: publishedAt === null ? ('unlisted' as const) : ('published' as const),
+      summary: input.summary === undefined ? trip.summary : normalizeOptionalText(input.summary)
+    };
+  });
 };
 
 export const updateTripStop = async (

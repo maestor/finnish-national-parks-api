@@ -33,6 +33,7 @@ describe('migrateDatabase', () => {
     const tripColumns = await client.execute('PRAGMA table_info(trips)');
     const tripStopColumns = await client.execute('PRAGMA table_info(trip_stops)');
     const tripVisitColumns = await client.execute('PRAGMA table_info(park_visits)');
+    const tripCoverColumns = await client.execute('PRAGMA table_info(trip_cover_images)');
     const publicDataVersionColumns = await client.execute(
       'PRAGMA table_info(public_data_versions)'
     );
@@ -66,7 +67,8 @@ describe('migrateDatabase', () => {
       '0025_park_magnets.sql',
       '0026_year_review_shares.sql',
       '0027_date_range_review_shares.sql',
-      '0028_trip_stop_display_name.sql'
+      '0028_trip_stop_display_name.sql',
+      '0029_trip_publication.sql'
     ]);
     expect(parkTypes.rows.map((row) => String(row.slug))).toEqual([
       'outdoor-recreation-area',
@@ -107,6 +109,14 @@ describe('migrateDatabase', () => {
     expect(tripColumns.rows.some((row) => String(row.name) === 'starting_point_label')).toBe(true);
     expect(tripColumns.rows.some((row) => String(row.name) === 'starting_point_lat')).toBe(true);
     expect(tripColumns.rows.some((row) => String(row.name) === 'starting_point_lon')).toBe(true);
+    expect(tripColumns.rows.some((row) => String(row.name) === 'summary')).toBe(true);
+    expect(tripColumns.rows.some((row) => String(row.name) === 'published_at')).toBe(true);
+    expect(tripColumns.rows.some((row) => String(row.name) === 'featured_at')).toBe(true);
+    expect(tripCoverColumns.rows.some((row) => String(row.name) === 'trip_id')).toBe(true);
+    expect(tripCoverColumns.rows.some((row) => String(row.name) === 'visit_image_id')).toBe(true);
+    expect(tripCoverColumns.rows.some((row) => String(row.name) === 'trip_stop_image_id')).toBe(
+      true
+    );
     expect(tripStopColumns.rows.some((row) => String(row.name) === 'trip_id')).toBe(true);
     expect(tripStopColumns.rows.some((row) => String(row.name) === 'trip_stop_order')).toBe(true);
     expect(tripStopColumns.rows.some((row) => String(row.name) === 'visited_on')).toBe(true);
@@ -166,7 +176,8 @@ describe('migrateDatabase', () => {
       '0025_park_magnets.sql',
       '0026_year_review_shares.sql',
       '0027_date_range_review_shares.sql',
-      '0028_trip_stop_display_name.sql'
+      '0028_trip_stop_display_name.sql',
+      '0029_trip_publication.sql'
     ]);
     expect(schemaMigrationTableBeforeApply.rows).toEqual([]);
     expect(pendingAfterApply).toEqual([]);

@@ -95,6 +95,9 @@ export const trips = sqliteTable(
     name: text('name').notNull(),
     slug: text('slug').notNull(),
     description: text('description'),
+    summary: text('summary'),
+    publishedAt: text('published_at'),
+    featuredAt: text('featured_at'),
     startingPointLabel: text('starting_point_label'),
     startingPointLat: real('starting_point_lat'),
     startingPointLon: real('starting_point_lon'),
@@ -214,6 +217,19 @@ export const tripStopImages = sqliteTable(
     tripStopIdIndex: index('trip_stop_images_trip_stop_id_idx').on(table.tripStopId)
   })
 );
+
+export const tripCoverImages = sqliteTable('trip_cover_images', {
+  tripId: integer('trip_id')
+    .primaryKey()
+    .references(() => trips.id, { onDelete: 'cascade' }),
+  visitImageId: integer('visit_image_id').references(() => visitImages.id, {
+    onDelete: 'cascade'
+  }),
+  tripStopImageId: integer('trip_stop_image_id').references(() => tripStopImages.id, {
+    onDelete: 'cascade'
+  }),
+  updatedAt: text('updated_at').notNull()
+});
 
 export const publicDataVersions = sqliteTable('public_data_versions', {
   key: text('key').primaryKey(),

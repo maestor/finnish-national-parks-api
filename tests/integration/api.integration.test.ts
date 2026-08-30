@@ -1926,6 +1926,7 @@ describe('API routes', () => {
     expect(assignTripBody.trip).toEqual({
       id: createdTrip.id,
       name: 'Kesäreissu 2026',
+      published: false,
       slug: 'kesareissu-2026'
     });
     expect(assignTripBody.excludeFromRoute).toBe(false);
@@ -2010,6 +2011,13 @@ describe('API routes', () => {
         description: 'Lapin puistoja ja yksi yllätys.',
         id: createdTrip.id,
         name: 'Kesäreissu 2026',
+        publication: {
+          cover: null,
+          featured: false,
+          publishedAt: null,
+          status: 'unlisted',
+          summary: null
+        },
         slug: 'kesareissu-2026',
         startingPoint: expect.objectContaining({
           coordinate: {
@@ -2075,12 +2083,14 @@ describe('API routes', () => {
     expect(timelineBody.visits.find((visit) => visit.id === firstVisit.id)?.trip).toEqual({
       id: createdTrip.id,
       name: 'Kesäreissu 2026',
+      published: false,
       slug: 'kesareissu-2026'
     });
     expect(timelineBody.visits.find((visit) => visit.id === firstVisit.id)?.tripStopOrder).toBe(1);
     expect(timelineBody.visits.find((visit) => visit.id === secondVisit.id)?.trip).toEqual({
       id: createdTrip.id,
       name: 'Kesäreissu 2026',
+      published: false,
       slug: 'kesareissu-2026'
     });
     expect(timelineBody.visits.find((visit) => visit.id === secondVisit.id)?.tripStopOrder).toBe(2);
@@ -2088,6 +2098,7 @@ describe('API routes', () => {
     expect(visitsBody.visits.find((visit) => visit.id === firstVisit.id)?.trip).toEqual({
       id: createdTrip.id,
       name: 'Kesäreissu 2026',
+      published: false,
       slug: 'kesareissu-2026'
     });
     expect(visitsBody.visits.find((visit) => visit.id === firstVisit.id)?.location).toEqual({
@@ -2106,6 +2117,7 @@ describe('API routes', () => {
     expect(visitDetailBody.trip).toEqual({
       id: createdTrip.id,
       name: 'Kesäreissu 2026',
+      published: false,
       slug: 'kesareissu-2026'
     });
     expect(visitDetailBody.excludeFromRoute).toBe(false);
@@ -2197,6 +2209,7 @@ describe('API routes', () => {
     expect(renamedTimelineBody.visits.find((visit) => visit.id === firstVisit.id)?.trip).toEqual({
       id: createdTrip.id,
       name: 'Kesäreissu 2026 v2',
+      published: false,
       slug: 'kesareissu-2026-v2'
     });
     expect(

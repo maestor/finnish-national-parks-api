@@ -519,6 +519,7 @@ describe('repositories', () => {
     expect(updatedVisit?.trip).toEqual({
       id: trip.id,
       name: 'Kesäreissu 2026',
+      published: false,
       slug: 'kesareissu-2026'
     });
     expect(listedTrips).toEqual([
@@ -545,11 +546,13 @@ describe('repositories', () => {
     expect(listedVisits.find((visit) => visit.id === assignedVisit.id)?.trip).toEqual({
       id: trip.id,
       name: 'Kesäreissu 2026',
+      published: false,
       slug: 'kesareissu-2026'
     });
     expect(visitDetail?.trip).toEqual({
       id: trip.id,
       name: 'Kesäreissu 2026',
+      published: false,
       slug: 'kesareissu-2026'
     });
 
