@@ -10,6 +10,7 @@ import {
   directVisitImageUploadRequestSchema,
   publicTripDetailSchema,
   reorderVisitImagesRequestSchema,
+  tripArchiveResponseSchema,
   tripDetailSchema,
   tripFeaturedImageResponseSchema,
   tripImageCandidatesResponseSchema,
@@ -133,6 +134,37 @@ export const listTripsRoute = createRoute({
     },
     304: {
       description: 'Trip list not modified'
+    }
+  }
+});
+
+export const listTripArchiveRoute = createRoute({
+  method: 'get',
+  path: '/api/trips/archive',
+  tags: ['Trips'],
+  security: [{ bearerAuth: [] }],
+  request: {
+    query: z.object({
+      cursor: z.string().max(1024).optional(),
+      limit: z.coerce.number().int().min(1).max(24).default(12)
+    })
+  },
+  responses: {
+    200: {
+      description: 'Cursor-paginated public trip archive cards',
+      content: {
+        'application/json': {
+          schema: tripArchiveResponseSchema
+        }
+      }
+    },
+    400: {
+      description: 'Invalid archive cursor or query',
+      content: {
+        'application/json': {
+          schema: errorSchema
+        }
+      }
     }
   }
 });

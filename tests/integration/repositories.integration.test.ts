@@ -2218,7 +2218,7 @@ describe('repositories', () => {
     expect(summary.version).toBeGreaterThan(0);
   });
 
-  it('orders latest trips by start date, then creation time, then name', async () => {
+  it('orders latest trips by start date, then creation time, then id', async () => {
     const januaryTrip = await createTrip(testDatabase.database, {
       name: 'Tammiretki'
     });
@@ -2275,13 +2275,13 @@ describe('repositories', () => {
         startDate: null
       },
       {
-        name: 'A-retki',
-        slug: 'a-retki',
+        name: 'Z-retki',
+        slug: 'z-retki',
         startDate: null
       },
       {
-        name: 'Z-retki',
-        slug: 'z-retki',
+        name: 'A-retki',
+        slug: 'a-retki',
         startDate: null
       }
     ]);
