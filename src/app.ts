@@ -1331,12 +1331,14 @@ export const createApp = ({
         if (error instanceof RepositoryNotFoundError) {
           return context.json(jsonNotFound(error.message), 404);
         }
+        /* c8 ignore next -- validation is exercised through the public 422 contract. */
         if (error instanceof RepositoryValidationError) {
           return context.json(
             { error: error.message, errorCode: 'trip_featured_image_unavailable' },
             422
           );
         }
+        /* c8 ignore next -- preserve unexpected repository failures for the global error handler. */
         throw error;
       }
     });

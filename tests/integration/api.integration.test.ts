@@ -11,7 +11,12 @@ const authConfig = {
 
 import { createApp } from '../../src/app.js';
 import * as repositories from '../../src/db/repositories.js';
-import { createTripStopImage, createVisitImage, getParkBySlug } from '../../src/db/repositories.js';
+import {
+  createTripStopImage,
+  createVisitImage,
+  getParkBySlug,
+  getYearReviewTripFeaturedImageAssetsByTripId
+} from '../../src/db/repositories.js';
 import { parks } from '../../src/db/schema.js';
 import { createSessionToken } from '../../src/http/session.js';
 import { importParks } from '../../src/importer/import-parks.js';
@@ -2305,6 +2310,39 @@ describe('API routes', () => {
     expect(candidates.status).toBe(200);
     expect((await candidates.json()) as { total: number }).toMatchObject({ total: 2 });
 
+    const missingCandidatesTrip = await requestAsAdmin(app, '/api/admin/trips/99999/images');
+    expect(missingCandidatesTrip.status).toBe(404);
+    const unavailableCandidates = await requestAsAdmin(
+      createAuthedApp(),
+      `/api/admin/trips/${trip.id}/images`
+    );
+    expect(unavailableCandidates.status).toBe(503);
+
+    const currentSelectionBeforeUpdate = await requestAsAdmin(
+      app,
+      `/api/admin/trips/${trip.id}/featured-image`
+    );
+    expect(currentSelectionBeforeUpdate.status).toBe(200);
+    expect((await currentSelectionBeforeUpdate.json()) as { featuredImage: null }).toEqual({
+      featuredImage: null
+    });
+    expect((await app.request(`/api/admin/trips/${trip.id}/featured-image`)).status).toBe(401);
+    expect(
+      (
+        await app.request(`/api/admin/trips/${trip.id}/featured-image`, {
+          body: JSON.stringify({ featuredImage: null }),
+          headers: { 'content-type': 'application/json' },
+          method: 'PATCH'
+        })
+      ).status
+    ).toBe(401);
+
+    const missingFeaturedImageTrip = await requestAsAdmin(
+      app,
+      '/api/admin/trips/99999/featured-image'
+    );
+    expect(missingFeaturedImageTrip.status).toBe(404);
+
     const unavailableStorage = await requestAsAdmin(
       createAuthedApp(),
       `/api/admin/trips/${trip.id}/featured-image`,
@@ -2327,6 +2365,17 @@ describe('API routes', () => {
     );
     expect(unavailableCandidate.status).toBe(422);
 
+    const unavailableStopCandidate = await requestAsAdmin(
+      app,
+      `/api/admin/trips/${trip.id}/featured-image`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify({ featuredImage: { imageId: 99999, source: 'trip-stop-image' } }),
+        headers: { 'content-type': 'application/json' }
+      }
+    );
+    expect(unavailableStopCandidate.status).toBe(422);
+
     const missingTrip = await requestAsAdmin(app, '/api/admin/trips/99999/featured-image', {
       method: 'PATCH',
       body: JSON.stringify({ featuredImage: null }),
@@ -2345,6 +2394,13 @@ describe('API routes', () => {
         featuredImage: { reference: { imageId: visitImage.id, source: 'visit-image' } }
       }
     );
+    const visitReviewAssets = await getYearReviewTripFeaturedImageAssetsByTripId(
+      testDatabase.database,
+      [trip.id]
+    );
+    expect(visitReviewAssets.get(trip.id)).toMatchObject({
+      fullKey: 'visits/featured/full.jpg'
+    });
 
     const selectedStop = await requestAsAdmin(app, `/api/admin/trips/${trip.id}/featured-image`, {
       method: 'PATCH',
@@ -2360,6 +2416,23 @@ describe('API routes', () => {
     });
     expect(movedVisit.status).toBe(200);
     expect(selectedStop.status).toBe(200);
+    const selectedStopRead = await requestAsAdmin(
+      app,
+      `/api/admin/trips/${trip.id}/featured-image`
+    );
+    expect(selectedStopRead.status).toBe(200);
+    const reviewAssets = await getYearReviewTripFeaturedImageAssetsByTripId(testDatabase.database, [
+      trip.id
+    ]);
+    expect(reviewAssets.get(trip.id)).toMatchObject({
+      fullKey: 'stops/featured/full.jpg',
+      thumbKey: 'stops/featured/thumb.jpg'
+    });
+    const unavailableRead = await requestAsAdmin(
+      createAuthedApp(),
+      `/api/admin/trips/${trip.id}/featured-image`
+    );
+    expect(unavailableRead.status).toBe(503);
     const publicTrip = await app.request('/api/trips/slug/kuvallinen-retki');
     expect(publicTrip.status).toBe(200);
     expect((await publicTrip.json()) as { featuredImage: unknown }).toHaveProperty('featuredImage');
