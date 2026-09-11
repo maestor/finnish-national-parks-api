@@ -11,7 +11,12 @@ const authConfig = {
 
 import { createApp } from '../../src/app.js';
 import * as repositories from '../../src/db/repositories.js';
-import { createVisitImage, getParkBySlug } from '../../src/db/repositories.js';
+import {
+  createTripStopImage,
+  createVisitImage,
+  getParkBySlug,
+  getYearReviewTripFeaturedImageAssetsByTripId
+} from '../../src/db/repositories.js';
 import { parks } from '../../src/db/schema.js';
 import { createSessionToken } from '../../src/http/session.js';
 import { importParks } from '../../src/importer/import-parks.js';
@@ -2259,6 +2264,186 @@ describe('API routes', () => {
     expect(clearedVisitsBody.visits.find((visit) => visit.id === firstVisit.id)?.trip).toBeNull();
     expect(clearedTripsResponse.status).toBe(200);
     expect(clearedTripsBody.trips).toEqual([]);
+  });
+
+  it('lists and updates a trip featured image from visits and stops', async () => {
+    const storage = createMemoryStorage();
+    const app = createAuthedApp({ storage });
+    const { body: trip } = await createTrip(app, {
+      name: 'Kuvallinen retki',
+      slug: 'kuvallinen-retki'
+    });
+    const { body: visit } = await createVisit(app, 'akasmannyn-kansallispuisto', {
+      tripId: trip.id,
+      tripStopOrder: 1,
+      visitedOn: '2026-06-07'
+    });
+    const { body: stop } = await createTripStop(app, trip.id, {
+      location: { coordinate: { lat: 60, lon: 24 }, label: 'Helsinki' },
+      tripStopOrder: 2,
+      visitedOn: '2026-06-08'
+    });
+    const visitImage = await createVisitImage(testDatabase.database, {
+      createdAt: '2026-06-07T09:00:00.000Z',
+      displayOrder: 0,
+      fullKey: 'visits/featured/full.jpg',
+      mimeType: 'image/jpeg',
+      originalName: 'featured.jpg',
+      thumbKey: 'visits/featured/thumb.jpg',
+      updatedAt: '2026-06-07T09:00:00.000Z',
+      visitId: visit.id
+    });
+    const stopImage = await createTripStopImage(testDatabase.database, {
+      createdAt: '2026-06-08T09:00:00.000Z',
+      displayOrder: 0,
+      fullKey: 'stops/featured/full.jpg',
+      mimeType: 'image/jpeg',
+      originalName: 'stop.jpg',
+      thumbKey: 'stops/featured/thumb.jpg',
+      tripStopId: stop.id,
+      updatedAt: '2026-06-08T09:00:00.000Z'
+    });
+
+    const unauthorized = await app.request(`/api/admin/trips/${trip.id}/images`);
+    expect(unauthorized.status).toBe(401);
+    const candidates = await requestAsAdmin(app, `/api/admin/trips/${trip.id}/images?limit=1`);
+    expect(candidates.status).toBe(200);
+    expect((await candidates.json()) as { total: number }).toMatchObject({ total: 2 });
+
+    const missingCandidatesTrip = await requestAsAdmin(app, '/api/admin/trips/99999/images');
+    expect(missingCandidatesTrip.status).toBe(404);
+    const unavailableCandidates = await requestAsAdmin(
+      createAuthedApp(),
+      `/api/admin/trips/${trip.id}/images`
+    );
+    expect(unavailableCandidates.status).toBe(503);
+
+    const currentSelectionBeforeUpdate = await requestAsAdmin(
+      app,
+      `/api/admin/trips/${trip.id}/featured-image`
+    );
+    expect(currentSelectionBeforeUpdate.status).toBe(200);
+    expect((await currentSelectionBeforeUpdate.json()) as { featuredImage: null }).toEqual({
+      featuredImage: null
+    });
+    expect((await app.request(`/api/admin/trips/${trip.id}/featured-image`)).status).toBe(401);
+    expect(
+      (
+        await app.request(`/api/admin/trips/${trip.id}/featured-image`, {
+          body: JSON.stringify({ featuredImage: null }),
+          headers: { 'content-type': 'application/json' },
+          method: 'PATCH'
+        })
+      ).status
+    ).toBe(401);
+
+    const missingFeaturedImageTrip = await requestAsAdmin(
+      app,
+      '/api/admin/trips/99999/featured-image'
+    );
+    expect(missingFeaturedImageTrip.status).toBe(404);
+
+    const unavailableStorage = await requestAsAdmin(
+      createAuthedApp(),
+      `/api/admin/trips/${trip.id}/featured-image`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify({ featuredImage: { imageId: visitImage.id, source: 'visit-image' } }),
+        headers: { 'content-type': 'application/json' }
+      }
+    );
+    expect(unavailableStorage.status).toBe(503);
+
+    const unavailableCandidate = await requestAsAdmin(
+      app,
+      `/api/admin/trips/${trip.id}/featured-image`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify({ featuredImage: { imageId: 99999, source: 'visit-image' } }),
+        headers: { 'content-type': 'application/json' }
+      }
+    );
+    expect(unavailableCandidate.status).toBe(422);
+
+    const unavailableStopCandidate = await requestAsAdmin(
+      app,
+      `/api/admin/trips/${trip.id}/featured-image`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify({ featuredImage: { imageId: 99999, source: 'trip-stop-image' } }),
+        headers: { 'content-type': 'application/json' }
+      }
+    );
+    expect(unavailableStopCandidate.status).toBe(422);
+
+    const missingTrip = await requestAsAdmin(app, '/api/admin/trips/99999/featured-image', {
+      method: 'PATCH',
+      body: JSON.stringify({ featuredImage: null }),
+      headers: { 'content-type': 'application/json' }
+    });
+    expect(missingTrip.status).toBe(404);
+
+    const selectedVisit = await requestAsAdmin(app, `/api/admin/trips/${trip.id}/featured-image`, {
+      method: 'PATCH',
+      body: JSON.stringify({ featuredImage: { imageId: visitImage.id, source: 'visit-image' } }),
+      headers: { 'content-type': 'application/json' }
+    });
+    expect(selectedVisit.status).toBe(200);
+    expect((await selectedVisit.json()) as { featuredImage: { reference: unknown } }).toMatchObject(
+      {
+        featuredImage: { reference: { imageId: visitImage.id, source: 'visit-image' } }
+      }
+    );
+    const visitReviewAssets = await getYearReviewTripFeaturedImageAssetsByTripId(
+      testDatabase.database,
+      [trip.id]
+    );
+    expect(visitReviewAssets.get(trip.id)).toMatchObject({
+      fullKey: 'visits/featured/full.jpg'
+    });
+
+    const selectedStop = await requestAsAdmin(app, `/api/admin/trips/${trip.id}/featured-image`, {
+      method: 'PATCH',
+      body: JSON.stringify({ featuredImage: { imageId: stopImage.id, source: 'trip-stop-image' } }),
+      headers: { 'content-type': 'application/json' }
+    });
+
+    const secondTrip = await createTrip(app, { name: 'Toinen retki', slug: 'toinen-retki' });
+    const movedVisit = await requestAsAdmin(app, `/api/visits/${visit.id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ tripId: secondTrip.body.id }),
+      headers: { 'content-type': 'application/json' }
+    });
+    expect(movedVisit.status).toBe(200);
+    expect(selectedStop.status).toBe(200);
+    const selectedStopRead = await requestAsAdmin(
+      app,
+      `/api/admin/trips/${trip.id}/featured-image`
+    );
+    expect(selectedStopRead.status).toBe(200);
+    const reviewAssets = await getYearReviewTripFeaturedImageAssetsByTripId(testDatabase.database, [
+      trip.id
+    ]);
+    expect(reviewAssets.get(trip.id)).toMatchObject({
+      fullKey: 'stops/featured/full.jpg',
+      thumbKey: 'stops/featured/thumb.jpg'
+    });
+    const unavailableRead = await requestAsAdmin(
+      createAuthedApp(),
+      `/api/admin/trips/${trip.id}/featured-image`
+    );
+    expect(unavailableRead.status).toBe(503);
+    const publicTrip = await app.request('/api/trips/slug/kuvallinen-retki');
+    expect(publicTrip.status).toBe(200);
+    expect((await publicTrip.json()) as { featuredImage: unknown }).toHaveProperty('featuredImage');
+
+    const cleared = await requestAsAdmin(app, `/api/admin/trips/${trip.id}/featured-image`, {
+      method: 'PATCH',
+      body: JSON.stringify({ featuredImage: null }),
+      headers: { 'content-type': 'application/json' }
+    });
+    expect(cleared.status).toBe(200);
+    expect((await cleared.json()) as { featuredImage: null }).toEqual({ featuredImage: null });
   });
 
   it('suffixes duplicate trip slugs through the trip API', async () => {

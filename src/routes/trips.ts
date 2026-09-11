@@ -11,13 +11,111 @@ import {
   publicTripDetailSchema,
   reorderVisitImagesRequestSchema,
   tripDetailSchema,
+  tripFeaturedImageResponseSchema,
+  tripImageCandidatesResponseSchema,
   tripListResponseSchema,
   tripSchema,
   tripStopSchema,
+  updateTripFeaturedImageRequestSchema,
   updateTripRequestSchema,
   updateTripStopRequestSchema,
   visitImageSchema
 } from '../contracts/parks.js';
+
+const adminTripIdParamsSchema = z.object({
+  id: z.coerce.number().int().positive()
+});
+
+export const listAdminTripImagesRoute = createRoute({
+  method: 'get',
+  path: '/api/admin/trips/{id}/images',
+  tags: ['Trips'],
+  security: [{ bearerAuth: [], sessionAuth: [] }],
+  request: {
+    params: adminTripIdParamsSchema,
+    query: z.object({
+      limit: z.coerce.number().int().min(1).max(100).default(48),
+      offset: z.coerce.number().int().min(0).default(0)
+    })
+  },
+  responses: {
+    200: {
+      description: 'Trip image candidates',
+      content: { 'application/json': { schema: tripImageCandidatesResponseSchema } }
+    },
+    401: {
+      description: 'Admin session required',
+      content: { 'application/json': { schema: errorSchema } }
+    },
+    404: {
+      description: 'Trip not found',
+      content: { 'application/json': { schema: errorSchema } }
+    },
+    503: {
+      description: 'OAuth or storage unavailable',
+      content: { 'application/json': { schema: errorSchema } }
+    }
+  }
+});
+
+export const getAdminTripFeaturedImageRoute = createRoute({
+  method: 'get',
+  path: '/api/admin/trips/{id}/featured-image',
+  tags: ['Trips'],
+  security: [{ bearerAuth: [], sessionAuth: [] }],
+  request: { params: adminTripIdParamsSchema },
+  responses: {
+    200: {
+      description: 'Saved trip featured image',
+      content: { 'application/json': { schema: tripFeaturedImageResponseSchema } }
+    },
+    401: {
+      description: 'Admin session required',
+      content: { 'application/json': { schema: errorSchema } }
+    },
+    404: {
+      description: 'Trip not found',
+      content: { 'application/json': { schema: errorSchema } }
+    },
+    503: {
+      description: 'OAuth or storage unavailable',
+      content: { 'application/json': { schema: errorSchema } }
+    }
+  }
+});
+
+export const updateAdminTripFeaturedImageRoute = createRoute({
+  method: 'patch',
+  path: '/api/admin/trips/{id}/featured-image',
+  tags: ['Trips'],
+  security: [{ bearerAuth: [], sessionAuth: [] }],
+  request: {
+    params: adminTripIdParamsSchema,
+    body: { content: { 'application/json': { schema: updateTripFeaturedImageRequestSchema } } }
+  },
+  responses: {
+    200: {
+      description: 'Updated trip featured image',
+      content: { 'application/json': { schema: tripFeaturedImageResponseSchema } }
+    },
+    401: {
+      description: 'Admin session required',
+      content: { 'application/json': { schema: errorSchema } }
+    },
+    404: {
+      description: 'Trip not found',
+      content: { 'application/json': { schema: errorSchema } }
+    },
+    422: {
+      description: 'Unavailable image',
+      content: { 'application/json': { schema: errorSchema } }
+    },
+    503: {
+      description: 'OAuth or storage unavailable',
+      content: { 'application/json': { schema: errorSchema } }
+    }
+  }
+});
 
 export const listTripsRoute = createRoute({
   method: 'get',

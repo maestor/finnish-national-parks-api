@@ -51,6 +51,33 @@ describe('year review story builder', () => {
     expect(createYearReviewSharePath('share-123')).toBe('/vuosikatsaus/jako/share-123');
   });
 
+  it('prefers an explicitly selected trip image for the trip highlight', () => {
+    const story = buildYearReviewStory({
+      tripFeaturedImagesByTripId: new Map([
+        [
+          1,
+          {
+            alt: null,
+            fullHeight: 900,
+            fullKey: 'trip-cover/full.jpg',
+            fullWidth: 1200,
+            thumbHeight: 180,
+            thumbKey: 'trip-cover/thumb.jpg',
+            thumbWidth: 240
+          }
+        ]
+      ]),
+      trips: [createTrip()],
+      visits: [createVisit()],
+      year: 2026
+    });
+    const card = story.cards.find((entry) => entry.kind === 'trip-highlight');
+
+    expect(card?.kind === 'trip-highlight' && card.featuredImage?.fullKey).toBe(
+      'trip-cover/full.jpg'
+    );
+  });
+
   it('returns a minimal empty-state story when the requested year has no visits', () => {
     const story = buildYearReviewStory({
       trips: [],

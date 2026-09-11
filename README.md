@@ -109,6 +109,9 @@ The paired UI presents catalog and visit `GET` data publicly to end users withou
 - `GET /api/trips`
 - `GET /api/trips/slug/:slug`
 - `GET /api/trips/:id`
+- `GET /api/admin/trips/:id/images`
+- `GET /api/admin/trips/:id/featured-image`
+- `PATCH /api/admin/trips/:id/featured-image`
 - `GET /api/visits-timeline`
 - `GET /api/date-range-review/preview`
 - `POST /api/date-range-review/publish`

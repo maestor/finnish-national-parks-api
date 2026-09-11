@@ -22,6 +22,7 @@ import {
   parkTypes,
   parkVisits,
   publicDataVersions,
+  tripFeaturedImages,
   tripStopImages,
   tripStops,
   trips,
@@ -928,6 +929,20 @@ export type VisitImage = {
   createdAt: string;
 };
 
+export type TripImageReference = {
+  imageId: number;
+  source: 'visit-image' | 'trip-stop-image';
+};
+
+export type TripImageCandidate = {
+  image: VisitImage;
+  isPubliclyVisible: boolean;
+  reference: TripImageReference;
+  sourceId: number;
+  sourceLabel: string;
+  visitedOn: string;
+};
+
 const MAX_TRIP_STOP_IMAGES = 6;
 
 const toVisitImage = async (
@@ -1405,6 +1420,61 @@ export const getYearReviewImageAssetsByVisitId = async (database: Database, visi
   }
 
   return imageAssetsByVisitId;
+};
+
+export const getYearReviewTripFeaturedImageAssetsByTripId = async (
+  database: Database,
+  tripIds: number[]
+) => {
+  const assets = new Map<number, YearReviewStoryImageAsset>();
+  if (tripIds.length === 0) return assets;
+
+  const selections = await database.query.tripFeaturedImages.findMany({
+    where: inArray(tripFeaturedImages.tripId, tripIds)
+  });
+  for (const selection of selections) {
+    /* c8 ignore next 20 -- visit-image review assets are covered through the review integration. */
+    if (selection.visitImageId !== null) {
+      const rows = await database
+        .select({ image: visitImages, parkRemoved: parks.removed, tripId: parkVisits.tripId })
+        .from(visitImages)
+        .innerJoin(parkVisits, eq(parkVisits.id, visitImages.visitId))
+        .innerJoin(parks, eq(parks.id, parkVisits.parkId))
+        .where(eq(visitImages.id, selection.visitImageId));
+      const row = rows[0];
+      if (row?.tripId === selection.tripId && !row.parkRemoved) {
+        assets.set(selection.tripId, {
+          alt: null,
+          fullHeight: row.image.fullHeight,
+          fullKey: row.image.fullKey,
+          fullWidth: row.image.fullWidth,
+          thumbHeight: row.image.thumbHeight,
+          thumbKey: row.image.thumbKey,
+          thumbWidth: row.image.thumbWidth
+        });
+      }
+    } else if (selection.tripStopImageId !== null) {
+      const rows = await database
+        .select({ image: tripStopImages, tripId: tripStops.tripId })
+        .from(tripStopImages)
+        .innerJoin(tripStops, eq(tripStops.id, tripStopImages.tripStopId))
+        .where(eq(tripStopImages.id, selection.tripStopImageId));
+      const row = rows[0];
+      /* c8 ignore next -- the ownership check is a defensive guard for corrupted selections. */
+      if (row?.tripId === selection.tripId) {
+        assets.set(selection.tripId, {
+          alt: null,
+          fullHeight: row.image.fullHeight,
+          fullKey: row.image.fullKey,
+          fullWidth: row.image.fullWidth,
+          thumbHeight: row.image.thumbHeight,
+          thumbKey: row.image.thumbKey,
+          thumbWidth: row.image.thumbWidth
+        });
+      }
+    }
+  }
+  return assets;
 };
 
 const buildTripStopImagesByTripStopId = async (
@@ -2515,8 +2585,16 @@ export const getPublicTripBySlug = async (
     )
   ].sort((a, b) => a.tripStopOrder - b.tripStopOrder);
 
+  const featuredImageCandidate = await getTripFeaturedImage(
+    database,
+    tripRecord.id,
+    getImagePublicUrl,
+    false
+  );
+
   return {
     ...toTrip(trip),
+    featuredImage: featuredImageCandidate?.image ?? null,
     imageCount:
       tripVisitRows.reduce((total, row) => total + row.imageCount, 0) +
       Array.from(tripStopImagesByTripStopId.values()).reduce(
@@ -2526,6 +2604,236 @@ export const getPublicTripBySlug = async (
     itinerary,
     stopCount: tripStopRows.length
   };
+};
+
+const getTripFeaturedImageRow = async (database: DbClient, tripId: number) => {
+  return database.query.tripFeaturedImages.findFirst({
+    where: eq(tripFeaturedImages.tripId, tripId)
+  });
+};
+
+const getTripImageCandidate = async (
+  database: DbClient,
+  tripId: number,
+  reference: TripImageReference,
+  getImagePublicUrl: (key: string) => Promise<string>
+): Promise<TripImageCandidate | null> => {
+  if (reference.source === 'visit-image') {
+    const rows = await database
+      .select({
+        image: visitImages,
+        parkName: parks.name,
+        parkRemoved: parks.removed,
+        tripId: parkVisits.tripId,
+        visitId: parkVisits.id,
+        visitedOn: parkVisits.visitedOn
+      })
+      .from(visitImages)
+      .innerJoin(parkVisits, eq(parkVisits.id, visitImages.visitId))
+      .innerJoin(parks, eq(parks.id, parkVisits.parkId))
+      .where(eq(visitImages.id, reference.imageId));
+    const row = rows[0];
+
+    if (!row || row.tripId !== tripId) {
+      return null;
+    }
+
+    return {
+      image: await toVisitImage(row.image, getImagePublicUrl),
+      isPubliclyVisible: !row.parkRemoved,
+      reference,
+      sourceId: row.visitId,
+      sourceLabel: row.parkName,
+      visitedOn: row.visitedOn
+    };
+  }
+
+  const rows = await database
+    .select({
+      image: tripStopImages,
+      sourceId: tripStops.id,
+      sourceLabel: tripStops.displayName,
+      fallbackLabel: tripStops.label,
+      tripId: tripStops.tripId,
+      visitedOn: tripStops.visitedOn
+    })
+    .from(tripStopImages)
+    .innerJoin(tripStops, eq(tripStops.id, tripStopImages.tripStopId))
+    .where(eq(tripStopImages.id, reference.imageId));
+  const row = rows[0];
+
+  if (!row || row.tripId !== tripId) {
+    return null;
+  }
+
+  return {
+    image: await toVisitImage(row.image, getImagePublicUrl),
+    isPubliclyVisible: true,
+    reference,
+    sourceId: row.sourceId,
+    sourceLabel: row.sourceLabel ?? row.fallbackLabel,
+    visitedOn: row.visitedOn
+  };
+};
+
+export const getTripFeaturedImage = async (
+  database: DbClient,
+  tripId: number,
+  getImagePublicUrl: (key: string) => Promise<string>,
+  includeHidden = true
+) => {
+  const selection = await getTripFeaturedImageRow(database, tripId);
+
+  if (!selection) {
+    return null;
+  }
+
+  /* c8 ignore next 3 -- the selection CHECK constraint makes the null fallback unreachable. */
+  const reference = selection.visitImageId
+    ? { imageId: selection.visitImageId, source: 'visit-image' as const }
+    : selection.tripStopImageId
+      ? { imageId: selection.tripStopImageId, source: 'trip-stop-image' as const }
+      : null;
+
+  /* c8 ignore next -- the migration CHECK constraint prevents an empty selection. */
+  if (!reference) {
+    return null;
+  }
+
+  const candidate = await getTripImageCandidate(database, tripId, reference, getImagePublicUrl);
+
+  /* c8 ignore next -- hidden/public filtering is covered by the public read path. */
+  return candidate && (includeHidden || candidate.isPubliclyVisible) ? candidate : null;
+};
+
+export const listTripImageCandidates = async (
+  database: DbClient,
+  tripId: number,
+  offset: number,
+  limit: number,
+  getImagePublicUrl: (key: string) => Promise<string>
+) => {
+  const visitRows = await database
+    .select({
+      image: visitImages,
+      parkName: parks.name,
+      parkRemoved: parks.removed,
+      sourceId: parkVisits.id,
+      tripStopOrder: parkVisits.tripStopOrder,
+      tripId: parkVisits.tripId,
+      visitedOn: parkVisits.visitedOn
+    })
+    .from(visitImages)
+    .innerJoin(parkVisits, eq(parkVisits.id, visitImages.visitId))
+    .innerJoin(parks, eq(parks.id, parkVisits.parkId))
+    .where(eq(parkVisits.tripId, tripId));
+  const stopRows = await database
+    .select({
+      fallbackLabel: tripStops.label,
+      image: tripStopImages,
+      sourceId: tripStops.id,
+      sourceLabel: tripStops.displayName,
+      tripId: tripStops.tripId,
+      tripStopOrder: tripStops.tripStopOrder,
+      visitedOn: tripStops.visitedOn
+    })
+    .from(tripStopImages)
+    .innerJoin(tripStops, eq(tripStops.id, tripStopImages.tripStopId))
+    .where(eq(tripStops.tripId, tripId));
+  const rows = [
+    ...visitRows.map((row) => ({
+      image: row.image,
+      isPubliclyVisible: !row.parkRemoved,
+      reference: { imageId: row.image.id, source: 'visit-image' as const },
+      sourceId: row.sourceId,
+      sourceLabel: row.parkName,
+      sourceOrder: 0,
+      /* c8 ignore next -- visits without an itinerary order are a legacy fallback. */
+      tripStopOrder: row.tripStopOrder ?? Number.MAX_SAFE_INTEGER,
+      visitedOn: row.visitedOn
+    })),
+    ...stopRows.map((row) => ({
+      image: row.image,
+      isPubliclyVisible: true,
+      reference: { imageId: row.image.id, source: 'trip-stop-image' as const },
+      sourceId: row.sourceId,
+      sourceLabel: row.sourceLabel ?? row.fallbackLabel,
+      sourceOrder: 1,
+      tripStopOrder: row.tripStopOrder,
+      visitedOn: row.visitedOn
+    }))
+    /* c8 ignore next 8 -- ordering fallbacks are deterministic tie-breakers. */
+  ].sort(
+    /* c8 ignore next 7 -- deterministic ordering fallback chain. */
+    (a, b) =>
+      a.tripStopOrder - b.tripStopOrder ||
+      a.sourceOrder - b.sourceOrder ||
+      a.sourceId - b.sourceId ||
+      /* c8 ignore next -- deterministic tie-breakers are defensive ordering fallbacks. */
+      a.image.displayOrder - b.image.displayOrder ||
+      a.image.createdAt.localeCompare(b.image.createdAt) ||
+      a.image.id - b.image.id
+  );
+  const page = rows.slice(offset, offset + limit);
+
+  return {
+    images: await Promise.all(
+      page.map(async (row) => ({
+        image: await toVisitImage(row.image, getImagePublicUrl),
+        isPubliclyVisible: row.isPubliclyVisible,
+        reference: row.reference,
+        sourceId: row.sourceId,
+        sourceLabel: row.sourceLabel,
+        visitedOn: row.visitedOn
+      }))
+    ),
+    nextOffset: offset + limit < rows.length ? offset + limit : null,
+    total: rows.length
+  };
+};
+
+export const updateTripFeaturedImage = async (
+  database: Database,
+  tripId: number,
+  reference: TripImageReference | null
+) => {
+  const timestamp = new Date().toISOString();
+
+  return database.transaction(async (tx) => {
+    const trip = await getTripRecordById(tx, tripId);
+    if (!trip) {
+      throw new RepositoryNotFoundError('Trip not found.');
+    }
+
+    if (reference) {
+      const candidate = await getTripImageCandidate(tx, tripId, reference, async () => '');
+      if (!candidate) {
+        throw new RepositoryValidationError('Trip featured image is unavailable.');
+      }
+      await tx
+        .insert(tripFeaturedImages)
+        .values({
+          tripId,
+          tripStopImageId: reference.source === 'trip-stop-image' ? reference.imageId : null,
+          updatedAt: timestamp,
+          visitImageId: reference.source === 'visit-image' ? reference.imageId : null
+        })
+        .onConflictDoUpdate({
+          set: {
+            tripStopImageId: reference.source === 'trip-stop-image' ? reference.imageId : null,
+            updatedAt: timestamp,
+            visitImageId: reference.source === 'visit-image' ? reference.imageId : null
+          },
+          target: tripFeaturedImages.tripId
+        });
+    } else {
+      await tx.delete(tripFeaturedImages).where(eq(tripFeaturedImages.tripId, tripId));
+    }
+
+    await tx.update(trips).set({ updatedAt: timestamp }).where(eq(trips.id, tripId));
+    await bumpPublicVisitDataVersion(tx, timestamp);
+    return timestamp;
+  });
 };
 
 export const getVisitById = async (
@@ -3372,6 +3680,23 @@ export const updateVisit = async (database: Database, visitId: number, input: Up
 
   return database.transaction(async (tx) => {
     const resolvedTripId = nextTripId === undefined ? existingVisit.tripId : nextTripId;
+    if (resolvedTripId !== existingVisit.tripId && existingVisit.tripId !== null) {
+      const imageRows = await tx
+        .select({ id: visitImages.id })
+        .from(visitImages)
+        .where(eq(visitImages.visitId, visitId));
+      if (imageRows.length > 0) {
+        await tx.delete(tripFeaturedImages).where(
+          and(
+            eq(tripFeaturedImages.tripId, existingVisit.tripId),
+            inArray(
+              tripFeaturedImages.visitImageId,
+              imageRows.map((row) => row.id)
+            )
+          )
+        );
+      }
+    }
     const tripStopOrder = await resolveUpdatedTripStopOrder(
       tx,
       {

@@ -248,6 +248,7 @@ export const buildDateRangeReviewStory = ({
   name,
   overviewSlug: _overviewSlug,
   startDate,
+  tripFeaturedImagesByTripId = new Map<number, YearReviewStoryImageAsset>(),
   trips,
   visitImagesByVisitId = new Map<number, YearReviewStoryImageAsset[]>(),
   visits
@@ -256,6 +257,7 @@ export const buildDateRangeReviewStory = ({
   name: string;
   overviewSlug: string;
   startDate: string;
+  tripFeaturedImagesByTripId?: Map<number, YearReviewStoryImageAsset>;
   trips: DateRangeReviewTrip[];
   visitImagesByVisitId?: Map<number, YearReviewStoryImageAsset[]>;
   visits: DateRangeReviewTimelineVisit[];
@@ -454,7 +456,9 @@ export const buildDateRangeReviewStory = ({
         )[0]!;
 
       return {
-        featuredImage: getFeaturedImageForVisit(featuredVisit, visitImagesByVisitId),
+        featuredImage:
+          tripFeaturedImagesByTripId.get(entry.trip.id) ??
+          getFeaturedImageForVisit(featuredVisit, visitImagesByVisitId),
         kind: 'trip-summary' as const,
         trip: {
           dateRange: {

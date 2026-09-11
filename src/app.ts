@@ -42,12 +42,15 @@ import {
   getPublishedYearReviewShareByShareId,
   getPublishedYearReviewShareByYear,
   getTripById,
+  getTripFeaturedImage,
   getVisitById,
   getYearReviewImageAssetsByVisitId,
+  getYearReviewTripFeaturedImageAssetsByTripId,
   listAdminParkVisibility,
   listParkSearchEntries,
   listPublicParks,
   listPublishedDateRangeReviewShares,
+  listTripImageCandidates,
   listTrips,
   listVisits,
   listVisitsTimeline,
@@ -65,6 +68,7 @@ import {
   updateParkRemoved,
   updatePublishedDateRangeReviewShareByShareId,
   updateTrip,
+  updateTripFeaturedImage,
   updateTripStop,
   updateVisit
 } from './db/repositories.js';
@@ -152,10 +156,13 @@ import {
   deleteTripRoute,
   deleteTripStopImageRoute,
   deleteTripStopRoute,
+  getAdminTripFeaturedImageRoute,
   getTripBySlugRoute,
   getTripRoute,
+  listAdminTripImagesRoute,
   listTripsRoute,
   reorderTripStopImagesRoute,
+  updateAdminTripFeaturedImageRoute,
   updateTripRoute,
   updateTripStopRoute,
   uploadTripStopImagesRoute
@@ -415,9 +422,14 @@ const buildYearReviewStoryWithImageAssets = async ({
           database,
           visits.filter((visit) => visit.visitedOn.startsWith(`${year}-`)).map((visit) => visit.id)
         );
+  const yearVisits = visits.filter((visit) => visit.visitedOn.startsWith(`${year}-`));
+  const tripFeaturedImagesByTripId = await getYearReviewTripFeaturedImageAssetsByTripId(database, [
+    ...new Set(yearVisits.flatMap((visit) => (visit.trip ? [visit.trip.id] : [])))
+  ]);
 
   return buildYearReviewStory({
     trips,
+    tripFeaturedImagesByTripId,
     visitImagesByVisitId,
     visits,
     year
@@ -446,12 +458,20 @@ const buildDateRangeReviewStoryWithImageAssets = async ({
     rangeVisitIds.length === 0
       ? new Map()
       : await getYearReviewImageAssetsByVisitId(database, rangeVisitIds);
+  const tripFeaturedImagesByTripId = await getYearReviewTripFeaturedImageAssetsByTripId(database, [
+    ...new Set(
+      visits
+        .filter((visit) => visit.visitedOn >= startDate && visit.visitedOn <= endDate)
+        .flatMap((visit) => (visit.trip ? [visit.trip.id] : []))
+    )
+  ]);
 
   return buildDateRangeReviewStory({
     endDate,
     name,
     overviewSlug: createSlug(name, 'overview'),
     startDate,
+    tripFeaturedImagesByTripId,
     trips,
     visitImagesByVisitId,
     visits
@@ -1256,6 +1276,71 @@ export const createApp = ({
       const trips = await listTrips(database);
 
       return context.json({ trips }, 200);
+    });
+
+    app.openapi(listAdminTripImagesRoute, async (context) => {
+      context.header('Cache-Control', PRIVATE_CACHE_CONTROL);
+      const authFailure = await requireAdminSession(context, auth);
+      if (authFailure) return authFailure;
+
+      const { id } = context.req.valid('param');
+      const { limit, offset } = context.req.valid('query');
+      if (!(await listTrips(database)).some((trip) => trip.id === id)) {
+        return context.json(jsonNotFound('Trip not found.'), 404);
+      }
+      const result = await listTripImageCandidates(database, id, offset, limit, getImagePublicUrl);
+      if (!storage && result.total > 0) {
+        return context.json({ error: 'Image storage is not configured.' }, 503);
+      }
+      return context.json(result, 200);
+    });
+
+    app.openapi(getAdminTripFeaturedImageRoute, async (context) => {
+      context.header('Cache-Control', PRIVATE_CACHE_CONTROL);
+      const authFailure = await requireAdminSession(context, auth);
+      if (authFailure) return authFailure;
+
+      const { id } = context.req.valid('param');
+      if (!(await listTrips(database)).some((trip) => trip.id === id)) {
+        return context.json(jsonNotFound('Trip not found.'), 404);
+      }
+      const featuredImage = await getTripFeaturedImage(database, id, getImagePublicUrl);
+      if (!storage && featuredImage) {
+        return context.json({ error: 'Image storage is not configured.' }, 503);
+      }
+      return context.json({ featuredImage }, 200);
+    });
+
+    app.openapi(updateAdminTripFeaturedImageRoute, async (context) => {
+      context.header('Cache-Control', PRIVATE_CACHE_CONTROL);
+      const authFailure = await requireAdminSession(context, auth);
+      if (authFailure) return authFailure;
+
+      const { id } = context.req.valid('param');
+      const { featuredImage } = context.req.valid('json');
+      if (featuredImage && !storage) {
+        return context.json({ error: 'Image storage is not configured.' }, 503);
+      }
+      try {
+        await updateTripFeaturedImage(database, id, featuredImage);
+        return context.json(
+          { featuredImage: await getTripFeaturedImage(database, id, getImagePublicUrl) },
+          200
+        );
+      } catch (error) {
+        if (error instanceof RepositoryNotFoundError) {
+          return context.json(jsonNotFound(error.message), 404);
+        }
+        /* c8 ignore next -- validation is exercised through the public 422 contract. */
+        if (error instanceof RepositoryValidationError) {
+          return context.json(
+            { error: error.message, errorCode: 'trip_featured_image_unavailable' },
+            422
+          );
+        }
+        /* c8 ignore next -- preserve unexpected repository failures for the global error handler. */
+        throw error;
+      }
     });
 
     app.openapi(getDateRangeReviewPreviewRoute, async (context) => {

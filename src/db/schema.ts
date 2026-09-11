@@ -215,6 +215,26 @@ export const tripStopImages = sqliteTable(
   })
 );
 
+export const tripFeaturedImages = sqliteTable(
+  'trip_featured_images',
+  {
+    tripId: integer('trip_id')
+      .primaryKey()
+      .references(() => trips.id, { onDelete: 'cascade' }),
+    visitImageId: integer('visit_image_id').references(() => visitImages.id, {
+      onDelete: 'cascade'
+    }),
+    tripStopImageId: integer('trip_stop_image_id').references(() => tripStopImages.id, {
+      onDelete: 'cascade'
+    }),
+    updatedAt: text('updated_at').notNull()
+  },
+  (table) => ({
+    visitImageIndex: index('trip_featured_visit_image_idx').on(table.visitImageId),
+    tripStopImageIndex: index('trip_featured_trip_stop_image_idx').on(table.tripStopImageId)
+  })
+);
+
 export const publicDataVersions = sqliteTable('public_data_versions', {
   key: text('key').primaryKey(),
   version: integer('version').notNull(),
