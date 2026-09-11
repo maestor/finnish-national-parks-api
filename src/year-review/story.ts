@@ -299,11 +299,13 @@ const buildHighlights = (
 export const createYearReviewSharePath = (shareId: string) => `/vuosikatsaus/jako/${shareId}`;
 
 export const buildYearReviewStory = ({
+  tripFeaturedImagesByTripId = new Map<number, YearReviewStoryImageAsset>(),
   trips,
   visitImagesByVisitId = new Map<number, YearReviewStoryImageAsset[]>(),
   visits,
   year
 }: {
+  tripFeaturedImagesByTripId?: Map<number, YearReviewStoryImageAsset>;
   trips: YearReviewTrip[];
   visitImagesByVisitId?: Map<number, YearReviewStoryImageAsset[]>;
   visits: YearReviewTimelineVisit[];
@@ -442,7 +444,9 @@ export const buildYearReviewStory = ({
           strongestTripId: strongestTripEntry.trip.id,
           visits: yearVisits
         });
-  const tripHighlightImage = getFeaturedImageForVisit(tripHighlightVisit, visitImagesByVisitId);
+  const tripHighlightImage =
+    (strongestTripEntry && tripFeaturedImagesByTripId.get(strongestTripEntry.trip.id)) ??
+    getFeaturedImageForVisit(tripHighlightVisit, visitImagesByVisitId);
   const seenNewNationalParkSlugs = new Set<string>();
   const newNationalParkMoments = yearVisits.flatMap((visit) => {
     if (

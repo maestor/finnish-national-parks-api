@@ -66,7 +66,8 @@ describe('migrateDatabase', () => {
       '0025_park_magnets.sql',
       '0026_year_review_shares.sql',
       '0027_date_range_review_shares.sql',
-      '0028_trip_stop_display_name.sql'
+      '0028_trip_stop_display_name.sql',
+      '0029_trip_featured_image.sql'
     ]);
     expect(parkTypes.rows.map((row) => String(row.slug))).toEqual([
       'outdoor-recreation-area',
@@ -166,7 +167,8 @@ describe('migrateDatabase', () => {
       '0025_park_magnets.sql',
       '0026_year_review_shares.sql',
       '0027_date_range_review_shares.sql',
-      '0028_trip_stop_display_name.sql'
+      '0028_trip_stop_display_name.sql',
+      '0029_trip_featured_image.sql'
     ]);
     expect(schemaMigrationTableBeforeApply.rows).toEqual([]);
     expect(pendingAfterApply).toEqual([]);

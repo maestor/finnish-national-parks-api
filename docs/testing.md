@@ -105,6 +105,8 @@ If an upload limit exists, at least one test should cover the real stored-object
 - Trip create/edit/delete supports named-trip CRUD, persisted trip slugs, optional starting points, and clears visit assignments on delete.
 - Trip-stop create/edit/delete supports non-park itinerary stops with labeled coordinates, optional custom `displayName`, required `visitedOn` dates, optional notes, and shared ordering between stops and park visits.
 - Trip-stop image routes support multipart uploads, direct uploads, delete, reorder, and a maximum of 6 images per stop.
+- Trip featured-image persistence and admin routes cover composite source identity, ownership, replacement/clear, reassignment and cascade cleanup, pagination, private caching, and nullable public resolution. Review builders cover explicit-cover priority and legacy fallback behavior.
+- Trip featured-image persistence and admin routes cover composite source identity, ownership, replacement/clear, reassignment and cascade cleanup, pagination, private caching, and nullable public resolution. Review builders cover explicit-cover priority and legacy fallback behavior.
 - Trip-stop validation covers both required trip membership context and date-range constraints: a stop cannot be created for a trip with zero visits, and each stop date may be at most one day outside the trip's visit-derived range so departure-day and return-day stops can extend the trip window.
 - Visit create/edit/delete supports optional route, author, `tripId`, `tripStopOrder`, and nullable visit `location` fields, including same-day ordering inside a named trip.
 - Visit create/edit/delete works against a real temporary database.

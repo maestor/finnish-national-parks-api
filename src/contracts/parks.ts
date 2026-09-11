@@ -131,6 +131,34 @@ export const visitImageSchema = z.object({
   createdAt: z.string()
 });
 
+export const tripImageReferenceSchema = z.object({
+  imageId: z.number().int().positive(),
+  source: z.enum(['visit-image', 'trip-stop-image'])
+});
+
+export const tripImageCandidateSchema = z.object({
+  image: visitImageSchema,
+  isPubliclyVisible: z.boolean(),
+  reference: tripImageReferenceSchema,
+  sourceId: z.number().int().positive(),
+  sourceLabel: z.string(),
+  visitedOn: visitDateSchema
+});
+
+export const tripFeaturedImageResponseSchema = z.object({
+  featuredImage: tripImageCandidateSchema.nullable()
+});
+
+export const tripImageCandidatesResponseSchema = z.object({
+  images: z.array(tripImageCandidateSchema),
+  nextOffset: z.number().int().nonnegative().nullable(),
+  total: z.number().int().nonnegative()
+});
+
+export const updateTripFeaturedImageRequestSchema = z.object({
+  featuredImage: tripImageReferenceSchema.nullable()
+});
+
 export const visitTripSchema = z.object({
   id: z.number().int(),
   name: z.string(),
@@ -315,6 +343,7 @@ export const publicTripItineraryEntrySchema = z.union([
 ]);
 
 export const publicTripDetailSchema = tripSchema.extend({
+  featuredImage: visitImageSchema.nullable(),
   imageCount: z.number().int(),
   itinerary: z.array(publicTripItineraryEntrySchema),
   route: publicTripRouteStateSchema,
