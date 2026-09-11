@@ -452,6 +452,30 @@ export const tripListResponseSchema = z.object({
   trips: z.array(tripSchema)
 });
 
+export const tripArchiveFeaturedImageSchema = z.object({
+  height: z.number().int().positive().nullable(),
+  url: z.string().url(),
+  width: z.number().int().positive().nullable()
+});
+
+export const tripArchiveItemSchema = z.object({
+  createdAt: z.string().datetime(),
+  dateRange: tripDateRangeSchema.nullable(),
+  descriptionExcerpt: z.string().nullable(),
+  featuredImage: tripArchiveFeaturedImageSchema.nullable(),
+  id: z.number().int(),
+  name: z.string(),
+  slug: z.string(),
+  stopCount: z.number().int().nonnegative(),
+  visitCount: z.number().int().nonnegative()
+});
+
+export const tripArchiveResponseSchema = z.object({
+  nextCursor: z.string().nullable(),
+  total: z.number().int().nonnegative(),
+  trips: z.array(tripArchiveItemSchema)
+});
+
 export const parkListResponseSchema = z.object({
   parks: z.array(parkListItemSchema)
 });

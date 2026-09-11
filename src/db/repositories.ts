@@ -1,4 +1,18 @@
-import { and, asc, desc, eq, gt, gte, inArray, lt, lte, notInArray, sql } from 'drizzle-orm';
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  gt,
+  gte,
+  inArray,
+  isNull,
+  lt,
+  lte,
+  notInArray,
+  or,
+  sql
+} from 'drizzle-orm';
 import type { DateRangeReviewStory } from '../date-range-review/story.js';
 import type { GeoJsonFeatureCollection } from '../importer/geometry.js';
 import { deriveDisplayNameFromLabel } from '../location-display.js';
@@ -252,6 +266,16 @@ type TripRow = {
   startVisitedOn: string | null;
   updatedAt: string;
   visitCount: number;
+};
+
+type TripArchiveRow = TripRow & {
+  stopCount: number;
+};
+
+export type TripArchiveCursor = {
+  createdAt: string;
+  id: number;
+  startVisitedOn: string | null;
 };
 
 type TripStopRow = typeof tripStops.$inferSelect;
@@ -630,6 +654,82 @@ const sortTripAwareVisitRows = <T extends TripAwareVisitOrder>(visitRows: T[]) =
 };
 
 const HOME_SUMMARY_MAX_ITEMS = 5;
+const TRIP_ARCHIVE_CURSOR_VERSION = 1;
+
+export class TripArchiveCursorError extends Error {}
+
+export const createTripDescriptionExcerpt = (description: string | null) => {
+  const normalized = description?.replace(/\s+/gu, ' ').trim() ?? '';
+
+  if (!normalized) {
+    return null;
+  }
+
+  const codePoints = Array.from(normalized);
+  if (codePoints.length <= 240) {
+    return normalized;
+  }
+
+  const prefix = codePoints.slice(0, 239);
+  const boundary = prefix.lastIndexOf(' ');
+  const excerpt = (boundary > 0 ? prefix.slice(0, boundary) : prefix).join('').trimEnd();
+
+  return `${excerpt}…`;
+};
+
+export const encodeTripArchiveCursor = (cursor: TripArchiveCursor) => {
+  return Buffer.from(
+    JSON.stringify({
+      createdAt: cursor.createdAt,
+      id: cursor.id,
+      startVisitedOn: cursor.startVisitedOn,
+      version: TRIP_ARCHIVE_CURSOR_VERSION
+    })
+  ).toString('base64url');
+};
+
+export const decodeTripArchiveCursor = (encodedCursor: string | undefined) => {
+  if (!encodedCursor) {
+    return null;
+  }
+
+  try {
+    const decoded = JSON.parse(Buffer.from(encodedCursor, 'base64url').toString('utf8')) as unknown;
+
+    if (typeof decoded !== 'object' || decoded === null) {
+      throw new Error('Cursor must be an object.');
+    }
+
+    const cursor = decoded as Record<string, unknown>;
+    const startVisitedOn = cursor.startVisitedOn;
+    const createdAt = cursor.createdAt;
+    const id = cursor.id;
+    const version = cursor.version;
+    const validStartDate =
+      startVisitedOn === null ||
+      (typeof startVisitedOn === 'string' && /^\d{4}-\d{2}-\d{2}$/u.test(startVisitedOn));
+
+    if (
+      version !== TRIP_ARCHIVE_CURSOR_VERSION ||
+      typeof createdAt !== 'string' ||
+      Number.isNaN(Date.parse(createdAt)) ||
+      !Number.isInteger(id) ||
+      typeof id !== 'number' ||
+      id < 1 ||
+      !validStartDate
+    ) {
+      throw new Error('Cursor fields are invalid.');
+    }
+
+    return {
+      createdAt,
+      id,
+      startVisitedOn: startVisitedOn as string | null
+    } satisfies TripArchiveCursor;
+  } catch {
+    throw new TripArchiveCursorError('Invalid archive cursor.');
+  }
+};
 
 const toBoundingBox = (row: typeof parks.$inferSelect): BoundingBox => {
   return {
@@ -1680,6 +1780,95 @@ const listTripRows = async (database: Database): Promise<TripRow[]> => {
     .orderBy(asc(trips.name), asc(trips.id));
 };
 
+const listTripArchiveRows = async (
+  database: Database,
+  limit: number,
+  cursor: TripArchiveCursor | null
+): Promise<TripArchiveRow[]> => {
+  const activeTripVisitStats = database
+    .select({
+      visitEndVisitedOn: sql<string | null>`MAX(${parkVisits.visitedOn})`.as(
+        'archive_visit_end_visited_on'
+      ),
+      visitStartVisitedOn: sql<string | null>`MIN(${parkVisits.visitedOn})`.as(
+        'archive_visit_start_visited_on'
+      ),
+      tripId: parkVisits.tripId,
+      visitCount: sql<number>`COUNT(${parkVisits.id})`.as('archive_visit_count')
+    })
+    .from(parkVisits)
+    .innerJoin(parks, eq(parkVisits.parkId, parks.id))
+    .where(eq(parks.removed, false))
+    .groupBy(parkVisits.tripId)
+    .as('archive_active_trip_visit_stats');
+
+  const tripStopStats = database
+    .select({
+      stopCount: sql<number>`COUNT(${tripStops.id})`.as('archive_stop_count'),
+      stopEndVisitedOn: sql<string | null>`MAX(${tripStops.visitedOn})`.as(
+        'archive_stop_end_visited_on'
+      ),
+      stopStartVisitedOn: sql<string | null>`MIN(${tripStops.visitedOn})`.as(
+        'archive_stop_start_visited_on'
+      ),
+      tripId: tripStops.tripId
+    })
+    .from(tripStops)
+    .groupBy(tripStops.tripId)
+    .as('archive_trip_stop_stats');
+
+  const startVisitedOn = sql<string | null>`CASE
+    WHEN ${activeTripVisitStats.visitStartVisitedOn} IS NULL THEN ${tripStopStats.stopStartVisitedOn}
+    WHEN ${tripStopStats.stopStartVisitedOn} IS NULL THEN ${activeTripVisitStats.visitStartVisitedOn}
+    WHEN ${activeTripVisitStats.visitStartVisitedOn} <= ${tripStopStats.stopStartVisitedOn}
+      THEN ${activeTripVisitStats.visitStartVisitedOn}
+    ELSE ${tripStopStats.stopStartVisitedOn}
+  END`;
+  const createdAtAfterCursor = (archiveCursor: TripArchiveCursor) =>
+    or(
+      lt(trips.createdAt, archiveCursor.createdAt),
+      and(eq(trips.createdAt, archiveCursor.createdAt), lt(trips.id, archiveCursor.id))
+    );
+  const cursorWhere = cursor
+    ? cursor.startVisitedOn === null
+      ? and(isNull(startVisitedOn), createdAtAfterCursor(cursor))
+      : or(
+          lt(startVisitedOn, cursor.startVisitedOn),
+          isNull(startVisitedOn),
+          and(eq(startVisitedOn, cursor.startVisitedOn), createdAtAfterCursor(cursor))
+        )
+    : undefined;
+
+  return database
+    .select({
+      createdAt: trips.createdAt,
+      description: trips.description,
+      endVisitedOn: sql<string | null>`CASE
+        WHEN ${activeTripVisitStats.visitEndVisitedOn} IS NULL THEN ${tripStopStats.stopEndVisitedOn}
+        WHEN ${tripStopStats.stopEndVisitedOn} IS NULL THEN ${activeTripVisitStats.visitEndVisitedOn}
+        WHEN ${activeTripVisitStats.visitEndVisitedOn} >= ${tripStopStats.stopEndVisitedOn}
+          THEN ${activeTripVisitStats.visitEndVisitedOn}
+        ELSE ${tripStopStats.stopEndVisitedOn}
+      END`,
+      id: trips.id,
+      name: trips.name,
+      slug: trips.slug,
+      startVisitedOn,
+      startingPointLabel: trips.startingPointLabel,
+      startingPointLat: trips.startingPointLat,
+      startingPointLon: trips.startingPointLon,
+      stopCount: sql<number>`COALESCE(${tripStopStats.stopCount}, 0)`,
+      updatedAt: trips.updatedAt,
+      visitCount: sql<number>`COALESCE(${activeTripVisitStats.visitCount}, 0)`
+    })
+    .from(trips)
+    .leftJoin(activeTripVisitStats, eq(activeTripVisitStats.tripId, trips.id))
+    .leftJoin(tripStopStats, eq(tripStopStats.tripId, trips.id))
+    .where(cursorWhere)
+    .orderBy(desc(startVisitedOn), desc(trips.createdAt), desc(trips.id))
+    .limit(limit + 1) as Promise<TripArchiveRow[]>;
+};
+
 const listTripStopRowsByTripId = async (database: Database, tripId: number) => {
   return database.query.tripStops.findMany({
     orderBy: [asc(tripStops.tripStopOrder), asc(tripStops.id)],
@@ -2706,6 +2895,160 @@ export const getTripFeaturedImage = async (
   return candidate && (includeHidden || candidate.isPubliclyVisible) ? candidate : null;
 };
 
+type TripArchiveFeaturedImageSource = {
+  fullHeight: number | null;
+  fullKey: string;
+  fullWidth: number | null;
+};
+
+const getTripArchiveFeaturedImages = async (
+  database: Database,
+  tripIds: number[],
+  getImagePublicUrl?: (key: string) => Promise<string>
+) => {
+  const imagesByTripId = new Map<number, TripArchiveFeaturedImageSource | null>();
+
+  if (!getImagePublicUrl || tripIds.length === 0) {
+    return imagesByTripId;
+  }
+
+  const selections = await database
+    .select()
+    .from(tripFeaturedImages)
+    .where(inArray(tripFeaturedImages.tripId, tripIds));
+  const visitImageIds = selections.flatMap((selection) =>
+    selection.visitImageId === null ? [] : [selection.visitImageId]
+  );
+  const tripStopImageIds = selections.flatMap((selection) =>
+    selection.tripStopImageId === null ? [] : [selection.tripStopImageId]
+  );
+  const [visitImageRows, tripStopImageRows] = await Promise.all([
+    visitImageIds.length === 0
+      ? Promise.resolve([])
+      : database
+          .select({
+            image: visitImages,
+            parkRemoved: parks.removed,
+            tripId: parkVisits.tripId
+          })
+          .from(visitImages)
+          .innerJoin(parkVisits, eq(parkVisits.id, visitImages.visitId))
+          .innerJoin(parks, eq(parks.id, parkVisits.parkId))
+          .where(inArray(visitImages.id, visitImageIds)),
+    tripStopImageIds.length === 0
+      ? Promise.resolve([])
+      : database
+          .select({
+            image: tripStopImages,
+            tripId: tripStops.tripId
+          })
+          .from(tripStopImages)
+          .innerJoin(tripStops, eq(tripStops.id, tripStopImages.tripStopId))
+          .where(inArray(tripStopImages.id, tripStopImageIds))
+  ]);
+  const visitImagesById = new Map(visitImageRows.map((row) => [row.image.id, row] as const));
+  const tripStopImagesById = new Map(tripStopImageRows.map((row) => [row.image.id, row] as const));
+
+  await Promise.all(
+    selections.map(async (selection) => {
+      const visitImageId = selection.visitImageId;
+      const tripStopImageId = selection.tripStopImageId;
+      const visitImage = visitImageId === null ? undefined : visitImagesById.get(visitImageId);
+      const tripStopImage =
+        tripStopImageId === null ? undefined : tripStopImagesById.get(tripStopImageId);
+      const selectedImage =
+        visitImage?.tripId === selection.tripId && !visitImage.parkRemoved
+          ? visitImage.image
+          : tripStopImage?.tripId === selection.tripId
+            ? tripStopImage.image
+            : null;
+      if (!selectedImage) {
+        imagesByTripId.set(selection.tripId, null);
+        return;
+      }
+
+      const url = await getImagePublicUrl(selectedImage.fullKey);
+      imagesByTripId.set(
+        selection.tripId,
+        url
+          ? {
+              fullHeight: selectedImage.fullHeight,
+              fullKey: url,
+              fullWidth: selectedImage.fullWidth
+            }
+          : null
+      );
+    })
+  );
+
+  return imagesByTripId;
+};
+
+export const listTripArchive = async (
+  database: Database,
+  limit: number,
+  cursor: TripArchiveCursor | null,
+  getImagePublicUrl?: (key: string) => Promise<string>
+) => {
+  const [rows, totalRows] = await Promise.all([
+    listTripArchiveRows(database, limit, cursor),
+    database.select({ count: sql<number>`COUNT(*)` }).from(trips)
+  ]);
+  const pageRows = rows.slice(0, limit);
+  const hasMore = rows.length > limit;
+  const featuredImagesByTripId = await getTripArchiveFeaturedImages(
+    database,
+    pageRows.map((row) => row.id),
+    getImagePublicUrl
+  );
+
+  return {
+    nextCursor:
+      hasMore && pageRows.length > 0
+        ? encodeTripArchiveCursor({
+            createdAt: pageRows[pageRows.length - 1]!.createdAt,
+            id: pageRows[pageRows.length - 1]!.id,
+            startVisitedOn: pageRows[pageRows.length - 1]!.startVisitedOn
+          })
+        : null,
+    total: Number(totalRows[0]!.count),
+    trips: await Promise.all(
+      pageRows.map(async (row) => {
+        const featuredImage = featuredImagesByTripId.get(row.id);
+        return {
+          createdAt: row.createdAt,
+          dateRange:
+            row.startVisitedOn && row.endVisitedOn
+              ? {
+                  end: row.endVisitedOn,
+                  start: row.startVisitedOn
+                }
+              : null,
+          descriptionExcerpt: createTripDescriptionExcerpt(row.description),
+          featuredImage: featuredImage
+            ? {
+                height:
+                  featuredImage.fullHeight !== null && featuredImage.fullHeight > 0
+                    ? featuredImage.fullHeight
+                    : null,
+                url: featuredImage.fullKey,
+                width:
+                  featuredImage.fullWidth !== null && featuredImage.fullWidth > 0
+                    ? featuredImage.fullWidth
+                    : null
+              }
+            : null,
+          id: row.id,
+          name: row.name,
+          slug: row.slug,
+          stopCount: Number(row.stopCount),
+          visitCount: Number(row.visitCount)
+        };
+      })
+    )
+  };
+};
+
 export const listTripImageCandidates = async (
   database: DbClient,
   tripId: number,
@@ -2997,7 +3340,7 @@ export const getPublicHomeSummary = async (database: Database) => {
         return b.createdAt.localeCompare(a.createdAt);
       }
 
-      return a.name.localeCompare(b.name);
+      return b.id - a.id;
     })
     .slice(0, HOME_SUMMARY_MAX_ITEMS)
     .map((trip) => ({

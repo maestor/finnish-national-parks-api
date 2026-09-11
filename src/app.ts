@@ -17,6 +17,7 @@ import {
   createTripStopImage,
   createVisit,
   createVisitImage,
+  decodeTripArchiveCursor,
   deleteTrip,
   deleteTripStop,
   deleteTripStopImage,
@@ -50,6 +51,7 @@ import {
   listParkSearchEntries,
   listPublicParks,
   listPublishedDateRangeReviewShares,
+  listTripArchive,
   listTripImageCandidates,
   listTrips,
   listVisits,
@@ -160,6 +162,7 @@ import {
   getTripBySlugRoute,
   getTripRoute,
   listAdminTripImagesRoute,
+  listTripArchiveRoute,
   listTripsRoute,
   reorderTripStopImagesRoute,
   updateAdminTripFeaturedImageRoute,
@@ -1276,6 +1279,23 @@ export const createApp = ({
       const trips = await listTrips(database);
 
       return context.json({ trips }, 200);
+    });
+
+    app.openapi(listTripArchiveRoute, async (context) => {
+      context.header('Cache-Control', PRIVATE_CACHE_CONTROL);
+
+      const { cursor: encodedCursor, limit } = context.req.valid('query');
+      let cursor: ReturnType<typeof decodeTripArchiveCursor>;
+
+      try {
+        cursor = decodeTripArchiveCursor(encodedCursor);
+      } catch {
+        return context.json({ error: 'Invalid archive cursor.' }, 400);
+      }
+
+      const archive = await listTripArchive(database, limit, cursor, getImagePublicUrl);
+
+      return context.json(archive, 200);
     });
 
     app.openapi(listAdminTripImagesRoute, async (context) => {
