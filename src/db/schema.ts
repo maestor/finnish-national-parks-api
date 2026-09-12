@@ -170,6 +170,7 @@ export const visitImages = sqliteTable(
     visitId: integer('visit_id')
       .notNull()
       .references(() => parkVisits.id, { onDelete: 'cascade' }),
+    uploadKey: text('upload_key'),
     fullKey: text('full_key').notNull(),
     thumbKey: text('thumb_key').notNull(),
     originalName: text('original_name'),
@@ -189,6 +190,10 @@ export const visitImages = sqliteTable(
       table.visitId,
       table.fullKey
     ),
+    visitUploadKeyIndex: uniqueIndex('visit_images_visit_upload_key_idx').on(
+      table.visitId,
+      table.uploadKey
+    ),
     orderIndex: index('visit_images_order_idx').on(table.visitId, table.displayOrder)
   })
 );
@@ -200,6 +205,7 @@ export const tripStopImages = sqliteTable(
     tripStopId: integer('trip_stop_id')
       .notNull()
       .references(() => tripStops.id, { onDelete: 'cascade' }),
+    uploadKey: text('upload_key'),
     fullKey: text('full_key').notNull(),
     thumbKey: text('thumb_key').notNull(),
     originalName: text('original_name'),
@@ -219,6 +225,10 @@ export const tripStopImages = sqliteTable(
     tripStopUploadIdentityIndex: uniqueIndex('trip_stop_images_trip_stop_full_key_idx').on(
       table.tripStopId,
       table.fullKey
+    ),
+    tripStopUploadKeyIndex: uniqueIndex('trip_stop_images_trip_stop_upload_key_idx').on(
+      table.tripStopId,
+      table.uploadKey
     )
   })
 );

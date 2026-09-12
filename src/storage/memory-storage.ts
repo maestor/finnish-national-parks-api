@@ -17,6 +17,10 @@ export const createMemoryStorage = (): StorageClient & { getStore(): Map<string,
 
       return metadata;
     },
+    getObject: async (key: string) => {
+      const object = store.get(key);
+      return object ? Buffer.from(object) : null;
+    },
     getPresignedUrl: async (key: string) => {
       return `https://memory-storage.test/${key}`;
     },

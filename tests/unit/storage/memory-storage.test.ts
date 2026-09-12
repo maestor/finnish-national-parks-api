@@ -49,4 +49,14 @@ describe('createMemoryStorage', () => {
     });
     await expect(storage.getObjectMetadata('missing.jpg')).resolves.toBeNull();
   });
+
+  it('returns a stored object buffer or null when it is missing', async () => {
+    const storage = createMemoryStorage();
+    const buffer = Buffer.from('photo');
+
+    await storage.upload('photo.jpg', buffer, 'image/jpeg');
+
+    await expect(storage.getObject('photo.jpg')).resolves.toEqual(buffer);
+    await expect(storage.getObject('missing.jpg')).resolves.toBeNull();
+  });
 });

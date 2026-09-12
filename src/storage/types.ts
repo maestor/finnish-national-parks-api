@@ -6,6 +6,7 @@ export type StoredObjectMetadata = {
 export interface StorageClient {
   upload(key: string, buffer: Buffer, contentType: string): Promise<void>;
   delete(key: string): Promise<void>;
+  getObject(key: string): Promise<Buffer | null>;
   getPresignedUrl(key: string, expiresInSeconds: number): Promise<string>;
   getPresignedUploadUrl(
     key: string,

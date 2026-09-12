@@ -152,8 +152,8 @@ describe('Visit image routes', () => {
     expect(body.images).toHaveLength(1);
     expect(body.images[0]!.fullUrl).toContain('memory-storage.test');
     expect(body.images[0]!.thumbUrl).toContain('memory-storage.test');
-    expect(body.images[0]!.fullWidth).toBeLessThanOrEqual(1920);
-    expect(body.images[0]!.thumbWidth).toBeLessThanOrEqual(400);
+    expect(body.images[0]!.fullWidth).toBeLessThanOrEqual(2560);
+    expect(body.images[0]!.thumbWidth).toBeLessThanOrEqual(480);
     expect(body.images[0]!.originalName).toBe('park.jpg');
 
     // Verify storage received both full and thumbnail
@@ -163,7 +163,7 @@ describe('Visit image routes', () => {
     expect(storedKeys.some((k) => k.endsWith('-thumb.jpg'))).toBe(true);
   });
 
-  it('creates direct upload plans and completes uploaded images without server-side resizing', async () => {
+  it('finalizes a direct upload as distinct server-produced derivatives', async () => {
     const visitId = await createVisit();
     const buffer = await createTestImageBuffer(1400, 900);
     const file = new File([buffer], 'cloud.jpg', { type: 'image/jpeg' });
@@ -185,6 +185,7 @@ describe('Visit image routes', () => {
     expect(initBody.method).toBe('PUT');
     expect(initBody.headers['content-type']).toBe('image/jpeg');
     expect(initBody.key).toContain(`visits/${visitId}/`);
+    expect(initBody.key).toContain('/staged/');
     expect(initBody.uploadUrl).toContain(initBody.key);
     expect(initBody.expiresAt).toMatch(/T/);
 
@@ -215,9 +216,16 @@ describe('Visit image routes', () => {
     expect(completeResponse.status).toBe(201);
     expect(completeBody.image.originalName).toBe('cloud.jpg');
     expect(completeBody.image.fullWidth).toBe(1400);
-    expect(completeBody.image.thumbWidth).toBe(1400);
+    expect(completeBody.image.thumbWidth).toBe(480);
     expect(completeBody.image.fullUrl).toContain('memory-storage.test');
-    expect(completeBody.image.thumbUrl).toBe(completeBody.image.fullUrl);
+    expect(completeBody.image.thumbUrl).toContain('memory-storage.test');
+    expect(completeBody.image.thumbUrl).not.toBe(completeBody.image.fullUrl);
+
+    const storedKeys = Array.from(storage.getStore().keys());
+    expect(storedKeys).toHaveLength(3);
+    expect(storedKeys).toContain(initBody.key);
+    expect(storedKeys.some((storedKey) => storedKey.endsWith('-full.jpg'))).toBe(true);
+    expect(storedKeys.some((storedKey) => storedKey.endsWith('-thumb.jpg'))).toBe(true);
   });
 
   it('returns the same image when concurrent direct completion retries use one upload key', async () => {
@@ -230,7 +238,7 @@ describe('Visit image routes', () => {
     const initResponse = await createDirectUploadPlan(visitId, file, app);
     const initBody = (await initResponse.json()) as { key: string };
 
-    await storage.upload(initBody.key, Buffer.from('jpeg-data'), file.type);
+    await storage.upload(initBody.key, await createTestImageBuffer(), file.type);
 
     const complete = () =>
       requestAsAdmin(app, `/api/visits/${visitId}/images/complete`, {
@@ -253,12 +261,46 @@ describe('Visit image routes', () => {
     expect(rows).toHaveLength(1);
   });
 
+  it('returns the completed image when its staged upload has already been removed', async () => {
+    const visitId = await createVisit();
+    const file = new File([await createTestImageBuffer()], 'retry-after-cleanup.jpg', {
+      type: 'image/jpeg'
+    });
+    const app = createAuthedApp({
+      allowServerImageUploads: false,
+      storage
+    });
+    const initResponse = await createDirectUploadPlan(visitId, file, app);
+    const initBody = (await initResponse.json()) as { key: string };
+
+    await storage.upload(initBody.key, await createTestImageBuffer(), file.type);
+
+    const complete = () =>
+      requestAsAdmin(app, `/api/visits/${visitId}/images/complete`, {
+        body: JSON.stringify({ key: initBody.key, originalName: file.name }),
+        headers: { 'content-type': 'application/json' },
+        method: 'POST'
+      });
+    const firstResponse = await complete();
+    const firstBody = (await firstResponse.json()) as { image: { id: number } };
+
+    await storage.delete(initBody.key);
+
+    const retryResponse = await complete();
+    const retryBody = (await retryResponse.json()) as { image: { id: number } };
+
+    expect(firstResponse.status).toBe(201);
+    expect(retryResponse.status).toBe(200);
+    expect(retryBody.image.id).toBe(firstBody.image.id);
+  });
+
   it('allows an admin to complete 25 valid direct uploads for one visit', async () => {
     const visitId = await createVisit();
     const app = createAuthedApp({
       allowServerImageUploads: false,
       storage
     });
+    const imageBuffer = await createTestImageBuffer();
 
     for (const index of Array.from({ length: 25 }, (_, position) => position)) {
       const file = new File(['small'], `batch-${index}.jpg`, { type: 'image/jpeg' });
@@ -266,7 +308,7 @@ describe('Visit image routes', () => {
       const initBody = (await initResponse.json()) as { key: string };
 
       expect(initResponse.status).toBe(201);
-      await storage.upload(initBody.key, Buffer.from('jpeg-data'), file.type);
+      await storage.upload(initBody.key, imageBuffer, file.type);
 
       const completeResponse = await requestAsAdmin(app, `/api/visits/${visitId}/images/complete`, {
         body: JSON.stringify({ key: initBody.key, originalName: file.name }),
@@ -663,6 +705,78 @@ describe('Visit image routes', () => {
     expect(body.error).toContain('Visit not found');
   });
 
+  it('returns 422 when a direct object disappears after its metadata check', async () => {
+    const visitId = await createVisit();
+    const app = createAuthedApp({ allowServerImageUploads: false, storage });
+    const initResponse = await createDirectUploadPlan(
+      visitId,
+      new File(['image'], 'gone.jpg', { type: 'image/jpeg' }),
+      app
+    );
+    const initBody = (await initResponse.json()) as { key: string };
+
+    await storage.upload(initBody.key, await createTestImageBuffer(), 'image/jpeg');
+    vi.spyOn(storage, 'getObject').mockResolvedValueOnce(null);
+
+    const response = await requestAsAdmin(app, `/api/visits/${visitId}/images/complete`, {
+      body: JSON.stringify({ key: initBody.key }),
+      headers: { 'content-type': 'application/json' },
+      method: 'POST'
+    });
+
+    expect(response.status).toBe(422);
+    await expect(response.json()).resolves.toEqual({ error: 'Upload is missing from storage.' });
+  });
+
+  it('rechecks the downloaded direct object size before processing', async () => {
+    const visitId = await createVisit();
+    const app = createAuthedApp({ allowServerImageUploads: false, storage });
+    const initResponse = await createDirectUploadPlan(
+      visitId,
+      new File(['image'], 'replaced.jpg', { type: 'image/jpeg' }),
+      app
+    );
+    const initBody = (await initResponse.json()) as { key: string };
+
+    await storage.upload(initBody.key, await createTestImageBuffer(), 'image/jpeg');
+    vi.spyOn(storage, 'getObjectMetadata').mockResolvedValueOnce({
+      contentLength: 1,
+      contentType: 'image/jpeg'
+    });
+    vi.spyOn(storage, 'getObject').mockResolvedValueOnce(Buffer.alloc(15 * 1024 * 1024 + 1));
+
+    const response = await requestAsAdmin(app, `/api/visits/${visitId}/images/complete`, {
+      body: JSON.stringify({ key: initBody.key }),
+      headers: { 'content-type': 'application/json' },
+      method: 'POST'
+    });
+
+    expect(response.status).toBe(413);
+    await expect(response.json()).resolves.toEqual({ error: 'File too large.' });
+  });
+
+  it('returns a retryable server error when final derivative storage fails', async () => {
+    const visitId = await createVisit();
+    const app = createAuthedApp({ allowServerImageUploads: false, storage });
+    const initResponse = await createDirectUploadPlan(
+      visitId,
+      new File(['image'], 'storage-failure.jpg', { type: 'image/jpeg' }),
+      app
+    );
+    const initBody = (await initResponse.json()) as { key: string };
+
+    await storage.upload(initBody.key, await createTestImageBuffer(), 'image/jpeg');
+    vi.spyOn(storage, 'upload').mockRejectedValueOnce(new Error('R2 unavailable'));
+
+    const response = await requestAsAdmin(app, `/api/visits/${visitId}/images/complete`, {
+      body: JSON.stringify({ key: initBody.key }),
+      headers: { 'content-type': 'application/json' },
+      method: 'POST'
+    });
+
+    expect(response.status).toBe(500);
+  });
+
   it('rejects image completion atomically when its visit no longer exists', async () => {
     await expect(
       repositories.completeVisitImage(testDatabase.database, {
@@ -675,6 +789,23 @@ describe('Visit image routes', () => {
         visitId: 99999
       })
     ).rejects.toThrow('Visit not found');
+  });
+
+  it('uses the final key as an upload identity for compatible repository callers', async () => {
+    const visitId = await createVisit();
+    const fullKey = `visits/${visitId}/final/legacy-full.jpg`;
+
+    const result = await repositories.completeVisitImage(testDatabase.database, {
+      createdAt: '2026-05-01T09:00:00.000Z',
+      displayOrder: 0,
+      fullKey,
+      mimeType: 'image/jpeg',
+      thumbKey: `visits/${visitId}/final/legacy-thumb.jpg`,
+      updatedAt: '2026-05-01T09:00:00.000Z',
+      visitId
+    });
+
+    expect(result).toMatchObject({ created: true, row: { uploadKey: fullKey } });
   });
 
   it('returns 422 when a direct upload key belongs to a different visit', async () => {
@@ -748,6 +879,32 @@ describe('Visit image routes', () => {
     expect(body.error).toContain('Unsupported file type');
   });
 
+  it('returns 422 when a direct upload declared as an image cannot be decoded', async () => {
+    const visitId = await createVisit();
+    const app = createAuthedApp({
+      allowServerImageUploads: false,
+      storage
+    });
+    const initResponse = await createDirectUploadPlan(
+      visitId,
+      new File(['not an image'], 'corrupt.jpg', { type: 'image/jpeg' }),
+      app
+    );
+    const initBody = (await initResponse.json()) as { key: string };
+
+    await storage.upload(initBody.key, Buffer.from('not an image'), 'image/jpeg');
+
+    const response = await requestAsAdmin(app, `/api/visits/${visitId}/images/complete`, {
+      body: JSON.stringify({ key: initBody.key }),
+      headers: { 'content-type': 'application/json' },
+      method: 'POST'
+    });
+    const body = (await response.json()) as { error: string };
+
+    expect(response.status).toBe(422);
+    expect(body.error).toBe('Invalid image content.');
+  });
+
   it.each([
     ['exceeds the stored size limit', 15 * 1024 * 1024 + 1, 413, 'File too large.'],
     ['has a zero stored size', 0, 422, 'Invalid stored file size.'],
@@ -766,7 +923,7 @@ describe('Visit image routes', () => {
     );
     const initBody = (await initResponse.json()) as { key: string };
 
-    await storage.upload(initBody.key, Buffer.from('jpeg-data'), 'image/jpeg');
+    await storage.upload(initBody.key, await createTestImageBuffer(), 'image/jpeg');
     vi.spyOn(storage, 'getObjectMetadata').mockResolvedValueOnce({
       contentLength,
       contentType: 'image/jpeg'
@@ -801,7 +958,7 @@ describe('Visit image routes', () => {
     );
     const initBody = (await initResponse.json()) as { key: string };
 
-    await storage.upload(initBody.key, Buffer.from('jpeg-data'), 'image/jpeg');
+    await storage.upload(initBody.key, await createTestImageBuffer(), 'image/jpeg');
     vi.spyOn(storage, 'getObjectMetadata').mockResolvedValueOnce({
       contentLength: 15 * 1024 * 1024,
       contentType: 'image/jpeg'
@@ -818,7 +975,7 @@ describe('Visit image routes', () => {
       .where(eq(visitImages.visitId, visitId));
 
     expect(response.status).toBe(201);
-    expect(rows).toMatchObject([{ fileSizeBytes: 15 * 1024 * 1024 }]);
+    expect(rows[0]?.fileSizeBytes).toBeGreaterThan(0);
   });
 
   it('falls back to application/octet-stream when storage metadata has no content type', async () => {

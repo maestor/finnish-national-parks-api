@@ -33,8 +33,10 @@ import {
   findAdminByGoogleSub,
   findParkRecordBySlugIncludingRemoved,
   findTripStopImageById,
+  findTripStopImageByUploadKey,
   findTripStopRecordById,
   findVisitImageById,
+  findVisitImageByUploadKey,
   findVisitRecordById,
   getCatalogListEtagSeed,
   getParkBySlug,
@@ -120,6 +122,7 @@ import {
   setSessionCookie,
   verifySessionToken
 } from './http/session.js';
+import { ImageProcessingError, processImage } from './images/process-image.js';
 import { createSlug } from './parks/park-normalization.js';
 import { createAdminInvitationRoute } from './routes/admin-invitations.js';
 import {
@@ -781,6 +784,82 @@ const getVisitImageFileExtension = (contentType: string) => {
   }
 
   return 'jpg';
+};
+
+const createFinalImageKeys = (parentPrefix: 'trip-stops' | 'visits', parentId: number) => {
+  const baseKey = `${parentPrefix}/${parentId}/final/${randomUUID()}`;
+
+  return {
+    fullKey: `${baseKey}-full.jpg`,
+    thumbKey: `${baseKey}-thumb.jpg`
+  };
+};
+
+const isDirectUploadKeyForParent = (
+  key: string,
+  parentPrefix: 'trip-stops' | 'visits',
+  parentId: number
+) => {
+  return key.startsWith(`${parentPrefix}/${parentId}/`);
+};
+
+type DirectImageFinalization =
+  | {
+      error: string;
+      status: 413 | 422;
+      valid: false;
+    }
+  | {
+      fileSizeBytes: number;
+      fullHeight: number;
+      fullKey: string;
+      fullWidth: number;
+      thumbHeight: number;
+      thumbKey: string;
+      thumbWidth: number;
+      valid: true;
+    };
+
+const finalizeDirectImageUpload = async (
+  storage: StorageClient,
+  key: string,
+  parentPrefix: 'trip-stops' | 'visits',
+  parentId: number
+): Promise<DirectImageFinalization> => {
+  const sourceBuffer = await storage.getObject(key);
+
+  if (!sourceBuffer || sourceBuffer.length === 0) {
+    return { error: 'Upload is missing from storage.', status: 422, valid: false };
+  }
+
+  if (sourceBuffer.length > MAX_VISIT_IMAGE_FILE_SIZE) {
+    return { error: 'File too large.', status: 413, valid: false };
+  }
+
+  try {
+    const processed = await processImage(sourceBuffer);
+    const { fullKey, thumbKey } = createFinalImageKeys(parentPrefix, parentId);
+
+    await storage.upload(fullKey, processed.fullBuffer, 'image/jpeg');
+    await storage.upload(thumbKey, processed.thumbBuffer, 'image/jpeg');
+
+    return {
+      fileSizeBytes: processed.fullBuffer.length,
+      fullHeight: processed.fullHeight,
+      fullKey,
+      fullWidth: processed.fullWidth,
+      thumbHeight: processed.thumbHeight,
+      thumbKey,
+      thumbWidth: processed.thumbWidth,
+      valid: true
+    };
+  } catch (error) {
+    if (error instanceof ImageProcessingError) {
+      return { error: 'Invalid image content.', status: 422, valid: false };
+    }
+
+    throw error;
+  }
 };
 
 const normalizeOptionalOriginalName = (originalName?: string | null) => {
@@ -2607,7 +2686,7 @@ export const createApp = ({
           );
         }
 
-        const key = `trip-stops/${id}/${randomUUID()}.${getVisitImageFileExtension(contentType)}`;
+        const key = `trip-stops/${id}/staged/${randomUUID()}.${getVisitImageFileExtension(contentType)}`;
         const uploadUrl = await storage.getPresignedUploadUrl(
           key,
           contentType,
@@ -2639,7 +2718,7 @@ export const createApp = ({
         }
 
         const { id } = context.req.valid('param');
-        const { fullHeight, fullWidth, key, originalName } = context.req.valid('json');
+        const { key, originalName } = context.req.valid('json');
 
         const existingTripStop = await findTripStopRecordById(database, id);
 
@@ -2647,8 +2726,19 @@ export const createApp = ({
           return context.json(jsonNotFound('Trip stop not found.'), 404);
         }
 
-        if (!key.startsWith(`trip-stops/${id}/`)) {
+        if (!isDirectUploadKeyForParent(key, 'trip-stops', id)) {
           return context.json({ error: 'Upload key does not belong to this trip stop.' }, 422);
+        }
+
+        const existingImage = await findTripStopImageByUploadKey(database, id, key);
+
+        if (existingImage) {
+          return context.json(
+            {
+              image: await toVisitImageResponse(storage, existingImage)
+            },
+            200
+          );
         }
 
         const objectMetadata = await storage.getObjectMetadata(key);
@@ -2664,21 +2754,28 @@ export const createApp = ({
         }
 
         try {
+          const finalizedImage = await finalizeDirectImageUpload(storage, key, 'trip-stops', id);
+
+          if (!finalizedImage.valid) {
+            return context.json({ error: finalizedImage.error }, finalizedImage.status);
+          }
+
           const timestamp = new Date().toISOString();
           const completedImage = await completeTripStopImage(database, {
             createdAt: timestamp,
             displayOrder: 0,
-            fileSizeBytes: validatedMetadata.contentLength,
-            fullHeight: fullHeight ?? null,
-            fullKey: key,
-            fullWidth: fullWidth ?? null,
-            mimeType: validatedMetadata.contentType,
+            fileSizeBytes: finalizedImage.fileSizeBytes,
+            fullHeight: finalizedImage.fullHeight,
+            fullKey: finalizedImage.fullKey,
+            fullWidth: finalizedImage.fullWidth,
+            mimeType: 'image/jpeg',
             originalName: normalizeOptionalOriginalName(originalName),
-            thumbHeight: fullHeight ?? null,
-            thumbKey: key,
-            thumbWidth: fullWidth ?? null,
+            thumbHeight: finalizedImage.thumbHeight,
+            thumbKey: finalizedImage.thumbKey,
+            thumbWidth: finalizedImage.thumbWidth,
             tripStopId: id,
-            updatedAt: timestamp
+            updatedAt: timestamp,
+            uploadKey: key
           });
 
           return context.json(
@@ -2902,7 +2999,7 @@ export const createApp = ({
           return context.json({ error: 'File too large.' }, 413);
         }
 
-        const key = `visits/${id}/${randomUUID()}.${getVisitImageFileExtension(contentType)}`;
+        const key = `visits/${id}/staged/${randomUUID()}.${getVisitImageFileExtension(contentType)}`;
         const uploadUrl = await storage.getPresignedUploadUrl(
           key,
           contentType,
@@ -2934,7 +3031,7 @@ export const createApp = ({
         }
 
         const { id } = context.req.valid('param');
-        const { fullHeight, fullWidth, key, originalName } = context.req.valid('json');
+        const { key, originalName } = context.req.valid('json');
 
         const existingVisit = await findVisitRecordById(database, id);
 
@@ -2942,8 +3039,19 @@ export const createApp = ({
           return context.json(jsonNotFound('Visit not found.'), 404);
         }
 
-        if (!key.startsWith(`visits/${id}/`)) {
+        if (!isDirectUploadKeyForParent(key, 'visits', id)) {
           return context.json({ error: 'Upload key does not belong to this visit.' }, 422);
+        }
+
+        const existingImage = await findVisitImageByUploadKey(database, id, key);
+
+        if (existingImage) {
+          return context.json(
+            {
+              image: await toVisitImageResponse(storage, existingImage)
+            },
+            200
+          );
         }
 
         const objectMetadata = await storage.getObjectMetadata(key);
@@ -2958,20 +3066,27 @@ export const createApp = ({
           return context.json({ error: validatedMetadata.error }, validatedMetadata.status);
         }
 
+        const finalizedImage = await finalizeDirectImageUpload(storage, key, 'visits', id);
+
+        if (!finalizedImage.valid) {
+          return context.json({ error: finalizedImage.error }, finalizedImage.status);
+        }
+
         const timestamp = new Date().toISOString();
         const completedImage = await completeVisitImage(database, {
           createdAt: timestamp,
           displayOrder: 0,
-          fileSizeBytes: validatedMetadata.contentLength,
-          fullHeight: fullHeight ?? null,
-          fullKey: key,
-          fullWidth: fullWidth ?? null,
-          mimeType: validatedMetadata.contentType,
+          fileSizeBytes: finalizedImage.fileSizeBytes,
+          fullHeight: finalizedImage.fullHeight,
+          fullKey: finalizedImage.fullKey,
+          fullWidth: finalizedImage.fullWidth,
+          mimeType: 'image/jpeg',
           originalName: normalizeOptionalOriginalName(originalName),
-          thumbHeight: fullHeight ?? null,
-          thumbKey: key,
-          thumbWidth: fullWidth ?? null,
+          thumbHeight: finalizedImage.thumbHeight,
+          thumbKey: finalizedImage.thumbKey,
+          thumbWidth: finalizedImage.thumbWidth,
           updatedAt: timestamp,
+          uploadKey: key,
           visitId: id
         });
 

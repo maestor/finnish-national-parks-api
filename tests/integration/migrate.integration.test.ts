@@ -32,6 +32,8 @@ describe('migrateDatabase', () => {
     const parkColumns = await client.execute('PRAGMA table_info(parks)');
     const tripColumns = await client.execute('PRAGMA table_info(trips)');
     const tripStopColumns = await client.execute('PRAGMA table_info(trip_stops)');
+    const visitImageColumns = await client.execute('PRAGMA table_info(visit_images)');
+    const tripStopImageColumns = await client.execute('PRAGMA table_info(trip_stop_images)');
     const tripVisitColumns = await client.execute('PRAGMA table_info(park_visits)');
     const adminColumns = await client.execute('PRAGMA table_info(admins)');
     const adminInvitationTable = await client.execute(
@@ -79,7 +81,8 @@ describe('migrateDatabase', () => {
       '0031_admin_invitations.sql',
       '0032_admin_super_admin.sql',
       '0033_trip_planner_budget_windows.sql',
-      '0034_image_completion_identity.sql'
+      '0034_image_completion_identity.sql',
+      '0035_image_derivative_upload_identity.sql'
     ]);
     expect(parkTypes.rows.map((row) => String(row.slug))).toEqual([
       'outdoor-recreation-area',
@@ -128,6 +131,8 @@ describe('migrateDatabase', () => {
     expect(tripStopColumns.rows.some((row) => String(row.name) === 'lon')).toBe(true);
     expect(tripStopColumns.rows.some((row) => String(row.name) === 'note')).toBe(true);
     expect(tripStopColumns.rows.some((row) => String(row.name) === 'display_name')).toBe(true);
+    expect(visitImageColumns.rows.some((row) => String(row.name) === 'upload_key')).toBe(true);
+    expect(tripStopImageColumns.rows.some((row) => String(row.name) === 'upload_key')).toBe(true);
     expect(tripVisitColumns.rows.some((row) => String(row.name) === 'trip_id')).toBe(true);
     expect(tripVisitColumns.rows.some((row) => String(row.name) === 'trip_stop_order')).toBe(true);
     expect(tripVisitColumns.rows.some((row) => String(row.name) === 'exclude_from_route')).toBe(
@@ -189,7 +194,8 @@ describe('migrateDatabase', () => {
       '0031_admin_invitations.sql',
       '0032_admin_super_admin.sql',
       '0033_trip_planner_budget_windows.sql',
-      '0034_image_completion_identity.sql'
+      '0034_image_completion_identity.sql',
+      '0035_image_derivative_upload_identity.sql'
     ]);
     expect(schemaMigrationTableBeforeApply.rows).toEqual([]);
     expect(pendingAfterApply).toEqual([]);

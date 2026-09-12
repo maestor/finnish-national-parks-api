@@ -1,9 +1,18 @@
 import sharp from 'sharp';
 
-const FULL_MAX_DIMENSION = 1920;
-const FULL_QUALITY = 80;
-const THUMB_MAX_DIMENSION = 400;
-const THUMB_QUALITY = 75;
+const FULL_MAX_DIMENSION = 2560;
+const FULL_QUALITY = 82;
+const MAX_INPUT_PIXELS = 40_000_000;
+const THUMB_MAX_DIMENSION = 480;
+const THUMB_QUALITY_STEPS = [83, 74, 66, 58, 50] as const;
+const THUMB_TARGET_BYTES = 150 * 1024;
+
+export class ImageProcessingError extends Error {
+  constructor(message = 'Image processing failed.') {
+    super(message);
+    this.name = 'ImageProcessingError';
+  }
+}
 
 export type ProcessedImage = {
   fullBuffer: Buffer;
@@ -15,45 +24,58 @@ export type ProcessedImage = {
 };
 
 export const processImage = async (buffer: Buffer): Promise<ProcessedImage> => {
-  const pipeline = sharp(buffer).rotate();
+  try {
+    const pipeline = sharp(buffer, { failOn: 'error', limitInputPixels: MAX_INPUT_PIXELS })
+      .rotate()
+      .flatten({ background: '#ffffff' });
 
-  const metadata = await pipeline.clone().metadata();
-  const originalWidth = metadata.width!;
-  const originalHeight = metadata.height!;
+    const fullBuffer = await pipeline
+      .clone()
+      .resize({
+        fit: 'inside',
+        height: FULL_MAX_DIMENSION,
+        width: FULL_MAX_DIMENSION,
+        withoutEnlargement: true
+      })
+      .jpeg({ quality: FULL_QUALITY })
+      .toBuffer();
 
-  const needsResize = originalWidth > FULL_MAX_DIMENSION || originalHeight > FULL_MAX_DIMENSION;
+    const createThumbnail = async (quality: number) => {
+      return pipeline
+        .clone()
+        .resize({
+          fit: 'inside',
+          height: THUMB_MAX_DIMENSION,
+          width: THUMB_MAX_DIMENSION,
+          withoutEnlargement: true
+        })
+        .jpeg({ quality })
+        .toBuffer();
+    };
+    let thumbBuffer = await createThumbnail(THUMB_QUALITY_STEPS[0]);
 
-  const fullBuffer = await pipeline
-    .clone()
-    .resize({
-      fit: 'inside',
-      height: needsResize ? FULL_MAX_DIMENSION : undefined,
-      width: needsResize ? FULL_MAX_DIMENSION : undefined,
-      withoutEnlargement: true
-    })
-    .jpeg({ quality: FULL_QUALITY })
-    .toBuffer();
+    for (const quality of THUMB_QUALITY_STEPS.slice(1)) {
+      if (thumbBuffer.length <= THUMB_TARGET_BYTES) {
+        break;
+      }
 
-  const thumbBuffer = await pipeline
-    .clone()
-    .resize({
-      fit: 'inside',
-      height: THUMB_MAX_DIMENSION,
-      width: THUMB_MAX_DIMENSION,
-      withoutEnlargement: true
-    })
-    .jpeg({ quality: THUMB_QUALITY })
-    .toBuffer();
+      thumbBuffer = await createThumbnail(quality);
+    }
 
-  const fullInfo = await sharp(fullBuffer).metadata();
-  const thumbInfo = await sharp(thumbBuffer).metadata();
+    const [fullInfo, thumbInfo] = await Promise.all([
+      sharp(fullBuffer).metadata(),
+      sharp(thumbBuffer).metadata()
+    ]);
 
-  return {
-    fullBuffer,
-    fullHeight: fullInfo.height!,
-    fullWidth: fullInfo.width!,
-    thumbBuffer,
-    thumbHeight: thumbInfo.height!,
-    thumbWidth: thumbInfo.width!
-  };
+    return {
+      fullBuffer,
+      fullHeight: fullInfo.height!,
+      fullWidth: fullInfo.width!,
+      thumbBuffer,
+      thumbHeight: thumbInfo.height!,
+      thumbWidth: thumbInfo.width!
+    };
+  } catch {
+    throw new ImageProcessingError();
+  }
 };
