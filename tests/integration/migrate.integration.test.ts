@@ -78,7 +78,8 @@ describe('migrateDatabase', () => {
       '0030_admin_google_sub.sql',
       '0031_admin_invitations.sql',
       '0032_admin_super_admin.sql',
-      '0033_trip_planner_budget_windows.sql'
+      '0033_trip_planner_budget_windows.sql',
+      '0034_image_completion_identity.sql'
     ]);
     expect(parkTypes.rows.map((row) => String(row.slug))).toEqual([
       'outdoor-recreation-area',
@@ -187,7 +188,8 @@ describe('migrateDatabase', () => {
       '0030_admin_google_sub.sql',
       '0031_admin_invitations.sql',
       '0032_admin_super_admin.sql',
-      '0033_trip_planner_budget_windows.sql'
+      '0033_trip_planner_budget_windows.sql',
+      '0034_image_completion_identity.sql'
     ]);
     expect(schemaMigrationTableBeforeApply.rows).toEqual([]);
     expect(pendingAfterApply).toEqual([]);

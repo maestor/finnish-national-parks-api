@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { createApp } from '../../src/app.js';
+import { createMemoryStorage } from '../../src/storage/memory-storage.js';
 import { createTestDatabase } from '../helpers/test-db.js';
 
 describe('health endpoint', () => {
@@ -25,13 +26,31 @@ describe('health endpoint', () => {
   });
 
   it('exposes the OpenAPI document', async () => {
-    const response = await createApp({ database: testDatabase.database }).request('/openapi.json');
-    const document = (await response.json()) as { paths: Record<string, unknown> };
+    const response = await createApp({
+      database: testDatabase.database,
+      storage: createMemoryStorage()
+    }).request('/openapi.json');
+    const document = (await response.json()) as {
+      paths: Record<
+        string,
+        {
+          post?: {
+            responses?: Record<string, unknown>;
+          };
+        }
+      >;
+    };
     const serialized = JSON.stringify(document);
 
     expect(response.status).toBe(200);
     expect(document.paths['/health']).toBeDefined();
     expect(serialized).toContain('hasMagnet');
+    expect(
+      document.paths['/api/visits/{id}/images/complete']?.post?.responses?.['200']
+    ).toBeDefined();
+    expect(
+      document.paths['/api/trip-stops/{id}/images/complete']?.post?.responses?.['200']
+    ).toBeDefined();
   });
 
   it('returns safe 500 for unhandled errors without leaking stack traces', async () => {

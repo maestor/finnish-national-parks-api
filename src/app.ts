@@ -14,6 +14,8 @@ import {
   AdminAlreadyEnrolledError,
   AdminSelfModificationError,
   acceptAdminInvitation,
+  completeTripStopImage,
+  completeVisitImage,
   countTripStopImages,
   createAdminInvitation,
   createTrip,
@@ -2663,7 +2665,7 @@ export const createApp = ({
 
         try {
           const timestamp = new Date().toISOString();
-          const row = await createTripStopImage(database, {
+          const completedImage = await completeTripStopImage(database, {
             createdAt: timestamp,
             displayOrder: 0,
             fileSizeBytes: validatedMetadata.contentLength,
@@ -2681,9 +2683,9 @@ export const createApp = ({
 
           return context.json(
             {
-              image: await toVisitImageResponse(storage, row)
+              image: await toVisitImageResponse(storage, completedImage.row)
             },
-            201
+            completedImage.created ? 201 : 200
           );
         } catch (error) {
           if (error instanceof RepositoryValidationError) {
@@ -2957,7 +2959,7 @@ export const createApp = ({
         }
 
         const timestamp = new Date().toISOString();
-        const row = await createVisitImage(database, {
+        const completedImage = await completeVisitImage(database, {
           createdAt: timestamp,
           displayOrder: 0,
           fileSizeBytes: validatedMetadata.contentLength,
@@ -2975,9 +2977,9 @@ export const createApp = ({
 
         return context.json(
           {
-            image: await toVisitImageResponse(storage, row)
+            image: await toVisitImageResponse(storage, completedImage.row)
           },
-          201
+          completedImage.created ? 201 : 200
         );
       });
 
