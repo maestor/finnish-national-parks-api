@@ -38,6 +38,8 @@ Restrict log access and retention to operational roles. Treat any confirmed hist
 
 - Keep R2 private and use presigned URLs for non-public media.
 - Validate limits against stored-object metadata, not only client-declared metadata. Direct-upload completion requires a positive integer stored size no greater than 15 MiB; missing or invalid metadata returns `422`, while an oversized stored object returns `413` and creates no image row.
+- A direct-upload object key is a parent-scoped completion identity. Retrying the same completion returns the original image with `200` and fresh read URLs; a first successful completion returns `201`. The database enforces this identity and atomically admits no more than six trip-stop images.
+- Before applying migration `0034_image_completion_identity.sql` to an existing database, run `npm run db:check-image-duplicates`. It is read-only and exits nonzero with every duplicate parent/key group, its ordering, and featured-image references. Repair any reported group manually before migrating; do not delete ambiguous rows automatically.
 - Keep upload and object-retention limits documented so bandwidth and storage remain predictable.
 - Do not remove media based only on absence from ordinary image rows; published review snapshots can still reference frozen image keys.
 

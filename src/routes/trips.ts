@@ -591,6 +591,14 @@ export const completeTripStopImageUploadRoute = createRoute({
     }
   },
   responses: {
+    200: {
+      description: 'Returned the existing image for an idempotent direct-upload completion retry',
+      content: {
+        'application/json': {
+          schema: completeDirectVisitImageUploadResponseSchema
+        }
+      }
+    },
     201: {
       description: 'Stored one directly uploaded trip stop image',
       content: {

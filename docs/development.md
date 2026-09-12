@@ -319,8 +319,8 @@ Key route behavior:
 - Image routes are only registered when R2 credentials (or `MEMORY_STORAGE=true`) are configured.
 - Localhost-style server uploads still use `POST /api/visits/:id/images`, which accepts multipart/form-data, resizes images with Sharp, and stores derived JPEGs in R2 or memory storage.
 - Localhost-style server uploads also support `POST /api/trip-stops/:id/images`, which uses the same Sharp-based processing path and enforces the 6-image trip-stop cap.
-- Deployed clients should use the Vercel-safe direct flow instead: `POST /api/visits/:id/images/upload-url`, upload the file to the returned presigned `PUT` URL, then call `POST /api/visits/:id/images/complete`.
-- Trip-stop images use the same Vercel-safe direct flow: `POST /api/trip-stops/:id/images/upload-url`, upload the file to the returned presigned `PUT` URL, then call `POST /api/trip-stops/:id/images/complete`.
+- Deployed clients should use the Vercel-safe direct flow instead: `POST /api/visits/:id/images/upload-url`, upload the file to the returned presigned `PUT` URL, then call `POST /api/visits/:id/images/complete`. Repeating completion with the same key returns the already-created image with `200`; a first completion returns `201`.
+- Trip-stop images use the same Vercel-safe direct flow: `POST /api/trip-stops/:id/images/upload-url`, upload the file to the returned presigned `PUT` URL, then call `POST /api/trip-stops/:id/images/complete`. The same key is idempotent, and atomic completion admission preserves the six-image limit even when multiple upload URLs are outstanding.
 - The direct flow currently stores the uploaded object as both the full-size and thumbnail asset, so it avoids Vercel body and Sharp runtime limits without requiring server-side image processing.
 - Image responses include time-limited presigned URLs so the R2 bucket can remain private.
 

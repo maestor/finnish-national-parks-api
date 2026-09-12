@@ -3735,7 +3735,7 @@ export const reassignParkVisits = async (
   };
 };
 
-export const findVisitRecordById = async (database: Database, visitId: number) => {
+export const findVisitRecordById = async (database: DbClient, visitId: number) => {
   const rows = await database.select().from(parkVisits).where(eq(parkVisits.id, visitId)).limit(1);
   return rows[0] ?? null;
 };
@@ -4163,12 +4163,10 @@ export const createVisitImage = async (
   database: Database,
   values: typeof visitImages.$inferInsert
 ) => {
-  const row = (await database.insert(visitImages).values(values).returning())[0]!;
-  await bumpPublicVisitDataVersion(database, values.updatedAt);
-  return row;
+  return (await completeVisitImage(database, values)).row;
 };
 
-export const countTripStopImages = async (database: Database, tripStopId: number) => {
+export const countTripStopImages = async (database: DbClient, tripStopId: number) => {
   const rows = await database
     .select({ count: sql<number>`COUNT(*)` })
     .from(tripStopImages)
@@ -4181,32 +4179,139 @@ export const createTripStopImage = async (
   database: Database,
   values: typeof tripStopImages.$inferInsert
 ) => {
-  const existingTripStop = await findTripStopRecordById(database, values.tripStopId);
+  return (await completeTripStopImage(database, values)).row;
+};
 
-  if (!existingTripStop) {
-    throw new RepositoryNotFoundError('Trip stop not found.');
-  }
+type CompletedImage<Row> = {
+  created: boolean;
+  row: Row;
+};
 
-  const imageCount = await countTripStopImages(database, values.tripStopId);
+const findVisitImageByUploadIdentity = async (
+  database: DbClient,
+  visitId: number,
+  fullKey: string
+) => {
+  return (
+    await database
+      .select()
+      .from(visitImages)
+      .where(and(eq(visitImages.visitId, visitId), eq(visitImages.fullKey, fullKey)))
+      .limit(1)
+  )[0]!;
+};
 
-  if (imageCount >= MAX_TRIP_STOP_IMAGES) {
+const findTripStopImageByUploadIdentity = async (
+  database: DbClient,
+  tripStopId: number,
+  fullKey: string
+) => {
+  return (
+    (
+      await database
+        .select()
+        .from(tripStopImages)
+        .where(and(eq(tripStopImages.tripStopId, tripStopId), eq(tripStopImages.fullKey, fullKey)))
+        .limit(1)
+    )[0] ?? null
+  );
+};
+
+export const completeVisitImage = async (
+  database: Database,
+  values: typeof visitImages.$inferInsert
+): Promise<CompletedImage<typeof visitImages.$inferSelect>> => {
+  return database.transaction(async (transaction) => {
+    const visit = await findVisitRecordById(transaction, values.visitId);
+
+    if (!visit) {
+      throw new RepositoryNotFoundError('Visit not found.');
+    }
+
+    const originalName = values.originalName ?? null;
+    const fullWidth = values.fullWidth ?? null;
+    const fullHeight = values.fullHeight ?? null;
+    const thumbWidth = values.thumbWidth ?? null;
+    const thumbHeight = values.thumbHeight ?? null;
+    const fileSizeBytes = values.fileSizeBytes ?? null;
+    const insertResult = await transaction.run(sql`
+      INSERT INTO visit_images (
+        visit_id, full_key, thumb_key, original_name, mime_type,
+        full_width, full_height, thumb_width, thumb_height,
+        file_size_bytes, display_order, created_at, updated_at
+      )
+      SELECT
+        ${values.visitId}, ${values.fullKey}, ${values.thumbKey}, ${originalName}, ${values.mimeType},
+        ${fullWidth}, ${fullHeight}, ${thumbWidth}, ${thumbHeight},
+        ${fileSizeBytes}, ${values.displayOrder}, ${values.createdAt}, ${values.updatedAt}
+      WHERE EXISTS (SELECT 1 FROM park_visits WHERE id = ${values.visitId})
+      ON CONFLICT(visit_id, full_key) DO NOTHING
+    `);
+    const row = await findVisitImageByUploadIdentity(transaction, values.visitId, values.fullKey);
+
+    const created = Number(insertResult.rowsAffected) > 0;
+
+    if (created) {
+      await bumpPublicVisitDataVersion(transaction, values.updatedAt);
+    }
+
+    return { created, row };
+  });
+};
+
+export const completeTripStopImage = async (
+  database: Database,
+  values: typeof tripStopImages.$inferInsert
+): Promise<CompletedImage<typeof tripStopImages.$inferSelect>> => {
+  return database.transaction(async (transaction) => {
+    const originalName = values.originalName ?? null;
+    const fullWidth = values.fullWidth ?? null;
+    const fullHeight = values.fullHeight ?? null;
+    const thumbWidth = values.thumbWidth ?? null;
+    const thumbHeight = values.thumbHeight ?? null;
+    const fileSizeBytes = values.fileSizeBytes ?? null;
+    const insertResult = await transaction.run(sql`
+      INSERT INTO trip_stop_images (
+        trip_stop_id, full_key, thumb_key, original_name, mime_type,
+        full_width, full_height, thumb_width, thumb_height,
+        file_size_bytes, display_order, created_at, updated_at
+      )
+      SELECT
+        ${values.tripStopId}, ${values.fullKey}, ${values.thumbKey}, ${originalName}, ${values.mimeType},
+        ${fullWidth}, ${fullHeight}, ${thumbWidth}, ${thumbHeight},
+        ${fileSizeBytes}, ${values.displayOrder}, ${values.createdAt}, ${values.updatedAt}
+      WHERE EXISTS (SELECT 1 FROM trip_stops WHERE id = ${values.tripStopId})
+        AND (
+          SELECT COUNT(*) FROM trip_stop_images WHERE trip_stop_id = ${values.tripStopId}
+        ) < ${MAX_TRIP_STOP_IMAGES}
+      ON CONFLICT(trip_stop_id, full_key) DO NOTHING
+    `);
+    const row = await findTripStopImageByUploadIdentity(
+      transaction,
+      values.tripStopId,
+      values.fullKey
+    );
+
+    if (row) {
+      const created = Number(insertResult.rowsAffected) > 0;
+
+      if (created) {
+        await bumpPublicVisitDataVersion(transaction, values.updatedAt);
+      }
+
+      return { created, row };
+    }
+
+    const tripStop = await findTripStopRecordById(transaction, values.tripStopId);
+
+    if (!tripStop) {
+      throw new RepositoryNotFoundError('Trip stop not found.');
+    }
+
     throw new RepositoryValidationError(
       `Trip stop already has the maximum of ${MAX_TRIP_STOP_IMAGES} images.`
     );
-  }
-
-  const row = (await database.insert(tripStopImages).values(values).returning())[0]!;
-  await bumpPublicVisitDataVersion(database, values.updatedAt);
-  return row;
-};
-
-export const findVisitImageById = async (database: Database, imageId: number) => {
-  const rows = await database
-    .select()
-    .from(visitImages)
-    .where(eq(visitImages.id, imageId))
-    .limit(1);
-  return rows[0] ?? null;
+  });
 };
 
 export const findTripStopImageById = async (database: Database, imageId: number) => {
@@ -4214,6 +4319,16 @@ export const findTripStopImageById = async (database: Database, imageId: number)
     .select()
     .from(tripStopImages)
     .where(eq(tripStopImages.id, imageId))
+    .limit(1);
+
+  return rows[0] ?? null;
+};
+
+export const findVisitImageById = async (database: Database, imageId: number) => {
+  const rows = await database
+    .select()
+    .from(visitImages)
+    .where(eq(visitImages.id, imageId))
     .limit(1);
 
   return rows[0] ?? null;

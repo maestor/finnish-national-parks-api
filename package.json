@@ -10,6 +10,7 @@
     "dev": "tsx watch src/local-server.ts",
     "start": "tsx src/local-server.ts",
     "db:backup": "tsx src/cli/backup-turso.ts",
+    "db:check-image-duplicates": "tsx src/cli/check-image-completion-duplicates.ts",
     "db:migrate": "tsx src/cli/migrate.ts",
     "db:migrate:pending": "tsx src/cli/check-pending-migrations.ts",
     "import:parks": "tsx src/cli/import-parks.ts",

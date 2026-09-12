@@ -3,6 +3,7 @@ import sharp from 'sharp';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { createApp } from '../../src/app.js';
+import * as repositories from '../../src/db/repositories.js';
 import { visitImages } from '../../src/db/schema.js';
 import { createSessionToken } from '../../src/http/session.js';
 import { importParks } from '../../src/importer/import-parks.js';
@@ -217,6 +218,39 @@ describe('Visit image routes', () => {
     expect(completeBody.image.thumbWidth).toBe(1400);
     expect(completeBody.image.fullUrl).toContain('memory-storage.test');
     expect(completeBody.image.thumbUrl).toBe(completeBody.image.fullUrl);
+  });
+
+  it('returns the same image when concurrent direct completion retries use one upload key', async () => {
+    const visitId = await createVisit();
+    const file = new File([await createTestImageBuffer()], 'retry.jpg', { type: 'image/jpeg' });
+    const app = createAuthedApp({
+      allowServerImageUploads: false,
+      storage
+    });
+    const initResponse = await createDirectUploadPlan(visitId, file, app);
+    const initBody = (await initResponse.json()) as { key: string };
+
+    await storage.upload(initBody.key, Buffer.from('jpeg-data'), file.type);
+
+    const complete = () =>
+      requestAsAdmin(app, `/api/visits/${visitId}/images/complete`, {
+        body: JSON.stringify({ key: initBody.key, originalName: file.name }),
+        headers: { 'content-type': 'application/json' },
+        method: 'POST'
+      });
+    const [firstResponse, retryResponse] = await Promise.all([complete(), complete()]);
+    const [firstBody, retryBody] = (await Promise.all([
+      firstResponse.json(),
+      retryResponse.json()
+    ])) as [{ image: { id: number } }, { image: { id: number } }];
+    const rows = await testDatabase.database
+      .select()
+      .from(visitImages)
+      .where(eq(visitImages.visitId, visitId));
+
+    expect([firstResponse.status, retryResponse.status].sort()).toEqual([200, 201]);
+    expect(firstBody.image.id).toBe(retryBody.image.id);
+    expect(rows).toHaveLength(1);
   });
 
   it('allows an admin to complete 25 valid direct uploads for one visit', async () => {
@@ -627,6 +661,20 @@ describe('Visit image routes', () => {
 
     expect(response.status).toBe(404);
     expect(body.error).toContain('Visit not found');
+  });
+
+  it('rejects image completion atomically when its visit no longer exists', async () => {
+    await expect(
+      repositories.completeVisitImage(testDatabase.database, {
+        createdAt: '2026-05-01T09:00:00.000Z',
+        displayOrder: 0,
+        fullKey: 'visits/99999/missing.jpg',
+        mimeType: 'image/jpeg',
+        thumbKey: 'visits/99999/missing-thumb.jpg',
+        updatedAt: '2026-05-01T09:00:00.000Z',
+        visitId: 99999
+      })
+    ).rejects.toThrow('Visit not found');
   });
 
   it('returns 422 when a direct upload key belongs to a different visit', async () => {

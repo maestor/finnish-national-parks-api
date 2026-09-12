@@ -185,6 +185,10 @@ export const visitImages = sqliteTable(
   },
   (table) => ({
     visitIdIndex: index('visit_images_visit_id_idx').on(table.visitId),
+    visitUploadIdentityIndex: uniqueIndex('visit_images_visit_full_key_idx').on(
+      table.visitId,
+      table.fullKey
+    ),
     orderIndex: index('visit_images_order_idx').on(table.visitId, table.displayOrder)
   })
 );
@@ -211,7 +215,11 @@ export const tripStopImages = sqliteTable(
   },
   (table) => ({
     orderIndex: index('trip_stop_images_order_idx').on(table.tripStopId, table.displayOrder),
-    tripStopIdIndex: index('trip_stop_images_trip_stop_id_idx').on(table.tripStopId)
+    tripStopIdIndex: index('trip_stop_images_trip_stop_id_idx').on(table.tripStopId),
+    tripStopUploadIdentityIndex: uniqueIndex('trip_stop_images_trip_stop_full_key_idx').on(
+      table.tripStopId,
+      table.fullKey
+    )
   })
 );
 
