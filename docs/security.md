@@ -18,7 +18,7 @@ Google ID tokens are verified locally with `jose` against the fixed Google JWKS 
 
 Admin access requires the verified Google email and stable Google `sub` to match `admins`. Migration `0030_admin_google_sub.sql` adds the nullable unique subject column. An email-only row does not grant normal login access.
 
-Migration `0032_admin_super_admin.sql` adds the `super_admin` flag, defaulting to false. Super-admin authorization is resolved from the current database row, so role changes apply to the next protected request. Super admins can list, promote, demote, or remove other admins; self-modification is rejected. Admin invitations use the same super-admin boundary.
+Migration `0032_admin_super_admin.sql` adds the `super_admin` flag, defaulting to false. Super-admin authorization is resolved from the current database row, so role changes apply to the next protected request. Super admins can list, promote, demote, or remove other admins; self-modification is rejected. Removing an admin deletes the allowlist row and blocks future login, but an already-issued stateless session can still reach ordinary admin routes until its 24-hour expiry. Admin invitations use the same super-admin boundary.
 
 Enrolled super admins can create an invitation with `POST /api/admin/invitations`. The email is normalized and validated syntactically; Google account existence is checked only when the recipient completes OAuth. Migration `0031_admin_invitations.sql` stores only a SHA-256 token hash. Each link is private, single-use, valid for 30 minutes, and revokes an earlier pending invitation for the same email. Acceptance requires an exact match with the verified Google email, then atomically binds an email-only row or inserts a new admin before issuing the normal session.
 

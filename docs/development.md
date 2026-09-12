@@ -222,7 +222,7 @@ Catalog rows marked with `parks.removed = 1` are intentionally hidden from park 
 
 The `admins` table stores an allowed Google email, the explicitly provisioned stable Google `sub`, and the `super_admin` boolean for control-panel access. It contains `email`, nullable `google_sub`, `super_admin` (default `0`), `created_at`, and `updated_at` — names and pictures are not persisted. A row with a null `google_sub` is intentionally not sufficient for normal login after migration `0030_admin_google_sub.sql`.
 
-Super admins can use `GET /api/admin/admins`, `PATCH /api/admin/admins/:id`, and `DELETE /api/admin/admins/:id` to list, change, or remove other admin rows. A super admin cannot change or remove their own row. The same super-admin check protects `POST /api/admin/invitations`.
+Super admins can use `GET /api/admin/admins`, `PATCH /api/admin/admins/:id`, and `DELETE /api/admin/admins/:id` to list, change, or remove other admin rows. A super admin cannot change or remove their own row. Removing a row blocks future login; existing stateless sessions expire normally. The same super-admin check protects `POST /api/admin/invitations`.
 
 Migration `0031_admin_invitations.sql` stores only invitation token hashes and migration `0032_admin_super_admin.sql` adds the role flag. Invitations are 30-minute, single-use links; acceptance verifies a signed Google ID token with `email_verified === true`, requires an exact email match, then binds an existing email-only row or inserts a new admin before creating the regular session. The API does not look up Google accounts before acceptance.
 
