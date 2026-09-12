@@ -37,7 +37,7 @@ Restrict log access and retention to operational roles. Treat any confirmed hist
 ## Storage and uploads
 
 - Keep R2 private and use presigned URLs for non-public media.
-- Validate limits against stored-object metadata, not only client-declared metadata.
+- Validate limits against stored-object metadata, not only client-declared metadata. Direct-upload completion requires a positive integer stored size no greater than 15 MiB; missing or invalid metadata returns `422`, while an oversized stored object returns `413` and creates no image row.
 - Keep upload and object-retention limits documented so bandwidth and storage remain predictable.
 - Do not remove media based only on absence from ordinary image rows; published review snapshots can still reference frozen image keys.
 

@@ -1,7 +1,9 @@
+import { eq } from 'drizzle-orm';
 import sharp from 'sharp';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { createApp } from '../../src/app.js';
+import { visitImages } from '../../src/db/schema.js';
 import { createSessionToken } from '../../src/http/session.js';
 import { importParks } from '../../src/importer/import-parks.js';
 import { createMemoryStorage } from '../../src/storage/memory-storage.js';
@@ -215,6 +217,38 @@ describe('Visit image routes', () => {
     expect(completeBody.image.thumbWidth).toBe(1400);
     expect(completeBody.image.fullUrl).toContain('memory-storage.test');
     expect(completeBody.image.thumbUrl).toBe(completeBody.image.fullUrl);
+  });
+
+  it('allows an admin to complete 25 valid direct uploads for one visit', async () => {
+    const visitId = await createVisit();
+    const app = createAuthedApp({
+      allowServerImageUploads: false,
+      storage
+    });
+
+    for (const index of Array.from({ length: 25 }, (_, position) => position)) {
+      const file = new File(['small'], `batch-${index}.jpg`, { type: 'image/jpeg' });
+      const initResponse = await createDirectUploadPlan(visitId, file, app);
+      const initBody = (await initResponse.json()) as { key: string };
+
+      expect(initResponse.status).toBe(201);
+      await storage.upload(initBody.key, Buffer.from('jpeg-data'), file.type);
+
+      const completeResponse = await requestAsAdmin(app, `/api/visits/${visitId}/images/complete`, {
+        body: JSON.stringify({ key: initBody.key, originalName: file.name }),
+        headers: { 'content-type': 'application/json' },
+        method: 'POST'
+      });
+
+      expect(completeResponse.status).toBe(201);
+    }
+
+    const rows = await testDatabase.database
+      .select()
+      .from(visitImages)
+      .where(eq(visitImages.visitId, visitId));
+
+    expect(rows).toHaveLength(25);
   });
 
   it('creates a direct upload plan with a png key extension for png uploads', async () => {
@@ -666,57 +700,77 @@ describe('Visit image routes', () => {
     expect(body.error).toContain('Unsupported file type');
   });
 
-  it('stores null optional direct upload fields when metadata is incomplete or blank', async () => {
+  it.each([
+    ['exceeds the stored size limit', 15 * 1024 * 1024 + 1, 413, 'File too large.'],
+    ['has a zero stored size', 0, 422, 'Invalid stored file size.'],
+    ['has a negative stored size', -1, 422, 'Invalid stored file size.'],
+    ['has no stored size', null, 422, 'Invalid stored file size.']
+  ])('rejects a direct visit upload that %s', async (_scenario, contentLength, status, error) => {
     const visitId = await createVisit();
-    const baseStorage = createMemoryStorage();
-    const storageWithNullMetadata = {
-      ...baseStorage,
-      getObjectMetadata: async () => ({
-        contentLength: null,
-        contentType: 'image/jpeg'
-      })
-    };
     const app = createAuthedApp({
       allowServerImageUploads: false,
-      storage: storageWithNullMetadata
+      storage
     });
-
-    const initResponse = await requestAsAdmin(app, `/api/visits/${visitId}/images/upload-url`, {
-      body: JSON.stringify({
-        contentType: 'image/jpeg',
-        fileSizeBytes: 100,
-        originalName: 'blank.jpg'
-      }),
-      headers: { 'content-type': 'application/json' },
-      method: 'POST'
-    });
+    const initResponse = await createDirectUploadPlan(
+      visitId,
+      new File(['small'], 'stored-size.jpg', { type: 'image/jpeg' }),
+      app
+    );
     const initBody = (await initResponse.json()) as { key: string };
 
-    await baseStorage.upload(initBody.key, Buffer.from('jpeg-data'), 'image/jpeg');
+    await storage.upload(initBody.key, Buffer.from('jpeg-data'), 'image/jpeg');
+    vi.spyOn(storage, 'getObjectMetadata').mockResolvedValueOnce({
+      contentLength,
+      contentType: 'image/jpeg'
+    });
 
     const response = await requestAsAdmin(app, `/api/visits/${visitId}/images/complete`, {
-      body: JSON.stringify({
-        key: initBody.key
-      }),
+      body: JSON.stringify({ key: initBody.key }),
       headers: { 'content-type': 'application/json' },
       method: 'POST'
     });
-    const body = (await response.json()) as {
-      image: {
-        fullHeight: number | null;
-        fullWidth: number | null;
-        originalName: string | null;
-        thumbHeight: number | null;
-        thumbWidth: number | null;
-      };
-    };
+    const body = (await response.json()) as { error: string };
+    const rows = await testDatabase.database
+      .select()
+      .from(visitImages)
+      .where(eq(visitImages.visitId, visitId));
+
+    expect(response.status).toBe(status);
+    expect(body.error).toBe(error);
+    expect(rows).toHaveLength(0);
+  });
+
+  it('accepts a direct visit upload at the stored size limit', async () => {
+    const visitId = await createVisit();
+    const app = createAuthedApp({
+      allowServerImageUploads: false,
+      storage
+    });
+    const initResponse = await createDirectUploadPlan(
+      visitId,
+      new File(['small'], 'stored-limit.jpg', { type: 'image/jpeg' }),
+      app
+    );
+    const initBody = (await initResponse.json()) as { key: string };
+
+    await storage.upload(initBody.key, Buffer.from('jpeg-data'), 'image/jpeg');
+    vi.spyOn(storage, 'getObjectMetadata').mockResolvedValueOnce({
+      contentLength: 15 * 1024 * 1024,
+      contentType: 'image/jpeg'
+    });
+
+    const response = await requestAsAdmin(app, `/api/visits/${visitId}/images/complete`, {
+      body: JSON.stringify({ key: initBody.key }),
+      headers: { 'content-type': 'application/json' },
+      method: 'POST'
+    });
+    const rows = await testDatabase.database
+      .select()
+      .from(visitImages)
+      .where(eq(visitImages.visitId, visitId));
 
     expect(response.status).toBe(201);
-    expect(body.image.originalName).toBeNull();
-    expect(body.image.fullHeight).toBeNull();
-    expect(body.image.fullWidth).toBeNull();
-    expect(body.image.thumbHeight).toBeNull();
-    expect(body.image.thumbWidth).toBeNull();
+    expect(rows).toMatchObject([{ fileSizeBytes: 15 * 1024 * 1024 }]);
   });
 
   it('falls back to application/octet-stream when storage metadata has no content type', async () => {
@@ -725,7 +779,7 @@ describe('Visit image routes', () => {
     const storageWithMissingContentType = {
       ...baseStorage,
       getObjectMetadata: async () => ({
-        contentLength: null,
+        contentLength: 5,
         contentType: null
       })
     };
