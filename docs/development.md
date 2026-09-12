@@ -220,15 +220,19 @@ Catalog rows marked with `parks.removed = 1` are intentionally hidden from park 
 
 ### Admin Allowlist
 
-The `admins` table stores an allowed Google email plus the explicitly provisioned stable Google `sub` for control-panel access. It contains `email`, nullable `google_sub`, `created_at`, and `updated_at` — names and pictures are not persisted. A row with a null `google_sub` is intentionally not sufficient for normal login after migration `0030_admin_google_sub.sql`.
+The `admins` table stores an allowed Google email, the explicitly provisioned stable Google `sub`, and the `super_admin` boolean for control-panel access. It contains `email`, nullable `google_sub`, `super_admin` (default `0`), `created_at`, and `updated_at` — names and pictures are not persisted. A row with a null `google_sub` is intentionally not sufficient for normal login after migration `0030_admin_google_sub.sql`.
 
-An enrolled admin can use `POST /api/admin/invitations` from the control panel to create a 30-minute, single-use enrollment link. Migration `0031_admin_invitations.sql` stores only its hash and revokes an earlier pending link for the same normalized email. Acceptance verifies a signed Google ID token with `email_verified === true`, requires an exact email match, then binds an existing email-only row or inserts a new admin before creating the regular session. The API does not look up Google accounts before acceptance.
+Super admins can use `GET /api/admin/admins`, `PATCH /api/admin/admins/:id`, and `DELETE /api/admin/admins/:id` to list, change, or remove other admin rows. A super admin cannot change or remove their own row. The same super-admin check protects `POST /api/admin/invitations`.
+
+Migration `0031_admin_invitations.sql` stores only invitation token hashes and migration `0032_admin_super_admin.sql` adds the role flag. Invitations are 30-minute, single-use links; acceptance verifies a signed Google ID token with `email_verified === true`, requires an exact email match, then binds an existing email-only row or inserts a new admin before creating the regular session. The API does not look up Google accounts before acceptance.
 
 For emergency or bootstrap-only operator access, an admin can still be added manually:
 
 ```sh
-sqlite3 data/local.db "INSERT INTO admins (email, google_sub, created_at, updated_at) VALUES ('admin@example.com', '<confirmed-google-sub>', datetime('now'), datetime('now'));"
+sqlite3 data/local.db "INSERT INTO admins (email, google_sub, super_admin, created_at, updated_at) VALUES ('admin@example.com', '<confirmed-google-sub>', 1, datetime('now'), datetime('now'));"
 ```
+
+After migration `0032`, promote the first already-enrolled admin with `UPDATE admins SET super_admin = 1, updated_at = datetime('now') WHERE email = 'admin@example.com';`. Keep at least one independently controlled super admin account.
 
 For an existing admin, prefer the invitation flow so the account holder completes Google sign-in themselves. If manual enrollment is unavoidable, independently confirm the Google account and set only that account's stable `sub` in the database. Do not auto-enroll a subject from an email-only match, and do not copy the real identifier into tickets or logs. Take a backup before production enrollment.
 
@@ -298,7 +302,7 @@ Key route behavior:
 - The trip archive is intentionally excluded from shared caching because its selected cover URLs may be signed; trip writes still revalidate the frontend archive page.
 - Visit and management routes use `private, no-store`.
 - Trip planner suggestion, route-search, and nearby-origin routes all use `private, no-store` and keep the provider key server-side.
-- All write routes, `GET /api/admin/parks/visibility`, and `POST /api/admin/invitations` require a valid admin session cookie.
+- All write routes and `GET /api/admin/parks/visibility` require a valid admin session cookie. `GET /api/admin/admins`, `PATCH /api/admin/admins/:id`, `DELETE /api/admin/admins/:id`, and `POST /api/admin/invitations` additionally require a super-admin session.
 - `PATCH /api/parks/:slug` updates the admin-editable park fields, including `hasMagnet` and optional nullable `markerPoint`, and auto-generates a slug from `name` when no explicit `slug` is provided. Setting `markerPoint` to `null` clears an override and restores the imported/default marker.
 - `PATCH /api/parks/:slug/removed` toggles whether a park is hidden from catalog and visit responses.
 - `POST /api/trips`, `PATCH /api/trips/:id`, and `DELETE /api/trips/:id` are admin-session write routes for named trips. Trip create/update accepts optional `slug` and optional nullable `startingPoint`, and otherwise derives the slug from `name`.

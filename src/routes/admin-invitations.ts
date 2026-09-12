@@ -38,7 +38,7 @@ export const createAdminInvitationRoute = createRoute({
       }
     },
     401: {
-      description: 'Admin session required',
+      description: 'Super admin session required',
       content: {
         'application/json': {
           schema: errorSchema
@@ -46,7 +46,7 @@ export const createAdminInvitationRoute = createRoute({
       }
     },
     403: {
-      description: 'Admin session is not provisioned',
+      description: 'Super admin session required',
       content: {
         'application/json': {
           schema: errorSchema

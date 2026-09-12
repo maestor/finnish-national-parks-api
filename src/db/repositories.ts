@@ -4544,9 +4544,97 @@ export const findAdminByEmail = async (db: DbClient, email: string) => {
   return rows[0] ?? null;
 };
 
+export const findAdminById = async (db: DbClient, id: number) => {
+  const rows = await db.select().from(admins).where(eq(admins.id, id)).limit(1);
+  return rows[0] ?? null;
+};
+
 export const findAdminByGoogleSub = async (db: DbClient, googleSub: string) => {
   const rows = await db.select().from(admins).where(eq(admins.googleSub, googleSub)).limit(1);
   return rows[0] ?? null;
+};
+
+export type AdminUser = {
+  createdAt: string;
+  email: string;
+  id: number;
+  isEnrolled: boolean;
+  isSuperAdmin: boolean;
+  updatedAt: string;
+};
+
+const toAdminUser = (admin: typeof admins.$inferSelect): AdminUser => ({
+  createdAt: admin.createdAt,
+  email: admin.email,
+  id: admin.id,
+  isEnrolled: admin.googleSub !== null,
+  isSuperAdmin: admin.superAdmin,
+  updatedAt: admin.updatedAt
+});
+
+export const listAdminUsers = async (database: Database) => {
+  const rows = await database.select().from(admins).orderBy(asc(admins.email));
+  return rows.map(toAdminUser);
+};
+
+export class AdminSelfModificationError extends Error {
+  constructor() {
+    super('A super admin cannot modify their own account.');
+    this.name = 'AdminSelfModificationError';
+  }
+}
+
+export const updateAdminUser = async (
+  database: Database,
+  params: { adminId: number; isSuperAdmin: boolean; actingAdminId: number }
+) => {
+  if (params.adminId === params.actingAdminId) {
+    throw new AdminSelfModificationError();
+  }
+
+  return database.transaction(async (transaction) => {
+    const existingAdmin = await findAdminById(transaction, params.adminId);
+
+    if (!existingAdmin) {
+      return null;
+    }
+
+    const updatedAt = new Date().toISOString();
+    await transaction
+      .update(admins)
+      .set({ superAdmin: params.isSuperAdmin, updatedAt })
+      .where(eq(admins.id, params.adminId));
+
+    return toAdminUser({
+      ...existingAdmin,
+      superAdmin: params.isSuperAdmin,
+      updatedAt
+    });
+  });
+};
+
+export const removeAdminUser = async (
+  database: Database,
+  params: { adminId: number; actingAdminId: number }
+) => {
+  if (params.adminId === params.actingAdminId) {
+    throw new AdminSelfModificationError();
+  }
+
+  return database.transaction(async (transaction) => {
+    const existingAdmin = await findAdminById(transaction, params.adminId);
+
+    if (!existingAdmin) {
+      return false;
+    }
+
+    await transaction
+      .delete(adminInvitations)
+      .where(eq(adminInvitations.createdByAdminId, params.adminId));
+
+    const result = await transaction.delete(admins).where(eq(admins.id, params.adminId));
+    return Number(result.rowsAffected) > 0;
+  });
 };
 
 export class AdminAlreadyEnrolledError extends Error {

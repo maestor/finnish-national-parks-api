@@ -73,7 +73,8 @@ describe('migrateDatabase', () => {
       '0028_trip_stop_display_name.sql',
       '0029_trip_featured_image.sql',
       '0030_admin_google_sub.sql',
-      '0031_admin_invitations.sql'
+      '0031_admin_invitations.sql',
+      '0032_admin_super_admin.sql'
     ]);
     expect(parkTypes.rows.map((row) => String(row.slug))).toEqual([
       'outdoor-recreation-area',
@@ -130,6 +131,7 @@ describe('migrateDatabase', () => {
     expect(tripVisitColumns.rows.some((row) => String(row.name) === 'location_lat')).toBe(true);
     expect(tripVisitColumns.rows.some((row) => String(row.name) === 'location_lon')).toBe(true);
     expect(adminColumns.rows.some((row) => String(row.name) === 'google_sub')).toBe(true);
+    expect(adminColumns.rows.some((row) => String(row.name) === 'super_admin')).toBe(true);
     expect(adminInvitationTable.rows).toHaveLength(1);
     expect(publicDataVersionColumns.rows.some((row) => String(row.name) === 'version')).toBe(true);
   });
@@ -178,7 +180,8 @@ describe('migrateDatabase', () => {
       '0028_trip_stop_display_name.sql',
       '0029_trip_featured_image.sql',
       '0030_admin_google_sub.sql',
-      '0031_admin_invitations.sql'
+      '0031_admin_invitations.sql',
+      '0032_admin_super_admin.sql'
     ]);
     expect(schemaMigrationTableBeforeApply.rows).toEqual([]);
     expect(pendingAfterApply).toEqual([]);
