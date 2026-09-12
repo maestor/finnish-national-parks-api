@@ -5,3 +5,4 @@ data/
 !src/importer/special-parks/data/*.json
 .DS_Store
 .env
+.claude
