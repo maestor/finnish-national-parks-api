@@ -1,6 +1,11 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import { logger } from '../../src/http/logger.js';
 import { createGeoapifyClient } from '../../src/trip-planner/geoapify.js';
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 describe('geoapify client', () => {
   it('geocodes with a Finland, Sweden, and Norway bias and filter, then normalizes the best result', async () => {
@@ -193,12 +198,27 @@ describe('geoapify client', () => {
   });
 
   it('throws when Geoapify returns a failing response', async () => {
+    const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
     const client = createGeoapifyClient({
-      apiKey: 'geoapify-test',
+      apiKey: 'synthetic-geoapify-secret',
       fetchFn: vi.fn().mockResolvedValue(new Response('oops', { status: 503 })) as typeof fetch
     });
 
-    await expect(client.geocode('Helsinki')).rejects.toThrow('Geoapify request failed');
+    await expect(client.geocode('Synthetic Helsinki address')).rejects.toThrow(
+      'Geoapify request failed'
+    );
+
+    const serializedLogs = JSON.stringify(warnSpy.mock.calls);
+    expect(serializedLogs).not.toContain('synthetic-geoapify-secret');
+    expect(serializedLogs).not.toContain('Synthetic Helsinki address');
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        errorCategory: 'http_error',
+        operation: 'geocode',
+        status: 503
+      }),
+      'Geoapify request failed'
+    );
   });
 
   it('returns null when geocoding responds with no matches', async () => {
@@ -404,6 +424,7 @@ describe('geoapify client', () => {
   });
 
   it('times out slow Geoapify requests', async () => {
+    const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
     const fetchFn = vi.fn(
       (_input: string | URL, init?: RequestInit) =>
         new Promise<Response>((_resolve, reject) => {
@@ -415,12 +436,49 @@ describe('geoapify client', () => {
         })
     );
     const client = createGeoapifyClient({
-      apiKey: 'geoapify-test',
+      apiKey: 'synthetic-geoapify-secret',
       fetchFn: fetchFn as typeof fetch,
       requestTimeoutMs: 10
     });
 
-    await expect(client.geocode('Helsinki')).rejects.toThrow('timed out');
+    await expect(client.geocode('Synthetic timeout address')).rejects.toThrow('timed out');
+
+    const serializedLogs = JSON.stringify(warnSpy.mock.calls);
+    expect(serializedLogs).not.toContain('synthetic-geoapify-secret');
+    expect(serializedLogs).not.toContain('Synthetic timeout address');
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        errorCategory: 'timeout',
+        operation: 'geocode',
+        requestTimeoutMs: 10
+      }),
+      'Geoapify request timed out'
+    );
+  });
+
+  it('logs an unexpected provider failure without request details', async () => {
+    const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
+    const client = createGeoapifyClient({
+      apiKey: 'synthetic-geoapify-secret',
+      fetchFn: vi
+        .fn()
+        .mockRejectedValue(
+          new Error('connect failed for https://provider.example/?apiKey=synthetic-geoapify-secret')
+        ) as typeof fetch
+    });
+
+    await expect(client.geocode('Synthetic unexpected address')).rejects.toThrow('connect failed');
+
+    const serializedLogs = JSON.stringify(warnSpy.mock.calls);
+    expect(serializedLogs).not.toContain('synthetic-geoapify-secret');
+    expect(serializedLogs).not.toContain('Synthetic unexpected address');
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        errorCategory: 'unexpected_error',
+        operation: 'geocode'
+      }),
+      'Geoapify request failed unexpectedly'
+    );
   });
 
   it('returns null when routing geometry is missing or too short', async () => {
