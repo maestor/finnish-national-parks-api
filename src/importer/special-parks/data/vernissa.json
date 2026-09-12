@@ -1,0 +1,41 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Vernissa",
+        "source": "Vantaan kaupunki, Vernissanranta ja Väritehtaanranta puistosuunnitelma 58022-1 (2019); simplified local boundary digitized from the published puistoalueen raja",
+        "source_coordinate_system": "ETRS-GK25 (EPSG:3879)",
+        "source_url": "https://www.vantaa.fi/sites/default/files/document/151546-Vernissarannan-ja-Varitehtaanrannan-puistosuunnitelma.pdf"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [25.0433, 60.29025],
+            [25.0442, 60.2906],
+            [25.0457, 60.2907],
+            [25.04645, 60.29045],
+            [25.04655, 60.29],
+            [25.04625, 60.2894],
+            [25.0464, 60.28885],
+            [25.04665, 60.28815],
+            [25.04635, 60.28765],
+            [25.04585, 60.2873],
+            [25.04545, 60.28685],
+            [25.0447, 60.28655],
+            [25.04415, 60.28685],
+            [25.04375, 60.28745],
+            [25.0433, 60.288],
+            [25.0429, 60.2886],
+            [25.043, 60.28915],
+            [25.04345, 60.2895],
+            [25.04335, 60.28992],
+            [25.0433, 60.29025]
+          ]
+        ]
+      }
+    }
+  ]
+}

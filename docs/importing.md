@@ -92,6 +92,20 @@ Example: `Tullisaaren kartanopuisto`
 - the stored user-facing import still remained `Tullisaaren kartanopuisto`
 - the final stored geometry was copied into a repo-local `special://tullisaaren-kartanopuisto`
 
+## Vantaa municipal-plan workflow
+
+Vantaa publishes open WMS/WFS interfaces, including coordinate-system guidance, but a park-area boundary is not necessarily available as a reusable WFS feature layer. When a published municipal park plan is the clearest official boundary source:
+
+- confirm the landmark or address through Vantaa's WFS in `EPSG:4326`
+- use the published plan's marked `puistoalueen raja` as the source boundary
+- store a simplified, attributed WGS84 snapshot under `special://...`, including the source plan URL and its source coordinate system in the GeoJSON properties
+
+Example: `Vernissa`
+
+- source plan: `Vernissanranta ja Väritehtaanranta` (drawing 58022-1)
+- scope: Vernissa, Vernissanranta, Tikkurilankoski, Väritehtaanranta, and Maisemalampi
+- address metadata: `Tikkurilantie 36, 01300 Vantaa`
+
 ## Reusable Workflow Families
 
 The special-parks importer already has a few source families that are worth reusing instead of inventing a new pattern each time.

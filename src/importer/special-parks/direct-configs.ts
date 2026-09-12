@@ -330,6 +330,23 @@ export const baseSpecialParkConfigs: SpecialParkConfig[] = [
   },
   {
     displayTypeName: null,
+    locationLabel: 'Tikkurilantie 36',
+    markerPoint: {
+      lat: 60.2897894,
+      lon: 25.04368011
+    },
+    parkUrl: 'https://www.vantaa.fi/fi/palveluhakemisto/toimipiste/kulttuuritehdas-vernissa',
+    name: 'Vernissa',
+    parkTypeSlug: 'cultural-history-area',
+    postalCode: '01300',
+    postalOffice: 'Vantaa',
+    responseShapeVersion: 'manual-vantaa-vernissanranta-varitehtaanranta-park-plan-v1',
+    slug: 'vernissa',
+    sourceUrl: 'special://vernissa',
+    syntheticLipasId: 9_002_053
+  },
+  {
+    displayTypeName: null,
     locationLabel: 'Pihlajamäki',
     parkUrl: 'https://vihreatsylit.fi/aarnipata-ja-rauninmalja/',
     name: 'Pihlajamäen hiidenkirnut',
