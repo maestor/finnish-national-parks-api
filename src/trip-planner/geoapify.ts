@@ -57,6 +57,8 @@ const DEFAULT_SUGGESTION_CACHE_TTL_MS = 60 * 60 * 1000;
 const DEFAULT_SUGGESTION_LIMIT = 3;
 const GEOAPIFY_NORDIC_COUNTRY_CODES = 'countrycode:fi,se,no';
 
+type GeoapifyOperation = 'geocode' | 'route' | 'suggest';
+
 type CacheEntry<T> = {
   expiresAt: number;
   value: T;
@@ -202,9 +204,12 @@ const isAbortError = (error: unknown) => {
 const fetchJson = async <T>(
   fetchFn: typeof fetch,
   url: string,
-  requestTimeoutMs: number
+  requestTimeoutMs: number,
+  operation: GeoapifyOperation,
+  now: () => number
 ): Promise<T | null> => {
   const controller = new AbortController();
+  const startedAt = now();
   const timeout = setTimeout(() => {
     controller.abort();
   }, requestTimeoutMs);
@@ -222,17 +227,41 @@ const fetchJson = async <T>(
     }
 
     if (!response.ok) {
-      logger.warn({ status: response.status, url }, 'Geoapify request failed');
+      logger.warn(
+        {
+          durationMs: now() - startedAt,
+          errorCategory: 'http_error',
+          operation,
+          status: response.status
+        },
+        'Geoapify request failed'
+      );
       throw new Error(`Geoapify request failed with status ${response.status}`);
     }
 
     return (await response.json()) as T;
   } catch (error) {
     if (isAbortError(error)) {
-      logger.warn({ requestTimeoutMs, url }, 'Geoapify request timed out');
+      logger.warn(
+        {
+          durationMs: now() - startedAt,
+          errorCategory: 'timeout',
+          operation,
+          requestTimeoutMs
+        },
+        'Geoapify request timed out'
+      );
       throw new Error(`Geoapify request timed out after ${requestTimeoutMs} ms`);
     }
 
+    logger.warn(
+      {
+        durationMs: now() - startedAt,
+        errorCategory: 'unexpected_error',
+        operation
+      },
+      'Geoapify request failed unexpectedly'
+    );
     throw error;
   } finally {
     clearTimeout(timeout);
@@ -327,7 +356,9 @@ export const createGeoapifyClient = ({
           const response = await fetchJson<GeoapifyGeocodeResponse>(
             fetchFn,
             buildGeocodeUrl(apiKey, query.trim()),
-            requestTimeoutMs
+            requestTimeoutMs,
+            'geocode',
+            now
           );
 
           return normalizeGeocodedLocation(response?.results?.[0]);
@@ -345,7 +376,9 @@ export const createGeoapifyClient = ({
           const response = await fetchJson<GeoapifyGeocodeResponse>(
             fetchFn,
             buildAutocompleteUrl(apiKey, query.trim()),
-            requestTimeoutMs
+            requestTimeoutMs,
+            'suggest',
+            now
           );
 
           return normalizeSuggestions(response?.results);
@@ -363,7 +396,9 @@ export const createGeoapifyClient = ({
           const response = await fetchJson<GeoapifyRoutingResponse>(
             fetchFn,
             buildRouteUrl(apiKey, origin, destination, mode),
-            requestTimeoutMs
+            requestTimeoutMs,
+            'route',
+            now
           );
 
           return normalizeRoute(mode, response?.features?.[0]);

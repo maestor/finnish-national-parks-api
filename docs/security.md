@@ -12,6 +12,22 @@ It is intentionally policy-oriented. Keep it focused on standing rules, design e
 - Keep storage private by default and expose files through presigned URLs instead of permanently public buckets.
 - Treat bandwidth, object storage growth, backup hygiene, and third-party dependency load as part of security and sustainability, not separate follow-up work.
 
+## Logging And Operator Response
+
+- Structured application logs use an allowlist of diagnostic fields. Provider URLs, API keys, free-text location queries, cookies, authorization values, and share identifiers must not be logged.
+- Geoapify failure logs may contain only the fixed operation (`geocode`, `suggest`, or `route`), HTTP status when available, elapsed duration, timeout budget, and a fixed error category. Raw provider errors and request URLs stay out of logs.
+- Request logs replace tokenized review-share path segments with route templates. Unhandled-error logs record a safe category and sanitized path, not the raw error message.
+- Log retention and access must be restricted to the operator roles that need diagnostics. Treat any historical credential exposure as an incident and do not copy sensitive log contents into tickets, plans, or chat.
+
+### Provider-logging deployment checklist
+
+After deploying the safe-logging change, the operator should:
+
+1. Confirm the deployed log viewer exposes only the allowlisted fields and that the provider failure, timeout, and unexpected-error paths do not include request URLs.
+2. Review existing log retention and access policy without exporting or reproducing credentials, location queries, or share tokens.
+3. If a real Geoapify key may have reached retained logs, rotate it through the provider and deployment secret store, then redeploy and verify the new key is not browser-reachable.
+4. Record only the review date, access/retention decision, and rotation outcome. Mark unavailable platform evidence as unverified instead of inferring it from source tests.
+
 ## Route Access Policy
 
 Every route must fit one explicit access class:

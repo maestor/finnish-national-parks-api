@@ -219,6 +219,28 @@ const LOGO_PRESIGNED_URL_TTL_SECONDS = 7 * 24 * 60 * 60;
 const MAP_PRESIGNED_URL_TTL_SECONDS = 7 * 24 * 60 * 60;
 const PUBLIC_LOGO_REDIRECT_CACHE_CONTROL = 'public, max-age=31536000, immutable';
 
+const sanitizeRequestPath = (path: string) => {
+  return path
+    .replace(/^(\/api\/(?:admin\/)?date-range-review\/shares)\/[^/]+$/, '$1/{shareId}')
+    .replace(/^(\/api\/year-review\/shares)\/[^/]+$/, '$1/{shareId}');
+};
+
+const getErrorCategory = (error: unknown) => {
+  if (error instanceof TripPlannerError) {
+    return `trip_planner_${error.code}`;
+  }
+
+  if (error instanceof RepositoryNotFoundError) {
+    return 'repository_not_found';
+  }
+
+  if (error instanceof RepositoryValidationError) {
+    return 'repository_validation';
+  }
+
+  return 'application_error';
+};
+
 const jsonNotFound = (error: string) => {
   return {
     error
@@ -811,11 +833,12 @@ export const createApp = ({
   app.use(async (c, next) => {
     const start = Date.now();
     await next();
+    const path = sanitizeRequestPath(c.req.path);
     logger.info(
       {
         duration: Date.now() - start,
         method: c.req.method,
-        path: c.req.path,
+        path,
         status: c.res.status
       },
       'request'
@@ -823,7 +846,13 @@ export const createApp = ({
   });
 
   app.onError((err, c) => {
-    logger.error({ err: err.message, path: c.req.path }, 'Unhandled error');
+    logger.error(
+      {
+        errorCategory: getErrorCategory(err),
+        path: sanitizeRequestPath(c.req.path)
+      },
+      'Unhandled error'
+    );
     return c.json({ error: 'Internal server error.' }, 500);
   });
 
