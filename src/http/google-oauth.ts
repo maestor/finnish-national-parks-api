@@ -1,12 +1,28 @@
 import { createHash, randomBytes } from 'node:crypto';
 import type { Context } from 'hono';
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie';
+import { createRemoteJWKSet, customFetch, type JWTPayload, jwtVerify } from 'jose';
 
 const GOOGLE_AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
 const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token';
-const GOOGLE_TOKENINFO_URL = 'https://oauth2.googleapis.com/tokeninfo';
+const GOOGLE_JWKS_URL = new URL('https://www.googleapis.com/oauth2/v3/certs');
+const GOOGLE_ISSUERS = ['https://accounts.google.com', 'accounts.google.com'];
+const GOOGLE_REQUEST_TIMEOUT_MS = 10_000;
 const OAUTH_STATE_COOKIE = '__oauth_state';
 const OAUTH_PKCE_COOKIE = '__oauth_pkce';
+
+type GoogleIdTokenPayload = JWTPayload & {
+  aud: string;
+  email: string;
+  email_verified: boolean;
+  exp: number;
+  iss: string;
+  name?: string;
+  picture?: string;
+  sub: string;
+};
+
+const defaultGoogleFetch: typeof fetch = (input, init) => globalThis.fetch(input, init);
 
 export const generateState = () => randomBytes(32).toString('base64url');
 export const generateCodeVerifier = () => randomBytes(32).toString('base64url');
@@ -85,7 +101,7 @@ export const exchangeCodeForTokens = async (params: {
   codeVerifier: string;
   redirectUri: string;
 }) => {
-  const response = await fetch(GOOGLE_TOKEN_URL, {
+  const response = await defaultGoogleFetch(GOOGLE_TOKEN_URL, {
     body: new URLSearchParams({
       client_id: params.clientId,
       client_secret: params.clientSecret,
@@ -95,47 +111,55 @@ export const exchangeCodeForTokens = async (params: {
       redirect_uri: params.redirectUri
     }),
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    method: 'POST'
+    method: 'POST',
+    signal: AbortSignal.timeout(GOOGLE_REQUEST_TIMEOUT_MS)
   });
 
   if (!response.ok) {
     throw new Error(`Token exchange failed: ${response.status}`);
   }
 
-  const data = (await response.json()) as { id_token: string };
-  return data;
-};
+  const data = (await response.json()) as { id_token?: unknown };
 
-export const verifyGoogleIdToken = async (idToken: string, clientId: string) => {
-  const response = await fetch(`${GOOGLE_TOKENINFO_URL}?id_token=${idToken}`);
-
-  if (!response.ok) {
-    throw new Error('Invalid ID token');
+  if (typeof data.id_token !== 'string' || data.id_token.length === 0) {
+    throw new Error('Token exchange did not return an ID token');
   }
 
-  const payload = (await response.json()) as {
-    aud: string;
-    email: string;
-    exp: string;
-    iss: string;
-    name?: string;
-    picture?: string;
-    sub: string;
+  return { id_token: data.id_token };
+};
+
+export const createGoogleIdTokenVerifier = (fetchFn: typeof fetch = defaultGoogleFetch) => {
+  const googleJwks = createRemoteJWKSet(GOOGLE_JWKS_URL, {
+    [customFetch]: (url, options) => fetchFn(url, options),
+    timeoutDuration: GOOGLE_REQUEST_TIMEOUT_MS
+  });
+
+  return async (idToken: string, clientId: string): Promise<GoogleIdTokenPayload> => {
+    const { payload } = await jwtVerify<GoogleIdTokenPayload>(idToken, googleJwks, {
+      algorithms: ['RS256'],
+      audience: clientId,
+      issuer: GOOGLE_ISSUERS,
+      requiredClaims: ['aud', 'email', 'email_verified', 'exp', 'iss', 'sub']
+    });
+
+    if (
+      typeof payload.aud !== 'string' ||
+      payload.aud !== clientId ||
+      typeof payload.email !== 'string' ||
+      payload.email.length === 0 ||
+      payload.email_verified !== true ||
+      typeof payload.exp !== 'number' ||
+      !Number.isFinite(payload.exp) ||
+      typeof payload.iss !== 'string' ||
+      !GOOGLE_ISSUERS.includes(payload.iss) ||
+      typeof payload.sub !== 'string' ||
+      payload.sub.length === 0
+    ) {
+      throw new Error('Invalid Google ID token claims');
+    }
+
+    return payload;
   };
-
-  if (payload.aud !== clientId) {
-    throw new Error('Invalid audience');
-  }
-
-  if (payload.iss !== 'https://accounts.google.com' && payload.iss !== 'accounts.google.com') {
-    throw new Error('Invalid issuer');
-  }
-
-  const now = Math.floor(Date.now() / 1000);
-
-  if (Number(payload.exp) < now) {
-    throw new Error('Token expired');
-  }
-
-  return payload;
 };
+
+export const verifyGoogleIdToken = createGoogleIdTokenVerifier();

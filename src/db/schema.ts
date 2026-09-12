@@ -287,6 +287,7 @@ export const admins = sqliteTable(
   {
     id: integer('id').primaryKey({ autoIncrement: true }),
     email: text('email').notNull().unique(),
+    googleSub: text('google_sub'),
     createdAt: text('created_at').notNull(),
     updatedAt: text('updated_at').notNull()
   },

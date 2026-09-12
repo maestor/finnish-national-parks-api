@@ -1,3 +1,4 @@
+import { exportJWK, generateKeyPair, SignJWT } from 'jose';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { createApp } from '../../src/app.js';
@@ -11,6 +12,33 @@ const authConfig = {
   googleClientSecret: 'test-google-client-secret',
   jwtSecret: 'test-jwt-secret-at-least-32-characters-long'
 };
+const googleClaimsFixtureUrl = 'https://test.invalid/google-id-token-claims';
+
+const testGoogleKeysPromise = (async () => {
+  const keyPair = await generateKeyPair('RS256');
+  const jwk = await exportJWK(keyPair.publicKey);
+
+  return {
+    jwk: { ...jwk, alg: 'RS256', kid: 'test-google-key', use: 'sig' },
+    privateKey: keyPair.privateKey
+  };
+})();
+
+const createTestGoogleIdToken = async (payload: object) => {
+  const { privateKey } = await testGoogleKeysPromise;
+  const claims = { ...(payload as Record<string, unknown>) };
+
+  if (claims.email_verified === undefined) {
+    claims.email_verified = true;
+  }
+  if (typeof claims.exp === 'string') {
+    claims.exp = Number(claims.exp);
+  }
+
+  return new SignJWT(claims)
+    .setProtectedHeader({ alg: 'RS256', kid: 'test-google-key' })
+    .sign(privateKey);
+};
 
 const mockFetch = (
   responses: Array<{
@@ -20,8 +48,31 @@ const mockFetch = (
     url: RegExp | string;
   }>
 ) => {
-  return vi.fn().mockImplementation((url: string, init?: RequestInit) => {
+  return vi.fn().mockImplementation(async (url: string, init?: RequestInit) => {
     const method = init?.method ?? 'GET';
+
+    if (url === 'https://www.googleapis.com/oauth2/v3/certs') {
+      const { jwk } = await testGoogleKeysPromise;
+      return new Response(JSON.stringify({ keys: [jwk] }), {
+        headers: { 'Content-Type': 'application/json' },
+        status: 200
+      });
+    }
+
+    if (url === 'https://oauth2.googleapis.com/token') {
+      const claimsFixtureResponse = responses.find(
+        (response) => typeof response.url === 'string' && response.url === googleClaimsFixtureUrl
+      );
+
+      if (claimsFixtureResponse) {
+        const idToken = await createTestGoogleIdToken(claimsFixtureResponse.body);
+        return new Response(JSON.stringify({ id_token: idToken }), {
+          headers: { 'Content-Type': 'application/json' },
+          status: 200
+        });
+      }
+    }
+
     const match = responses.find((r) => {
       const urlMatch = typeof r.url === 'string' ? url === r.url : r.url.test(url);
       const methodMatch = !r.method || r.method === method;
@@ -32,12 +83,10 @@ const mockFetch = (
       return Promise.resolve(new Response('Not found', { status: 404 }));
     }
 
-    return Promise.resolve(
-      new Response(JSON.stringify(match.body), {
-        headers: { 'Content-Type': 'application/json' },
-        status: match.status ?? 200
-      })
-    );
+    return new Response(JSON.stringify(match.body), {
+      headers: { 'Content-Type': 'application/json' },
+      status: match.status ?? 200
+    });
   });
 };
 
@@ -93,44 +142,41 @@ describe('google oauth', () => {
   it('uses configured public redirect uri for proxied oauth deployments', async () => {
     const googleRedirectUri = 'https://parks.example.com/auth/google/callback';
 
-    global.fetch = vi.fn().mockImplementation((url: string, init?: RequestInit) => {
+    global.fetch = vi.fn().mockImplementation(async (url: string, init?: RequestInit) => {
       if (url === 'https://oauth2.googleapis.com/token') {
         const body = init?.body;
         expect(body).toBeInstanceOf(URLSearchParams);
         expect((body as URLSearchParams).get('redirect_uri')).toBe(googleRedirectUri);
 
-        return Promise.resolve(
-          new Response(JSON.stringify({ id_token: 'mock-id-token' }), {
-            headers: { 'Content-Type': 'application/json' },
-            status: 200
-          })
-        );
+        const idToken = await createTestGoogleIdToken({
+          aud: 'test-google-client-id',
+          email: 'admin@example.com',
+          exp: Math.floor(Date.now() / 1000) + 3600,
+          iss: 'https://accounts.google.com',
+          sub: 'google-user-id'
+        });
+
+        return new Response(JSON.stringify({ id_token: idToken }), {
+          headers: { 'Content-Type': 'application/json' },
+          status: 200
+        });
       }
 
-      if (url === 'https://oauth2.googleapis.com/tokeninfo?id_token=mock-id-token') {
-        return Promise.resolve(
-          new Response(
-            JSON.stringify({
-              aud: 'test-google-client-id',
-              email: 'admin@example.com',
-              exp: String(Math.floor(Date.now() / 1000) + 3600),
-              iss: 'https://accounts.google.com',
-              sub: 'google-user-id'
-            }),
-            {
-              headers: { 'Content-Type': 'application/json' },
-              status: 200
-            }
-          )
-        );
+      if (url === 'https://www.googleapis.com/oauth2/v3/certs') {
+        const { jwk } = await testGoogleKeysPromise;
+        return new Response(JSON.stringify({ keys: [jwk] }), {
+          headers: { 'Content-Type': 'application/json' },
+          status: 200
+        });
       }
 
-      return Promise.resolve(new Response('Not found', { status: 404 }));
+      return new Response('Not found', { status: 404 });
     }) as typeof fetch;
 
     await testDatabase.database.insert(admins).values({
       createdAt: '2026-05-01T10:00:00.000Z',
       email: 'admin@example.com',
+      googleSub: 'google-user-id',
       updatedAt: '2026-05-01T10:00:00.000Z'
     });
 
@@ -177,13 +223,14 @@ describe('google oauth', () => {
           picture: 'https://example.com/photo.jpg',
           sub: 'google-user-id'
         },
-        url: 'https://oauth2.googleapis.com/tokeninfo?id_token=mock-id-token'
+        url: googleClaimsFixtureUrl
       }
     ]);
 
     await testDatabase.database.insert(admins).values({
       createdAt: '2026-05-01T10:00:00.000Z',
       email: 'admin@example.com',
+      googleSub: 'google-user-id',
       updatedAt: '2026-05-01T10:00:00.000Z'
     });
 
@@ -239,9 +286,98 @@ describe('google oauth', () => {
           iss: 'https://accounts.google.com',
           sub: 'google-user-id'
         },
-        url: 'https://oauth2.googleapis.com/tokeninfo?id_token=mock-id-token'
+        url: googleClaimsFixtureUrl
       }
     ]);
+
+    const app = createApp({ auth: authConfig, database: testDatabase.database });
+    const initResponse = await app.request('/auth/google');
+    const cookies = extractCookies(initResponse);
+
+    const callbackResponse = await app.request(
+      `/auth/google/callback?code=auth-code&state=${cookies.__oauth_state}`,
+      {
+        headers: {
+          cookie: `__oauth_state=${cookies.__oauth_state}; __oauth_pkce=${cookies.__oauth_pkce}`
+        }
+      }
+    );
+
+    expect(callbackResponse.status).toBe(302);
+    expect(callbackResponse.headers.get('location')).toBe(
+      'http://localhost:4300/login?error=access_denied'
+    );
+  });
+
+  it('redirects to access_denied when the provisioned admin has a conflicting Google subject', async () => {
+    global.fetch = mockFetch([
+      {
+        body: { id_token: 'mock-id-token' },
+        method: 'POST',
+        url: 'https://oauth2.googleapis.com/token'
+      },
+      {
+        body: {
+          aud: 'test-google-client-id',
+          email: 'admin@example.com',
+          exp: String(Math.floor(Date.now() / 1000) + 3600),
+          iss: 'https://accounts.google.com',
+          sub: 'unexpected-google-user-id'
+        },
+        url: googleClaimsFixtureUrl
+      }
+    ]);
+
+    await testDatabase.database.insert(admins).values({
+      createdAt: '2026-05-01T10:00:00.000Z',
+      email: 'admin@example.com',
+      googleSub: 'google-user-id',
+      updatedAt: '2026-05-01T10:00:00.000Z'
+    });
+
+    const app = createApp({ auth: authConfig, database: testDatabase.database });
+    const initResponse = await app.request('/auth/google');
+    const cookies = extractCookies(initResponse);
+
+    const callbackResponse = await app.request(
+      `/auth/google/callback?code=auth-code&state=${cookies.__oauth_state}`,
+      {
+        headers: {
+          cookie: `__oauth_state=${cookies.__oauth_state}; __oauth_pkce=${cookies.__oauth_pkce}`
+        }
+      }
+    );
+
+    expect(callbackResponse.status).toBe(302);
+    expect(callbackResponse.headers.get('location')).toBe(
+      'http://localhost:4300/login?error=access_denied'
+    );
+  });
+
+  it('redirects to access_denied for an email-only admin without subject enrollment', async () => {
+    global.fetch = mockFetch([
+      {
+        body: { id_token: 'mock-id-token' },
+        method: 'POST',
+        url: 'https://oauth2.googleapis.com/token'
+      },
+      {
+        body: {
+          aud: 'test-google-client-id',
+          email: 'admin@example.com',
+          exp: String(Math.floor(Date.now() / 1000) + 3600),
+          iss: 'https://accounts.google.com',
+          sub: 'google-user-id'
+        },
+        url: googleClaimsFixtureUrl
+      }
+    ]);
+
+    await testDatabase.database.insert(admins).values({
+      createdAt: '2026-05-01T10:00:00.000Z',
+      email: 'admin@example.com',
+      updatedAt: '2026-05-01T10:00:00.000Z'
+    });
 
     const app = createApp({ auth: authConfig, database: testDatabase.database });
     const initResponse = await app.request('/auth/google');
@@ -336,7 +472,7 @@ describe('google oauth', () => {
     );
   });
 
-  it('redirects to auth_failed when tokeninfo endpoint rejects the id token', async () => {
+  it('redirects to auth_failed when the signed ID token is invalid', async () => {
     global.fetch = mockFetch([
       {
         body: { id_token: 'mock-id-token' },
@@ -345,14 +481,14 @@ describe('google oauth', () => {
       },
       {
         body: { error: 'invalid_token' },
-        status: 400,
-        url: 'https://oauth2.googleapis.com/tokeninfo?id_token=mock-id-token'
+        url: googleClaimsFixtureUrl
       }
     ]);
 
     await testDatabase.database.insert(admins).values({
       createdAt: '2026-05-01T10:00:00.000Z',
       email: 'admin@example.com',
+      googleSub: 'google-user-id',
       updatedAt: '2026-05-01T10:00:00.000Z'
     });
 
@@ -390,13 +526,14 @@ describe('google oauth', () => {
           iss: 'https://accounts.google.com',
           sub: 'google-user-id'
         },
-        url: 'https://oauth2.googleapis.com/tokeninfo?id_token=mock-id-token'
+        url: googleClaimsFixtureUrl
       }
     ]);
 
     await testDatabase.database.insert(admins).values({
       createdAt: '2026-05-01T10:00:00.000Z',
       email: 'admin@example.com',
+      googleSub: 'google-user-id',
       updatedAt: '2026-05-01T10:00:00.000Z'
     });
 
@@ -434,13 +571,14 @@ describe('google oauth', () => {
           iss: 'https://evil.com',
           sub: 'google-user-id'
         },
-        url: 'https://oauth2.googleapis.com/tokeninfo?id_token=mock-id-token'
+        url: googleClaimsFixtureUrl
       }
     ]);
 
     await testDatabase.database.insert(admins).values({
       createdAt: '2026-05-01T10:00:00.000Z',
       email: 'admin@example.com',
+      googleSub: 'google-user-id',
       updatedAt: '2026-05-01T10:00:00.000Z'
     });
 
@@ -478,13 +616,14 @@ describe('google oauth', () => {
           iss: 'https://accounts.google.com',
           sub: 'google-user-id'
         },
-        url: 'https://oauth2.googleapis.com/tokeninfo?id_token=mock-id-token'
+        url: googleClaimsFixtureUrl
       }
     ]);
 
     await testDatabase.database.insert(admins).values({
       createdAt: '2026-05-01T10:00:00.000Z',
       email: 'admin@example.com',
+      googleSub: 'google-user-id',
       updatedAt: '2026-05-01T10:00:00.000Z'
     });
 
@@ -524,13 +663,14 @@ describe('google oauth', () => {
           picture: 'https://example.com/photo.jpg',
           sub: 'google-user-id'
         },
-        url: 'https://oauth2.googleapis.com/tokeninfo?id_token=mock-id-token'
+        url: googleClaimsFixtureUrl
       }
     ]);
 
     await testDatabase.database.insert(admins).values({
       createdAt: '2026-05-01T10:00:00.000Z',
       email: 'admin@example.com',
+      googleSub: 'google-user-id',
       updatedAt: '2026-05-01T10:00:00.000Z'
     });
 
@@ -607,13 +747,14 @@ describe('google oauth', () => {
           iss: 'https://accounts.google.com',
           sub: 'google-user-id'
         },
-        url: 'https://oauth2.googleapis.com/tokeninfo?id_token=mock-id-token'
+        url: googleClaimsFixtureUrl
       }
     ]);
 
     await testDatabase.database.insert(admins).values({
       createdAt: '2026-05-01T10:00:00.000Z',
       email: 'admin@example.com',
+      googleSub: 'google-user-id',
       updatedAt: '2026-05-01T10:00:00.000Z'
     });
 

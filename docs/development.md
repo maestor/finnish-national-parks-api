@@ -220,13 +220,15 @@ Catalog rows marked with `parks.removed = 1` are intentionally hidden from park 
 
 ### Admin Allowlist
 
-The `admins` table stores allowed Google email addresses for control-panel access. It contains only `email`, `created_at`, and `updated_at` — no Google IDs, names, or pictures are persisted.
+The `admins` table stores an allowed Google email plus the explicitly provisioned stable Google `sub` for control-panel access. It contains `email`, nullable `google_sub`, `created_at`, and `updated_at` — names and pictures are not persisted. A row with a null `google_sub` is intentionally not sufficient for login after migration `0030_admin_google_sub.sql`.
 
 Add an admin manually:
 
 ```sh
-sqlite3 data/local.db "INSERT INTO admins (email, created_at, updated_at) VALUES ('admin@example.com', datetime('now'), datetime('now'));"
+sqlite3 data/local.db "INSERT INTO admins (email, google_sub, created_at, updated_at) VALUES ('admin@example.com', '<confirmed-google-sub>', datetime('now'), datetime('now'));"
 ```
+
+For an existing admin, first confirm the Google account through the normal OAuth flow and then set only that account's stable `sub` in the database. Do not auto-enroll a subject from an email-only match, and do not copy the real identifier into tickets or logs. Take a backup before production enrollment.
 
 Local development should use a file database. Production should target Turso with the same Drizzle schema and libSQL client path.
 

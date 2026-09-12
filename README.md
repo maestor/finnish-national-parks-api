@@ -80,6 +80,7 @@ Production notes:
 - If Google OAuth is enabled in Vercel, `FRONTEND_URL` must be the deployed frontend origin.
 - If Google calls the API directly, Google must allow `https://your-api-domain.vercel.app/auth/google/callback`.
 - If `/auth/*` is exposed through a frontend proxy or rewrite, set `GOOGLE_REDIRECT_URI=https://your-frontend-domain/auth/google/callback`, register that exact URI in Google Cloud, and start the login flow through that same public domain so the OAuth cookies stay on the right host.
+- Google ID tokens are verified locally against Google's cached signing keys; the API does not call `tokeninfo` during login. Before deploying the subject-binding migration, explicitly provision each existing admin's confirmed Google `sub` in `admins.google_sub`; email-only rows will be denied after the migration is enforced.
 - `GEOAPIFY_API_KEY` enables `POST /api/trip-planner/suggestions`, `POST /api/trip-planner/search`, `POST /api/trip-planner/nearby`, and routed `GET /api/trips/slug/:slug` responses when a trip has enough waypoints. Keep it server-side only; the UI should call the backend through its existing server proxy layer.
 - `MEMORY_STORAGE=true` is for tests and local-only development, not Vercel.
 - Production merges to `main` should run the GitHub Actions `Production Migration` workflow against Turso before Vercel promotes the new production build.
