@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { getParkBySlug, listParks } from '../../src/db/repositories.js';
 import { parks } from '../../src/db/schema.js';
+import { isFullyInsideArea } from '../../src/importer/geometry.js';
 import { importParks } from '../../src/importer/import-parks.js';
 import { importSpecialParks } from '../../src/importer/import-special-parks.js';
 import { createLipasPark } from '../fixtures/lipas.js';
@@ -55,7 +56,7 @@ describe('manual catalog imports', () => {
       now: () => '2026-05-27T08:00:00.000Z'
     });
 
-    expect(result.results).toHaveLength(156);
+    expect(result.results).toHaveLength(157);
 
     const merenkurkku = await getParkBySlug(
       testDatabase.database,
@@ -435,6 +436,44 @@ describe('manual catalog imports', () => {
     expect(tullisaari?.areaKm2).toBeCloseTo(0.35, 2);
     expect(tullisaari?.boundaryGeoJson?.features).toHaveLength(7);
     expect(tullisaari?.boundaryGeoJson?.features[0]?.geometry.type).toBe('Polygon');
+
+    const vernissa = await getParkBySlug(testDatabase.database, 'vernissa');
+    expect(vernissa).toMatchObject({
+      address: 'Tikkurilantie 36, 01300 Vantaa',
+      lipasId: 9002053,
+      locationLabel: 'Tikkurilantie 36',
+      name: 'Vernissa',
+      postalCode: '01300',
+      postalOffice: 'Vantaa',
+      type: { slug: 'cultural-history-area' }
+    });
+    expect(vernissa?.boundaryGeoJson?.features).toHaveLength(1);
+    expect(vernissa?.boundaryGeoJson?.features[0]?.geometry.type).toBe('Polygon');
+    expect(vernissa?.boundingBox.minLat).toBeLessThan(60.288);
+    expect(vernissa?.boundingBox.maxLat).toBeGreaterThan(60.29);
+    expect(vernissa?.boundingBox.minLon).toBeLessThan(25.044);
+    expect(vernissa?.boundingBox.maxLon).toBeGreaterThan(25.046);
+    expect(
+      isFullyInsideArea(
+        {
+          features: [
+            {
+              geometry: {
+                coordinates: [
+                  [25.04368011, 60.2897894],
+                  [25.0444814, 60.2895044],
+                  [25.0450069, 60.289847]
+                ],
+                type: 'LineString'
+              },
+              type: 'Feature'
+            }
+          ],
+          type: 'FeatureCollection'
+        },
+        vernissa!.boundaryGeoJson!
+      )
+    ).toBe(true);
 
     const expectedNewManualImports: ExpectedManualImport[] = [
       {
@@ -1361,7 +1400,7 @@ describe('manual catalog imports', () => {
     );
     const kevo = await getParkBySlug(testDatabase.database, 'kevon-luonnonpuisto');
 
-    expect(allParks).toHaveLength(156);
+    expect(allParks).toHaveLength(157);
     expect(merenkurkku).toMatchObject({ catalogStatus: 'active' });
     expect(kevo).toMatchObject({ catalogStatus: 'active' });
   });
@@ -1438,7 +1477,7 @@ describe('manual catalog imports', () => {
       database: testDatabase.database
     });
 
-    expect(result.results).toHaveLength(156);
+    expect(result.results).toHaveLength(157);
 
     const merenkurkku = await getParkBySlug(
       testDatabase.database,
@@ -1732,7 +1771,7 @@ describe('manual catalog imports', () => {
       now: () => '2026-05-27T08:00:00.000Z'
     });
 
-    expect(result.results).toHaveLength(156);
+    expect(result.results).toHaveLength(157);
   });
 
   it('fails clearly when a selected special-park slug is unknown', async () => {
