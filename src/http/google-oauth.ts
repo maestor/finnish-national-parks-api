@@ -10,6 +10,8 @@ const GOOGLE_ISSUERS = ['https://accounts.google.com', 'accounts.google.com'];
 const GOOGLE_REQUEST_TIMEOUT_MS = 10_000;
 const OAUTH_STATE_COOKIE = '__oauth_state';
 const OAUTH_PKCE_COOKIE = '__oauth_pkce';
+const OAUTH_INVITATION_COOKIE = '__oauth_invitation';
+const ADMIN_INVITATION_COOKIE_MAX_AGE_SECONDS = 30 * 60;
 
 type GoogleIdTokenPayload = JWTPayload & {
   aud: string;
@@ -69,6 +71,29 @@ export const getPkceCookie = (c: Context): string | undefined => {
 
 export const clearPkceCookie = (c: Context) => {
   deleteCookie(c, OAUTH_PKCE_COOKIE, {
+    httpOnly: true,
+    path: '/',
+    sameSite: 'Lax',
+    secure: process.env.NODE_ENV === 'production'
+  });
+};
+
+export const setAdminInvitationCookie = (c: Context, token: string) => {
+  setCookie(c, OAUTH_INVITATION_COOKIE, token, {
+    httpOnly: true,
+    maxAge: ADMIN_INVITATION_COOKIE_MAX_AGE_SECONDS,
+    path: '/',
+    sameSite: 'Lax',
+    secure: process.env.NODE_ENV === 'production'
+  });
+};
+
+export const getAdminInvitationCookie = (c: Context): string | undefined => {
+  return getCookie(c, OAUTH_INVITATION_COOKIE);
+};
+
+export const clearAdminInvitationCookie = (c: Context) => {
+  deleteCookie(c, OAUTH_INVITATION_COOKIE, {
     httpOnly: true,
     path: '/',
     sameSite: 'Lax',

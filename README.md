@@ -80,7 +80,7 @@ Production notes:
 - If Google OAuth is enabled in Vercel, `FRONTEND_URL` must be the deployed frontend origin.
 - If Google calls the API directly, Google must allow `https://your-api-domain.vercel.app/auth/google/callback`.
 - If `/auth/*` is exposed through a frontend proxy or rewrite, set `GOOGLE_REDIRECT_URI=https://your-frontend-domain/auth/google/callback`, register that exact URI in Google Cloud, and start the login flow through that same public domain so the OAuth cookies stay on the right host.
-- Google ID tokens are verified locally against Google's cached signing keys; the API does not call `tokeninfo` during login. Before deploying the subject-binding migration, explicitly provision each existing admin's confirmed Google `sub` in `admins.google_sub`; email-only rows will be denied after the migration is enforced.
+- Google ID tokens are verified locally against Google's cached signing keys; the API does not call `tokeninfo` during login. Migration `0030_admin_google_sub.sql` requires a bound subject for normal login. Existing email-only admins can use the control-panel invitation flow after migration `0031_admin_invitations.sql`; the operator SQL path remains for bootstrap and recovery.
 - `GEOAPIFY_API_KEY` enables `POST /api/trip-planner/suggestions`, `POST /api/trip-planner/search`, `POST /api/trip-planner/nearby`, and routed `GET /api/trips/slug/:slug` responses when a trip has enough waypoints. Keep it server-side only; the UI should call the backend through its existing server proxy layer.
 - `MEMORY_STORAGE=true` is for tests and local-only development, not Vercel.
 - Production merges to `main` should run the GitHub Actions `Production Migration` workflow against Turso before Vercel promotes the new production build.
@@ -103,6 +103,7 @@ The paired UI presents catalog and visit `GET` data publicly to end users withou
 - `GET /api/parks`
 - `GET /api/parks/search`
 - `GET /api/admin/parks/visibility`
+- `POST /api/admin/invitations`
 - `GET /api/parks/:slug`
 - `PATCH /api/parks/:slug`
 - `GET /api/home-summary`
@@ -205,6 +206,7 @@ Catalog endpoints stay cache-friendly and database-backed:
 - Visit and management endpoints use `Cache-Control: private, no-store`.
 - Trip planner suggestion, route-search, and nearby-origin responses also use `Cache-Control: private, no-store`.
 - All write routes and `GET /api/admin/parks/visibility` require a valid admin session cookie.
+- `POST /api/admin/invitations` lets an enrolled admin create a one-time, 30-minute Google enrollment link. The email is normalized and checked when the recipient completes Google OAuth; the endpoint does not attempt to discover whether a Google account exists. Acceptance binds an existing email-only admin row or creates a new row, then issues the normal admin session.
 - `PATCH /api/parks/:slug` updates the admin-editable park fields (`name`, `slug`, `locationLabel`, `postalOffice`, `postalCode`, `areaKm2`, `establishmentYear`, `parkUrl`, `displayTypeName`, `hasMagnet`, optional nullable `markerPoint`) and auto-generates a slug from `name` when `slug` is omitted. `markerPoint: null` clears an override and restores the imported/default marker.
 - `PATCH /api/parks/:slug/removed` lets the admin UI hide or restore a park by toggling its persisted `removed` flag.
 - `POST /api/trips`, `PATCH /api/trips/:id`, and `DELETE /api/trips/:id` are admin-session write routes for named trip management. Trip create/update accepts optional `slug` and optional nullable `startingPoint`, and auto-generates the slug from `name` when `slug` is omitted.

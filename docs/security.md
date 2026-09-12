@@ -1,124 +1,61 @@
 # Security And Sustainability Guide
 
-This document defines the security and operational sustainability baseline for future development in this repository.
+This document describes the current security and operational baseline for the API.
 
-It is intentionally policy-oriented. Keep it focused on standing rules, design expectations, and contributor checklists rather than dated audit notes.
+## Route access
 
-## Core Principles
+- Anonymous backend reads: `GET /health`, `GET /openapi.json`, `GET /assets/logos/*`, and `/auth/*` login-control routes.
+- API-key boundary: frontend-facing `/api/*` reads outside localhost.
+- Admin session: all writes and admin-only reads, including `POST /api/admin/invitations`.
+- Local-only operations: imports, migrations, backups, and repair commands.
 
-- Prefer owned data, local persistence, and deterministic cache behavior over live upstream dependencies on normal read paths.
-- Keep the smallest possible anonymous surface.
-- Treat browser-facing admin actions as session-authorized operations, not shared-secret operations.
-- Keep storage private by default and expose files through presigned URLs instead of permanently public buckets.
-- Treat bandwidth, object storage growth, backup hygiene, and third-party dependency load as part of security and sustainability, not separate follow-up work.
+The frontend may present catalog and visit reads without login, but it reaches the backend through its server-side API-key boundary. Do not call a backend route public unless its middleware and tests prove that access.
 
-## Logging And Operator Response
+## Authentication
 
-- Structured application logs use an allowlist of diagnostic fields. Provider URLs, API keys, free-text location queries, cookies, authorization values, and share identifiers must not be logged.
-- Geoapify failure logs may contain only the fixed operation (`geocode`, `suggest`, or `route`), HTTP status when available, elapsed duration, timeout budget, and a fixed error category. Raw provider errors and request URLs stay out of logs.
-- Request logs replace tokenized review-share path segments with route templates. Unhandled-error logs record a safe category and sanitized path, not the raw error message.
-- Log retention and access must be restricted to the operator roles that need diagnostics. Treat any historical credential exposure as an incident and do not copy sensitive log contents into tickets, plans, or chat.
+Google ID tokens are verified locally with `jose` against the fixed Google JWKS endpoint. Verification requires a valid `RS256` signature, Google issuer, configured audience, current expiry, non-empty subject, and `email_verified === true`. JWKS retrieval and authorization-code exchange have 10-second timeouts; the one-use authorization code is not retried.
 
-### Provider-logging deployment checklist
+Admin access requires the verified Google email and stable Google `sub` to match `admins`. Migration `0030_admin_google_sub.sql` adds the nullable unique subject column. An email-only row does not grant normal login access.
 
-After deploying the safe-logging change, the operator should:
+Enrolled admins can create an invitation with `POST /api/admin/invitations`. The email is normalized and validated syntactically; Google account existence is checked only when the recipient completes OAuth. Migration `0031_admin_invitations.sql` stores only a SHA-256 token hash. Each link is private, single-use, valid for 30 minutes, and revokes an earlier pending invitation for the same email. Acceptance requires an exact match with the verified Google email, then atomically binds an email-only row or inserts a new admin before issuing the normal session.
 
-1. Confirm the deployed log viewer exposes only the allowlisted fields and that the provider failure, timeout, and unexpected-error paths do not include request URLs.
-2. Review existing log retention and access policy without exporting or reproducing credentials, location queries, or share tokens.
-3. If a real Geoapify key may have reached retained logs, rotate it through the provider and deployment secret store, then redeploy and verify the new key is not browser-reachable.
-4. Record only the review date, access/retention decision, and rotation outcome. Mark unavailable platform evidence as unverified instead of inferring it from source tests.
+Sessions are HS256 JWTs with a 24-hour lifetime, issuer `reissuvihko-api`, audience `reissuvihko-ui`, and role `admin`. The `__session` cookie is `HttpOnly`, `SameSite=Lax`, `Path=/`, and `Secure` in production. Admin and private responses use `Cache-Control: private, no-store`.
 
-## Route Access Policy
+The frontend must independently validate session issuer, audience, expiry, and admin role before proxying admin operations. OAuth/session failures fail closed.
 
-Every route must fit one explicit access class:
+## Logging
 
-- Anonymous remote:
-  `GET /health`, `GET /openapi.json`, login-control `/auth/*` routes, and the public logo asset redirect route `GET /assets/logos/*` belong here today.
-- API-key integration:
-  Read-only `/api/*` routes that are intentionally available to trusted non-browser callers may use the shared `API_KEY`.
-- Admin session:
-  All write routes and admin-only read routes must require a valid admin session cookie.
-- Local-only maintenance:
-  Imports, migrations, backups, and one-off repair workflows should stay in CLI or operator tooling rather than becoming HTTP endpoints.
+Logs use an allowlist of diagnostic fields. They must not contain provider URLs, API keys, free-text location queries, cookies, authorization values, invitation tokens, or share identifiers.
 
-Rules:
+Geoapify diagnostics contain only the fixed operation, status when available, elapsed duration, timeout budget, and safe error category. Request logs use route templates for tokenized paths, and unhandled errors use safe categories instead of raw messages.
 
-- Do not describe a route as public unless it is anonymously accessible over the network.
-- Frontend-facing `GET` routes such as `/api/home-summary`, `/api/map-summary`, `/api/trips`, `/api/trips/archive`, `/api/trips/slug/:slug`, `/api/trips/:id`, `/api/visits-timeline`, `/api/date-range-review/shares/:shareId`, and `/api/year-review/shares/:shareId` still require the API key outside localhost, while admin routes require a valid admin session. The archive response is private/no-store because it may contain signed cover URLs.
-- New anonymously accessible routes must define cache policy, abuse controls, and the reason they are safe to expose.
-- Removing an unused admin endpoint is preferred over leaving it available behind auth.
+Restrict log access and retention to operational roles. Treat any confirmed historical credential exposure as an incident and rotate the affected credential through the provider and deployment secret store.
 
-## Auth And Session Rules
+## Storage and uploads
 
-- Never expose the shared `API_KEY` in browser-delivered code.
-- Browser-facing admin or mutation flows must use Google-backed admin sessions.
-- Google OAuth ID tokens are verified locally with `jose` against the fixed Google JWKS endpoint. Verification requires an allowed Google issuer, the configured client audience, a valid signature using `RS256`, a current `exp`, a non-empty `sub`, and `email_verified === true`. The verifier keeps the signing keys in a bounded in-process cache; it does not call the token-controlled `tokeninfo` endpoint.
-- OAuth authorization-code exchange has a 10-second timeout and does not retry a one-use authorization code. JWKS retrieval has the same finite timeout and uses `jose`'s bounded refresh/caching behavior.
-- Admin access is bound to the pair of verified Google email and stable Google `sub`. Migration `0030_admin_google_sub.sql` adds a nullable unique `google_sub` column so deployment can preserve existing rows while the operator explicitly enrolls each legitimate admin. An email-only or unbound row fails closed; the callback does not auto-enroll a new subject or trust a changed subject.
-- Session JWTs are HS256, 24h expiry, and always carry `iss: "reissuvihko-api"`, `aud: "reissuvihko-ui"`, and `role: "admin"` claims. Issuance and verification both bind issuer and audience; allowlisted Google users are issued the `admin` role.
-- The `__session` cookie is `HttpOnly`, `SameSite=Lax`, `Path=/`, and `Secure` in production. SameSite=Lax is the CSRF baseline; the frontend additionally rejects cross-origin non-GET requests.
-- Frontend callers that verify the session JWT (for example the `/hallinta` proxy and `POST /api/revalidate-public-cache`) must bind `issuer`/`audience` and require `role === "admin"`.
-- If OAuth/session auth is unavailable, admin-session routes should fail closed rather than silently downgrading to weaker auth.
-- Before promoting the code that enforces `google_sub`, back up the production database and bind every existing admin through an independently confirmed Google login identity. Example operator SQL for one confirmed row is `UPDATE admins SET google_sub = '<confirmed-google-sub>' WHERE email = '<confirmed-admin-email>';`; verify the unique constraint and keep the actual identifiers out of logs and documentation.
-- When auth policy changes, update runtime enforcement, route contracts, integration tests, `README.md`, `docs/development.md`, and this file in the same change.
-- When a route mixes API-key and session requirements, document both clearly in contract and contributor docs.
-- Named-trip writes (`POST /api/trips`, `PATCH /api/trips/:id`, `DELETE /api/trips/:id`, `POST /api/trips/:id/stops`, `PATCH /api/trip-stops/:id`, `DELETE /api/trip-stops/:id`, and the trip-stop image upload/delete/reorder routes) stay on the admin-session side, while trip reads (`GET /api/trips`, `GET /api/trips/slug/:slug`, `GET /api/trips/:id`) stay read-only and API-key protected like the other frontend summary endpoints.
-- Trip featured-image candidate reads and selection writes (`GET /api/admin/trips/:id/images`, `GET /api/admin/trips/:id/featured-image`, `PATCH /api/admin/trips/:id/featured-image`) require an admin session and are private/no-store. They persist only source plus integer image IDs; ownership is rechecked on every read and hidden park sources never resolve publicly.
-- Date-range-review preview, publish, and admin share-management routes (`GET /api/date-range-review/preview`, `POST /api/date-range-review/publish`, `DELETE /api/date-range-review/publish`, `GET /api/admin/date-range-review/shares`, `PATCH /api/admin/date-range-review/shares/:shareId`, and `DELETE /api/admin/date-range-review/shares/:shareId`) stay on the admin-session side, while `GET /api/date-range-review/shares/:shareId` stays on the API-key-protected frontend-read side for server-rendered share pages.
-- Published date-range-review snapshots may freeze image keys for selected story cards, but share reads must resolve fresh presigned URLs at response time instead of storing expiring URLs inside the snapshot JSON.
-- Year-review preview and publish routes (`GET /api/year-review/:year/preview`, `POST /api/year-review/:year/publish`, and `DELETE /api/year-review/:year/publish`) stay on the admin-session side, while `GET /api/year-review/shares/:shareId` stays on the API-key-protected frontend-read side for server-rendered share pages.
-- Published year-review snapshots may freeze image keys for selected story cards, but share reads must resolve fresh presigned URLs at response time instead of storing expiring URLs inside the snapshot JSON.
+- Keep R2 private and use presigned URLs for non-public media.
+- Validate limits against stored-object metadata, not only client-declared metadata.
+- Keep upload and object-retention limits documented so bandwidth and storage remain predictable.
+- Do not remove media based only on absence from ordinary image rows; published review snapshots can still reference frozen image keys.
 
-## Storage And Upload Rules
+## External services
 
-- Keep R2 private by default.
-- Use presigned URLs for visit images, trip-stop images, and other non-public assets instead of public bucket URLs.
-- Public park logos may use stable API-owned redirect URLs such as `GET /assets/logos/*?v=<updatedAt>` so frontend caches see deterministic source URLs while the underlying R2 bucket stays private.
-- Enforce upload limits against the actual stored object metadata, not only client-declared metadata.
-- Keep a documented size budget for uploads so storage growth and bandwidth remain predictable.
-- If direct uploads can create orphaned objects, define and document cleanup strategy.
-- Do not require manual pre-compression or manual resizing as a normal admin workflow when the system can handle it automatically.
+Normal reads use the owned database rather than live upstream catalog requests. Geoapify is limited to the trip-planner operations, remains server-side, uses short timeouts, reuses identical requests in process, and returns `503` when unavailable. Public provider work still requires an abuse budget before production exposure.
 
-## External Dependency Rules
+## Deployment requirements
 
-- Normal API reads must use the local or Turso database, not live LIPAS or other upstream calls.
-- Avoid new live third-party request-path dependencies when local verification or cached verification is practical.
-- If a live dependency is necessary on a request path, document:
-  - what is called
-  - timeout and retry expectations
-  - cache strategy
-  - failure behavior
-  - test coverage for failure cases
-- Prefer local JWT verification against trusted signing keys over per-request token introspection endpoints when feasible.
-- `POST /api/trip-planner/suggestions` and `POST /api/trip-planner/search` may call Geoapify for autocomplete, geocoding, and routing when `GEOAPIFY_API_KEY` is configured. Keep those calls behind the existing backend auth boundary, scope free-text autocomplete and geocoding to Finland, Sweden, and Norway, use short request timeouts, reuse identical requests through process-local in-memory caching and in-flight deduplication, and fail closed with `503` when the provider is unavailable.
+- Vercel must use a remote Turso database and must not use `MEMORY_STORAGE=true`.
+- Keep `API_KEY`, database credentials, OAuth secrets, and `GEOAPIFY_API_KEY` server-side.
+- Run the production migration workflow before promoting code that requires a new schema migration.
+- Back up Turso before high-risk imports, migrations, or bulk admin changes.
+- After migration `0030`, ensure every existing admin is enrolled through the invitation flow or an independently confirmed operator procedure. Use the SQL procedure only for bootstrap or emergency recovery.
 
-## Data Handling Rules
+## Contributor checklist
 
-- Preserve personal notes, visit history, and related assets across catalog re-imports.
-- Keep imported catalog data and owned personal data logically separated.
-- Do not store or republish unnecessary upstream personal/contact fields.
-- Before high-risk imports, migrations, or bulk admin data operations against Turso, take a fresh backup or document why the operation is safely reversible.
+For changes to auth, routes, uploads, caching, storage, or external integrations:
 
-## Operational Guardrails
-
-- Vercel deployments must not run against local `file:` databases.
-- Vercel deployments must not use `MEMORY_STORAGE=true`.
-- Production Turso credentials for automated migrations must live in GitHub Actions environment secrets, not in committed files or browser-reachable config.
-- Production deployment promotion should stay gated on the GitHub migration check so schema updates complete before merged code is served.
-- Shared cache headers and `ETag` behavior must be deliberate for catalog and summary routes.
-- Shared cache headers and `ETag` behavior for trip and visit summary datasets must stay tied to the owned visit-data version signal so trip rename/delete, trip-stop reordering, trip-stop image changes, and visit reassignment invalidate cached timeline reads predictably.
-- Private or admin responses must use non-cacheable headers.
-- New rate-sensitive anonymous flows should add edge or app-layer rate limiting before exposure.
-- Add a minimal API-focused security header set when platform defaults do not already provide it.
-
-## Contributor Checklist
-
-When changing auth, routes, uploads, env vars, caching, storage, or external integrations:
-
-1. Classify the route access level explicitly.
-2. Verify the auth boundary with integration tests.
-3. Verify cache headers and `ETag` behavior for changed `GET` routes.
-4. Re-check stored-object metadata for upload flows.
-5. Update all contributor-facing env docs together with `src/env.ts` and `.env.example`.
-6. Remove stale endpoints, stale docs, and stale compatibility assumptions in the same change.
-7. Document any remaining risk as a standing rule or follow-up task, not as a dated diary entry.
+1. Define the route access class and cache policy.
+2. Add an integration test for the authentication and failure boundary.
+3. Keep Zod/OpenAPI, runtime behavior, generated UI types, and documentation aligned.
+4. Keep secrets, tokens, personal data, and upstream request details out of logs.
+5. Record remaining risks as current rules or tracked follow-up work, not as implementation diaries.
