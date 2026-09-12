@@ -1,3 +1,4 @@
+import { z } from '@hono/zod-openapi';
 import type { Context } from 'hono';
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie';
 import { jwtVerify, SignJWT } from 'jose';
@@ -15,6 +16,15 @@ export type SessionPayload = {
   role: 'admin';
 };
 
+const verifiedSessionPayloadSchema = z.object({
+  email: z.string().email(),
+  exp: z.number().finite(),
+  name: z.string(),
+  picture: z.string(),
+  role: z.literal('admin'),
+  sub: z.string().min(1)
+});
+
 export const createSessionToken = async (payload: SessionPayload, secret: Uint8Array) => {
   return new SignJWT(payload)
     .setProtectedHeader({ alg: 'HS256' })
@@ -31,7 +41,13 @@ export const verifySessionToken = async (token: string, secret: Uint8Array) => {
     audience: SESSION_AUDIENCE,
     issuer: SESSION_ISSUER
   });
-  return payload as unknown as SessionPayload;
+
+  const parsedPayload = verifiedSessionPayloadSchema.safeParse(payload);
+  if (!parsedPayload.success) {
+    throw new Error('Invalid session payload');
+  }
+
+  return parsedPayload.data;
 };
 
 export const setSessionCookie = (c: Context, token: string, cookieName: string) => {

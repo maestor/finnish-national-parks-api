@@ -908,6 +908,11 @@ export const createApp = ({
     app.use('/api/*', authCors);
   }
 
+  app.use('/auth/*', async (c, next) => {
+    c.header('Cache-Control', PRIVATE_CACHE_CONTROL);
+    await next();
+  });
+
   app.use(createAuthMiddleware(apiKey));
 
   app.openAPIRegistry.registerComponent('securitySchemes', 'bearerAuth', {

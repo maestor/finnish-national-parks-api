@@ -809,20 +809,24 @@ describe('google oauth', () => {
     expect(googleResponse.status).toBe(503);
     const googleBody = (await googleResponse.json()) as { error: string };
     expect(googleBody.error).toBe('OAuth not configured.');
+    expect(googleResponse.headers.get('cache-control')).toBe('private, no-store');
 
     const callbackResponse = await app.request('/auth/google/callback');
     expect(callbackResponse.status).toBe(503);
     const callbackBody = (await callbackResponse.json()) as { error: string };
     expect(callbackBody.error).toBe('OAuth not configured.');
+    expect(callbackResponse.headers.get('cache-control')).toBe('private, no-store');
 
     const meResponse = await app.request('/auth/me');
     expect(meResponse.status).toBe(503);
     const meBody = (await meResponse.json()) as { error: string };
     expect(meBody.error).toBe('OAuth not configured.');
+    expect(meResponse.headers.get('cache-control')).toBe('private, no-store');
 
     const logoutResponse = await app.request('/auth/logout', { method: 'POST' });
     expect(logoutResponse.status).toBe(503);
     const logoutBody = (await logoutResponse.json()) as { error: string };
     expect(logoutBody.error).toBe('OAuth not configured.');
+    expect(logoutResponse.headers.get('cache-control')).toBe('private, no-store');
   });
 });

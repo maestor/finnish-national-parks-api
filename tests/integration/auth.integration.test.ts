@@ -1,3 +1,4 @@
+import { SignJWT } from 'jose';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { createApp } from '../../src/app.js';
@@ -25,6 +26,22 @@ const createAdminSessionCookie = async () => {
   );
 
   return `${authConfig.cookieName}=${token}`;
+};
+
+const createSignedSessionCookie = async (payload: Record<string, unknown>, withExpiry = true) => {
+  const builder = new SignJWT(payload)
+    .setProtectedHeader({ alg: 'HS256' })
+    .setIssuedAt()
+    .setIssuer('reissuvihko-api')
+    .setAudience('reissuvihko-ui');
+
+  if (withExpiry) {
+    builder.setExpirationTime('1 hour');
+  }
+
+  return `${authConfig.cookieName}=${await builder.sign(
+    new TextEncoder().encode(authConfig.jwtSecret)
+  )}`;
 };
 
 describe('auth middleware', () => {
@@ -125,6 +142,52 @@ describe('auth middleware', () => {
 
     expect(unauthorizedResponse.status).toBe(401);
     expect(authorizedResponse.status).toBe(200);
+  });
+
+  it('rejects signed sessions with a non-admin role or missing expiry', async () => {
+    const app = createApp({ auth: authConfig, database: testDatabase.database });
+    const nonAdminResponse = await app.request('/api/admin/parks/visibility', {
+      headers: {
+        cookie: await createSignedSessionCookie({
+          email: 'admin@example.com',
+          name: 'Admin User',
+          picture: '',
+          role: 'user',
+          sub: 'google-user-id'
+        })
+      }
+    });
+    const missingExpiryResponse = await app.request('/api/admin/parks/visibility', {
+      headers: {
+        cookie: await createSignedSessionCookie(
+          {
+            email: 'admin@example.com',
+            name: 'Admin User',
+            picture: '',
+            role: 'admin',
+            sub: 'google-user-id'
+          },
+          false
+        )
+      }
+    });
+
+    expect(nonAdminResponse.status).toBe(401);
+    expect(missingExpiryResponse.status).toBe(401);
+  });
+
+  it('marks every configured auth response as private and non-cacheable', async () => {
+    const app = createApp({ auth: authConfig, database: testDatabase.database });
+    const responses = await Promise.all([
+      app.request('/auth/google'),
+      app.request('/auth/google/callback'),
+      app.request('/auth/me'),
+      app.request('/auth/logout', { method: 'POST' })
+    ]);
+
+    for (const response of responses) {
+      expect(response.headers.get('cache-control')).toBe('private, no-store');
+    }
   });
 
   it('leaves health and openapi.json unprotected', async () => {
