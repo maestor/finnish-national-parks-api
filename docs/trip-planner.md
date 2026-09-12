@@ -33,6 +33,12 @@ It is meant to answer two questions quickly:
 
 All three endpoints require the existing backend auth boundary outside localhost and depend on `GEOAPIFY_API_KEY`.
 
+## Provider Budget
+
+Provider work is admitted through the shared libSQL/Turso database so separate API instances use the same counters. Suggestions allow 30 requests per client per minute; route and nearby searches allow 5 requests per client per minute. The provider-wide daily ceiling is configured with `GEOAPIFY_DAILY_REQUEST_LIMIT` and defaults to 3,000 credits, matching Geoapify's Free plan. Suggestions and nearby searches reserve one credit; two-point route searches reserve five to cover geocoding plus the routing API's long-distance surcharge; public multi-leg routes reserve five per leg. This is a conservative admission reservation: actual Routing API billing is one credit per leg plus any applicable long-distance surcharge.
+
+Requests above the 16 KiB planner JSON body limit return `413`. Exhausted client or provider budgets return `429` with `Retry-After`. The frontend proxy counts streamed request bytes before buffering and supplies the API with a server-issued opaque client ID. Requests that reach the API without that internal ID use a shared anonymous bucket. Confirm the daily unit ceiling and any platform-level rate rules against the actual provider subscription before production deployment.
+
 ## Core Definitions
 
 - `corridor distance`

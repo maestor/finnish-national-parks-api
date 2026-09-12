@@ -195,6 +195,14 @@ import {
   unpublishYearReviewRoute
 } from './routes/year-review.js';
 import type { StorageClient } from './storage/types.js';
+import {
+  createTripPlannerBudget,
+  getTripPlannerClientId,
+  getTripPlannerRouteBudgetUnits,
+  TRIP_PLANNER_CLIENT_ID_HEADER,
+  type TripPlannerBudget,
+  type TripPlannerBudgetOperation
+} from './trip-planner/budget.js';
 import { TripPlannerError } from './trip-planner/search.js';
 import type { TripPlannerService } from './trip-planner/types.js';
 import {
@@ -221,6 +229,7 @@ type AppDependencies = {
   getLogoPublicUrl?: ((key: string, updatedAt: string) => string | Promise<string>) | undefined;
   getMapPublicUrl?: ((key: string, updatedAt: string) => string | Promise<string>) | undefined;
   storage?: StorageClient | undefined;
+  tripPlannerBudget?: TripPlannerBudget | undefined;
   tripPlanner?: TripPlannerService | undefined;
 };
 
@@ -236,6 +245,7 @@ const DIRECT_VISIT_UPLOAD_URL_TTL_SECONDS = 15 * 60;
 const LOGO_PRESIGNED_URL_TTL_SECONDS = 7 * 24 * 60 * 60;
 const MAP_PRESIGNED_URL_TTL_SECONDS = 7 * 24 * 60 * 60;
 const PUBLIC_LOGO_REDIRECT_CACHE_CONTROL = 'public, max-age=31536000, immutable';
+const TRIP_PLANNER_REQUEST_BODY_LIMIT_BYTES = 16 * 1024;
 
 const sanitizeRequestPath = (path: string) => {
   return path
@@ -257,6 +267,43 @@ const getErrorCategory = (error: unknown) => {
   }
 
   return 'application_error';
+};
+
+const admitTripPlannerRequest = async (
+  context: SessionContext,
+  budget: TripPlannerBudget,
+  operation: TripPlannerBudgetOperation,
+  providerUnits?: number
+) => {
+  try {
+    const admission = await budget.admit(
+      operation,
+      getTripPlannerClientId(context.req.header(TRIP_PLANNER_CLIENT_ID_HEADER)),
+      undefined,
+      providerUnits
+    );
+
+    if (admission.allowed) {
+      return null;
+    }
+
+    context.header('Retry-After', String(admission.retryAfterSeconds));
+    return context.json(
+      {
+        error: 'Trip planner request budget exceeded.',
+        errorCode: 'trip_planner_budget_exceeded' as const
+      },
+      429
+    );
+  } catch {
+    return context.json(
+      {
+        error: 'Trip planner budget is unavailable.',
+        errorCode: 'trip_planner_budget_unavailable' as const
+      },
+      503
+    );
+  }
 };
 
 const jsonNotFound = (error: string) => {
@@ -598,13 +645,15 @@ const buildPublicTripRouteWaypoints = async (database: Database, trip: PublicTri
   ];
 };
 
-const attachPublicTripRoute = async (
-  database: Database,
-  trip: PublicTripDetail,
-  tripPlanner?: TripPlannerService
-) => {
-  const waypoints = await buildPublicTripRouteWaypoints(database, trip);
+type PublicTripRouteWaypoints = NonNullable<
+  Awaited<ReturnType<typeof buildPublicTripRouteWaypoints>>
+>;
 
+const attachPublicTripRoute = async (
+  trip: PublicTripDetail,
+  tripPlanner: TripPlannerService | undefined,
+  waypoints: PublicTripRouteWaypoints | null
+) => {
   if (!waypoints) {
     return {
       ...trip,
@@ -850,6 +899,7 @@ export const createApp = ({
   getLogoPublicUrl,
   getMapPublicUrl,
   storage,
+  tripPlannerBudget,
   tripPlanner
 }: AppDependencies = {}) => {
   const logoPublicUrl =
@@ -915,6 +965,17 @@ export const createApp = ({
 
   app.use(createAuthMiddleware(apiKey));
 
+  app.use('/api/trip-planner/*', async (context, next) => {
+    const contentLength = Number(context.req.header('content-length'));
+
+    if (Number.isFinite(contentLength) && contentLength > TRIP_PLANNER_REQUEST_BODY_LIMIT_BYTES) {
+      context.header('Cache-Control', PRIVATE_CACHE_CONTROL);
+      return context.json({ error: 'Request body too large.' }, 413);
+    }
+
+    await next();
+  });
+
   app.openAPIRegistry.registerComponent('securitySchemes', 'bearerAuth', {
     type: 'http',
     scheme: 'bearer'
@@ -959,6 +1020,8 @@ export const createApp = ({
   });
 
   if (database) {
+    const effectiveTripPlannerBudget = tripPlannerBudget ?? createTripPlannerBudget({ database });
+
     app.openapi(googleAuthRoute, async (c) => {
       if (!auth) {
         return c.json({ error: 'OAuth not configured.' }, 503);
@@ -2051,7 +2114,22 @@ export const createApp = ({
         return context.json(jsonNotFound('Trip not found.'), 404);
       }
 
-      return context.json(await attachPublicTripRoute(database, trip, tripPlanner), 200);
+      const routeWaypoints = await buildPublicTripRouteWaypoints(database, trip);
+
+      if (routeWaypoints && tripPlanner?.buildRoundTripRoute) {
+        const budgetResponse = await admitTripPlannerRequest(
+          context,
+          effectiveTripPlannerBudget,
+          'route',
+          getTripPlannerRouteBudgetUnits(routeWaypoints.length)
+        );
+
+        if (budgetResponse) {
+          return budgetResponse;
+        }
+      }
+
+      return context.json(await attachPublicTripRoute(trip, tripPlanner, routeWaypoints), 200);
     });
 
     app.openapi(getTripRoute, async (context) => {
@@ -2078,6 +2156,16 @@ export const createApp = ({
           },
           503
         );
+      }
+
+      const budgetResponse = await admitTripPlannerRequest(
+        context,
+        effectiveTripPlannerBudget,
+        'suggestions'
+      );
+
+      if (budgetResponse) {
+        return budgetResponse;
       }
 
       const body = context.req.valid('json');
@@ -2108,6 +2196,16 @@ export const createApp = ({
         );
       }
 
+      const budgetResponse = await admitTripPlannerRequest(
+        context,
+        effectiveTripPlannerBudget,
+        'route'
+      );
+
+      if (budgetResponse) {
+        return budgetResponse;
+      }
+
       const body = context.req.valid('json');
 
       try {
@@ -2134,6 +2232,16 @@ export const createApp = ({
           },
           503
         );
+      }
+
+      const budgetResponse = await admitTripPlannerRequest(
+        context,
+        effectiveTripPlannerBudget,
+        'nearby'
+      );
+
+      if (budgetResponse) {
+        return budgetResponse;
       }
 
       const body = context.req.valid('json');

@@ -99,6 +99,8 @@ export const tripPlannerErrorCodeSchema = z.enum([
   'origin_not_found',
   'provider_unavailable',
   'route_not_found',
+  'trip_planner_budget_exceeded',
+  'trip_planner_budget_unavailable',
   'trip_planner_not_configured'
 ]);
 

@@ -43,7 +43,7 @@ Restrict log access and retention to operational roles. Treat any confirmed hist
 
 ## External services
 
-Normal reads use the owned database rather than live upstream catalog requests. Geoapify is limited to the trip-planner operations, remains server-side, uses short timeouts, reuses identical requests in process, and returns `503` when unavailable. Public provider work still requires an abuse budget before production exposure.
+Normal reads use the owned database rather than live upstream catalog requests. Geoapify is limited to the trip-planner operations, remains server-side, uses short timeouts, reuses identical requests in process, and returns `503` when unavailable. Public provider work uses an atomic shared libSQL/Turso budget with separate per-client suggestion, route, and nearby limits plus a provider-wide daily credit ceiling. Two-point route searches reserve five credits to cover geocoding plus the routing API's long-distance surcharge; public multi-leg routes reserve five per leg; suggestions and nearby searches reserve one. The paired UI proxy counts and caps planner request bodies at 16 KiB before buffering; the API repeats the declared-size guard. Confirm the daily limit and edge rules against the provider subscription before production exposure.
 
 ## Deployment requirements
 

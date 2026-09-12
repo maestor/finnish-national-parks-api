@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createApp } from '../../src/app.js';
 import { createVisit } from '../../src/db/repositories.js';
 import { importParks } from '../../src/importer/import-parks.js';
+import { createTripPlannerBudget } from '../../src/trip-planner/budget.js';
 import { createGeoapifyClient } from '../../src/trip-planner/geoapify.js';
 import { createTripPlannerService, TripPlannerError } from '../../src/trip-planner/search.js';
 import { createLipasPark, createLipasTrail, parkTypeFixtures } from '../fixtures/lipas.js';
@@ -236,10 +237,22 @@ describe('trip planner route', () => {
     vi.restoreAllMocks();
   });
 
-  const createTripPlannerApp = (fetchFn: typeof fetch) => {
+  const createTripPlannerApp = (
+    fetchFn: typeof fetch,
+    budgetOptions: {
+      dailyProviderUnits?: number;
+      now?: () => number;
+      routeRequestsPerMinute?: number;
+      suggestionsPerMinute?: number;
+    } = {}
+  ) => {
     return createApp({
       apiKey: 'test-api-key',
       database: testDatabase.database,
+      tripPlannerBudget: createTripPlannerBudget({
+        database: testDatabase.database,
+        ...budgetOptions
+      }),
       tripPlanner: createTripPlannerService({
         database: testDatabase.database,
         provider: createGeoapifyClient({
@@ -337,6 +350,142 @@ describe('trip planner route', () => {
         }
       ]
     });
+  });
+
+  it('rejects suggestion work after the per-client budget without calling the provider', async () => {
+    const fetchFn = mockGeoapifyFetch() as typeof fetch;
+    const app = createTripPlannerApp(fetchFn, {
+      dailyProviderUnits: 100,
+      suggestionsPerMinute: 1
+    });
+
+    const firstResponse = await requestSuggestionsAsRemote(
+      app,
+      {
+        query: 'He'
+      },
+      { 'x-trip-planner-client-id': 'client-one' }
+    );
+    const secondResponse = await requestSuggestionsAsRemote(
+      app,
+      { query: 'Helsinki' },
+      { 'x-trip-planner-client-id': 'client-one' }
+    );
+
+    expect(firstResponse.status).toBe(200);
+    expect(secondResponse.status).toBe(429);
+    expect(secondResponse.headers.get('cache-control')).toBe('private, no-store');
+    expect(secondResponse.headers.get('retry-after')).toBeTruthy();
+    expect(await secondResponse.json()).toEqual({
+      error: 'Trip planner request budget exceeded.',
+      errorCode: 'trip_planner_budget_exceeded'
+    });
+    expect(fetchFn).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects nearby work after the per-client budget without calling the provider', async () => {
+    const fetchFn = mockGeoapifyFetch() as typeof fetch;
+    const app = createTripPlannerApp(fetchFn, {
+      routeRequestsPerMinute: 1
+    });
+
+    const firstResponse = await requestNearbyAsRemote(
+      app,
+      { originQuery: 'Origin' },
+      { 'x-trip-planner-client-id': 'client_1234567890' }
+    );
+    const secondResponse = await requestNearbyAsRemote(
+      app,
+      { originQuery: 'Origin' },
+      { 'x-trip-planner-client-id': 'client_1234567890' }
+    );
+
+    expect(firstResponse.status).toBe(200);
+    expect(secondResponse.status).toBe(429);
+    expect(fetchFn).toHaveBeenCalledTimes(1);
+  });
+
+  it('fails closed when the trip planner budget store errors', async () => {
+    const app = createApp({
+      apiKey: 'test-api-key',
+      database: testDatabase.database,
+      tripPlannerBudget: {
+        admit: vi.fn().mockRejectedValue(new Error('budget store unavailable'))
+      },
+      tripPlanner: {
+        search: vi.fn(async () => {
+          throw new Error('not used in this test');
+        }),
+        searchNearby: vi.fn(async () => {
+          throw new Error('not used in this test');
+        }),
+        suggest: vi.fn(async () => [])
+      }
+    });
+
+    const response = await requestSuggestionsAsRemote(app, { query: 'He' });
+
+    expect(response.status).toBe(503);
+    expect(await response.json()).toEqual({
+      error: 'Trip planner budget is unavailable.',
+      errorCode: 'trip_planner_budget_unavailable'
+    });
+  });
+
+  it('rejects an oversized planner body before provider work', async () => {
+    const fetchFn = mockGeoapifyFetch() as typeof fetch;
+    const app = createTripPlannerApp(fetchFn);
+    const body = JSON.stringify({ query: 'x'.repeat(16 * 1024) });
+    const response = await app.request('/api/trip-planner/suggestions', {
+      body,
+      headers: {
+        authorization: 'Bearer test-api-key',
+        'content-length': String(new TextEncoder().encode(body).byteLength),
+        'content-type': 'application/json',
+        host: 'parks.example.com',
+        'x-forwarded-for': '203.0.113.1'
+      },
+      method: 'POST'
+    });
+
+    expect(response.status).toBe(413);
+    expect(await response.json()).toEqual({ error: 'Request body too large.' });
+    expect(fetchFn).not.toHaveBeenCalled();
+  });
+
+  it('shares the provider budget across app instances', async () => {
+    const firstFetch = mockGeoapifyFetch();
+    const secondFetch = mockGeoapifyFetch();
+    const budgetOptions = {
+      dailyProviderUnits: 5,
+      routeRequestsPerMinute: 10
+    };
+    const firstApp = createTripPlannerApp(firstFetch as typeof fetch, budgetOptions);
+    const secondApp = createTripPlannerApp(secondFetch as typeof fetch, budgetOptions);
+
+    const [firstResponse, secondResponse] = await Promise.all([
+      requestAsRemote(
+        firstApp,
+        {
+          destinationQuery: 'Destination',
+          mode: 'drive',
+          originQuery: 'Origin'
+        },
+        { 'x-trip-planner-client-id': 'client-one' }
+      ),
+      requestAsRemote(
+        secondApp,
+        {
+          destinationQuery: 'Destination',
+          mode: 'drive',
+          originQuery: 'Origin'
+        },
+        { 'x-trip-planner-client-id': 'client-two' }
+      )
+    ]);
+
+    expect([firstResponse.status, secondResponse.status].sort()).toEqual([200, 429]);
+    expect(firstFetch.mock.calls.length + secondFetch.mock.calls.length).toBe(3);
   });
 
   it('returns unvisited areas first, then unvisited trails, then visited results', async () => {
@@ -616,6 +765,19 @@ describe('trip planner route', () => {
       boundingBox: expect.any(Object),
       distanceFromOriginKm: expect.any(Object)
     });
+
+    for (const path of [
+      '/api/trip-planner/suggestions',
+      '/api/trip-planner/search',
+      '/api/trip-planner/nearby'
+    ] as const) {
+      expect(body.paths?.[path]?.post?.responses).toEqual(
+        expect.objectContaining({
+          '413': expect.any(Object),
+          '429': expect.any(Object)
+        })
+      );
+    }
   });
 
   it('returns 422 when the origin cannot be geocoded', async () => {

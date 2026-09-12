@@ -16,6 +16,7 @@ const createEnv = (overrides: Partial<Env> = {}): Env => {
     DATABASE_URL: 'libsql://parks-db.turso.io',
     FRONTEND_URL: 'https://parks.example.com',
     GEOAPIFY_API_KEY: undefined,
+    GEOAPIFY_DAILY_REQUEST_LIMIT: 3000,
     GOOGLE_CLIENT_ID: undefined,
     GOOGLE_CLIENT_SECRET: undefined,
     GOOGLE_REDIRECT_URI: undefined,

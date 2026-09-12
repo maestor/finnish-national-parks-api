@@ -39,6 +39,22 @@ export const suggestTripPlannerRoute = createRoute({
       },
       description: 'Bearer token required outside localhost'
     },
+    413: {
+      content: {
+        'application/json': {
+          schema: errorSchema
+        }
+      },
+      description: 'Request body exceeds the trip planner limit'
+    },
+    429: {
+      content: {
+        'application/json': {
+          schema: tripPlannerErrorSchema
+        }
+      },
+      description: 'Trip planner request budget exceeded'
+    },
     503: {
       content: {
         'application/json': {
@@ -80,6 +96,22 @@ export const searchTripPlannerRoute = createRoute({
         }
       },
       description: 'Bearer token required outside localhost'
+    },
+    413: {
+      content: {
+        'application/json': {
+          schema: errorSchema
+        }
+      },
+      description: 'Request body exceeds the trip planner limit'
+    },
+    429: {
+      content: {
+        'application/json': {
+          schema: tripPlannerErrorSchema
+        }
+      },
+      description: 'Trip planner request budget exceeded'
     },
     422: {
       content: {
@@ -130,6 +162,22 @@ export const searchNearbyTripPlannerRoute = createRoute({
         }
       },
       description: 'Bearer token required outside localhost'
+    },
+    413: {
+      content: {
+        'application/json': {
+          schema: errorSchema
+        }
+      },
+      description: 'Request body exceeds the trip planner limit'
+    },
+    429: {
+      content: {
+        'application/json': {
+          schema: tripPlannerErrorSchema
+        }
+      },
+      description: 'Trip planner request budget exceeded'
     },
     422: {
       content: {
