@@ -1,3 +1,4 @@
+import { SignJWT } from 'jose';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -60,6 +61,40 @@ describe('session token', () => {
       .setIssuer(SESSION_ISSUER)
       .setAudience('someone-else')
       .setExpirationTime('1 hour')
+      .sign(secret);
+
+    await expect(verifySessionToken(token, secret)).rejects.toThrow();
+  });
+
+  it.each([
+    ['a non-admin role', { ...adminPayload, role: 'user' }],
+    [
+      'a missing role',
+      (() => {
+        const { role: _role, ...payload } = adminPayload;
+        return payload;
+      })()
+    ],
+    ['a missing subject', { ...adminPayload, sub: '' }],
+    ['an invalid email', { ...adminPayload, email: 'not-an-email' }]
+  ])('rejects tokens with %s', async (_description, payload) => {
+    const token = await new SignJWT(payload)
+      .setProtectedHeader({ alg: 'HS256' })
+      .setIssuedAt()
+      .setIssuer(SESSION_ISSUER)
+      .setAudience(SESSION_AUDIENCE)
+      .setExpirationTime('1 hour')
+      .sign(secret);
+
+    await expect(verifySessionToken(token, secret)).rejects.toThrow();
+  });
+
+  it('rejects tokens without an expiry claim', async () => {
+    const token = await new SignJWT(adminPayload)
+      .setProtectedHeader({ alg: 'HS256' })
+      .setIssuedAt()
+      .setIssuer(SESSION_ISSUER)
+      .setAudience(SESSION_AUDIENCE)
       .sign(secret);
 
     await expect(verifySessionToken(token, secret)).rejects.toThrow();
