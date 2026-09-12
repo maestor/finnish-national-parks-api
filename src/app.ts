@@ -11,7 +11,10 @@ import {
 import { validateDateRangeReviewRequest } from './date-range-review/validation.js';
 import type { Database } from './db/database.js';
 import {
+  AdminAlreadyEnrolledError,
+  acceptAdminInvitation,
   countTripStopImages,
+  createAdminInvitation,
   createTrip,
   createTripStop,
   createTripStopImage,
@@ -24,6 +27,7 @@ import {
   deleteVisit,
   deleteVisitImage,
   findAdminByEmailAndGoogleSub,
+  findAdminByGoogleSub,
   findParkRecordBySlugIncludingRemoved,
   findTripStopImageById,
   findTripStopRecordById,
@@ -47,6 +51,7 @@ import {
   getVisitById,
   getYearReviewImageAssetsByVisitId,
   getYearReviewTripFeaturedImageAssetsByTripId,
+  isAdminInvitationUsable,
   listAdminParkVisibility,
   listParkSearchEntries,
   listPublicParks,
@@ -86,14 +91,17 @@ import {
 } from './http/cache.js';
 import {
   buildGoogleAuthUrl,
+  clearAdminInvitationCookie,
   clearOAuthStateCookie,
   clearPkceCookie,
   exchangeCodeForTokens,
   generateCodeChallenge,
   generateCodeVerifier,
   generateState,
+  getAdminInvitationCookie,
   getOAuthStateCookie,
   getPkceCookie,
+  setAdminInvitationCookie,
   setOAuthStateCookie,
   setPkceCookie,
   verifyGoogleIdToken
@@ -107,6 +115,7 @@ import {
   verifySessionToken
 } from './http/session.js';
 import { createSlug } from './parks/park-normalization.js';
+import { createAdminInvitationRoute } from './routes/admin-invitations.js';
 import {
   getAuthMeRoute,
   googleAuthCallbackRoute,
@@ -912,9 +921,15 @@ export const createApp = ({
   });
 
   if (database) {
-    app.openapi(googleAuthRoute, (c) => {
+    app.openapi(googleAuthRoute, async (c) => {
       if (!auth) {
         return c.json({ error: 'OAuth not configured.' }, 503);
+      }
+
+      const { invite } = c.req.valid('query');
+
+      if (invite && !(await isAdminInvitationUsable(database, invite))) {
+        return c.redirect(`${auth.frontendUrl}/login?error=invitation_invalid`, 302);
       }
 
       const state = generateState();
@@ -923,6 +938,11 @@ export const createApp = ({
 
       setOAuthStateCookie(c, state);
       setPkceCookie(c, codeVerifier);
+      if (invite) {
+        setAdminInvitationCookie(c, invite);
+      } else {
+        clearAdminInvitationCookie(c);
+      }
 
       const redirectUri =
         auth.googleRedirectUri ?? new URL('/auth/google/callback', c.req.url).toString();
@@ -943,6 +963,9 @@ export const createApp = ({
 
       const query = c.req.valid('query');
       const frontendUrl = auth.frontendUrl;
+      const invitationToken = getAdminInvitationCookie(c);
+
+      clearAdminInvitationCookie(c);
 
       try {
         if (query.error) {
@@ -977,14 +1000,21 @@ export const createApp = ({
         });
 
         const googleUser = await verifyGoogleIdToken(tokens.id_token, auth.googleClientId);
-        const admin = await findAdminByEmailAndGoogleSub(
-          database,
-          googleUser.email,
-          googleUser.sub
-        );
+        const admin = invitationToken
+          ? (await acceptAdminInvitation(database, {
+              email: googleUser.email,
+              googleSub: googleUser.sub,
+              token: invitationToken
+            }))
+            ? true
+            : null
+          : await findAdminByEmailAndGoogleSub(database, googleUser.email, googleUser.sub);
 
         if (!admin) {
-          return c.redirect(`${frontendUrl}/login?error=access_denied`, 302);
+          return c.redirect(
+            `${frontendUrl}/login?error=${invitationToken ? 'invitation_failed' : 'access_denied'}`,
+            302
+          );
         }
 
         const sessionToken = await createSessionToken(
@@ -1002,7 +1032,56 @@ export const createApp = ({
 
         return c.redirect(`${frontendUrl}/control-panel`, 302);
       } catch {
-        return c.redirect(`${frontendUrl}/login?error=auth_failed`, 302);
+        return c.redirect(
+          `${frontendUrl}/login?error=${invitationToken ? 'invitation_failed' : 'auth_failed'}`,
+          302
+        );
+      }
+    });
+
+    app.openapi(createAdminInvitationRoute, async (c) => {
+      if (!auth) {
+        return c.json({ error: 'OAuth not configured.' }, 503);
+      }
+
+      const session = await getAuthenticatedSession(c, auth);
+
+      if (!session || String(session.role) !== 'admin') {
+        return c.json({ error: 'Unauthorized' }, 401);
+      }
+
+      const inviter = await findAdminByGoogleSub(database, session.sub);
+
+      if (!inviter) {
+        return c.json({ error: 'Admin session is not provisioned.' }, 403);
+      }
+
+      const { email } = c.req.valid('json');
+
+      try {
+        const invitation = await createAdminInvitation(database, {
+          createdByAdminId: inviter.id,
+          email
+        });
+        const invitationUrl = new URL('/auth/google', auth.frontendUrl);
+        invitationUrl.searchParams.set('invite', invitation.token);
+
+        c.header('Cache-Control', PRIVATE_CACHE_CONTROL);
+        c.header('Referrer-Policy', 'no-referrer');
+        return c.json(
+          {
+            email: invitation.email,
+            expiresAt: invitation.expiresAt,
+            invitationUrl: invitationUrl.toString()
+          },
+          201
+        );
+      } catch (error) {
+        if (error instanceof AdminAlreadyEnrolledError) {
+          return c.json({ error: error.message }, 409);
+        }
+
+        throw error;
       }
     });
 

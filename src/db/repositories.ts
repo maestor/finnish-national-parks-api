@@ -1,3 +1,5 @@
+import { createHash, randomBytes } from 'node:crypto';
+
 import {
   and,
   asc,
@@ -29,6 +31,7 @@ import type { TripPlannerParkCandidate } from '../trip-planner/types.js';
 import type { YearReviewStory, YearReviewStoryImageAsset } from '../year-review/story.js';
 import type { Database, DbClient } from './database.js';
 import {
+  adminInvitations,
   admins,
   dateRangeReviewShares,
   importRuns,
@@ -4525,7 +4528,164 @@ export const findAdminByEmailAndGoogleSub = async (
   const rows = await db
     .select()
     .from(admins)
-    .where(and(eq(admins.email, email), eq(admins.googleSub, googleSub)))
+    .where(and(eq(admins.email, normalizeAdminEmail(email)), eq(admins.googleSub, googleSub)))
     .limit(1);
   return rows[0] ?? null;
+};
+
+export const normalizeAdminEmail = (email: string) => email.trim().toLowerCase();
+
+export const findAdminByEmail = async (db: DbClient, email: string) => {
+  const rows = await db
+    .select()
+    .from(admins)
+    .where(eq(admins.email, normalizeAdminEmail(email)))
+    .limit(1);
+  return rows[0] ?? null;
+};
+
+export const findAdminByGoogleSub = async (db: DbClient, googleSub: string) => {
+  const rows = await db.select().from(admins).where(eq(admins.googleSub, googleSub)).limit(1);
+  return rows[0] ?? null;
+};
+
+export class AdminAlreadyEnrolledError extends Error {
+  constructor() {
+    super('The email already belongs to an enrolled admin.');
+    this.name = 'AdminAlreadyEnrolledError';
+  }
+}
+
+const hashAdminInvitationToken = (token: string) =>
+  createHash('sha256').update(token).digest('hex');
+
+export const isAdminInvitationUsable = async (database: Database, token: string) => {
+  if (token.length === 0 || token.length > 256) {
+    return false;
+  }
+
+  const now = new Date().toISOString();
+  const rows = await database
+    .select({ id: adminInvitations.id })
+    .from(adminInvitations)
+    .where(
+      and(
+        eq(adminInvitations.tokenHash, hashAdminInvitationToken(token)),
+        gt(adminInvitations.expiresAt, now),
+        isNull(adminInvitations.usedAt),
+        isNull(adminInvitations.revokedAt)
+      )
+    )
+    .limit(1);
+
+  return rows.length > 0;
+};
+
+export const createAdminInvitation = async (
+  database: Database,
+  params: { createdByAdminId: number; email: string }
+) => {
+  const email = normalizeAdminEmail(params.email);
+  const token = randomBytes(32).toString('base64url');
+  const tokenHash = hashAdminInvitationToken(token);
+  const createdAt = new Date();
+  const expiresAt = new Date(createdAt.getTime() + 30 * 60 * 1000);
+
+  await database.transaction(async (transaction) => {
+    const existingAdmin = await findAdminByEmail(transaction, email);
+
+    if (existingAdmin?.googleSub) {
+      throw new AdminAlreadyEnrolledError();
+    }
+
+    await transaction
+      .update(adminInvitations)
+      .set({ revokedAt: createdAt.toISOString() })
+      .where(
+        and(
+          eq(adminInvitations.email, email),
+          isNull(adminInvitations.usedAt),
+          isNull(adminInvitations.revokedAt)
+        )
+      );
+
+    await transaction.insert(adminInvitations).values({
+      createdAt: createdAt.toISOString(),
+      createdByAdminId: params.createdByAdminId,
+      email,
+      expiresAt: expiresAt.toISOString(),
+      tokenHash
+    });
+  });
+
+  return {
+    email,
+    expiresAt: expiresAt.toISOString(),
+    token
+  };
+};
+
+export const acceptAdminInvitation = async (
+  database: Database,
+  params: { email: string; googleSub: string; token: string }
+) => {
+  if (params.token.length === 0 || params.token.length > 256) {
+    return false;
+  }
+
+  const now = new Date().toISOString();
+  const tokenHash = hashAdminInvitationToken(params.token);
+  const email = normalizeAdminEmail(params.email);
+
+  return database.transaction(async (transaction) => {
+    const invitationRows = await transaction
+      .select()
+      .from(adminInvitations)
+      .where(
+        and(
+          eq(adminInvitations.tokenHash, tokenHash),
+          gt(adminInvitations.expiresAt, now),
+          isNull(adminInvitations.usedAt),
+          isNull(adminInvitations.revokedAt)
+        )
+      )
+      .limit(1);
+    const invitation = invitationRows[0];
+
+    if (!invitation || invitation.email !== email) {
+      return false;
+    }
+
+    const existingAdmin = await findAdminByEmail(transaction, email);
+    const subjectOwner = await findAdminByGoogleSub(transaction, params.googleSub);
+
+    if (subjectOwner && (!existingAdmin || subjectOwner.id !== existingAdmin.id)) {
+      return false;
+    }
+
+    if (existingAdmin?.googleSub && existingAdmin.googleSub !== params.googleSub) {
+      return false;
+    }
+
+    if (existingAdmin) {
+      await transaction
+        .update(admins)
+        .set({ googleSub: params.googleSub, updatedAt: now })
+        .where(eq(admins.id, existingAdmin.id));
+    } else {
+      await transaction.insert(admins).values({
+        createdAt: now,
+        email,
+        googleSub: params.googleSub,
+        updatedAt: now
+      });
+    }
+
+    await transaction
+      .update(adminInvitations)
+      .set({ usedAt: now })
+      .where(eq(adminInvitations.id, invitation.id));
+
+    return true;
+  });
 };

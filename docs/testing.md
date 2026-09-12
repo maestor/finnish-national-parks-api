@@ -102,6 +102,7 @@ If an upload limit exists, at least one test should cover the real stored-object
 - Visit and management endpoints are private or no-store.
 - Trip planner provider failures surface as stable app errors instead of raw Geoapify responses.
 - All write routes and admin-only visibility reads require an admin session and fail closed when OAuth session auth is unavailable.
+- Admin invitation tests cover provisioned-admin creation, normalized email handling, existing email-only enrollment, new-admin insertion, exact recipient-email matching, token reuse rejection, and already-enrolled conflicts.
 - Park removal toggle can hide and restore a park through the authenticated park-management API.
 - Trip create/edit/delete supports named-trip CRUD, persisted trip slugs, optional starting points, and clears visit assignments on delete.
 - Trip-stop create/edit/delete supports non-park itinerary stops with labeled coordinates, optional custom `displayName`, required `visitedOn` dates, optional notes, and shared ordering between stops and park visits.

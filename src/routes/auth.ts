@@ -5,6 +5,11 @@ import { errorSchema } from '../contracts/common.js';
 export const googleAuthRoute = createRoute({
   method: 'get',
   path: '/auth/google',
+  request: {
+    query: z.object({
+      invite: z.string().max(256).optional()
+    })
+  },
   security: [],
   tags: ['Auth'],
   responses: {

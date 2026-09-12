@@ -295,3 +295,28 @@ export const admins = sqliteTable(
     emailIndex: uniqueIndex('admins_email_idx').on(table.email)
   })
 );
+
+export const adminInvitations = sqliteTable(
+  'admin_invitations',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    email: text('email').notNull(),
+    tokenHash: text('token_hash').notNull().unique(),
+    expiresAt: text('expires_at').notNull(),
+    createdByAdminId: integer('created_by_admin_id')
+      .notNull()
+      .references(() => admins.id),
+    createdAt: text('created_at').notNull(),
+    usedAt: text('used_at'),
+    revokedAt: text('revoked_at')
+  },
+  (table) => ({
+    emailIndex: index('admin_invitations_email_idx').on(table.email),
+    expiryIndex: index('admin_invitations_expiry_idx').on(table.expiresAt),
+    activeTokenIndex: index('admin_invitations_active_token_idx').on(
+      table.tokenHash,
+      table.usedAt,
+      table.revokedAt
+    )
+  })
+);
