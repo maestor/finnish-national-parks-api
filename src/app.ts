@@ -23,7 +23,7 @@ import {
   deleteTripStopImage,
   deleteVisit,
   deleteVisitImage,
-  findAdminByEmail,
+  findAdminByEmailAndGoogleSub,
   findParkRecordBySlugIncludingRemoved,
   findTripStopImageById,
   findTripStopRecordById,
@@ -977,7 +977,11 @@ export const createApp = ({
         });
 
         const googleUser = await verifyGoogleIdToken(tokens.id_token, auth.googleClientId);
-        const admin = await findAdminByEmail(database, googleUser.email);
+        const admin = await findAdminByEmailAndGoogleSub(
+          database,
+          googleUser.email,
+          googleUser.sub
+        );
 
         if (!admin) {
           return c.redirect(`${frontendUrl}/login?error=access_denied`, 302);

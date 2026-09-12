@@ -4517,7 +4517,15 @@ export const getPublicVisitSummaryEtagSeed = async (
   };
 };
 
-export const findAdminByEmail = async (db: DbClient, email: string) => {
-  const rows = await db.select().from(admins).where(eq(admins.email, email)).limit(1);
+export const findAdminByEmailAndGoogleSub = async (
+  db: DbClient,
+  email: string,
+  googleSub: string
+) => {
+  const rows = await db
+    .select()
+    .from(admins)
+    .where(and(eq(admins.email, email), eq(admins.googleSub, googleSub)))
+    .limit(1);
   return rows[0] ?? null;
 };
