@@ -12,6 +12,7 @@ import { validateDateRangeReviewRequest } from './date-range-review/validation.j
 import type { Database } from './db/database.js';
 import {
   AdminAlreadyEnrolledError,
+  AdminSelfModificationError,
   acceptAdminInvitation,
   countTripStopImages,
   createAdminInvitation,
@@ -53,6 +54,7 @@ import {
   getYearReviewTripFeaturedImageAssetsByTripId,
   isAdminInvitationUsable,
   listAdminParkVisibility,
+  listAdminUsers,
   listParkSearchEntries,
   listPublicParks,
   listPublishedDateRangeReviewShares,
@@ -66,11 +68,13 @@ import {
   publishYearReviewShare,
   RepositoryNotFoundError,
   RepositoryValidationError,
+  removeAdminUser,
   reorderTripStopImages,
   reorderVisitImages,
   unpublishDateRangeReviewShare,
   unpublishDateRangeReviewShareByShareId,
   unpublishYearReviewShare,
+  updateAdminUser,
   updateParkDetails,
   updateParkRemoved,
   updatePublishedDateRangeReviewShareByShareId,
@@ -116,6 +120,11 @@ import {
 } from './http/session.js';
 import { createSlug } from './parks/park-normalization.js';
 import { createAdminInvitationRoute } from './routes/admin-invitations.js';
+import {
+  deleteAdminUserRoute,
+  listAdminUsersRoute,
+  updateAdminUserRoute
+} from './routes/admin-users.js';
 import {
   getAuthMeRoute,
   googleAuthCallbackRoute,
@@ -755,7 +764,7 @@ const requireAdminSession = async (context: SessionContext, auth?: AuthConfig) =
 
   const session = await getAuthenticatedSession(context, auth);
 
-  if (!session) {
+  if (!session || String(session.role) !== 'admin') {
     return context.json({ error: 'Unauthorized' }, 401);
   }
 
@@ -778,6 +787,30 @@ const getAuthenticatedSession = async (context: SessionContext, auth?: AuthConfi
   } catch {
     return null;
   }
+};
+
+const requireSuperAdminSession = async (
+  context: SessionContext,
+  auth: AuthConfig | undefined,
+  database: Database
+) => {
+  if (!auth) {
+    return context.json({ error: 'OAuth not configured.' }, 503);
+  }
+
+  const session = await getAuthenticatedSession(context, auth);
+
+  if (!session || String(session.role) !== 'admin') {
+    return context.json({ error: 'Unauthorized' }, 401);
+  }
+
+  const admin = await findAdminByGoogleSub(database, session.sub);
+
+  if (!admin?.superAdmin) {
+    return context.json({ error: 'Super admin access required.' }, 403);
+  }
+
+  return { admin, session };
 };
 
 const toVisitImageResponse = async (
@@ -1044,23 +1077,17 @@ export const createApp = ({
         return c.json({ error: 'OAuth not configured.' }, 503);
       }
 
-      const session = await getAuthenticatedSession(c, auth);
+      const access = await requireSuperAdminSession(c, auth, database);
 
-      if (!session || String(session.role) !== 'admin') {
-        return c.json({ error: 'Unauthorized' }, 401);
-      }
-
-      const inviter = await findAdminByGoogleSub(database, session.sub);
-
-      if (!inviter) {
-        return c.json({ error: 'Admin session is not provisioned.' }, 403);
+      if (access instanceof Response) {
+        return access;
       }
 
       const { email } = c.req.valid('json');
 
       try {
         const invitation = await createAdminInvitation(database, {
-          createdByAdminId: inviter.id,
+          createdByAdminId: access.admin.id,
           email
         });
         const invitationUrl = new URL('/auth/google', auth.frontendUrl);
@@ -1085,6 +1112,78 @@ export const createApp = ({
       }
     });
 
+    app.openapi(listAdminUsersRoute, async (c) => {
+      const access = await requireSuperAdminSession(c, auth, database);
+
+      if (access instanceof Response) {
+        return access;
+      }
+
+      c.header('Cache-Control', PRIVATE_CACHE_CONTROL);
+      return c.json({ admins: await listAdminUsers(database) }, 200);
+    });
+
+    app.openapi(updateAdminUserRoute, async (c) => {
+      const access = await requireSuperAdminSession(c, auth, database);
+
+      if (access instanceof Response) {
+        return access;
+      }
+
+      const { id } = c.req.valid('param');
+      const { isSuperAdmin } = c.req.valid('json');
+
+      try {
+        const admin = await updateAdminUser(database, {
+          actingAdminId: access.admin.id,
+          adminId: id,
+          isSuperAdmin
+        });
+
+        if (!admin) {
+          return c.json({ error: 'Admin user not found.' }, 404);
+        }
+
+        c.header('Cache-Control', PRIVATE_CACHE_CONTROL);
+        return c.json(admin, 200);
+      } catch (error) {
+        if (error instanceof AdminSelfModificationError) {
+          return c.json({ error: error.message }, 409);
+        }
+
+        throw error;
+      }
+    });
+
+    app.openapi(deleteAdminUserRoute, async (c) => {
+      const access = await requireSuperAdminSession(c, auth, database);
+
+      if (access instanceof Response) {
+        return access;
+      }
+
+      const { id } = c.req.valid('param');
+
+      try {
+        const removed = await removeAdminUser(database, {
+          actingAdminId: access.admin.id,
+          adminId: id
+        });
+
+        if (!removed) {
+          return c.json({ error: 'Admin user not found.' }, 404);
+        }
+
+        return new Response(null, { headers: c.res.headers, status: 204 });
+      } catch (error) {
+        if (error instanceof AdminSelfModificationError) {
+          return c.json({ error: error.message }, 409);
+        }
+
+        throw error;
+      }
+    });
+
     app.openapi(getAuthMeRoute, async (c) => {
       if (!auth) {
         return c.json({ error: 'OAuth not configured.' }, 503);
@@ -1098,11 +1197,13 @@ export const createApp = ({
 
       try {
         const payload = await verifySessionToken(token, new TextEncoder().encode(auth.jwtSecret));
+        const admin = await findAdminByGoogleSub(database, payload.sub);
 
         return c.json(
           {
             email: payload.email,
             id: payload.sub,
+            isSuperAdmin: admin?.superAdmin === true,
             name: payload.name,
             picture: payload.picture
           },

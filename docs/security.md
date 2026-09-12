@@ -6,7 +6,8 @@ This document describes the current security and operational baseline for the AP
 
 - Anonymous backend reads: `GET /health`, `GET /openapi.json`, `GET /assets/logos/*`, and `/auth/*` login-control routes.
 - API-key boundary: frontend-facing `/api/*` reads outside localhost.
-- Admin session: all writes and admin-only reads, including `POST /api/admin/invitations`.
+- Admin session: all writes and admin-only reads.
+- Super-admin session: `GET /api/admin/admins`, admin role changes/removal, and `POST /api/admin/invitations`.
 - Local-only operations: imports, migrations, backups, and repair commands.
 
 The frontend may present catalog and visit reads without login, but it reaches the backend through its server-side API-key boundary. Do not call a backend route public unless its middleware and tests prove that access.
@@ -17,7 +18,9 @@ Google ID tokens are verified locally with `jose` against the fixed Google JWKS 
 
 Admin access requires the verified Google email and stable Google `sub` to match `admins`. Migration `0030_admin_google_sub.sql` adds the nullable unique subject column. An email-only row does not grant normal login access.
 
-Enrolled admins can create an invitation with `POST /api/admin/invitations`. The email is normalized and validated syntactically; Google account existence is checked only when the recipient completes OAuth. Migration `0031_admin_invitations.sql` stores only a SHA-256 token hash. Each link is private, single-use, valid for 30 minutes, and revokes an earlier pending invitation for the same email. Acceptance requires an exact match with the verified Google email, then atomically binds an email-only row or inserts a new admin before issuing the normal session.
+Migration `0032_admin_super_admin.sql` adds the `super_admin` flag, defaulting to false. Super-admin authorization is resolved from the current database row, so role changes apply to the next protected request. Super admins can list, promote, demote, or remove other admins; self-modification is rejected. Removing an admin deletes the allowlist row and blocks future login, but an already-issued stateless session can still reach ordinary admin routes until its 24-hour expiry. Admin invitations use the same super-admin boundary.
+
+Enrolled super admins can create an invitation with `POST /api/admin/invitations`. The email is normalized and validated syntactically; Google account existence is checked only when the recipient completes OAuth. Migration `0031_admin_invitations.sql` stores only a SHA-256 token hash. Each link is private, single-use, valid for 30 minutes, and revokes an earlier pending invitation for the same email. Acceptance requires an exact match with the verified Google email, then atomically binds an email-only row or inserts a new admin before issuing the normal session.
 
 Sessions are HS256 JWTs with a 24-hour lifetime, issuer `reissuvihko-api`, audience `reissuvihko-ui`, and role `admin`. The `__session` cookie is `HttpOnly`, `SameSite=Lax`, `Path=/`, and `Secure` in production. Admin and private responses use `Cache-Control: private, no-store`.
 
@@ -48,7 +51,7 @@ Normal reads use the owned database rather than live upstream catalog requests. 
 - Keep `API_KEY`, database credentials, OAuth secrets, and `GEOAPIFY_API_KEY` server-side.
 - Run the production migration workflow before promoting code that requires a new schema migration.
 - Back up Turso before high-risk imports, migrations, or bulk admin changes.
-- After migration `0030`, ensure every existing admin is enrolled through the invitation flow or an independently confirmed operator procedure. Use the SQL procedure only for bootstrap or emergency recovery.
+- After migrations `0030`–`0032`, ensure every existing admin is enrolled and promote the first independently confirmed super admin with the documented SQL procedure. Use direct SQL only for bootstrap or emergency recovery.
 
 ## Contributor checklist
 
