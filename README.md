@@ -64,6 +64,7 @@ FRONTEND_URL=http://localhost:4300
 
 # Optional: enable the backend trip planner with Geoapify geocoding + routing
 GEOAPIFY_API_KEY=
+GEOAPIFY_DAILY_REQUEST_LIMIT=3000
 
 # Optional: Cloudflare R2 storage for visit images and park logos
 PUBLIC_API_BASE_URL=
@@ -82,6 +83,7 @@ Production notes:
 - If `/auth/*` is exposed through a frontend proxy or rewrite, set `GOOGLE_REDIRECT_URI=https://your-frontend-domain/auth/google/callback`, register that exact URI in Google Cloud, and start the login flow through that same public domain so the OAuth cookies stay on the right host.
 - Google ID tokens are verified locally against Google's cached signing keys; the API does not call `tokeninfo` during login. Migration `0030_admin_google_sub.sql` requires a bound subject for normal login. Existing email-only admins can use the control-panel invitation flow after migrations `0031_admin_invitations.sql` and `0032_admin_super_admin.sql`; the operator SQL path remains for bootstrap and recovery.
 - `GEOAPIFY_API_KEY` enables `POST /api/trip-planner/suggestions`, `POST /api/trip-planner/search`, `POST /api/trip-planner/nearby`, and routed `GET /api/trips/slug/:slug` responses when a trip has enough waypoints. Keep it server-side only; the UI should call the backend through its existing server proxy layer.
+- Trip planner requests use an atomic shared libSQL/Turso budget: 30 suggestions, 5 route searches, or 5 nearby requests per client per minute, plus a provider-wide daily credit ceiling from `GEOAPIFY_DAILY_REQUEST_LIMIT`. Suggestions and nearby work reserve one provider credit; a two-point route search reserves five to cover the routing API's long-distance credit surcharge, and public multi-leg trip routes reserve five per leg. The UI proxy rejects planner bodies over 16 KiB before forwarding them, and the API applies the same declared-size guard.
 - `MEMORY_STORAGE=true` is for tests and local-only development, not Vercel.
 - Production merges to `main` should run the GitHub Actions `Production Migration` workflow against Turso before Vercel promotes the new production build.
 - Store production `DATABASE_URL` and `DATABASE_AUTH_TOKEN` in the GitHub `production` environment for that workflow, and configure Vercel Deployment Checks to require the GitHub check named `Migrate production database`.

@@ -37,6 +37,9 @@ describe('migrateDatabase', () => {
     const adminInvitationTable = await client.execute(
       "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'admin_invitations'"
     );
+    const tripPlannerBudgetTable = await client.execute(
+      "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'trip_planner_budget_windows'"
+    );
     const publicDataVersionColumns = await client.execute(
       'PRAGMA table_info(public_data_versions)'
     );
@@ -74,7 +77,8 @@ describe('migrateDatabase', () => {
       '0029_trip_featured_image.sql',
       '0030_admin_google_sub.sql',
       '0031_admin_invitations.sql',
-      '0032_admin_super_admin.sql'
+      '0032_admin_super_admin.sql',
+      '0033_trip_planner_budget_windows.sql'
     ]);
     expect(parkTypes.rows.map((row) => String(row.slug))).toEqual([
       'outdoor-recreation-area',
@@ -133,6 +137,7 @@ describe('migrateDatabase', () => {
     expect(adminColumns.rows.some((row) => String(row.name) === 'google_sub')).toBe(true);
     expect(adminColumns.rows.some((row) => String(row.name) === 'super_admin')).toBe(true);
     expect(adminInvitationTable.rows).toHaveLength(1);
+    expect(tripPlannerBudgetTable.rows).toHaveLength(1);
     expect(publicDataVersionColumns.rows.some((row) => String(row.name) === 'version')).toBe(true);
   });
 
@@ -181,7 +186,8 @@ describe('migrateDatabase', () => {
       '0029_trip_featured_image.sql',
       '0030_admin_google_sub.sql',
       '0031_admin_invitations.sql',
-      '0032_admin_super_admin.sql'
+      '0032_admin_super_admin.sql',
+      '0033_trip_planner_budget_windows.sql'
     ]);
     expect(schemaMigrationTableBeforeApply.rows).toEqual([]);
     expect(pendingAfterApply).toEqual([]);

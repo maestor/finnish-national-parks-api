@@ -22,6 +22,7 @@ import { createSessionToken } from '../../src/http/session.js';
 import { importParks } from '../../src/importer/import-parks.js';
 import { importSpecialParks } from '../../src/importer/import-special-parks.js';
 import { createMemoryStorage } from '../../src/storage/memory-storage.js';
+import { createTripPlannerBudget } from '../../src/trip-planner/budget.js';
 import { TripPlannerError } from '../../src/trip-planner/search.js';
 import type {
   TripPlannerRoundTripRoute,
@@ -3586,6 +3587,55 @@ describe('API routes', () => {
       },
       success: false
     });
+  });
+
+  it('rejects a public multi-leg route before provider work when its reservation exceeds the daily budget', async () => {
+    const buildRoundTripRoute = vi.fn(async () => null);
+    const app = createAuthedApp({
+      tripPlannerBudget: createTripPlannerBudget({
+        dailyProviderUnits: 5,
+        database: testDatabase.database
+      }),
+      tripPlanner: {
+        buildRoundTripRoute,
+        search: vi.fn(async () => {
+          throw new Error('not used in this test');
+        }),
+        searchNearby: vi.fn(async () => {
+          throw new Error('not used in this test');
+        }),
+        suggest: vi.fn(async () => {
+          throw new Error('not used in this test');
+        })
+      }
+    });
+    const { body: trip } = await createTrip(app, {
+      name: 'Liian moniosainen julkinen reitti',
+      startingPoint: {
+        coordinate: {
+          lat: 60.1699,
+          lon: 24.9384
+        },
+        label: 'Helsinki'
+      }
+    });
+
+    await createVisit(app, 'akasmannyn-kansallispuisto', {
+      tripId: trip.id,
+      tripStopOrder: 1,
+      visitedOn: '2026-06-07'
+    });
+    await createVisit(app, 'seitsemisen-kansallispuisto', {
+      tripId: trip.id,
+      tripStopOrder: 2,
+      visitedOn: '2026-06-08'
+    });
+
+    const response = await app.request('/api/trips/slug/liian-moniosainen-julkinen-reitti');
+
+    expect(response.status).toBe(429);
+    expect(response.headers.get('retry-after')).toBeTruthy();
+    expect(buildRoundTripRoute).not.toHaveBeenCalled();
   });
 
   it('returns 500 for unsupported public trip route planner error codes by slug', async () => {

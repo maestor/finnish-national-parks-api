@@ -4,6 +4,7 @@ import { createDatabase, type Database } from './db/database.js';
 import { type Env, getEnv, isVercelDeployment } from './env.js';
 import { createMemoryStorage } from './storage/memory-storage.js';
 import { createR2Client } from './storage/r2-client.js';
+import { createTripPlannerBudget } from './trip-planner/budget.js';
 import { createGeoapifyClient } from './trip-planner/geoapify.js';
 import { createTripPlannerService } from './trip-planner/search.js';
 
@@ -98,5 +99,9 @@ export const app = createApp({
   getLogoPublicUrl: createLogoPublicUrl(env),
   getMapPublicUrl: undefined,
   storage: createStorage(env),
+  tripPlannerBudget: createTripPlannerBudget({
+    dailyProviderUnits: env.GEOAPIFY_DAILY_REQUEST_LIMIT,
+    database
+  }),
   tripPlanner
 });

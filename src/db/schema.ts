@@ -241,6 +241,18 @@ export const publicDataVersions = sqliteTable('public_data_versions', {
   updatedAt: text('updated_at').notNull()
 });
 
+export const tripPlannerBudgetWindows = sqliteTable(
+  'trip_planner_budget_windows',
+  {
+    key: text('key').primaryKey(),
+    requestCount: integer('request_count').notNull(),
+    windowStartedAt: integer('window_started_at').notNull()
+  },
+  (table) => ({
+    expiryIndex: index('trip_planner_budget_windows_expiry_idx').on(table.windowStartedAt)
+  })
+);
+
 export const yearReviewShares = sqliteTable(
   'year_review_shares',
   {
