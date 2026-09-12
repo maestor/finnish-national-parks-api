@@ -194,7 +194,7 @@ import {
   publishYearReviewRoute,
   unpublishYearReviewRoute
 } from './routes/year-review.js';
-import type { StorageClient } from './storage/types.js';
+import type { StorageClient, StoredObjectMetadata } from './storage/types.js';
 import {
   createTripPlannerBudget,
   getTripPlannerClientId,
@@ -246,6 +246,61 @@ const LOGO_PRESIGNED_URL_TTL_SECONDS = 7 * 24 * 60 * 60;
 const MAP_PRESIGNED_URL_TTL_SECONDS = 7 * 24 * 60 * 60;
 const PUBLIC_LOGO_REDIRECT_CACHE_CONTROL = 'public, max-age=31536000, immutable';
 const TRIP_PLANNER_REQUEST_BODY_LIMIT_BYTES = 16 * 1024;
+
+type StoredImageCompletionMetadata =
+  | {
+      contentLength: number;
+      contentType: string;
+      valid: true;
+    }
+  | {
+      error: string;
+      status: 413 | 422;
+      valid: false;
+    };
+
+const validateStoredImageCompletionMetadata = (
+  objectMetadata: StoredObjectMetadata
+): StoredImageCompletionMetadata => {
+  const { contentLength } = objectMetadata;
+
+  if (
+    typeof contentLength !== 'number' ||
+    !Number.isFinite(contentLength) ||
+    !Number.isInteger(contentLength) ||
+    contentLength <= 0
+  ) {
+    return {
+      error: 'Invalid stored file size.',
+      status: 422,
+      valid: false
+    };
+  }
+
+  if (contentLength > MAX_VISIT_IMAGE_FILE_SIZE) {
+    return {
+      error: 'File too large.',
+      status: 413,
+      valid: false
+    };
+  }
+
+  const contentType = objectMetadata.contentType ?? 'application/octet-stream';
+
+  if (!ACCEPTED_VISIT_IMAGE_MIME_TYPES.includes(contentType)) {
+    return {
+      error: 'Unsupported file type.',
+      status: 422,
+      valid: false
+    };
+  }
+
+  return {
+    contentLength,
+    contentType,
+    valid: true
+  };
+};
 
 const sanitizeRequestPath = (path: string) => {
   return path
@@ -2600,10 +2655,10 @@ export const createApp = ({
           return context.json({ error: 'Upload is missing from storage.' }, 422);
         }
 
-        const resolvedContentType = objectMetadata.contentType ?? 'application/octet-stream';
+        const validatedMetadata = validateStoredImageCompletionMetadata(objectMetadata);
 
-        if (!ACCEPTED_VISIT_IMAGE_MIME_TYPES.includes(resolvedContentType)) {
-          return context.json({ error: 'Unsupported file type.' }, 422);
+        if (!validatedMetadata.valid) {
+          return context.json({ error: validatedMetadata.error }, validatedMetadata.status);
         }
 
         try {
@@ -2611,11 +2666,11 @@ export const createApp = ({
           const row = await createTripStopImage(database, {
             createdAt: timestamp,
             displayOrder: 0,
-            fileSizeBytes: objectMetadata.contentLength,
+            fileSizeBytes: validatedMetadata.contentLength,
             fullHeight: fullHeight ?? null,
             fullKey: key,
             fullWidth: fullWidth ?? null,
-            mimeType: resolvedContentType,
+            mimeType: validatedMetadata.contentType,
             originalName: normalizeOptionalOriginalName(originalName),
             thumbHeight: fullHeight ?? null,
             thumbKey: key,
@@ -2895,21 +2950,21 @@ export const createApp = ({
           return context.json({ error: 'Upload is missing from storage.' }, 422);
         }
 
-        const resolvedContentType = objectMetadata.contentType ?? 'application/octet-stream';
+        const validatedMetadata = validateStoredImageCompletionMetadata(objectMetadata);
 
-        if (!ACCEPTED_VISIT_IMAGE_MIME_TYPES.includes(resolvedContentType)) {
-          return context.json({ error: 'Unsupported file type.' }, 422);
+        if (!validatedMetadata.valid) {
+          return context.json({ error: validatedMetadata.error }, validatedMetadata.status);
         }
 
         const timestamp = new Date().toISOString();
         const row = await createVisitImage(database, {
           createdAt: timestamp,
           displayOrder: 0,
-          fileSizeBytes: objectMetadata.contentLength,
+          fileSizeBytes: validatedMetadata.contentLength,
           fullHeight: fullHeight ?? null,
           fullKey: key,
           fullWidth: fullWidth ?? null,
-          mimeType: resolvedContentType,
+          mimeType: validatedMetadata.contentType,
           originalName: normalizeOptionalOriginalName(originalName),
           thumbHeight: fullHeight ?? null,
           thumbKey: key,

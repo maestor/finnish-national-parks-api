@@ -1,8 +1,10 @@
+import { eq } from 'drizzle-orm';
 import sharp from 'sharp';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { createApp } from '../../src/app.js';
 import * as repositories from '../../src/db/repositories.js';
+import { tripStopImages } from '../../src/db/schema.js';
 import { createSessionToken } from '../../src/http/session.js';
 import { importParks } from '../../src/importer/import-parks.js';
 import { createMemoryStorage } from '../../src/storage/memory-storage.js';
@@ -421,6 +423,82 @@ describe('Trip stop image routes', () => {
 
     expect(response.status).toBe(422);
     expect(body.error).toContain('Unsupported file type');
+  });
+
+  it.each([
+    ['exceeds the stored size limit', 15 * 1024 * 1024 + 1, 413, 'File too large.'],
+    ['has a zero stored size', 0, 422, 'Invalid stored file size.'],
+    ['has a negative stored size', -1, 422, 'Invalid stored file size.'],
+    ['has no stored size', null, 422, 'Invalid stored file size.']
+  ])(
+    'rejects a direct trip stop upload that %s',
+    async (_scenario, contentLength, status, error) => {
+      const { stopId } = await createTripStopFixture();
+      const app = createAuthedApp({
+        allowServerImageUploads: false,
+        storage
+      });
+      const initResponse = await createDirectUploadPlan(
+        stopId,
+        new File(['small'], 'stored-size.jpg', { type: 'image/jpeg' }),
+        app
+      );
+      const initBody = (await initResponse.json()) as { key: string };
+
+      await storage.upload(initBody.key, Buffer.from('jpeg-data'), 'image/jpeg');
+      vi.spyOn(storage, 'getObjectMetadata').mockResolvedValueOnce({
+        contentLength,
+        contentType: 'image/jpeg'
+      });
+
+      const response = await requestAsAdmin(app, `/api/trip-stops/${stopId}/images/complete`, {
+        body: JSON.stringify({ key: initBody.key }),
+        headers: { 'content-type': 'application/json' },
+        method: 'POST'
+      });
+      const body = (await response.json()) as { error: string };
+      const rows = await testDatabase.database
+        .select()
+        .from(tripStopImages)
+        .where(eq(tripStopImages.tripStopId, stopId));
+
+      expect(response.status).toBe(status);
+      expect(body.error).toBe(error);
+      expect(rows).toHaveLength(0);
+    }
+  );
+
+  it('accepts a direct trip stop upload at the stored size limit', async () => {
+    const { stopId } = await createTripStopFixture();
+    const app = createAuthedApp({
+      allowServerImageUploads: false,
+      storage
+    });
+    const initResponse = await createDirectUploadPlan(
+      stopId,
+      new File(['small'], 'stored-limit.jpg', { type: 'image/jpeg' }),
+      app
+    );
+    const initBody = (await initResponse.json()) as { key: string };
+
+    await storage.upload(initBody.key, Buffer.from('jpeg-data'), 'image/jpeg');
+    vi.spyOn(storage, 'getObjectMetadata').mockResolvedValueOnce({
+      contentLength: 15 * 1024 * 1024,
+      contentType: 'image/jpeg'
+    });
+
+    const response = await requestAsAdmin(app, `/api/trip-stops/${stopId}/images/complete`, {
+      body: JSON.stringify({ key: initBody.key }),
+      headers: { 'content-type': 'application/json' },
+      method: 'POST'
+    });
+    const rows = await testDatabase.database
+      .select()
+      .from(tripStopImages)
+      .where(eq(tripStopImages.tripStopId, stopId));
+
+    expect(response.status).toBe(201);
+    expect(rows).toMatchObject([{ fileSizeBytes: 15 * 1024 * 1024 }]);
   });
 
   it('returns 422 when completing a direct trip stop upload before the object exists in storage', async () => {

@@ -615,6 +615,14 @@ export const completeTripStopImageUploadRoute = createRoute({
         }
       }
     },
+    413: {
+      description: 'Stored file size exceeds the allowed upload limit',
+      content: {
+        'application/json': {
+          schema: errorSchema
+        }
+      }
+    },
     422: {
       description: 'Upload is missing or invalid',
       content: {
