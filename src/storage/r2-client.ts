@@ -58,6 +58,29 @@ export const createR2Client = (config: R2Config): StorageClient => {
         throw error;
       }
     },
+    getObject: async (key: string) => {
+      try {
+        const response = await s3.send(
+          new GetObjectCommand({
+            Bucket: config.bucketName,
+            Key: key
+          })
+        );
+
+        if (!response.Body) {
+          return null;
+        }
+
+        return Buffer.from(await response.Body.transformToByteArray());
+      } catch (error) {
+        const errorName = (error as { name?: string }).name;
+        if (errorName === 'NotFound' || errorName === 'NoSuchKey') {
+          return null;
+        }
+
+        throw error;
+      }
+    },
     getPresignedUrl: async (key: string, expiresInSeconds: number) => {
       return getSignedUrl(s3, new GetObjectCommand({ Bucket: config.bucketName, Key: key }), {
         expiresIn: expiresInSeconds

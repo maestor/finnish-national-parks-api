@@ -4163,7 +4163,12 @@ export const createVisitImage = async (
   database: Database,
   values: typeof visitImages.$inferInsert
 ) => {
-  return (await completeVisitImage(database, values)).row;
+  return (
+    await completeVisitImage(database, {
+      ...values,
+      uploadKey: values.uploadKey ?? values.fullKey
+    })
+  ).row;
 };
 
 export const countTripStopImages = async (database: DbClient, tripStopId: number) => {
@@ -4179,7 +4184,12 @@ export const createTripStopImage = async (
   database: Database,
   values: typeof tripStopImages.$inferInsert
 ) => {
-  return (await completeTripStopImage(database, values)).row;
+  return (
+    await completeTripStopImage(database, {
+      ...values,
+      uploadKey: values.uploadKey ?? values.fullKey
+    })
+  ).row;
 };
 
 type CompletedImage<Row> = {
@@ -4187,34 +4197,144 @@ type CompletedImage<Row> = {
   row: Row;
 };
 
-const findVisitImageByUploadIdentity = async (
-  database: DbClient,
-  visitId: number,
-  fullKey: string
-) => {
-  return (
-    await database
-      .select()
-      .from(visitImages)
-      .where(and(eq(visitImages.visitId, visitId), eq(visitImages.fullKey, fullKey)))
-      .limit(1)
-  )[0]!;
+export type LegacyImageDerivativeType = 'trip-stop' | 'visit';
+
+export type LegacyImageDerivativeRecord = {
+  id: number;
+  parentId: number;
+  sourceKey: string;
+  type: LegacyImageDerivativeType;
 };
 
-const findTripStopImageByUploadIdentity = async (
+export type LegacyImageDerivativeCursor = {
+  tripStopImageId: number;
+  visitImageId: number;
+};
+
+const mapLegacyVisitImage = (
+  row: typeof visitImages.$inferSelect
+): LegacyImageDerivativeRecord => ({
+  id: row.id,
+  parentId: row.visitId,
+  sourceKey: row.fullKey,
+  type: 'visit'
+});
+
+const mapLegacyTripStopImage = (
+  row: typeof tripStopImages.$inferSelect
+): LegacyImageDerivativeRecord => ({
+  id: row.id,
+  parentId: row.tripStopId,
+  sourceKey: row.fullKey,
+  type: 'trip-stop'
+});
+
+export const listLegacyImageDerivativeRecords = async (
+  database: Database,
+  cursor: LegacyImageDerivativeCursor,
+  limit: number
+): Promise<LegacyImageDerivativeRecord[]> => {
+  const visitRows = await database
+    .select()
+    .from(visitImages)
+    .where(
+      and(eq(visitImages.fullKey, visitImages.thumbKey), gt(visitImages.id, cursor.visitImageId))
+    )
+    .orderBy(asc(visitImages.id))
+    .limit(limit);
+  const remainingLimit = limit - visitRows.length;
+
+  if (remainingLimit === 0) {
+    return visitRows.map(mapLegacyVisitImage);
+  }
+
+  const tripStopRows = await database
+    .select()
+    .from(tripStopImages)
+    .where(
+      and(
+        eq(tripStopImages.fullKey, tripStopImages.thumbKey),
+        gt(tripStopImages.id, cursor.tripStopImageId)
+      )
+    )
+    .orderBy(asc(tripStopImages.id))
+    .limit(remainingLimit);
+
+  return [...visitRows.map(mapLegacyVisitImage), ...tripStopRows.map(mapLegacyTripStopImage)];
+};
+
+export const replaceLegacyImageDerivatives = async (
+  database: Database,
+  record: LegacyImageDerivativeRecord,
+  values: {
+    fileSizeBytes: number;
+    fullHeight: number;
+    fullKey: string;
+    fullWidth: number;
+    thumbHeight: number;
+    thumbKey: string;
+    thumbWidth: number;
+    updatedAt: string;
+  }
+) => {
+  return database.transaction(async (transaction) => {
+    const table = record.type === 'visit' ? visitImages : tripStopImages;
+    const result = await transaction
+      .update(table)
+      .set({
+        fileSizeBytes: values.fileSizeBytes,
+        fullHeight: values.fullHeight,
+        fullKey: values.fullKey,
+        fullWidth: values.fullWidth,
+        mimeType: 'image/jpeg',
+        thumbHeight: values.thumbHeight,
+        thumbKey: values.thumbKey,
+        thumbWidth: values.thumbWidth,
+        updatedAt: values.updatedAt
+      })
+      .where(
+        and(
+          eq(table.id, record.id),
+          eq(table.fullKey, record.sourceKey),
+          eq(table.thumbKey, record.sourceKey)
+        )
+      );
+    const updated = Number(result.rowsAffected) > 0;
+
+    if (updated) {
+      await bumpPublicVisitDataVersion(transaction, values.updatedAt);
+    }
+
+    return updated;
+  });
+};
+
+export const findVisitImageByUploadKey = async (
+  database: DbClient,
+  visitId: number,
+  uploadKey: string
+) => {
+  const rows = await database
+    .select()
+    .from(visitImages)
+    .where(and(eq(visitImages.visitId, visitId), eq(visitImages.uploadKey, uploadKey)))
+    .limit(1);
+
+  return rows[0] ?? null;
+};
+
+export const findTripStopImageByUploadKey = async (
   database: DbClient,
   tripStopId: number,
-  fullKey: string
+  uploadKey: string
 ) => {
-  return (
-    (
-      await database
-        .select()
-        .from(tripStopImages)
-        .where(and(eq(tripStopImages.tripStopId, tripStopId), eq(tripStopImages.fullKey, fullKey)))
-        .limit(1)
-    )[0] ?? null
-  );
+  const rows = await database
+    .select()
+    .from(tripStopImages)
+    .where(and(eq(tripStopImages.tripStopId, tripStopId), eq(tripStopImages.uploadKey, uploadKey)))
+    .limit(1);
+
+  return rows[0] ?? null;
 };
 
 export const completeVisitImage = async (
@@ -4229,6 +4349,7 @@ export const completeVisitImage = async (
     }
 
     const originalName = values.originalName ?? null;
+    const uploadKey = values.uploadKey ?? values.fullKey;
     const fullWidth = values.fullWidth ?? null;
     const fullHeight = values.fullHeight ?? null;
     const thumbWidth = values.thumbWidth ?? null;
@@ -4236,18 +4357,18 @@ export const completeVisitImage = async (
     const fileSizeBytes = values.fileSizeBytes ?? null;
     const insertResult = await transaction.run(sql`
       INSERT INTO visit_images (
-        visit_id, full_key, thumb_key, original_name, mime_type,
+        visit_id, upload_key, full_key, thumb_key, original_name, mime_type,
         full_width, full_height, thumb_width, thumb_height,
         file_size_bytes, display_order, created_at, updated_at
       )
       SELECT
-        ${values.visitId}, ${values.fullKey}, ${values.thumbKey}, ${originalName}, ${values.mimeType},
+        ${values.visitId}, ${uploadKey}, ${values.fullKey}, ${values.thumbKey}, ${originalName}, ${values.mimeType},
         ${fullWidth}, ${fullHeight}, ${thumbWidth}, ${thumbHeight},
         ${fileSizeBytes}, ${values.displayOrder}, ${values.createdAt}, ${values.updatedAt}
       WHERE EXISTS (SELECT 1 FROM park_visits WHERE id = ${values.visitId})
-      ON CONFLICT(visit_id, full_key) DO NOTHING
+      ON CONFLICT(visit_id, upload_key) DO NOTHING
     `);
-    const row = await findVisitImageByUploadIdentity(transaction, values.visitId, values.fullKey);
+    const row = await findVisitImageByUploadKey(transaction, values.visitId, uploadKey);
 
     const created = Number(insertResult.rowsAffected) > 0;
 
@@ -4255,7 +4376,7 @@ export const completeVisitImage = async (
       await bumpPublicVisitDataVersion(transaction, values.updatedAt);
     }
 
-    return { created, row };
+    return { created, row: row! };
   });
 };
 
@@ -4264,6 +4385,7 @@ export const completeTripStopImage = async (
   values: typeof tripStopImages.$inferInsert
 ): Promise<CompletedImage<typeof tripStopImages.$inferSelect>> => {
   return database.transaction(async (transaction) => {
+    const uploadKey = values.uploadKey ?? values.fullKey;
     const originalName = values.originalName ?? null;
     const fullWidth = values.fullWidth ?? null;
     const fullHeight = values.fullHeight ?? null;
@@ -4272,25 +4394,21 @@ export const completeTripStopImage = async (
     const fileSizeBytes = values.fileSizeBytes ?? null;
     const insertResult = await transaction.run(sql`
       INSERT INTO trip_stop_images (
-        trip_stop_id, full_key, thumb_key, original_name, mime_type,
+        trip_stop_id, upload_key, full_key, thumb_key, original_name, mime_type,
         full_width, full_height, thumb_width, thumb_height,
         file_size_bytes, display_order, created_at, updated_at
       )
       SELECT
-        ${values.tripStopId}, ${values.fullKey}, ${values.thumbKey}, ${originalName}, ${values.mimeType},
+        ${values.tripStopId}, ${uploadKey}, ${values.fullKey}, ${values.thumbKey}, ${originalName}, ${values.mimeType},
         ${fullWidth}, ${fullHeight}, ${thumbWidth}, ${thumbHeight},
         ${fileSizeBytes}, ${values.displayOrder}, ${values.createdAt}, ${values.updatedAt}
       WHERE EXISTS (SELECT 1 FROM trip_stops WHERE id = ${values.tripStopId})
         AND (
           SELECT COUNT(*) FROM trip_stop_images WHERE trip_stop_id = ${values.tripStopId}
         ) < ${MAX_TRIP_STOP_IMAGES}
-      ON CONFLICT(trip_stop_id, full_key) DO NOTHING
+      ON CONFLICT(trip_stop_id, upload_key) DO NOTHING
     `);
-    const row = await findTripStopImageByUploadIdentity(
-      transaction,
-      values.tripStopId,
-      values.fullKey
-    );
+    const row = await findTripStopImageByUploadKey(transaction, values.tripStopId, uploadKey);
 
     if (row) {
       const created = Number(insertResult.rowsAffected) > 0;

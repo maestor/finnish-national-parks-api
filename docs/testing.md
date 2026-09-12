@@ -119,7 +119,7 @@ If an upload limit exists, at least one test should cover the real stored-object
 - `POST /auth/logout` clears the session cookie.
 - Runtime API handlers are implemented against the same Zod/OpenAPI contract definitions.
 - Auth, cache, and documentation claims stay aligned for `/health`, `/openapi.json`, `/auth/*`, and `/api/*` route families.
-- Direct-upload tests should protect the real object-size and content-type checks whenever that flow changes.
+- Direct-upload tests should protect the real object-size, decodability/pixel-bound, orientation/metadata stripping, distinct derivative-key, retry, and content-type checks whenever that flow changes. Backfill tests must cover dry-run, bounded continuation, retained sources, and a retryable failed source.
 
 ## Required Scripts
 

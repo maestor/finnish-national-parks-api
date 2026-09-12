@@ -34,6 +34,7 @@ The deployment guardrail test for this lives in `tests/integration/vercel-entry.
 - All write routes and `GET /api/admin/parks/visibility` should stay admin-session protected.
 - When adding or changing an env var, update `src/env.ts`, `.env.example`, `README.md`, and the relevant docs in the same change.
 - Treat direct uploads as a storage-cost surface: enforce size and content-type limits against the actual stored object, not only the client request.
+- Keep browser uploads staged and server-finalized: decode with a bounded pixel budget, normalize orientation and metadata, and publish distinct full/thumbnail objects. Do not treat browser preprocessing or a declared MIME type as a trust boundary.
 - Prefer owned data and cached verification over new live third-party request-path dependencies.
 - Before risky imports, migrations, or large manual catalog updates against Turso, take a fresh `npm run db:backup`.
 - Keep the current hardening priorities in [docs/security.md](./security.md).
