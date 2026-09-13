@@ -97,10 +97,10 @@ describe('runtime helpers', () => {
     expect(
       getLogoPublicUrl?.('logos/akasmannyn-kansallispuisto.png', '2026-07-28T10:00:00.000Z')
     ).toBe(
-      'https://api.example.com/assets/logos/akasmannyn-kansallispuisto.png?v=2026-07-28T10%3A00%3A00.000Z'
+      'https://api.example.com/assets/logos/akasmannyn-kansallispuisto.png?v=2026-07-28T10%3A00%3A00.000Z&policy=2'
     );
     expect(getLogoPublicUrl?.('nested/logo image.png', '2026-07-28T11:00:00.000Z')).toBe(
-      'https://api.example.com/assets/logos/nested/logo%20image.png?v=2026-07-28T11%3A00%3A00.000Z'
+      'https://api.example.com/assets/logos/nested/logo%20image.png?v=2026-07-28T11%3A00%3A00.000Z&policy=2'
     );
     expect(
       getLogoPublicUrlWithTrailingSlash?.(
@@ -108,7 +108,7 @@ describe('runtime helpers', () => {
         '2026-07-28T12:00:00.000Z'
       )
     ).toBe(
-      'https://api.example.com/assets/logos/ukko-kolin-kansallismaisema.png?v=2026-07-28T12%3A00%3A00.000Z'
+      'https://api.example.com/assets/logos/ukko-kolin-kansallismaisema.png?v=2026-07-28T12%3A00%3A00.000Z&policy=2'
     );
   });
 

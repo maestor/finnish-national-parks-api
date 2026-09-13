@@ -8,6 +8,8 @@ import { createTripPlannerBudget } from './trip-planner/budget.js';
 import { createGeoapifyClient } from './trip-planner/geoapify.js';
 import { createTripPlannerService } from './trip-planner/search.js';
 
+const LOGO_URL_POLICY_VERSION = '2';
+
 const normalizeBaseUrl = (baseUrl: string) => {
   return baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`;
 };
@@ -83,6 +85,7 @@ export const createLogoPublicUrl = (env: Env) => {
     const logoPath = key.startsWith('logos/') ? key.slice('logos/'.length) : key;
     const url = new URL(`assets/logos/${encodeKeyPath(logoPath)}`, baseUrl);
     url.searchParams.set('v', updatedAt);
+    url.searchParams.set('policy', LOGO_URL_POLICY_VERSION);
     return url.toString();
   };
 };
