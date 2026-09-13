@@ -8,6 +8,42 @@ import {
 import type { StorageClient } from '../storage/types.js';
 import { processImage } from './process-image.js';
 
+const TRANSIENT_STORAGE_RETRY_DELAYS_MS = [0, 250, 1000] as const;
+
+const isTransientStorageError = (error: unknown) => {
+  const details = error instanceof Error ? `${error.name} ${error.message}` : String(error);
+
+  return /bad record mac|ECONNRESET|ECONNREFUSED|EPIPE|ETIMEDOUT|socket hang up|network error/i.test(
+    details
+  );
+};
+
+const waitForRetry = async (delayMs: number) => {
+  if (delayMs > 0) {
+    await new Promise<void>((resolve) => {
+      setTimeout(resolve, delayMs);
+    });
+  }
+};
+
+const retryTransientStorageOperation = async <Result>(
+  operation: () => Promise<Result>,
+  retryDelaysMs: readonly number[] = TRANSIENT_STORAGE_RETRY_DELAYS_MS
+): Promise<Result> => {
+  try {
+    return await operation();
+  } catch (error) {
+    if (!isTransientStorageError(error) || retryDelaysMs.length === 0) {
+      throw error;
+    }
+
+    const [delayMs, ...remainingDelays] = retryDelaysMs;
+    await waitForRetry(delayMs!);
+
+    return retryTransientStorageOperation(operation, remainingDelays);
+  }
+};
+
 export type ImageDerivativeBackfillCursor = LegacyImageDerivativeCursor;
 
 export type ImageDerivativeBackfillResult = {
@@ -63,7 +99,9 @@ export const runImageDerivativeBackfill = async ({
 
   for (const record of records) {
     try {
-      const metadata = await storage.getObjectMetadata(record.sourceKey);
+      const metadata = await retryTransientStorageOperation(() =>
+        storage.getObjectMetadata(record.sourceKey)
+      );
 
       if (!metadata?.contentLength || metadata.contentLength < 1) {
         throw new Error('Source object is missing or has an invalid size.');
@@ -72,7 +110,9 @@ export const runImageDerivativeBackfill = async ({
       sourceBytes += metadata.contentLength;
 
       if (!dryRun) {
-        const sourceBuffer = await storage.getObject(record.sourceKey);
+        const sourceBuffer = await retryTransientStorageOperation(() =>
+          storage.getObject(record.sourceKey)
+        );
 
         if (!sourceBuffer) {
           throw new Error('Source object is missing.');
@@ -81,8 +121,12 @@ export const runImageDerivativeBackfill = async ({
         const processed = await processImage(sourceBuffer);
         const { fullKey, thumbKey } = createBackfillDerivativeKeys(record);
 
-        await storage.upload(fullKey, processed.fullBuffer, 'image/jpeg');
-        await storage.upload(thumbKey, processed.thumbBuffer, 'image/jpeg');
+        await retryTransientStorageOperation(() =>
+          storage.upload(fullKey, processed.fullBuffer, 'image/jpeg')
+        );
+        await retryTransientStorageOperation(() =>
+          storage.upload(thumbKey, processed.thumbBuffer, 'image/jpeg')
+        );
 
         const updated = await replaceLegacyImageDerivatives(database, record, {
           fileSizeBytes: processed.fullBuffer.length,
@@ -128,4 +172,54 @@ export const runImageDerivativeBackfill = async ({
     scanned: records.length,
     sourceBytes
   };
+};
+
+export const runImageDerivativeBackfillToCompletion = async ({
+  batchSize,
+  cursor,
+  database,
+  dryRun,
+  storage
+}: {
+  batchSize: number;
+  cursor: ImageDerivativeBackfillCursor;
+  database: Database;
+  dryRun: boolean;
+  storage: StorageClient;
+}): Promise<ImageDerivativeBackfillResult> => {
+  let currentCursor = cursor;
+  let completed = 0;
+  let outputBytes = 0;
+  let scanned = 0;
+  let sourceBytes = 0;
+
+  while (true) {
+    const batch = await runImageDerivativeBackfill({
+      batchSize,
+      cursor: currentCursor,
+      database,
+      dryRun,
+      storage
+    });
+
+    completed += batch.completed;
+    outputBytes += batch.outputBytes;
+    scanned += batch.scanned;
+    sourceBytes += batch.sourceBytes;
+
+    if (batch.failures.length > 0 || batch.scanned === 0) {
+      return {
+        completed,
+        dryRun,
+        failures: batch.failures,
+        nextCursor: batch.nextCursor,
+        outputBytes,
+        previewCursor: batch.previewCursor,
+        scanned,
+        sourceBytes
+      };
+    }
+
+    currentCursor = dryRun ? batch.previewCursor : batch.nextCursor;
+  }
 };
