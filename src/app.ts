@@ -249,7 +249,7 @@ const ACCEPTED_VISIT_IMAGE_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'
 const DIRECT_VISIT_UPLOAD_URL_TTL_SECONDS = 15 * 60;
 const LOGO_PRESIGNED_URL_TTL_SECONDS = 7 * 24 * 60 * 60;
 const MAP_PRESIGNED_URL_TTL_SECONDS = 7 * 24 * 60 * 60;
-const PUBLIC_LOGO_REDIRECT_CACHE_CONTROL = 'public, max-age=31536000, immutable';
+const PUBLIC_LOGO_REDIRECT_CACHE_CONTROL = 'public, max-age=86400';
 const TRIP_PLANNER_REQUEST_BODY_LIMIT_BYTES = 16 * 1024;
 
 type StoredImageCompletionMetadata =

@@ -391,12 +391,14 @@ describe('API routes', () => {
       .where(eq(parks.slug, 'akasmannyn-kansallispuisto'));
 
     const apiKey = 'test-api-key';
+    const storage = createMemoryStorage();
+    const getPresignedUrl = vi.spyOn(storage, 'getPresignedUrl');
     const app = createApp({
       apiKey,
       database: testDatabase.database,
       getLogoPublicUrl: (key, updatedAt) =>
         `https://api.example.com/assets/logos/${key.slice('logos/'.length)}?v=${encodeURIComponent(updatedAt)}`,
-      storage: createMemoryStorage()
+      storage
     });
 
     const parksResponse = await app.request('/api/parks', {
@@ -415,8 +417,12 @@ describe('API routes', () => {
     const logoResponse = await app.request(`${url.pathname}${url.search}`);
 
     expect(logoResponse.status).toBe(302);
-    expect(logoResponse.headers.get('cache-control')).toBe('public, max-age=31536000, immutable');
+    expect(logoResponse.headers.get('cache-control')).toBe('public, max-age=86400');
     expect(logoResponse.headers.get('location')).toContain('https://memory-storage.test/logos/');
+    expect(getPresignedUrl).toHaveBeenCalledWith(
+      'logos/akasmannyn-kansallispuisto.png',
+      7 * 24 * 60 * 60
+    );
   });
 
   it('rejects anonymous stable logo requests without a version query', async () => {

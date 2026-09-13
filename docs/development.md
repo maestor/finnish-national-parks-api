@@ -195,11 +195,13 @@ That command:
 - stores the logo key plus a logo timestamp on the matching park row so catalog ETags and logo URLs change together
 
 When `PUBLIC_API_BASE_URL` is set, catalog APIs return stable park logo URLs like
-`https://api.example.com/assets/logos/<slug>.png?v=<logoUpdatedAt>`. That anonymous
-asset route redirects to a fresh presigned R2 GET URL and sets long-lived public
-cache headers, so the bucket can stay private while frontend caches see a stable
-source URL. Without `PUBLIC_API_BASE_URL`, catalog APIs fall back to presigned logo
-URLs directly.
+`https://api.example.com/assets/logos/<slug>.png?v=<logoUpdatedAt>&policy=2`. That
+anonymous asset route redirects to a fresh seven-day presigned R2 GET URL, but its
+redirect is reusable for only one day. The policy component changes when redirect
+caching rules change, so clients with the earlier year-long redirect discover the
+corrected URL. The bucket can therefore stay private without a redirect outliving
+its target signature. Without `PUBLIC_API_BASE_URL`, catalog APIs fall back to
+presigned logo URLs directly.
 
 ## Database
 
