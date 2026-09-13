@@ -41,7 +41,7 @@ Restrict log access and retention to operational roles. Treat any confirmed hist
 - Direct browser PUTs target parent-scoped temporary keys. Completion reads the stored object, limits decoding to 40 megapixels, applies orientation, strips EXIF/GPS metadata, and creates separate server-owned JPEG full (maximum 2,560 px) and thumbnail (maximum 480 px; 150 KiB quality budget) keys. The temporary key is separately persisted as the parent-scoped completion identity, so a retry returns the original image with `200` and fresh read URLs even after staging cleanup; a first successful completion returns `201`. The database enforces that identity and atomically admits no more than six trip-stop images.
 - Before applying migration `0034_image_completion_identity.sql` to an existing database, run `npm run db:check-image-duplicates`. It is read-only and exits nonzero with every duplicate parent/key group, its ordering, and featured-image references. Repair any reported group manually before migrating; do not delete ambiguous rows automatically.
 - Apply `0035_image_derivative_upload_identity.sql` before deploying the image-processing completion handler. Before production promotion, prove one disposable direct upload through the deployed R2/Vercel runtime; local Sharp tests do not establish function memory or duration limits.
-- `npm run media:convert-existing-images` converts photos uploaded before thumbnail support into a normal-size JPEG and a thumbnail. It keeps the original image and does not delete anything. Follow the step-by-step guide below. M3 owns eventual retention/deletion decisions.
+- `npm run media:convert-existing-images` converts photos uploaded before thumbnail support into a normal-size JPEG and a thumbnail. It keeps the old source image initially and does not delete anything. The separate source-file cleanup below can remove that old copy only after checking published review snapshots.
 - Keep upload and object-retention limits documented so bandwidth and storage remain predictable.
 - Do not remove media based only on absence from ordinary image rows; published review snapshots can still reference frozen image keys.
 
@@ -73,7 +73,29 @@ Run this only after the image-processing handler and migration are deployed. One
 
    The command starts its internal scan again, skips every image it already converted, and retries the first unfinished image. There is no recovery token to copy or manage.
 
-The preview result uses `imagesToConvert` for the number of images it would convert. The conversion result uses `imagesConverted` for the number it converted. Both list any `problems`, report original and new-image byte totals, and keep every original image.
+The preview result uses `imagesToConvert` for the number of images it would convert. The conversion result uses `imagesConverted` for the number it converted. Both list any `problems` and report original and new-image byte totals. The conversion itself keeps every old source image; the separate cleanup below decides whether it can later be removed.
+
+### Remove old conversion source files
+
+Run this only after the existing-image conversion has completed successfully. It is a one-time storage cleanup for the old root image files that M1 kept alongside the new normal-size image and thumbnail. It does **not** remove either current image size.
+
+1. Start with a preview. It scans all visit and trip-stop image folders internally, identifies only files created by the completed M1 conversion, and checks every published year-review and date-range-review snapshot:
+
+   ```sh
+   npm run media:remove-converted-originals
+   ```
+
+2. Review `oldSourceImagesToRemove` and `oldSourceImageBytesToRemove`. `publishedReviewProtectedSourceImages` means an old source is still needed by a published review, so it will be kept. `alreadyRemovedSourceImages` means a prior run has already removed the file. The preview changes nothing.
+
+3. If the preview has no `problems` and the totals look expected, run the same command with permission to remove only those old source files:
+
+   ```sh
+   npm run media:remove-converted-originals -- --apply
+   ```
+
+4. A successful result has `"status":"complete"`. It reports `removedSourceImages`; the normal-size images and thumbnails remain in place. If R2 has a short-lived connection failure, the command retries automatically. If it still reports a problem, wait briefly and run the exact same command again. Already removed files are recognized, so it is safe to repeat.
+
+This command is intentionally separate from `media:cleanup-unused-images`: the latter protects all current image source keys, while this command has the narrower job of retiring only M1 source files that current content no longer serves and published snapshots do not use.
 
 ## Remove unused image files safely
 
