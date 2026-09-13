@@ -352,6 +352,11 @@ export const publicTripDetailSchema = tripSchema.extend({
   stopCount: z.number().int()
 });
 
+export const publicTripVisitImagesResponseSchema = z.object({
+  images: z.array(visitImageSchema),
+  nextOffset: z.number().int().nonnegative().nullable()
+});
+
 export const visitWithParkSchema = visitSchema.extend({
   park: visitParkSchema
 });

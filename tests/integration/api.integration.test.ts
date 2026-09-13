@@ -2943,6 +2943,99 @@ describe('API routes', () => {
     });
   });
 
+  it('returns only one public trip visit image page without loading the trip route', async () => {
+    const buildRoundTripRoute = vi.fn(async () => {
+      throw new Error('The image page must not load a trip route.');
+    });
+    const app = createAuthedApp({
+      tripPlanner: {
+        buildRoundTripRoute,
+        search: vi.fn(async () => {
+          throw new Error('not used in this test');
+        }),
+        searchNearby: vi.fn(async () => {
+          throw new Error('not used in this test');
+        }),
+        suggest: vi.fn(async () => {
+          throw new Error('not used in this test');
+        })
+      }
+    });
+    const { body: trip } = await createTrip(app, { name: 'Kuvaretki' });
+    const { body: otherTrip } = await createTrip(app, { name: 'Toinen kuvaretki' });
+    const { body: visit } = await createVisit(app, 'akasmannyn-kansallispuisto', {
+      note: 'This must never be returned by the image endpoint.',
+      route: 'This must never be returned by the image endpoint.',
+      tripId: trip.id,
+      tripStopOrder: 1,
+      visitedOn: '2026-06-07'
+    });
+
+    for (let index = 0; index < 13; index += 1) {
+      await createVisitImage(testDatabase.database, {
+        createdAt: `2026-06-07T10:${String(index).padStart(2, '0')}:00.000Z`,
+        displayOrder: index,
+        fullKey: `visits/${visit.id}/final/${index}-full.jpg`,
+        mimeType: 'image/jpeg',
+        originalName: `kuva-${index}.jpg`,
+        thumbKey: `visits/${visit.id}/final/${index}-thumb.jpg`,
+        updatedAt: `2026-06-07T10:${String(index).padStart(2, '0')}:00.000Z`,
+        visitId: visit.id
+      });
+    }
+
+    const firstResponse = await app.request(
+      `/api/trips/slug/${trip.slug}/visits/${visit.id}/images`
+    );
+    const firstBody = (await firstResponse.json()) as {
+      images: Array<{ displayOrder: number; id: number; originalName: string | null }>;
+      nextOffset: number | null;
+    };
+
+    expect(firstResponse.status).toBe(200);
+    expect(firstResponse.headers.get('cache-control')).toBe('private, no-store');
+    expect(firstBody.images).toHaveLength(12);
+    expect(firstBody.images.map((image) => image.displayOrder)).toEqual(
+      Array.from({ length: 12 }, (_, index) => index)
+    );
+    expect(firstBody.nextOffset).toBe(12);
+    expect(firstBody).not.toHaveProperty('note');
+    expect(buildRoundTripRoute).not.toHaveBeenCalled();
+
+    const secondResponse = await app.request(
+      `/api/trips/slug/${trip.slug}/visits/${visit.id}/images?offset=12`
+    );
+    const secondBody = (await secondResponse.json()) as {
+      images: Array<{ displayOrder: number }>;
+      nextOffset: number | null;
+    };
+
+    expect(secondResponse.status).toBe(200);
+    expect(secondBody.images.map((image) => image.displayOrder)).toEqual([12]);
+    expect(secondBody.nextOffset).toBeNull();
+
+    const wrongTripResponse = await app.request(
+      `/api/trips/slug/${otherTrip.slug}/visits/${visit.id}/images`
+    );
+    const missingVisitResponse = await app.request(
+      `/api/trips/slug/${trip.slug}/visits/999999/images`
+    );
+
+    expect(wrongTripResponse.status).toBe(404);
+    expect(missingVisitResponse.status).toBe(404);
+
+    await testDatabase.database
+      .update(parks)
+      .set({ removed: true })
+      .where(eq(parks.slug, 'akasmannyn-kansallispuisto'));
+
+    const hiddenParentResponse = await app.request(
+      `/api/trips/slug/${trip.slug}/visits/${visit.id}/images`
+    );
+
+    expect(hiddenParentResponse.status).toBe(404);
+  });
+
   it('returns a successful empty route state by slug when the trip does not meet route prerequisites', async () => {
     const buildRoundTripRoute: NonNullable<TripPlannerService['buildRoundTripRoute']> = vi.fn(
       async (): Promise<TripPlannerRoundTripRoute> => ({

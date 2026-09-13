@@ -109,6 +109,7 @@ The paired UI presents catalog and visit `GET` data publicly to end users withou
 - `GET /assets/logos/*`
 - `GET /api/parks`
 - `GET /api/parks/search`
+- `GET /api/trips/slug/:slug/visits/:visitId/images` — one visible trip visit's image page; private/no-store, ordered, default 12 and maximum 24 images
 - `GET /api/admin/parks/visibility`
 - `GET /api/admin/admins`
 - `PATCH /api/admin/admins/:id`

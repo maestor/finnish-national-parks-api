@@ -10,6 +10,12 @@ Before investigating, planning, editing, or running code:
 
 The README and `docs/` are the source of truth for detailed development, import, security, test, and deployment guidance. Do not duplicate them here.
 
+## Resume After Context Compaction
+
+- Treat a compacted conversation summary as task state, never as a substitute for project instructions.
+- Before taking the next action after compaction, re-read every skill relevant to that action. In particular, before any branch, commit, push, PR handoff, or cleanup action, re-read `.agents/skills/git-pr-workflow/SKILL.md`.
+- The user creates every pull request. Never create, submit, or automate a PR through `gh`, a browser, an API, or another tool. After a branch is pushed, provide a clickable compare link and one copy-pasteable fenced PR-notes block; the Git workflow skill remains the source of truth for its content.
+
 ## Shared Plans Vault
 
 - Use `/Users/maestor/Projects/Documentations/Reissuvihko/Plans/` for every new product, technical, research, and cross-repository plan; start from `_Plan template.md`.
