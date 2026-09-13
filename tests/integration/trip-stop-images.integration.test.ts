@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { createApp } from '../../src/app.js';
 import * as repositories from '../../src/db/repositories.js';
-import { tripStopImages } from '../../src/db/schema.js';
+import { mediaUploads, tripStopImages } from '../../src/db/schema.js';
 import { createSessionToken } from '../../src/http/session.js';
 import { importParks } from '../../src/importer/import-parks.js';
 import { createMemoryStorage } from '../../src/storage/memory-storage.js';
@@ -320,6 +320,21 @@ describe('Trip stop image routes', () => {
     expect(completeBody.image.originalName).toBe('cloud.jpg');
     expect(completeBody.image.fullWidth).toBe(1400);
     expect(completeBody.image.thumbWidth).toBe(480);
+  });
+
+  it('completes a valid staged trip stop upload that predates the upload ledger', async () => {
+    const { stopId } = await createTripStopFixture();
+    const key = `trip-stops/${stopId}/staged/pre-ledger.jpg`;
+    const app = createAuthedApp({ allowServerImageUploads: false, storage });
+    await storage.upload(key, await createTestImageBuffer(), 'image/jpeg');
+
+    const response = await requestAsAdmin(app, `/api/trip-stops/${stopId}/images/complete`, {
+      body: JSON.stringify({ key, originalName: 'pre-ledger.jpg' }),
+      headers: { 'content-type': 'application/json' },
+      method: 'POST'
+    });
+
+    expect(response.status).toBe(201);
   });
 
   it('returns the same trip stop image when direct completion is retried', async () => {
@@ -734,6 +749,29 @@ describe('Trip stop image routes', () => {
 
     expect(response.status).toBe(422);
     expect(body.error).toContain('does not belong to this trip stop');
+  });
+
+  it('rejects a structurally valid trip stop key when its pending-upload record belongs elsewhere', async () => {
+    const { stopId } = await createTripStopFixture();
+    const file = new File([await createTestImageBuffer()], 'mismatched-ledger.jpg', {
+      type: 'image/jpeg'
+    });
+    const app = createAuthedApp({ allowServerImageUploads: false, storage });
+    const plan = await createDirectUploadPlan(stopId, file, app);
+    const { key } = (await plan.json()) as { key: string };
+
+    await testDatabase.database
+      .update(mediaUploads)
+      .set({ parentType: 'visit' })
+      .where(eq(mediaUploads.uploadKey, key));
+
+    const response = await requestAsAdmin(app, `/api/trip-stops/${stopId}/images/complete`, {
+      body: JSON.stringify({ key, originalName: file.name }),
+      headers: { 'content-type': 'application/json' },
+      method: 'POST'
+    });
+
+    expect(response.status).toBe(422);
   });
 
   it('returns 422 when direct trip stop upload completion fails validation', async () => {

@@ -233,6 +233,45 @@ export const tripStopImages = sqliteTable(
   })
 );
 
+export const mediaUploads = sqliteTable(
+  'media_uploads',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    parentType: text('parent_type').notNull(),
+    parentId: integer('parent_id').notNull(),
+    uploadKey: text('upload_key').notNull(),
+    fullKey: text('full_key').notNull(),
+    thumbKey: text('thumb_key').notNull(),
+    expiresAt: text('expires_at').notNull(),
+    settledAt: text('settled_at'),
+    createdAt: text('created_at').notNull(),
+    updatedAt: text('updated_at').notNull()
+  },
+  (table) => ({
+    expiryIndex: index('media_uploads_expiry_idx').on(table.settledAt, table.expiresAt),
+    parentIndex: index('media_uploads_parent_idx').on(table.parentType, table.parentId),
+    uploadKeyIndex: uniqueIndex('media_uploads_upload_key_idx').on(table.uploadKey)
+  })
+);
+
+export const mediaCleanupTasks = sqliteTable(
+  'media_cleanup_tasks',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    key: text('key').notNull(),
+    eligibleAt: text('eligible_at').notNull(),
+    attemptCount: integer('attempt_count').notNull().default(0),
+    lastAttemptAt: text('last_attempt_at'),
+    lastError: text('last_error'),
+    createdAt: text('created_at').notNull(),
+    updatedAt: text('updated_at').notNull()
+  },
+  (table) => ({
+    eligibleAtIndex: index('media_cleanup_tasks_eligible_at_idx').on(table.eligibleAt),
+    keyIndex: uniqueIndex('media_cleanup_tasks_key_idx').on(table.key)
+  })
+);
+
 export const tripFeaturedImages = sqliteTable(
   'trip_featured_images',
   {

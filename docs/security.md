@@ -75,6 +75,26 @@ Run this only after the image-processing handler and migration are deployed. One
 
 The preview result uses `imagesToConvert` for the number of images it would convert. The conversion result uses `imagesConverted` for the number it converted. Both list any `problems`, report original and new-image byte totals, and keep every original image.
 
+## Remove unused image files safely
+
+Deleting an image, visit, trip stop, or trip removes it from the application immediately. Its stored image files are recorded for delayed cleanup instead of being deleted during the user request. This preserves a recovery window and means a temporary R2 failure never makes a successful user deletion fail unpredictably.
+
+Run the review command from a trusted operator machine with the production database and restricted R2 credentials:
+
+```sh
+npm run media:cleanup-unused-images
+```
+
+It scans only `visits/` and `trip-stops/`, ignores files newer than eight days, protects active uploads and image keys in current rows or published review snapshots, and prints `imagesToDelete` plus `unusedImageBytes`. It does not delete anything by default. Review that report before applying the exact same command:
+
+```sh
+npm run media:cleanup-unused-images -- --apply
+```
+
+The command paginates its whole scan internally; there is no position token to copy. It rechecks references immediately before each deletion. Storage failures are recorded in the database and retried by the next normal run. Never lower the eight-day minimum, delete a whole bucket, or use this command before a current recovery drill confirms the backup and media-recovery controls.
+
+Run a preview after bulk imports or large deletions and at least monthly. Production deletion remains an operator review step; no automatic bucket lifecycle rule may delete finalized media based only on age.
+
 ## External services
 
 Normal reads use the owned database rather than live upstream catalog requests. Geoapify is limited to the trip-planner operations, remains server-side, uses short timeouts, reuses identical requests in process, and returns `503` when unavailable. Public provider work uses an atomic shared libSQL/Turso budget with separate per-client suggestion, route, and nearby limits plus a provider-wide daily credit ceiling. Two-point route searches reserve five credits to cover geocoding plus the routing API's long-distance surcharge; public multi-leg routes reserve five per leg; suggestions and nearby searches reserve one. The paired UI proxy counts and caps planner request bodies at 16 KiB before buffering; the API repeats the declared-size guard. Confirm the daily limit and edge rules against the provider subscription before production exposure.

@@ -37,7 +37,7 @@ import {
   updateTripStop,
   updateVisit
 } from '../../src/db/repositories.js';
-import { parks, parkVisits, trips } from '../../src/db/schema.js';
+import { mediaCleanupTasks, parks, parkVisits, trips } from '../../src/db/schema.js';
 import { importParks } from '../../src/importer/import-parks.js';
 import { createLipasPark, parkTypeFixtures } from '../fixtures/lipas.js';
 import { createTestDatabase } from '../helpers/test-db.js';
@@ -653,6 +653,51 @@ describe('repositories', () => {
     expect(renamedSecondTrip).toMatchObject({
       id: secondTrip.id,
       slug: 'kesareissu-2026-2'
+    });
+  });
+
+  it('queues only trip-stop media when deleting a trip that retains its visits', async () => {
+    const trip = await createTrip(testDatabase.database, { name: 'Media cleanup trip' });
+    const visit = await createVisit(testDatabase.database, 'akasmannyn-kansallispuisto', {
+      tripId: trip.id,
+      tripStopOrder: 0,
+      visitedOn: '2026-04-10'
+    });
+    const stop = await createTripStop(testDatabase.database, trip.id, {
+      location: { coordinate: { lat: 61.3167, lon: 22.1333 }, label: 'Cleanup stop' },
+      visitedOn: '2026-04-10'
+    });
+    const timestamp = '2026-05-01T10:00:00.000Z';
+    await createVisitImage(testDatabase.database, {
+      createdAt: timestamp,
+      displayOrder: 0,
+      fullKey: `visits/${visit.id}/final/keep-full.jpg`,
+      mimeType: 'image/jpeg',
+      thumbKey: `visits/${visit.id}/final/keep-thumb.jpg`,
+      updatedAt: timestamp,
+      visitId: visit.id
+    });
+    await createTripStopImage(testDatabase.database, {
+      createdAt: timestamp,
+      displayOrder: 0,
+      fullKey: `trip-stops/${stop.id}/final/remove-full.jpg`,
+      mimeType: 'image/jpeg',
+      thumbKey: `trip-stops/${stop.id}/final/remove-thumb.jpg`,
+      tripStopId: stop.id,
+      updatedAt: timestamp
+    });
+
+    await expect(deleteTrip(testDatabase.database, trip.id)).resolves.toBe(true);
+    await expect(
+      testDatabase.database.select({ key: mediaCleanupTasks.key }).from(mediaCleanupTasks)
+    ).resolves.toEqual([
+      { key: `trip-stops/${stop.id}/final/remove-full.jpg` },
+      { key: `trip-stops/${stop.id}/final/remove-thumb.jpg` }
+    ]);
+    await expect(
+      getVisitById(testDatabase.database, visit.id, getImagePublicUrl)
+    ).resolves.toMatchObject({
+      id: visit.id
     });
   });
 

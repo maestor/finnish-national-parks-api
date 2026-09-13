@@ -59,4 +59,35 @@ describe('createMemoryStorage', () => {
     await expect(storage.getObject('photo.jpg')).resolves.toEqual(buffer);
     await expect(storage.getObject('missing.jpg')).resolves.toBeNull();
   });
+
+  it('lists objects by prefix in pages with object metadata', async () => {
+    const storage = createMemoryStorage();
+    await storage.upload('visits/a.jpg', Buffer.from('a'), 'image/jpeg');
+    await storage.upload('visits/b.jpg', Buffer.from('bb'), 'image/jpeg');
+    storage.getStore().set('visits/legacy-without-metadata.jpg', Buffer.from('legacy'));
+
+    const firstPage = await storage.listObjects({ limit: 1, prefix: 'visits/' });
+    const secondPage = await storage.listObjects({
+      ...(firstPage.nextCursor ? { cursor: firstPage.nextCursor } : {}),
+      limit: 10,
+      prefix: 'visits/'
+    });
+
+    expect(firstPage).toMatchObject({
+      items: [{ key: 'visits/a.jpg', size: 1 }],
+      nextCursor: 'visits/a.jpg'
+    });
+    expect(secondPage).toMatchObject({
+      items: [
+        { key: 'visits/b.jpg', size: 2 },
+        { key: 'visits/legacy-without-metadata.jpg', lastModified: null, size: null }
+      ],
+      nextCursor: null
+    });
+
+    await expect(storage.listObjects({ limit: 0, prefix: 'visits/' })).resolves.toMatchObject({
+      items: [],
+      nextCursor: null
+    });
+  });
 });

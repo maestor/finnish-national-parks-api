@@ -35,6 +35,7 @@ import {
   admins,
   dateRangeReviewShares,
   importRuns,
+  mediaUploads,
   parks,
   parkTypes,
   parkVisits,
@@ -46,6 +47,100 @@ import {
   visitImages,
   yearReviewShares
 } from './schema.js';
+
+export const MEDIA_CLEANUP_GRACE_PERIOD_MS = 8 * 24 * 60 * 60 * 1000;
+
+export type MediaUploadParentType = 'trip-stop' | 'visit';
+
+type MediaUploadKeys = {
+  fullKey: string;
+  thumbKey: string;
+  uploadKey: string | null;
+};
+
+const getMediaCleanupEligibleAt = (timestamp: string) => {
+  return new Date(new Date(timestamp).getTime() + MEDIA_CLEANUP_GRACE_PERIOD_MS).toISOString();
+};
+
+const enqueueMediaCleanup = async (
+  database: DbClient,
+  keys: Iterable<string | null | undefined>,
+  timestamp: string
+) => {
+  const eligibleAt = getMediaCleanupEligibleAt(timestamp);
+
+  for (const key of new Set(Array.from(keys).filter((key): key is string => Boolean(key)))) {
+    await database.run(sql`
+      INSERT INTO media_cleanup_tasks (key, eligible_at, created_at, updated_at)
+      VALUES (${key}, ${eligibleAt}, ${timestamp}, ${timestamp})
+      ON CONFLICT(key) DO UPDATE SET
+        eligible_at = MIN(media_cleanup_tasks.eligible_at, excluded.eligible_at),
+        updated_at = excluded.updated_at
+    `);
+  }
+};
+
+export const createPendingMediaUpload = async (
+  database: Database,
+  input: {
+    expiresAt: string;
+    fullKey: string;
+    parentId: number;
+    parentType: MediaUploadParentType;
+    thumbKey: string;
+    timestamp: string;
+    uploadKey: string;
+  }
+) => {
+  await database.insert(mediaUploads).values({
+    createdAt: input.timestamp,
+    expiresAt: input.expiresAt,
+    fullKey: input.fullKey,
+    parentId: input.parentId,
+    parentType: input.parentType,
+    thumbKey: input.thumbKey,
+    updatedAt: input.timestamp,
+    uploadKey: input.uploadKey
+  });
+};
+
+export const findMediaUploadByUploadKey = async (database: DbClient, uploadKey: string) => {
+  const rows = await database
+    .select()
+    .from(mediaUploads)
+    .where(eq(mediaUploads.uploadKey, uploadKey))
+    .limit(1);
+
+  return rows[0] ?? null;
+};
+
+const settleMediaUpload = async (database: DbClient, uploadKey: string, timestamp: string) => {
+  const result = await database
+    .update(mediaUploads)
+    .set({ settledAt: timestamp, updatedAt: timestamp })
+    .where(eq(mediaUploads.uploadKey, uploadKey));
+
+  return Number(result.rowsAffected) > 0;
+};
+
+const getMediaUploadKeys = (row: MediaUploadKeys) => {
+  return [row.uploadKey, row.fullKey, row.thumbKey];
+};
+
+const listMediaUploadKeysForParent = async (
+  database: DbClient,
+  parentType: MediaUploadParentType,
+  parentId: number
+) => {
+  return database
+    .select({
+      fullKey: mediaUploads.fullKey,
+      thumbKey: mediaUploads.thumbKey,
+      uploadKey: mediaUploads.uploadKey
+    })
+    .from(mediaUploads)
+    .where(and(eq(mediaUploads.parentType, parentType), eq(mediaUploads.parentId, parentId)));
+};
 
 type PutVisitInput = {
   author?: string | null | undefined;
@@ -4095,6 +4190,24 @@ export const deleteTrip = async (database: Database, tripId: number) => {
   const timestamp = new Date().toISOString();
 
   return database.transaction(async (tx) => {
+    const tripStopImageRows = await tx
+      .select({
+        fullKey: tripStopImages.fullKey,
+        thumbKey: tripStopImages.thumbKey,
+        uploadKey: tripStopImages.uploadKey
+      })
+      .from(tripStopImages)
+      .innerJoin(tripStops, eq(tripStopImages.tripStopId, tripStops.id))
+      .where(eq(tripStops.tripId, tripId));
+    const tripStopUploadRows = await tx
+      .select({ id: tripStops.id })
+      .from(tripStops)
+      .where(eq(tripStops.tripId, tripId));
+    const pendingUploadRows = (
+      await Promise.all(
+        tripStopUploadRows.map((row) => listMediaUploadKeysForParent(tx, 'trip-stop', row.id))
+      )
+    ).flat();
     await tx
       .update(parkVisits)
       .set({
@@ -4106,6 +4219,11 @@ export const deleteTrip = async (database: Database, tripId: number) => {
     const result = await tx.delete(trips).where(eq(trips.id, tripId));
 
     if (Number(result.rowsAffected) > 0) {
+      await enqueueMediaCleanup(
+        tx,
+        [...tripStopImageRows, ...pendingUploadRows].flatMap(getMediaUploadKeys),
+        timestamp
+      );
       await bumpPublicVisitDataVersion(tx, timestamp);
     }
 
@@ -4114,17 +4232,33 @@ export const deleteTrip = async (database: Database, tripId: number) => {
 };
 
 export const deleteTripStop = async (database: Database, tripStopId: number) => {
-  const existingTripStop = await findTripStopRecordById(database, tripStopId);
-
-  if (!existingTripStop) {
-    return false;
-  }
-
   const timestamp = new Date().toISOString();
 
   return database.transaction(async (tx) => {
-    const result = await tx.delete(tripStops).where(eq(tripStops.id, tripStopId));
+    const existingTripStop = await findTripStopRecordById(tx, tripStopId);
 
+    if (!existingTripStop) {
+      return false;
+    }
+
+    const [imageRows, pendingUploadRows] = await Promise.all([
+      tx
+        .select({
+          fullKey: tripStopImages.fullKey,
+          thumbKey: tripStopImages.thumbKey,
+          uploadKey: tripStopImages.uploadKey
+        })
+        .from(tripStopImages)
+        .where(eq(tripStopImages.tripStopId, tripStopId)),
+      listMediaUploadKeysForParent(tx, 'trip-stop', tripStopId)
+    ]);
+    await tx.delete(tripStops).where(eq(tripStops.id, tripStopId));
+
+    await enqueueMediaCleanup(
+      tx,
+      [...imageRows, ...pendingUploadRows].flatMap(getMediaUploadKeys),
+      timestamp
+    );
     await closeTripStopOrderGap(
       tx,
       existingTripStop.tripId,
@@ -4133,29 +4267,45 @@ export const deleteTripStop = async (database: Database, tripStopId: number) => 
     );
     await bumpPublicVisitDataVersion(tx, timestamp);
 
-    return Number(result.rowsAffected) > 0;
+    return true;
   });
 };
 
 export const deleteVisit = async (database: Database, visitId: number) => {
-  const existingVisit = await findVisitRecordById(database, visitId);
-
-  if (!existingVisit) {
-    return false;
-  }
-
   const timestamp = new Date().toISOString();
 
   return database.transaction(async (tx) => {
-    const result = await tx.delete(parkVisits).where(eq(parkVisits.id, visitId));
+    const existingVisit = await findVisitRecordById(tx, visitId);
+
+    if (!existingVisit) {
+      return false;
+    }
+
+    const [imageRows, pendingUploadRows] = await Promise.all([
+      tx
+        .select({
+          fullKey: visitImages.fullKey,
+          thumbKey: visitImages.thumbKey,
+          uploadKey: visitImages.uploadKey
+        })
+        .from(visitImages)
+        .where(eq(visitImages.visitId, visitId)),
+      listMediaUploadKeysForParent(tx, 'visit', visitId)
+    ]);
+    await tx.delete(parkVisits).where(eq(parkVisits.id, visitId));
 
     if (existingVisit.tripId !== null && existingVisit.tripStopOrder !== null) {
       await closeTripStopOrderGap(tx, existingVisit.tripId, existingVisit.tripStopOrder, timestamp);
     }
 
+    await enqueueMediaCleanup(
+      tx,
+      [...imageRows, ...pendingUploadRows].flatMap(getMediaUploadKeys),
+      timestamp
+    );
     await bumpPublicVisitDataVersion(tx, timestamp);
 
-    return Number(result.rowsAffected) > 0;
+    return true;
   });
 };
 
@@ -4376,6 +4526,12 @@ export const completeVisitImage = async (
       await bumpPublicVisitDataVersion(transaction, values.updatedAt);
     }
 
+    if (await settleMediaUpload(transaction, uploadKey, values.updatedAt)) {
+      // The source upload is not referenced after the generated files are saved.
+      // Keep it recoverable for the same window as a deleted image.
+      await enqueueMediaCleanup(transaction, [uploadKey], values.updatedAt);
+    }
+
     return { created, row: row! };
   });
 };
@@ -4417,6 +4573,12 @@ export const completeTripStopImage = async (
         await bumpPublicVisitDataVersion(transaction, values.updatedAt);
       }
 
+      if (await settleMediaUpload(transaction, uploadKey, values.updatedAt)) {
+        // The source upload is not referenced after the generated files are saved.
+        // Keep it recoverable for the same window as a deleted image.
+        await enqueueMediaCleanup(transaction, [uploadKey], values.updatedAt);
+      }
+
       return { created, row };
     }
 
@@ -4432,7 +4594,7 @@ export const completeTripStopImage = async (
   });
 };
 
-export const findTripStopImageById = async (database: Database, imageId: number) => {
+export const findTripStopImageById = async (database: DbClient, imageId: number) => {
   const rows = await database
     .select()
     .from(tripStopImages)
@@ -4442,7 +4604,7 @@ export const findTripStopImageById = async (database: Database, imageId: number)
   return rows[0] ?? null;
 };
 
-export const findVisitImageById = async (database: Database, imageId: number) => {
+export const findVisitImageById = async (database: DbClient, imageId: number) => {
   const rows = await database
     .select()
     .from(visitImages)
@@ -4453,23 +4615,41 @@ export const findVisitImageById = async (database: Database, imageId: number) =>
 };
 
 export const deleteVisitImage = async (database: Database, imageId: number) => {
-  const result = await database.delete(visitImages).where(eq(visitImages.id, imageId));
+  const timestamp = new Date().toISOString();
 
-  if (Number(result.rowsAffected) > 0) {
-    await bumpPublicVisitDataVersion(database, new Date().toISOString());
-  }
+  return database.transaction(async (transaction) => {
+    const image = await findVisitImageById(transaction, imageId);
 
-  return Number(result.rowsAffected) > 0;
+    if (!image) {
+      return false;
+    }
+
+    await transaction.delete(visitImages).where(eq(visitImages.id, imageId));
+
+    await enqueueMediaCleanup(transaction, getMediaUploadKeys(image), timestamp);
+    await bumpPublicVisitDataVersion(transaction, timestamp);
+
+    return true;
+  });
 };
 
 export const deleteTripStopImage = async (database: Database, imageId: number) => {
-  const result = await database.delete(tripStopImages).where(eq(tripStopImages.id, imageId));
+  const timestamp = new Date().toISOString();
 
-  if (Number(result.rowsAffected) > 0) {
-    await bumpPublicVisitDataVersion(database, new Date().toISOString());
-  }
+  return database.transaction(async (transaction) => {
+    const image = await findTripStopImageById(transaction, imageId);
 
-  return Number(result.rowsAffected) > 0;
+    if (!image) {
+      return false;
+    }
+
+    await transaction.delete(tripStopImages).where(eq(tripStopImages.id, imageId));
+
+    await enqueueMediaCleanup(transaction, getMediaUploadKeys(image), timestamp);
+    await bumpPublicVisitDataVersion(transaction, timestamp);
+
+    return true;
+  });
 };
 
 export const reorderVisitImages = async (

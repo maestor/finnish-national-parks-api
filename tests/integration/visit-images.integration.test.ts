@@ -4,9 +4,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { createApp } from '../../src/app.js';
 import * as repositories from '../../src/db/repositories.js';
-import { visitImages } from '../../src/db/schema.js';
+import { mediaCleanupTasks, mediaUploads, visitImages } from '../../src/db/schema.js';
 import { createSessionToken } from '../../src/http/session.js';
 import { importParks } from '../../src/importer/import-parks.js';
+import { runUnusedMediaCleanup } from '../../src/media/unused-media-cleanup.js';
 import { createMemoryStorage } from '../../src/storage/memory-storage.js';
 import { createLipasPark } from '../fixtures/lipas.js';
 import { createTestDatabase } from '../helpers/test-db.js';
@@ -163,6 +164,47 @@ describe('Visit image routes', () => {
     expect(storedKeys.some((k) => k.endsWith('-thumb.jpg'))).toBe(true);
   });
 
+  it('tracks a direct upload until its finalized image record is committed', async () => {
+    const visitId = await createVisit();
+    const buffer = await createTestImageBuffer();
+    const file = new File([buffer], 'tracked.jpg', { type: 'image/jpeg' });
+    const app = createAuthedApp({ allowServerImageUploads: false, storage });
+    const initResponse = await createDirectUploadPlan(visitId, file, app);
+    const initBody = (await initResponse.json()) as { key: string };
+    const [pendingUpload] = await testDatabase.database
+      .select()
+      .from(mediaUploads)
+      .where(eq(mediaUploads.uploadKey, initBody.key));
+
+    expect(pendingUpload).toMatchObject({
+      parentId: visitId,
+      parentType: 'visit',
+      settledAt: null,
+      uploadKey: initBody.key
+    });
+    expect(pendingUpload!.fullKey).not.toBe(pendingUpload!.thumbKey);
+
+    await storage.upload(initBody.key, buffer, file.type);
+    const completeResponse = await requestAsAdmin(app, `/api/visits/${visitId}/images/complete`, {
+      body: JSON.stringify({ key: initBody.key, originalName: file.name }),
+      headers: { 'content-type': 'application/json' },
+      method: 'POST'
+    });
+    const [settledUpload] = await testDatabase.database
+      .select()
+      .from(mediaUploads)
+      .where(eq(mediaUploads.uploadKey, initBody.key));
+
+    expect(completeResponse.status).toBe(201);
+    expect(settledUpload!.settledAt).toMatch(/T/);
+    await expect(
+      testDatabase.database
+        .select()
+        .from(mediaCleanupTasks)
+        .where(eq(mediaCleanupTasks.key, initBody.key))
+    ).resolves.toHaveLength(1);
+  });
+
   it('finalizes a direct upload as distinct server-produced derivatives', async () => {
     const visitId = await createVisit();
     const buffer = await createTestImageBuffer(1400, 900);
@@ -226,6 +268,22 @@ describe('Visit image routes', () => {
     expect(storedKeys).toContain(initBody.key);
     expect(storedKeys.some((storedKey) => storedKey.endsWith('-full.jpg'))).toBe(true);
     expect(storedKeys.some((storedKey) => storedKey.endsWith('-thumb.jpg'))).toBe(true);
+  });
+
+  it('completes a valid staged upload that predates the upload ledger', async () => {
+    const visitId = await createVisit();
+    const key = `visits/${visitId}/staged/pre-ledger.jpg`;
+    const buffer = await createTestImageBuffer();
+    const app = createAuthedApp({ allowServerImageUploads: false, storage });
+    await storage.upload(key, buffer, 'image/jpeg');
+
+    const response = await requestAsAdmin(app, `/api/visits/${visitId}/images/complete`, {
+      body: JSON.stringify({ key, originalName: 'pre-ledger.jpg' }),
+      headers: { 'content-type': 'application/json' },
+      method: 'POST'
+    });
+
+    expect(response.status).toBe(201);
   });
 
   it('returns the same image when concurrent direct completion retries use one upload key', async () => {
@@ -369,7 +427,7 @@ describe('Visit image routes', () => {
     expect(body.visits[0]!.images[0]!.fullUrl).toContain('memory-storage.test');
   });
 
-  it('deletes an image and removes it from storage', async () => {
+  it('removes an image from the visit immediately and schedules its stored files for safe cleanup', async () => {
     const visitId = await createVisit();
     const buffer = await createTestImageBuffer();
     const file = new File([buffer], 'to-delete.jpg', { type: 'image/jpeg' });
@@ -386,13 +444,24 @@ describe('Visit image routes', () => {
     });
 
     expect(deleteResponse.status).toBe(204);
-    expect(storage.getStore().size).toBe(0);
+    expect(storage.getStore().size).toBe(2);
+    await expect(testDatabase.database.select().from(mediaCleanupTasks)).resolves.toHaveLength(2);
 
     const parkVisitsResponse = await app.request('/api/parks/akasmannyn-kansallispuisto/visits');
     const parkVisitsBody = (await parkVisitsResponse.json()) as {
       visits: Array<{ images: unknown[] }>;
     };
     expect(parkVisitsBody.visits[0]!.images).toHaveLength(0);
+
+    const cleanup = await runUnusedMediaCleanup({
+      apply: true,
+      database: testDatabase.database,
+      now: new Date('2030-01-01T00:00:00.000Z'),
+      storage
+    });
+
+    expect(cleanup.deleted).toBe(2);
+    expect(storage.getStore().size).toBe(0);
   });
 
   it('reorders images via PATCH', async () => {
@@ -827,6 +896,29 @@ describe('Visit image routes', () => {
 
     expect(response.status).toBe(422);
     expect(body.error).toContain('does not belong to this visit');
+  });
+
+  it('rejects a structurally valid upload key when its pending-upload record belongs elsewhere', async () => {
+    const visitId = await createVisit();
+    const file = new File([await createTestImageBuffer()], 'mismatched-ledger.jpg', {
+      type: 'image/jpeg'
+    });
+    const app = createAuthedApp({ allowServerImageUploads: false, storage });
+    const plan = await createDirectUploadPlan(visitId, file, app);
+    const { key } = (await plan.json()) as { key: string };
+
+    await testDatabase.database
+      .update(mediaUploads)
+      .set({ parentId: visitId + 1 })
+      .where(eq(mediaUploads.uploadKey, key));
+
+    const response = await requestAsAdmin(app, `/api/visits/${visitId}/images/complete`, {
+      body: JSON.stringify({ key, originalName: file.name }),
+      headers: { 'content-type': 'application/json' },
+      method: 'POST'
+    });
+
+    expect(response.status).toBe(422);
   });
 
   it('requires an admin session for direct upload completion', async () => {
