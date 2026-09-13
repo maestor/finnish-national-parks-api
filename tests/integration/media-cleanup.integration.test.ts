@@ -154,6 +154,7 @@ describe('unused media cleanup', () => {
     const visit = await createVisit(testDatabase.database, 'akasmannyn-kansallispuisto', {
       visitedOn: '2026-04-10'
     });
+    const originalKey = `visits/${visit.id}/legacy-original.jpg`;
     const fullKey = `visits/${visit.id}/final/current-full.jpg`;
     const thumbKey = `visits/${visit.id}/final/current-thumb.jpg`;
     await createVisitImage(testDatabase.database, {
@@ -163,8 +164,10 @@ describe('unused media cleanup', () => {
       mimeType: 'image/jpeg',
       thumbKey,
       updatedAt: timestamp,
+      uploadKey: originalKey,
       visitId: visit.id
     });
+    await storage.upload(originalKey, Buffer.from('original'), 'image/jpeg');
     await storage.upload(fullKey, Buffer.from('full'), 'image/jpeg');
     await storage.upload(thumbKey, Buffer.from('thumb'), 'image/jpeg');
 
@@ -178,8 +181,56 @@ describe('unused media cleanup', () => {
     expect(result).toMatchObject({
       deleted: 0,
       eligibleKeys: [],
-      protectedKeys: [fullKey, thumbKey]
+      protectedKeys: [fullKey, thumbKey, originalKey]
     });
+  });
+
+  it('cleans a completed direct-upload staging file after its recovery window', async () => {
+    const timestamp = '2026-05-01T10:00:00.000Z';
+    await importParks({
+      database: testDatabase.database,
+      expectedActiveCount: 1,
+      fetchSource: async () => ({ items: [createLipasPark()] }),
+      now: () => timestamp,
+      sourceUrl: 'https://example.test/lipas'
+    });
+    const visit = await createVisit(testDatabase.database, 'akasmannyn-kansallispuisto', {
+      visitedOn: '2026-04-10'
+    });
+    const stagedKey = `visits/${visit.id}/staged/completed.jpg`;
+    const fullKey = `visits/${visit.id}/final/current-full.jpg`;
+    const thumbKey = `visits/${visit.id}/final/current-thumb.jpg`;
+    await createVisitImage(testDatabase.database, {
+      createdAt: timestamp,
+      displayOrder: 0,
+      fullKey,
+      mimeType: 'image/jpeg',
+      thumbKey,
+      updatedAt: timestamp,
+      uploadKey: stagedKey,
+      visitId: visit.id
+    });
+    await testDatabase.database.run(sql`
+      INSERT INTO media_cleanup_tasks (key, eligible_at, created_at, updated_at)
+      VALUES (
+        ${stagedKey}, '2026-05-09T10:00:00.000Z', ${timestamp}, ${timestamp}
+      )
+    `);
+    await storage.upload(stagedKey, Buffer.from('staged'), 'image/jpeg');
+    await storage.upload(fullKey, Buffer.from('full'), 'image/jpeg');
+    await storage.upload(thumbKey, Buffer.from('thumb'), 'image/jpeg');
+
+    const result = await runUnusedMediaCleanup({
+      apply: true,
+      database: testDatabase.database,
+      now: new Date('2030-01-10T00:00:00.000Z'),
+      storage
+    });
+
+    expect(result).toMatchObject({ deleted: 1, eligibleKeys: [stagedKey] });
+    expect(storage.getStore().has(stagedKey)).toBe(false);
+    expect(storage.getStore().has(fullKey)).toBe(true);
+    expect(storage.getStore().has(thumbKey)).toBe(true);
   });
 
   it('keeps a deleted image through its scheduled recovery window even when the object itself is old', async () => {
