@@ -4,7 +4,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { createTrip, createTripStop, createVisit } from '../../src/db/repositories.js';
 import { tripStopImages, visitImages } from '../../src/db/schema.js';
-import { runImageDerivativeBackfill } from '../../src/images/backfill-image-derivatives.js';
+import {
+  runImageDerivativeBackfill,
+  runImageDerivativeBackfillToCompletion
+} from '../../src/images/backfill-image-derivatives.js';
 import { importParks } from '../../src/importer/import-parks.js';
 import { createMemoryStorage } from '../../src/storage/memory-storage.js';
 import { createLipasPark } from '../fixtures/lipas.js';
@@ -175,6 +178,160 @@ describe('image derivative backfill', () => {
     expect(storage.getStore().has(updatedVisit!.thumbKey)).toBe(true);
     expect(storage.getStore().has(updatedTripStop!.fullKey)).toBe(true);
     expect(storage.getStore().has(updatedTripStop!.thumbKey)).toBe(true);
+  });
+
+  it('processes the complete legacy backlog in one operator run while keeping internal batches bounded', async () => {
+    const { tripStopImage, visitImage } = await createLegacyRecords();
+
+    const result = await runImageDerivativeBackfillToCompletion({
+      batchSize: 1,
+      cursor: { tripStopImageId: 0, visitImageId: 0 },
+      database: testDatabase.database,
+      dryRun: false,
+      storage
+    });
+    const [updatedVisit] = await testDatabase.database
+      .select()
+      .from(visitImages)
+      .where(eq(visitImages.id, visitImage.id));
+    const [updatedTripStop] = await testDatabase.database
+      .select()
+      .from(tripStopImages)
+      .where(eq(tripStopImages.id, tripStopImage.id));
+
+    expect(result).toMatchObject({ completed: 2, failures: [], scanned: 2 });
+    expect(updatedVisit?.fullKey).not.toBe(visitImage.fullKey);
+    expect(updatedTripStop?.fullKey).not.toBe(tripStopImage.fullKey);
+    expect(storage.getStore().has(visitImage.fullKey)).toBe(true);
+    expect(storage.getStore().has(tripStopImage.fullKey)).toBe(true);
+  });
+
+  it('previews the complete legacy backlog in one dry run without writing derivatives', async () => {
+    const { tripStopImage, visitImage } = await createLegacyRecords();
+
+    const result = await runImageDerivativeBackfillToCompletion({
+      batchSize: 1,
+      cursor: { tripStopImageId: 0, visitImageId: 0 },
+      database: testDatabase.database,
+      dryRun: true,
+      storage
+    });
+    const [unchangedVisit] = await testDatabase.database
+      .select()
+      .from(visitImages)
+      .where(eq(visitImages.id, visitImage.id));
+    const [unchangedTripStop] = await testDatabase.database
+      .select()
+      .from(tripStopImages)
+      .where(eq(tripStopImages.id, tripStopImage.id));
+
+    expect(result).toMatchObject({ completed: 2, dryRun: true, failures: [], scanned: 2 });
+    expect(unchangedVisit?.fullKey).toBe(visitImage.fullKey);
+    expect(unchangedTripStop?.fullKey).toBe(tripStopImage.fullKey);
+  });
+
+  it('stops one operator run at the first failed legacy source', async () => {
+    const { tripStopImage, visitImage } = await createLegacyRecords();
+    await storage.delete(visitImage.fullKey);
+
+    const result = await runImageDerivativeBackfillToCompletion({
+      batchSize: 1,
+      cursor: { tripStopImageId: 0, visitImageId: 0 },
+      database: testDatabase.database,
+      dryRun: false,
+      storage
+    });
+    const [untouchedTripStop] = await testDatabase.database
+      .select()
+      .from(tripStopImages)
+      .where(eq(tripStopImages.id, tripStopImage.id));
+
+    expect(result).toMatchObject({
+      completed: 0,
+      failures: [
+        {
+          id: visitImage.id,
+          message: 'Source object is missing or has an invalid size.',
+          type: 'visit'
+        }
+      ],
+      scanned: 1
+    });
+    expect(untouchedTripStop?.fullKey).toBe(tripStopImage.fullKey);
+  });
+
+  it('restarts from the beginning and skips completed images after a stopped run', async () => {
+    const { tripStopImage } = await createLegacyRecords();
+    const originalGetObject = storage.getObject;
+    const getObject = vi.spyOn(storage, 'getObject').mockImplementation(async (key) => {
+      if (key === tripStopImage.fullKey) {
+        throw new Error('R2 unavailable');
+      }
+
+      return originalGetObject(key);
+    });
+
+    const firstRun = await runImageDerivativeBackfillToCompletion({
+      batchSize: 1,
+      cursor: { tripStopImageId: 0, visitImageId: 0 },
+      database: testDatabase.database,
+      dryRun: false,
+      storage
+    });
+
+    getObject.mockRestore();
+
+    const restartedRun = await runImageDerivativeBackfillToCompletion({
+      batchSize: 1,
+      cursor: { tripStopImageId: 0, visitImageId: 0 },
+      database: testDatabase.database,
+      dryRun: false,
+      storage
+    });
+
+    expect(firstRun).toMatchObject({ completed: 1, failures: [{ type: 'trip-stop' }] });
+    expect(restartedRun).toMatchObject({ completed: 1, failures: [] });
+  });
+
+  it('automatically retries a transient R2 TLS read failure', async () => {
+    await createLegacyRecords();
+    const getObject = vi
+      .spyOn(storage, 'getObject')
+      .mockRejectedValueOnce(
+        new Error('ssl3_read_bytes: ssl/tls alert bad record mac: SSL alert number 20')
+      );
+
+    const result = await runImageDerivativeBackfill({
+      batchSize: 1,
+      cursor: { tripStopImageId: 0, visitImageId: 0 },
+      database: testDatabase.database,
+      dryRun: false,
+      storage
+    });
+
+    expect(result).toMatchObject({ completed: 1, failures: [] });
+    expect(getObject).toHaveBeenCalledTimes(2);
+  });
+
+  it('stops with a retryable cursor only after transient R2 TLS retries are exhausted', async () => {
+    const { visitImage } = await createLegacyRecords();
+    const getObject = vi
+      .spyOn(storage, 'getObject')
+      .mockRejectedValue(
+        new Error('ssl3_read_bytes: ssl/tls alert bad record mac: SSL alert number 20')
+      );
+
+    const result = await runImageDerivativeBackfill({
+      batchSize: 1,
+      cursor: { tripStopImageId: 0, visitImageId: 0 },
+      database: testDatabase.database,
+      dryRun: false,
+      storage
+    });
+
+    expect(result.failures).toMatchObject([{ id: visitImage.id, type: 'visit' }]);
+    expect(result.nextCursor).toEqual({ tripStopImageId: 0, visitImageId: 0 });
+    expect(getObject).toHaveBeenCalledTimes(4);
   });
 
   it('leaves the cursor at a missing source so the next run can retry it', async () => {

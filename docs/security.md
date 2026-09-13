@@ -40,10 +40,40 @@ Restrict log access and retention to operational roles. Treat any confirmed hist
 - Validate limits against stored-object metadata, not only client-declared metadata. Direct-upload completion requires a positive integer stored size no greater than 15 MiB; missing or invalid metadata returns `422`, while an oversized stored object returns `413` and creates no image row.
 - Direct browser PUTs target parent-scoped temporary keys. Completion reads the stored object, limits decoding to 40 megapixels, applies orientation, strips EXIF/GPS metadata, and creates separate server-owned JPEG full (maximum 2,560 px) and thumbnail (maximum 480 px; 150 KiB quality budget) keys. The temporary key is separately persisted as the parent-scoped completion identity, so a retry returns the original image with `200` and fresh read URLs even after staging cleanup; a first successful completion returns `201`. The database enforces that identity and atomically admits no more than six trip-stop images.
 - Before applying migration `0034_image_completion_identity.sql` to an existing database, run `npm run db:check-image-duplicates`. It is read-only and exits nonzero with every duplicate parent/key group, its ordering, and featured-image references. Repair any reported group manually before migrating; do not delete ambiguous rows automatically.
-- Apply `0035_image_derivative_upload_identity.sql` before deploying derivative completion handlers. Before production promotion, prove one disposable direct upload through the deployed R2/Vercel runtime; local Sharp tests do not establish function memory or duration limits.
-- `npm run media:backfill-derivatives` is an operator command for legacy rows with identical full/thumb keys. It defaults to a bounded dry run, reports scanned source bytes and failures, retains source objects, and has no delete operation. Review the output and snapshot policy first; then use `--apply` in bounded batches. Save and reuse only an apply run's `nextCursor` to resume after interruption. M3 owns eventual retention/deletion decisions.
+- Apply `0035_image_derivative_upload_identity.sql` before deploying the image-processing completion handler. Before production promotion, prove one disposable direct upload through the deployed R2/Vercel runtime; local Sharp tests do not establish function memory or duration limits.
+- `npm run media:convert-existing-images` converts photos uploaded before thumbnail support into a normal-size JPEG and a thumbnail. It keeps the original image and does not delete anything. Follow the step-by-step guide below. M3 owns eventual retention/deletion decisions.
 - Keep upload and object-retention limits documented so bandwidth and storage remain predictable.
 - Do not remove media based only on absence from ordinary image rows; published review snapshots can still reference frozen image keys.
+
+### Convert existing images
+
+Run this only after the image-processing handler and migration are deployed. One command converts all older images that still need a thumbnail. It works through images in small groups so it does not try to hold the whole library in memory, but you run the command only once. Each finished image is saved immediately.
+
+1. Start with a preview. It writes nothing and reports every older image that still needs conversion:
+
+   ```sh
+   npm run media:convert-existing-images
+   ```
+
+2. If the preview has no failures, run this once to convert everything remaining:
+
+   ```sh
+   npm run media:convert-existing-images -- --apply
+   ```
+
+3. A successful conversion result has `"status":"complete"` and says, in plain text, that all existing images now have a normal-size image and a thumbnail. Its `imagesConverted` value is the number converted in that run. No further command is needed.
+
+4. Transient R2 connection faults, including `ssl/tls alert bad record mac`, are retried automatically four times: immediately, then after 250 ms and 1 second. A retry that succeeds continues the same one-command run without operator action.
+
+5. If the conversion run still reports a failure, it exits nonzero. Wait briefly and run the exact same command again:
+
+   ```sh
+   npm run media:convert-existing-images -- --apply
+   ```
+
+   The command starts its internal scan again, skips every image it already converted, and retries the first unfinished image. There is no recovery token to copy or manage.
+
+The preview result uses `imagesToConvert` for the number of images it would convert. The conversion result uses `imagesConverted` for the number it converted. Both list any `problems`, report original and new-image byte totals, and keep every original image.
 
 ## External services
 
