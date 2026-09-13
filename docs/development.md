@@ -273,6 +273,7 @@ Key route behavior:
 - `GET /api/parks?category=hiking-and-wilderness-areas` filters by the derived `Erämaa-/retkeilyalue` category while preserving each park's imported `type`.
 - `GET /api/parks?category=trails-and-routes` filters by a derived API category while preserving the original imported `type` in responses.
 - `GET /api/parks/:slug?includeBoundary=true` returns the stored boundary GeoJSON.
+- `GET /api/trips/slug/:slug/visits/:visitId/images` verifies that the visit belongs to the requested trip and its parent park is visible, then returns only that visit's ordered image page. It is private/no-store, defaults to 12 images, accepts at most 24, and never builds a trip route or returns notes/history.
 - `GET /api/parks/:slug` still hides removed parks publicly, but returns removed-park detail to a request carrying a valid admin session cookie when OAuth is enabled.
 - Park list, detail, removed, and map summary responses expose both the source `type` and a derived `category`.
 - Park list, detail, and map summary responses expose `hasMagnet: boolean`, with imported `national-park` rows defaulting to `true`.

@@ -2649,6 +2649,41 @@ export const getParkVisitsBySlug = async (
   };
 };
 
+export const getPublicTripVisitImagesBySlug = async (
+  database: Database,
+  slug: string,
+  visitId: number,
+  limit: number,
+  offset: number,
+  getImagePublicUrl: (key: string) => Promise<string>
+) => {
+  const visit = await database
+    .select({ id: parkVisits.id })
+    .from(parkVisits)
+    .innerJoin(trips, eq(trips.id, parkVisits.tripId))
+    .innerJoin(parks, eq(parks.id, parkVisits.parkId))
+    .where(and(eq(trips.slug, slug), eq(parkVisits.id, visitId), eq(parks.removed, false)))
+    .limit(1);
+
+  if (!visit[0]) {
+    return null;
+  }
+
+  const rows = await database
+    .select()
+    .from(visitImages)
+    .where(eq(visitImages.visitId, visitId))
+    .orderBy(asc(visitImages.displayOrder), asc(visitImages.createdAt), asc(visitImages.id))
+    .limit(limit + 1)
+    .offset(offset);
+  const page = rows.slice(0, limit);
+
+  return {
+    images: await Promise.all(page.map((row) => toVisitImage(row, getImagePublicUrl))),
+    nextOffset: rows.length > limit ? offset + limit : null
+  };
+};
+
 export const syncParkTypes = async (database: DbClient) => {
   await database
     .insert(parkTypes)

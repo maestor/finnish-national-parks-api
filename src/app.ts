@@ -47,6 +47,7 @@ import {
   getPublicHomeSummary,
   getPublicMapSummary,
   getPublicTripBySlug,
+  getPublicTripVisitImagesBySlug,
   getPublicVisitDataVersion,
   getPublicVisitSummaryEtagSeed,
   getPublishedDateRangeReviewShareByName,
@@ -184,6 +185,7 @@ import {
   deleteTripStopImageRoute,
   deleteTripStopRoute,
   getAdminTripFeaturedImageRoute,
+  getPublicTripVisitImagesRoute,
   getTripBySlugRoute,
   getTripRoute,
   listAdminTripImagesRoute,
@@ -2286,6 +2288,27 @@ export const createApp = ({
       }
 
       return context.json(await attachPublicTripRoute(trip, tripPlanner, routeWaypoints), 200);
+    });
+
+    app.openapi(getPublicTripVisitImagesRoute, async (context) => {
+      context.header('Cache-Control', PRIVATE_CACHE_CONTROL);
+
+      const { slug, visitId } = context.req.valid('param');
+      const { limit, offset } = context.req.valid('query');
+      const images = await getPublicTripVisitImagesBySlug(
+        database,
+        slug,
+        visitId,
+        limit,
+        offset,
+        getImagePublicUrl
+      );
+
+      if (!images) {
+        return context.json(jsonNotFound('Trip visit not found.'), 404);
+      }
+
+      return context.json(images, 200);
     });
 
     app.openapi(getTripRoute, async (context) => {

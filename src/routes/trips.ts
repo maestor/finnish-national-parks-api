@@ -9,6 +9,7 @@ import {
   directVisitImageUploadPlanSchema,
   directVisitImageUploadRequestSchema,
   publicTripDetailSchema,
+  publicTripVisitImagesResponseSchema,
   reorderVisitImagesRequestSchema,
   tripArchiveResponseSchema,
   tripDetailSchema,
@@ -267,6 +268,33 @@ export const getTripBySlugRoute = createRoute({
           schema: errorSchema
         }
       }
+    }
+  }
+});
+
+export const getPublicTripVisitImagesRoute = createRoute({
+  method: 'get',
+  path: '/api/trips/slug/{slug}/visits/{visitId}/images',
+  tags: ['Trips'],
+  security: [{ bearerAuth: [] }],
+  request: {
+    params: z.object({
+      slug: z.string().trim().min(1),
+      visitId: z.coerce.number().int().positive()
+    }),
+    query: z.object({
+      limit: z.coerce.number().int().min(1).max(24).default(12),
+      offset: z.coerce.number().int().min(0).default(0)
+    })
+  },
+  responses: {
+    200: {
+      description: 'One public trip visit image page',
+      content: { 'application/json': { schema: publicTripVisitImagesResponseSchema } }
+    },
+    404: {
+      description: 'Trip visit was not found or is not publicly visible',
+      content: { 'application/json': { schema: errorSchema } }
     }
   }
 });
