@@ -22,7 +22,6 @@ import {
   updateTripStopRequestSchema,
   visitImageSchema
 } from '../contracts/parks.js';
-import { tripPlannerErrorSchema } from '../contracts/trip-planner.js';
 
 const adminTripIdParamsSchema = z.object({
   id: z.coerce.number().int().positive()
@@ -266,22 +265,6 @@ export const getTripBySlugRoute = createRoute({
       content: {
         'application/json': {
           schema: errorSchema
-        }
-      }
-    },
-    429: {
-      description: 'Trip route budget exceeded',
-      content: {
-        'application/json': {
-          schema: tripPlannerErrorSchema
-        }
-      }
-    },
-    503: {
-      description: 'Trip route budget unavailable',
-      content: {
-        'application/json': {
-          schema: tripPlannerErrorSchema
         }
       }
     }

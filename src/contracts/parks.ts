@@ -316,6 +316,8 @@ export const publicTripRouteSchema = z.object({
 export const publicTripRouteErrorCodeSchema = z.enum([
   'provider_unavailable',
   'route_not_found',
+  'trip_planner_budget_exceeded',
+  'trip_planner_budget_unavailable',
   'trip_planner_not_configured'
 ]);
 

@@ -3595,7 +3595,7 @@ describe('API routes', () => {
     });
   });
 
-  it('rejects a public multi-leg route before provider work when its reservation exceeds the daily budget', async () => {
+  it('returns the public trip with a route budget error before provider work when its reservation exceeds the daily budget', async () => {
     const buildRoundTripRoute = vi.fn(async () => null);
     const app = createAuthedApp({
       tripPlannerBudget: createTripPlannerBudget({
@@ -3638,9 +3638,25 @@ describe('API routes', () => {
     });
 
     const response = await app.request('/api/trips/slug/liian-moniosainen-julkinen-reitti');
+    const body = (await response.json()) as {
+      name: string;
+      route: {
+        data: null;
+        error: { error: string; errorCode: string };
+        success: boolean;
+      };
+    };
 
-    expect(response.status).toBe(429);
-    expect(response.headers.get('retry-after')).toBeTruthy();
+    expect(response.status).toBe(200);
+    expect(body.name).toBe('Liian moniosainen julkinen reitti');
+    expect(body.route).toEqual({
+      data: null,
+      error: {
+        error: 'Trip planner request budget exceeded.',
+        errorCode: 'trip_planner_budget_exceeded'
+      },
+      success: false
+    });
     expect(buildRoundTripRoute).not.toHaveBeenCalled();
   });
 
