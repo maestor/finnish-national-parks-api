@@ -16,6 +16,7 @@
     "db:migrate:pending": "tsx src/cli/check-pending-migrations.ts",
     "import:parks": "tsx src/cli/import-parks.ts",
     "import:special-parks": "tsx src/cli/import-special-parks.ts",
+    "media:cleanup-unused-images": "tsx src/cli/cleanup-unused-images.ts",
     "media:convert-existing-images": "tsx src/cli/backfill-image-derivatives.ts",
     "park:move-visits": "tsx src/cli/move-park-visits.ts",
     "park:logo": "tsx src/cli/upload-park-logo.ts",

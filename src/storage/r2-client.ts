@@ -2,6 +2,7 @@ import {
   DeleteObjectCommand,
   GetObjectCommand,
   HeadObjectCommand,
+  ListObjectsV2Command,
   PutObjectCommand,
   S3Client
 } from '@aws-sdk/client-s3';
@@ -98,6 +99,33 @@ export const createR2Client = (config: R2Config): StorageClient => {
           expiresIn: expiresInSeconds
         }
       );
+    },
+    listObjects: async ({ cursor, limit, prefix }) => {
+      const response = await s3.send(
+        new ListObjectsV2Command({
+          Bucket: config.bucketName,
+          ContinuationToken: cursor,
+          MaxKeys: limit,
+          Prefix: prefix
+        })
+      );
+
+      return {
+        items: (response.Contents ?? []).flatMap((object) => {
+          if (!object.Key) {
+            return [];
+          }
+
+          return [
+            {
+              key: object.Key,
+              lastModified: object.LastModified ?? null,
+              size: object.Size ?? null
+            }
+          ];
+        }),
+        nextCursor: response.NextContinuationToken ?? null
+      };
     },
     upload: async (key: string, buffer: Buffer, contentType: string) => {
       await s3.send(

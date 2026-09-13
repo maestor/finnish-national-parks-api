@@ -18,6 +18,7 @@ import {
   completeVisitImage,
   countTripStopImages,
   createAdminInvitation,
+  createPendingMediaUpload,
   createTrip,
   createTripStop,
   createTripStopImage,
@@ -31,6 +32,7 @@ import {
   deleteVisitImage,
   findAdminByEmailAndGoogleSub,
   findAdminByGoogleSub,
+  findMediaUploadByUploadKey,
   findParkRecordBySlugIncludingRemoved,
   findTripStopImageById,
   findTripStopImageByUploadKey,
@@ -824,7 +826,8 @@ const finalizeDirectImageUpload = async (
   storage: StorageClient,
   key: string,
   parentPrefix: 'trip-stops' | 'visits',
-  parentId: number
+  parentId: number,
+  finalKeys = createFinalImageKeys(parentPrefix, parentId)
 ): Promise<DirectImageFinalization> => {
   const sourceBuffer = await storage.getObject(key);
 
@@ -838,7 +841,7 @@ const finalizeDirectImageUpload = async (
 
   try {
     const processed = await processImage(sourceBuffer);
-    const { fullKey, thumbKey } = createFinalImageKeys(parentPrefix, parentId);
+    const { fullKey, thumbKey } = finalKeys;
 
     await storage.upload(fullKey, processed.fullBuffer, 'image/jpeg');
     await storage.upload(thumbKey, processed.thumbBuffer, 'image/jpeg');
@@ -2704,17 +2707,27 @@ export const createApp = ({
         }
 
         const key = `trip-stops/${id}/staged/${randomUUID()}.${getVisitImageFileExtension(contentType)}`;
+        const finalKeys = createFinalImageKeys('trip-stops', id);
+        const expiresAt = new Date(
+          Date.now() + DIRECT_VISIT_UPLOAD_URL_TTL_SECONDS * 1000
+        ).toISOString();
         const uploadUrl = await storage.getPresignedUploadUrl(
           key,
           contentType,
           DIRECT_VISIT_UPLOAD_URL_TTL_SECONDS
         );
+        await createPendingMediaUpload(database, {
+          ...finalKeys,
+          expiresAt,
+          parentId: id,
+          parentType: 'trip-stop',
+          timestamp: new Date().toISOString(),
+          uploadKey: key
+        });
 
         return context.json(
           {
-            expiresAt: new Date(
-              Date.now() + DIRECT_VISIT_UPLOAD_URL_TTL_SECONDS * 1000
-            ).toISOString(),
+            expiresAt,
             headers: {
               'content-type': contentType
             },
@@ -2758,6 +2771,15 @@ export const createApp = ({
           );
         }
 
+        const pendingUpload = await findMediaUploadByUploadKey(database, key);
+
+        if (
+          pendingUpload &&
+          (pendingUpload.parentId !== id || pendingUpload.parentType !== 'trip-stop')
+        ) {
+          return context.json({ error: 'Upload key does not belong to this trip stop.' }, 422);
+        }
+
         const objectMetadata = await storage.getObjectMetadata(key);
 
         if (!objectMetadata) {
@@ -2771,7 +2793,15 @@ export const createApp = ({
         }
 
         try {
-          const finalizedImage = await finalizeDirectImageUpload(storage, key, 'trip-stops', id);
+          const finalizedImage = await finalizeDirectImageUpload(
+            storage,
+            key,
+            'trip-stops',
+            id,
+            pendingUpload
+              ? { fullKey: pendingUpload.fullKey, thumbKey: pendingUpload.thumbKey }
+              : undefined
+          );
 
           if (!finalizedImage.valid) {
             return context.json({ error: finalizedImage.error }, finalizedImage.status);
@@ -2953,8 +2983,6 @@ export const createApp = ({
           return context.json(jsonNotFound('Image not found.'), 404);
         }
 
-        await storage.delete(image.fullKey);
-        await storage.delete(image.thumbKey);
         await deleteTripStopImage(database, imageId);
 
         return new Response(null, {
@@ -3017,17 +3045,27 @@ export const createApp = ({
         }
 
         const key = `visits/${id}/staged/${randomUUID()}.${getVisitImageFileExtension(contentType)}`;
+        const finalKeys = createFinalImageKeys('visits', id);
+        const expiresAt = new Date(
+          Date.now() + DIRECT_VISIT_UPLOAD_URL_TTL_SECONDS * 1000
+        ).toISOString();
         const uploadUrl = await storage.getPresignedUploadUrl(
           key,
           contentType,
           DIRECT_VISIT_UPLOAD_URL_TTL_SECONDS
         );
+        await createPendingMediaUpload(database, {
+          ...finalKeys,
+          expiresAt,
+          parentId: id,
+          parentType: 'visit',
+          timestamp: new Date().toISOString(),
+          uploadKey: key
+        });
 
         return context.json(
           {
-            expiresAt: new Date(
-              Date.now() + DIRECT_VISIT_UPLOAD_URL_TTL_SECONDS * 1000
-            ).toISOString(),
+            expiresAt,
             headers: {
               'content-type': contentType
             },
@@ -3071,6 +3109,15 @@ export const createApp = ({
           );
         }
 
+        const pendingUpload = await findMediaUploadByUploadKey(database, key);
+
+        if (
+          pendingUpload &&
+          (pendingUpload.parentId !== id || pendingUpload.parentType !== 'visit')
+        ) {
+          return context.json({ error: 'Upload key does not belong to this visit.' }, 422);
+        }
+
         const objectMetadata = await storage.getObjectMetadata(key);
 
         if (!objectMetadata) {
@@ -3083,7 +3130,15 @@ export const createApp = ({
           return context.json({ error: validatedMetadata.error }, validatedMetadata.status);
         }
 
-        const finalizedImage = await finalizeDirectImageUpload(storage, key, 'visits', id);
+        const finalizedImage = await finalizeDirectImageUpload(
+          storage,
+          key,
+          'visits',
+          id,
+          pendingUpload
+            ? { fullKey: pendingUpload.fullKey, thumbKey: pendingUpload.thumbKey }
+            : undefined
+        );
 
         if (!finalizedImage.valid) {
           return context.json({ error: finalizedImage.error }, finalizedImage.status);
@@ -3246,8 +3301,6 @@ export const createApp = ({
           return context.json(jsonNotFound('Image not found.'), 404);
         }
 
-        await storage.delete(image.fullKey);
-        await storage.delete(image.thumbKey);
         await deleteVisitImage(database, imageId);
 
         return new Response(null, {

@@ -3,6 +3,17 @@ export type StoredObjectMetadata = {
   contentType: string | null;
 };
 
+export type StoredObject = {
+  key: string;
+  lastModified: Date | null;
+  size: number | null;
+};
+
+export type StoredObjectPage = {
+  items: StoredObject[];
+  nextCursor: string | null;
+};
+
 export interface StorageClient {
   upload(key: string, buffer: Buffer, contentType: string): Promise<void>;
   delete(key: string): Promise<void>;
@@ -14,4 +25,5 @@ export interface StorageClient {
     expiresInSeconds: number
   ): Promise<string>;
   getObjectMetadata(key: string): Promise<StoredObjectMetadata | null>;
+  listObjects(input: { cursor?: string; limit: number; prefix: string }): Promise<StoredObjectPage>;
 }
