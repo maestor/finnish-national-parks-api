@@ -85,6 +85,7 @@ Normal reads use the owned database rather than live upstream catalog requests. 
 - Keep `API_KEY`, database credentials, OAuth secrets, and `GEOAPIFY_API_KEY` server-side.
 - Run the production migration workflow before promoting code that requires a new schema migration.
 - Back up Turso before high-risk imports, migrations, or bulk admin changes.
+- The migration workflow artifact is not evidence of recurring backup or media recovery. Run the isolated local database drill in [docs/recovery.md](./recovery.md) and record the required Turso, R2, GitHub, and Vercel evidence before claiming recovery coverage.
 - After migrations `0030`–`0032`, ensure every existing admin is enrolled and promote the first independently confirmed super admin with the documented SQL procedure. Use direct SQL only for bootstrap or emergency recovery.
 
 ## Contributor checklist

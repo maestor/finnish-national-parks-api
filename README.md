@@ -38,6 +38,7 @@ npm run import:special-parks -- <special-park-slug> [<special-park-slug> ...]
 npm run park:move-visits -- (--from <source-slug> | --visit-id <visit-id>) --to <target-slug> [--dry-run]
 npm run park:logo -- <park-slug>
 npm run db:backup
+npm run db:verify-backup -- <local-backup.db>
 npm run verify
 npm run dev
 ```
@@ -89,6 +90,7 @@ Production notes:
 - Store production `DATABASE_URL` and `DATABASE_AUTH_TOKEN` in the GitHub `production` environment for that workflow, and configure Vercel Deployment Checks to require the GitHub check named `Migrate production database`.
 - That workflow now checks production first and only takes a backup plus runs `npm run db:migrate` when unapplied SQL migration files actually exist.
 - `npm run db:backup` reads the current remote `DATABASE_URL` and `DATABASE_AUTH_TOKEN`, then writes a timestamped SQLite backup under `data/backups/`. You can append an optional label with `npm run db:backup -- before-import`.
+- `npm run db:verify-backup -- <local-backup.db>` restores only a supplied local SQLite backup into a temporary directory, checks integrity and current migrations, then removes that copy. It never reads `DATABASE_URL` or connects to Turso/R2. See [the recovery drill](docs/recovery.md).
 - `npm run db:migrate` remains available as the manual fallback or recovery path if the production workflow is unavailable.
 - `npm run media:convert-existing-images -- [--apply] [--batch-size <1-100>]` converts every older uploaded image into a normal-size JPEG and a smaller thumbnail. It is a preview by default; after checking `imagesToConvert` and `problems`, run it once with `--apply`. A successful conversion says `"status":"complete"` and states that all existing images now have both sizes. It keeps every original image. If it stops, wait briefly and run the same command again; images already converted are skipped. See [the step-by-step conversion guide](docs/security.md#convert-existing-images).
 - `npm run park:move-visits -- (--from <source-slug> | --visit-id <visit-id>) --to <target-slug> [--dry-run]` reassigns either all visits for one park slug or one specific visit to another park. Visit images stay attached automatically because they belong to the visit rows.
@@ -299,6 +301,7 @@ It runs typecheck, lint, and coverage tests with 100 percent thresholds for firs
 - [AGENTS.md](AGENTS.md): codebase rules for future agents and implementation sessions.
 - [docs/development.md](docs/development.md): local development, database, importer, and deployment notes.
 - [docs/importing.md](docs/importing.md): reproducible import workflow for curated special parks, including Helsinki-specific sourcing tips.
+- [docs/recovery.md](docs/recovery.md): safe database recovery drill and remaining operator evidence for Turso, R2, GitHub, and Vercel.
 - [docs/security.md](docs/security.md): current security and operational sustainability priorities, plus contributor guardrails.
 - [docs/testing.md](docs/testing.md): testing strategy and verification expectations.
 - [docs/trip-planner.md](docs/trip-planner.md): trip planner endpoints, route-corridor definitions, and long-trip start-zone logic.

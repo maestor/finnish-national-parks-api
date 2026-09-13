@@ -13,6 +13,7 @@ npm run import:special-parks -- <special-park-slug> [<special-park-slug> ...]
 npm run park:move-visits -- (--from <source-slug> | --visit-id <visit-id>) --to <target-slug> [--dry-run]
 npm run park:logo -- <park-slug>
 npm run db:backup
+npm run db:verify-backup -- <local-backup.db>
 npm run verify
 npm run dev
 ```
@@ -37,6 +38,7 @@ The deployment guardrail test for this lives in `tests/integration/vercel-entry.
 - Keep browser uploads staged and server-finalized: decode with a bounded pixel budget, normalize orientation and metadata, and publish distinct full/thumbnail objects. Do not treat browser preprocessing or a declared MIME type as a trust boundary.
 - Prefer owned data and cached verification over new live third-party request-path dependencies.
 - Before risky imports, migrations, or large manual catalog updates against Turso, take a fresh `npm run db:backup`.
+- Use `npm run db:verify-backup -- <local-backup.db>` to test that a downloaded backup restores into a temporary local database without reading production configuration. The complete drill and outstanding operator controls are in [docs/recovery.md](./recovery.md).
 - Keep the current hardening priorities in [docs/security.md](./security.md).
 
 ## Branch And PR Workflow
