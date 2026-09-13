@@ -33,6 +33,10 @@ const isManagedMediaKey = (value: string) => {
   return MEDIA_PREFIXES.some((prefix) => value.startsWith(prefix));
 };
 
+const isTemporaryDirectUploadKey = (value: string) => {
+  return /^(?:trip-stops|visits)\/\d+\/staged\//.test(value);
+};
+
 const collectMediaKeys = (value: unknown, keys: Set<string>): void => {
   if (typeof value === 'string') {
     if (isManagedMediaKey(value)) {
@@ -76,11 +80,11 @@ const collectSnapshotMediaKeys = (stories: Array<{ storyJson: string }>) => {
 const getMediaReferences = async (database: Database, now: Date): Promise<MediaReferences> => {
   const [visitRows, tripStopRows, yearReviewRows, dateRangeReviewRows, pendingRows, cleanupRows] =
     await Promise.all([
-      database.all<{ fullKey: string; thumbKey: string }>(sql`
-      SELECT full_key AS fullKey, thumb_key AS thumbKey FROM visit_images
+      database.all<{ fullKey: string; thumbKey: string; uploadKey: string | null }>(sql`
+      SELECT full_key AS fullKey, thumb_key AS thumbKey, upload_key AS uploadKey FROM visit_images
     `),
-      database.all<{ fullKey: string; thumbKey: string }>(sql`
-      SELECT full_key AS fullKey, thumb_key AS thumbKey FROM trip_stop_images
+      database.all<{ fullKey: string; thumbKey: string; uploadKey: string | null }>(sql`
+      SELECT full_key AS fullKey, thumb_key AS thumbKey, upload_key AS uploadKey FROM trip_stop_images
     `),
       database.all<{ storyJson: string }>(
         sql`SELECT story_json AS storyJson FROM year_review_shares`
@@ -102,6 +106,10 @@ const getMediaReferences = async (database: Database, now: Date): Promise<MediaR
   for (const row of [...visitRows, ...tripStopRows]) {
     referencedKeys.add(row.fullKey);
     referencedKeys.add(row.thumbKey);
+
+    if (row.uploadKey && !isTemporaryDirectUploadKey(row.uploadKey)) {
+      referencedKeys.add(row.uploadKey);
+    }
   }
   const snapshotMedia = collectSnapshotMediaKeys([...yearReviewRows, ...dateRangeReviewRows]);
   for (const key of snapshotMedia.keys) {
