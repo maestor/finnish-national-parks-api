@@ -869,6 +869,8 @@ const normalizeOptionalOriginalName = (originalName?: string | null) => {
 type PublicTripRouteErrorCode =
   | 'provider_unavailable'
   | 'route_not_found'
+  | 'trip_planner_budget_exceeded'
+  | 'trip_planner_budget_unavailable'
   | 'trip_planner_not_configured';
 
 const toTripPlannerErrorResponse = (
@@ -2261,7 +2263,22 @@ export const createApp = ({
         );
 
         if (budgetResponse) {
-          return budgetResponse;
+          const routeError = (await budgetResponse.json()) as {
+            error: string;
+            errorCode: PublicTripRouteErrorCode;
+          };
+
+          return context.json(
+            {
+              ...trip,
+              route: {
+                data: null,
+                error: routeError,
+                success: false
+              }
+            },
+            200
+          );
         }
       }
 
