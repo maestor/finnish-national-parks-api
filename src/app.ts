@@ -210,7 +210,6 @@ import type { StorageClient, StoredObjectMetadata } from './storage/types.js';
 import {
   createTripPlannerBudget,
   getTripPlannerClientId,
-  getTripPlannerRouteBudgetUnits,
   TRIP_PLANNER_CLIENT_ID_HEADER,
   type TripPlannerBudget,
   type TripPlannerBudgetOperation
@@ -341,16 +340,13 @@ const getErrorCategory = (error: unknown) => {
 const admitTripPlannerRequest = async (
   context: SessionContext,
   budget: TripPlannerBudget,
-  operation: TripPlannerBudgetOperation,
-  providerUnits?: number
+  operation: TripPlannerBudgetOperation
 ) => {
   try {
-    const admission = await budget.admit(
-      operation,
-      getTripPlannerClientId(context.req.header(TRIP_PLANNER_CLIENT_ID_HEADER)),
-      undefined,
-      providerUnits
-    );
+    const clientId = getTripPlannerClientId(context.req.header(TRIP_PLANNER_CLIENT_ID_HEADER));
+    const admission = budget.admitRequest
+      ? await budget.admitRequest(operation, clientId)
+      : await budget.admit(operation, clientId);
 
     if (admission.allowed) {
       return null;
@@ -2263,34 +2259,6 @@ export const createApp = ({
       }
 
       const routeWaypoints = await buildPublicTripRouteWaypoints(database, trip);
-
-      if (routeWaypoints && tripPlanner?.buildRoundTripRoute) {
-        const budgetResponse = await admitTripPlannerRequest(
-          context,
-          effectiveTripPlannerBudget,
-          'route',
-          getTripPlannerRouteBudgetUnits(routeWaypoints.length)
-        );
-
-        if (budgetResponse) {
-          const routeError = (await budgetResponse.json()) as {
-            error: string;
-            errorCode: PublicTripRouteErrorCode;
-          };
-
-          return context.json(
-            {
-              ...trip,
-              route: {
-                data: null,
-                error: routeError,
-                success: false
-              }
-            },
-            200
-          );
-        }
-      }
 
       return context.json(await attachPublicTripRoute(trip, tripPlanner, routeWaypoints), 200);
     });

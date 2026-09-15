@@ -4,7 +4,7 @@ import { createDatabase, type Database } from './db/database.js';
 import { type Env, getEnv, isVercelDeployment } from './env.js';
 import { createMemoryStorage } from './storage/memory-storage.js';
 import { createR2Client } from './storage/r2-client.js';
-import { createTripPlannerBudget } from './trip-planner/budget.js';
+import { createTripPlannerBudget, TripPlannerBudgetError } from './trip-planner/budget.js';
 import { createGeoapifyClient } from './trip-planner/geoapify.js';
 import { createTripPlannerService } from './trip-planner/search.js';
 
@@ -61,7 +61,14 @@ export const createAuthConfig = (env: Env) => {
   };
 };
 
-export const createTripPlanner = (env: Env, database: Database) => {
+export const createTripPlanner = (
+  env: Env,
+  database: Database,
+  tripPlannerBudget = createTripPlannerBudget({
+    dailyProviderUnits: env.GEOAPIFY_DAILY_REQUEST_LIMIT,
+    database
+  })
+) => {
   if (!env.GEOAPIFY_API_KEY) {
     return undefined;
   }
@@ -69,7 +76,31 @@ export const createTripPlanner = (env: Env, database: Database) => {
   return createTripPlannerService({
     database,
     provider: createGeoapifyClient({
-      apiKey: env.GEOAPIFY_API_KEY
+      apiKey: env.GEOAPIFY_API_KEY,
+      providerAdmission: async (operation) => {
+        const reservation = await tripPlannerBudget.reserveProvider?.(
+          operation === 'route' ? 5 : 1
+        );
+
+        if (reservation?.allowed) {
+          return;
+        }
+
+        if (reservation?.reason === 'exceeded') {
+          throw new TripPlannerBudgetError(
+            'trip_planner_budget_exceeded',
+            'Trip planner provider budget exceeded.',
+            429,
+            reservation.retryAfterSeconds
+          );
+        }
+
+        throw new TripPlannerBudgetError(
+          'trip_planner_budget_unavailable',
+          'Trip planner budget is unavailable.',
+          503
+        );
+      }
     })
   });
 };
@@ -93,7 +124,11 @@ export const createLogoPublicUrl = (env: Env) => {
 export const env = getEnv();
 export const databaseClient = createDatabaseClient();
 export const database = createDatabase(databaseClient);
-export const tripPlanner = createTripPlanner(env, database);
+export const tripPlannerBudget = createTripPlannerBudget({
+  dailyProviderUnits: env.GEOAPIFY_DAILY_REQUEST_LIMIT,
+  database
+});
+export const tripPlanner = createTripPlanner(env, database, tripPlannerBudget);
 export const app = createApp({
   apiKey: env.API_KEY,
   allowServerImageUploads: !isVercelDeployment(),
@@ -102,9 +137,6 @@ export const app = createApp({
   getLogoPublicUrl: createLogoPublicUrl(env),
   getMapPublicUrl: undefined,
   storage: createStorage(env),
-  tripPlannerBudget: createTripPlannerBudget({
-    dailyProviderUnits: env.GEOAPIFY_DAILY_REQUEST_LIMIT,
-    database
-  }),
+  tripPlannerBudget,
   tripPlanner
 });
