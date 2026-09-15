@@ -382,6 +382,7 @@ describe('date range review routes', () => {
     };
 
     expect(updatedPublicShareResponse.status).toBe(200);
+    expect(updatedPublicShareResponse.headers.get('cache-control')).toBe('private, no-store');
     expect(updatedPublicShareBody.overview).toEqual({
       endDate: '2026-07-31',
       name: 'July Vacation',
@@ -411,6 +412,7 @@ describe('date range review routes', () => {
     const deletedPublicShareBody = (await deletedPublicShareResponse.json()) as { error: string };
 
     expect(deletedPublicShareResponse.status).toBe(404);
+    expect(deletedPublicShareResponse.headers.get('cache-control')).toBe('private, no-store');
     expect(deletedPublicShareBody).toEqual({
       error: 'Published date range review share not found.'
     });
@@ -1139,6 +1141,7 @@ describe('date range review routes', () => {
     );
 
     expect(shareResponse.status).toBe(200);
+    expect(shareResponse.headers.get('cache-control')).toBe('private, no-store');
     expect(shareBody.overview).toEqual({
       endDate: '2026-06-30',
       name: 'Summer Vacation',
@@ -1171,6 +1174,7 @@ describe('date range review routes', () => {
     const removedShareBody = (await removedShareResponse.json()) as { error: string };
 
     expect(removedShareResponse.status).toBe(404);
+    expect(removedShareResponse.headers.get('cache-control')).toBe('private, no-store');
     expect(removedShareBody).toEqual({
       error: 'Published date range review share not found.'
     });

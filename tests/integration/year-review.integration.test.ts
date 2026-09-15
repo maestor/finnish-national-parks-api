@@ -804,7 +804,7 @@ describe('year review routes', () => {
     };
 
     expect(shareResponse.status).toBe(200);
-    expect(shareResponse.headers.get('cache-control')).toBe('public, max-age=0, s-maxage=600');
+    expect(shareResponse.headers.get('cache-control')).toBe('private, no-store');
     expect(shareBody.shareId).toBe(publishBody.shareId);
     expect(shareBody.year).toBe(2026);
     expect(shareBody.publishedAt).toBe(publishBody.publishedAt);
@@ -889,6 +889,7 @@ describe('year review routes', () => {
     });
 
     expect(shareResponse.status).toBe(404);
+    expect(shareResponse.headers.get('cache-control')).toBe('private, no-store');
   });
 
   it('returns not found when unpublishing a year without a published share', async () => {

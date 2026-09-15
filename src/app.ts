@@ -2092,7 +2092,7 @@ export const createApp = ({
     });
 
     app.openapi(getDateRangeReviewShareRoute, async (context) => {
-      context.header('Cache-Control', PUBLIC_SUMMARY_CACHE_CONTROL);
+      context.header('Cache-Control', PRIVATE_CACHE_CONTROL);
 
       const { shareId } = context.req.valid('param');
       const share = await getPublishedDateRangeReviewShareByShareId(database, shareId);
@@ -2227,7 +2227,7 @@ export const createApp = ({
     });
 
     app.openapi(getYearReviewShareRoute, async (context) => {
-      context.header('Cache-Control', PUBLIC_SUMMARY_CACHE_CONTROL);
+      context.header('Cache-Control', PRIVATE_CACHE_CONTROL);
 
       const { shareId } = context.req.valid('param');
       const share = await getPublishedYearReviewShareByShareId(database, shareId);
