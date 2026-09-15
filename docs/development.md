@@ -46,11 +46,13 @@ The deployment guardrail test for this lives in `tests/integration/vercel-entry.
 
 Run `npm run test -- tests/integration/resource-baseline.integration.test.ts` to reproduce the
 deterministic O4 baseline. The test seeds 20 synthetic parks, a 20-visit trip, and a 13-image
-gallery, then measures public JSON bytes, ETag-hit query counts, gallery-page query counts, and
-stored full-versus-thumbnail bytes through the real Hono boundary. The absolute budgets live next
-to the fixture in the test; a deliberately inflated fixture should fail those assertions. Browser
-request and transfer measurements require an authorized production-mode runtime and are tracked
-separately from this CI gate.
+gallery, finalizes deterministic generated images through the direct completion path, and measures
+public JSON bytes, ETag-hit query counts, gallery-page query counts, and persisted derivative bytes
+through the real Hono boundary. The first detailed fixture currently measures 772,939 B full and
+67,259 B thumbnail output; the test asserts the real 2,560 px / 480 px dimension bounds and a
+150 KiB thumbnail ceiling. The absolute budgets live next to the fixture; a deliberately reused
+full image fails the derivative assertion. Browser request and transfer measurements require an
+authorized production-mode runtime and are tracked separately from this CI gate.
 
 ## Branch And PR Workflow
 

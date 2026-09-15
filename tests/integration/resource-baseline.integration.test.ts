@@ -1,7 +1,11 @@
+import { eq } from 'drizzle-orm';
+import sharp from 'sharp';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { createApp } from '../../src/app.js';
-import { createTrip, createVisit, createVisitImage } from '../../src/db/repositories.js';
+import { createTrip, createVisit } from '../../src/db/repositories.js';
+import { visitImages } from '../../src/db/schema.js';
+import { createSessionToken } from '../../src/http/session.js';
 import { importParks } from '../../src/importer/import-parks.js';
 import { createSlug } from '../../src/parks/park-normalization.js';
 import { createMemoryStorage } from '../../src/storage/memory-storage.js';
@@ -26,6 +30,11 @@ const QUERY_BUDGETS = {
   conditionalHomeQueries: 5,
   galleryPageQueries: 2
 } as const;
+
+const IMAGE_SOURCE_BYTES_LIMIT = 15 * 1024 * 1024;
+const THUMBNAIL_MAX_DIMENSION = 480;
+const FULL_MAX_DIMENSION = 2560;
+const THUMBNAIL_MAX_BYTES = 150 * 1024;
 
 type GalleryResponse = {
   images: Array<{ thumbWidth: number | null }>;
@@ -57,6 +66,51 @@ const createBaselineParks = () =>
       www: `https://www.luontoon.fi/synthetic-park-${index + 1}`
     })
   );
+
+const createBaselineImageBuffer = async (index: number) => {
+  const dimensions =
+    index === 0
+      ? { height: 900, width: 1600 }
+      : index === 1
+        ? { height: 1600, width: 900 }
+        : index === 2
+          ? { height: 240, width: 320 }
+          : { height: 800, width: 1200 };
+  const pixels = Buffer.alloc(dimensions.width * dimensions.height * 3);
+
+  for (let pixel = 0; pixel < pixels.length; pixel += 3) {
+    const position = pixel / 3;
+    const x = position % dimensions.width;
+    const y = Math.floor(position / dimensions.width);
+    pixels[pixel] = (x * 17 + y * 3 + index * 11) % 256;
+    pixels[pixel + 1] = (x * 5 + y * 19 + index * 7) % 256;
+    pixels[pixel + 2] = (x * 13 + y * 11 + index * 3) % 256;
+  }
+
+  return sharp(pixels, {
+    raw: {
+      channels: 3,
+      height: dimensions.height,
+      width: dimensions.width
+    }
+  })
+    .jpeg({ quality: 88 })
+    .toBuffer();
+};
+
+const assertDerivativeBudget = async (fullBuffer: Buffer, thumbBuffer: Buffer) => {
+  const [fullMetadata, thumbMetadata] = await Promise.all([
+    sharp(fullBuffer).metadata(),
+    sharp(thumbBuffer).metadata()
+  ]);
+
+  expect(fullMetadata.width).toBeLessThanOrEqual(FULL_MAX_DIMENSION);
+  expect(fullMetadata.height).toBeLessThanOrEqual(FULL_MAX_DIMENSION);
+  expect(thumbMetadata.width).toBeLessThanOrEqual(THUMBNAIL_MAX_DIMENSION);
+  expect(thumbMetadata.height).toBeLessThanOrEqual(THUMBNAIL_MAX_DIMENSION);
+  expect(thumbBuffer.byteLength).toBeLessThanOrEqual(THUMBNAIL_MAX_BYTES);
+  expect(fullBuffer.byteLength).toBeLessThanOrEqual(IMAGE_SOURCE_BYTES_LIMIT);
+};
 
 describe('resource baseline API', () => {
   let testDatabase: Awaited<ReturnType<typeof createTestDatabase>>;
@@ -104,35 +158,39 @@ describe('resource baseline API', () => {
     }
 
     const imageVisitId = visitIds[0]!;
-    const fullKeyPrefix = 'baseline/visit/full';
-    const thumbKeyPrefix = 'baseline/visit/thumb';
+    const auth = {
+      cookieName: '__session',
+      frontendUrl: 'http://localhost:4300',
+      googleClientId: 'baseline-client-id',
+      googleClientSecret: 'baseline-client-secret',
+      jwtSecret: 'baseline-secret-at-least-32-characters-long'
+    };
+    const adminSession = await createSessionToken(
+      {
+        email: 'admin@example.com',
+        name: 'Baseline Admin',
+        picture: 'https://example.com/admin.jpg',
+        role: 'admin',
+        sub: 'baseline-admin'
+      },
+      new TextEncoder().encode(auth.jwtSecret)
+    );
+    const app = createApp({ auth, database: testDatabase.database, storage });
 
     for (let index = 0; index < BASELINE_IMAGE_COUNT; index += 1) {
-      const fullKey = `${fullKeyPrefix}-${index + 1}.jpg`;
-      const thumbKey = `${thumbKeyPrefix}-${index + 1}.jpg`;
-      const fullBuffer = Buffer.alloc(160_000, index);
-      const thumbBuffer = Buffer.alloc(16_000, index);
-
-      await storage.upload(fullKey, fullBuffer, 'image/jpeg');
-      await storage.upload(thumbKey, thumbBuffer, 'image/jpeg');
-      await createVisitImage(testDatabase.database, {
-        createdAt: BASELINE_TIMESTAMP,
-        displayOrder: index + 1,
-        fileSizeBytes: fullBuffer.byteLength,
-        fullHeight: 900,
-        fullKey,
-        fullWidth: 1600,
-        mimeType: 'image/jpeg',
-        originalName: `synthetic-${index + 1}.jpg`,
-        thumbHeight: 360,
-        thumbKey,
-        thumbWidth: 640,
-        updatedAt: BASELINE_TIMESTAMP,
-        visitId: imageVisitId
+      const key = `visits/${imageVisitId}/staged/baseline-${index + 1}.jpg`;
+      await storage.upload(key, await createBaselineImageBuffer(index), 'image/jpeg');
+      const response = await app.request(`/api/visits/${imageVisitId}/images/complete`, {
+        body: JSON.stringify({ key, originalName: `synthetic-${index + 1}.jpg` }),
+        headers: {
+          'content-type': 'application/json',
+          cookie: `__session=${adminSession}`
+        },
+        method: 'POST'
       });
-    }
 
-    const app = createApp({ database: testDatabase.database, storage });
+      expect(response.status).toBe(201);
+    }
     const executeSpy = vi.spyOn(testDatabase.client, 'execute');
 
     const measure = async (path: string) => {
@@ -196,7 +254,7 @@ describe('resource baseline API', () => {
     expectWithinBudget('gallery page 1', firstGallery.bytes, RESOURCE_BUDGETS.galleryPageBytes);
     expectWithinBudget('gallery page 2', secondGallery.bytes, RESOURCE_BUDGETS.galleryPageBytes);
     expect(firstGallery.body).toMatchObject({
-      images: expect.arrayContaining([expect.objectContaining({ thumbWidth: 640 })]),
+      images: expect.arrayContaining([expect.objectContaining({ thumbWidth: 480 })]),
       nextOffset: 12
     });
     expect(firstGallery.body.images).toHaveLength(12);
@@ -205,9 +263,19 @@ describe('resource baseline API', () => {
     expect(firstGalleryQueryCount).toBeLessThanOrEqual(QUERY_BUDGETS.galleryPageQueries);
     expect(secondGalleryQueryCount).toBeLessThanOrEqual(QUERY_BUDGETS.galleryPageQueries);
 
-    const fullBytes = storage.getStore().get(`${fullKeyPrefix}-1.jpg`)?.byteLength ?? 0;
-    const thumbBytes = storage.getStore().get(`${thumbKeyPrefix}-1.jpg`)?.byteLength ?? 0;
+    const imageRows = await testDatabase.database
+      .select()
+      .from(visitImages)
+      .where(eq(visitImages.visitId, imageVisitId));
+    expect(imageRows).toHaveLength(BASELINE_IMAGE_COUNT);
+    const firstImage = imageRows[0]!;
+    const fullBuffer = storage.getStore().get(firstImage.fullKey)!;
+    const thumbBuffer = storage.getStore().get(firstImage.thumbKey)!;
+    await assertDerivativeBudget(fullBuffer, thumbBuffer);
+    const fullBytes = fullBuffer.byteLength;
+    const thumbBytes = thumbBuffer.byteLength;
     expect(thumbBytes).toBeLessThan(fullBytes);
+    await expect(assertDerivativeBudget(fullBuffer, fullBuffer)).rejects.toThrow();
 
     const providerFetch = vi.fn().mockResolvedValue(
       new Response(
