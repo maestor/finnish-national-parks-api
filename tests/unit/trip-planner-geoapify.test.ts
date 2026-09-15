@@ -3,6 +3,33 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { logger } from '../../src/http/logger.js';
 import { createGeoapifyClient } from '../../src/trip-planner/geoapify.js';
 
+const createJsonResponse = (body: object) =>
+  new Response(JSON.stringify(body), {
+    headers: { 'content-type': 'application/json' },
+    status: 200
+  });
+
+const createRouteResponse = () =>
+  createJsonResponse({
+    features: [
+      {
+        geometry: {
+          coordinates: [
+            [
+              [24.93, 60.17],
+              [25.01, 60.18]
+            ]
+          ],
+          type: 'MultiLineString'
+        },
+        properties: {
+          distance: 8_450,
+          time: 760
+        }
+      }
+    ]
+  });
+
 afterEach(() => {
   vi.restoreAllMocks();
 });
@@ -421,6 +448,143 @@ describe('geoapify client', () => {
 
     expect(first).toEqual(second);
     expect(fetchFn).toHaveBeenCalledTimes(1);
+  });
+
+  it('bounds geocode and suggestion caches while preserving recently used entries', async () => {
+    const fetchFn = vi.fn().mockImplementation(async (input: string | URL) => {
+      const requestUrl = new URL(String(input));
+      const query = requestUrl.searchParams.get('text') ?? 'unknown';
+
+      if (requestUrl.pathname.endsWith('/autocomplete')) {
+        return createJsonResponse({ results: [] });
+      }
+
+      return createJsonResponse({
+        results: [
+          {
+            formatted: query,
+            lat: 60.1,
+            lon: 24.9
+          }
+        ]
+      });
+    });
+    const client = createGeoapifyClient({
+      apiKey: 'geoapify-test',
+      fetchFn: fetchFn as typeof fetch,
+      geocodeCacheMaxEntries: 2,
+      suggestionCacheMaxEntries: 2
+    });
+
+    await client.geocode('one');
+    await client.geocode('two');
+    await client.geocode('one');
+    await client.geocode('three');
+    await client.geocode('two');
+
+    await client.suggest('one');
+    await client.suggest('two');
+    await client.suggest('one');
+    await client.suggest('three');
+    await client.suggest('two');
+
+    expect(fetchFn).toHaveBeenCalledTimes(8);
+  });
+
+  it('bounds route cache entries and skips routes over the byte budget', async () => {
+    const fetchFn = vi.fn().mockImplementation(async () => createRouteResponse());
+    const createRouteInput = (offset: number) => ({
+      destination: { lat: 60.18 + offset, lon: 25.01 + offset },
+      mode: 'drive' as const,
+      origin: { lat: 60.17 + offset, lon: 24.93 + offset }
+    });
+    const client = createGeoapifyClient({
+      apiKey: 'geoapify-test',
+      fetchFn: fetchFn as typeof fetch,
+      routeCacheMaxEntries: 2
+    });
+
+    await client.route(createRouteInput(0));
+    await client.route(createRouteInput(1));
+    await client.route(createRouteInput(0));
+    await client.route(createRouteInput(2));
+    await client.route(createRouteInput(1));
+
+    expect(fetchFn).toHaveBeenCalledTimes(4);
+
+    const byteLimitedClient = createGeoapifyClient({
+      apiKey: 'geoapify-test',
+      fetchFn: fetchFn as typeof fetch,
+      routeCacheMaxBytes: 1
+    });
+    const routeInput = createRouteInput(3);
+
+    await byteLimitedClient.route(routeInput);
+    await byteLimitedClient.route(routeInput);
+
+    expect(fetchFn).toHaveBeenCalledTimes(6);
+  });
+
+  it('does not poison a cache after a provider failure', async () => {
+    const fetchFn = vi
+      .fn()
+      .mockRejectedValueOnce(new Error('temporary provider failure'))
+      .mockResolvedValueOnce(
+        createJsonResponse({
+          results: [
+            {
+              formatted: 'Helsinki, Finland',
+              lat: 60.1699,
+              lon: 24.9384
+            }
+          ]
+        })
+      );
+    const client = createGeoapifyClient({
+      apiKey: 'geoapify-test',
+      fetchFn: fetchFn as typeof fetch
+    });
+
+    await expect(client.geocode('Helsinki')).rejects.toThrow('temporary provider failure');
+    await expect(client.geocode('Helsinki')).resolves.toMatchObject({
+      coordinate: { lat: 60.1699, lon: 24.9384 }
+    });
+    expect(fetchFn).toHaveBeenCalledTimes(2);
+  });
+
+  it('limits simultaneous distinct provider requests while keeping duplicate requests shared', async () => {
+    const pendingResponses: Array<() => void> = [];
+    const fetchFn = vi.fn(
+      () =>
+        new Promise<Response>((resolve) => {
+          pendingResponses.push(() => resolve(createJsonResponse({ results: [] })));
+        })
+    );
+    const client = createGeoapifyClient({
+      apiKey: 'geoapify-test',
+      fetchFn: fetchFn as typeof fetch,
+      maxConcurrentRequests: 2
+    });
+
+    const requests = Promise.all([
+      client.geocode('one'),
+      client.geocode('two'),
+      client.geocode('three'),
+      client.geocode('one')
+    ]);
+    await Promise.resolve();
+
+    expect(fetchFn).toHaveBeenCalledTimes(2);
+    expect(pendingResponses).toHaveLength(2);
+
+    pendingResponses.shift()?.();
+    pendingResponses.shift()?.();
+    await vi.waitFor(() => expect(fetchFn).toHaveBeenCalledTimes(3));
+
+    expect(pendingResponses).toHaveLength(1);
+    pendingResponses.shift()?.();
+
+    await expect(requests).resolves.toHaveLength(4);
   });
 
   it('times out slow Geoapify requests', async () => {

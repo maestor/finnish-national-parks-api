@@ -1,6 +1,8 @@
 import { logger } from '../http/logger.js';
 import type { GeoJsonFeatureCollection } from '../importer/geometry.js';
 import { deriveLocationDisplayName } from '../location-display.js';
+import { type BoundedTtlCache, createBoundedTtlCache } from './bounded-cache.js';
+import { createConcurrencyLimiter } from './concurrency.js';
 import { deriveBoundingBox } from './geometry.js';
 import type {
   TripPlannerCoordinate,
@@ -14,10 +16,15 @@ import type {
 type GeoapifyClientOptions = {
   apiKey: string;
   fetchFn?: typeof fetch | undefined;
+  geocodeCacheMaxEntries?: number | undefined;
   geocodeCacheTtlMs?: number | undefined;
+  maxConcurrentRequests?: number | undefined;
   now?: (() => number) | undefined;
   requestTimeoutMs?: number | undefined;
+  routeCacheMaxBytes?: number | undefined;
+  routeCacheMaxEntries?: number | undefined;
   routeCacheTtlMs?: number | undefined;
+  suggestionCacheMaxEntries?: number | undefined;
 };
 
 type GeoapifyGeocodeResponse = {
@@ -54,15 +61,15 @@ const DEFAULT_GEOAPIFY_REQUEST_TIMEOUT_MS = 8_000;
 const DEFAULT_GEOCODE_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
 const DEFAULT_ROUTE_CACHE_TTL_MS = 30 * 60 * 1000;
 const DEFAULT_SUGGESTION_CACHE_TTL_MS = 60 * 60 * 1000;
+const DEFAULT_GEOCODE_CACHE_MAX_ENTRIES = 256;
+const DEFAULT_ROUTE_CACHE_MAX_BYTES = 16 * 1024 * 1024;
+const DEFAULT_ROUTE_CACHE_MAX_ENTRIES = 64;
+const DEFAULT_SUGGESTION_CACHE_MAX_ENTRIES = 256;
+const DEFAULT_MAX_CONCURRENT_REQUESTS = 8;
 const DEFAULT_SUGGESTION_LIMIT = 3;
 const GEOAPIFY_NORDIC_COUNTRY_CODES = 'countrycode:fi,se,no';
 
 type GeoapifyOperation = 'geocode' | 'route' | 'suggest';
-
-type CacheEntry<T> = {
-  expiresAt: number;
-  value: T;
-};
 
 const buildGeocodeUrl = (apiKey: string, query: string) => {
   const params = new URLSearchParams({
@@ -201,6 +208,11 @@ const isAbortError = (error: unknown) => {
   return error instanceof Error && error.name === 'AbortError';
 };
 
+const estimateSerializedBytes = (value: unknown) => {
+  const serialized = JSON.stringify(value)!;
+  return new TextEncoder().encode(serialized).byteLength;
+};
+
 const fetchJson = async <T>(
   fetchFn: typeof fetch,
   url: string,
@@ -268,41 +280,20 @@ const fetchJson = async <T>(
   }
 };
 
-const getCachedValue = <T>(
-  cache: Map<string, CacheEntry<T>>,
-  key: string,
-  now: number
-): T | undefined => {
-  const cachedEntry = cache.get(key);
-
-  if (!cachedEntry) {
-    return undefined;
-  }
-
-  if (cachedEntry.expiresAt <= now) {
-    cache.delete(key);
-    return undefined;
-  }
-
-  return cachedEntry.value;
-};
-
 const loadWithCache = <T>({
   cache,
   inFlight,
   key,
   load,
-  now,
   ttlMs
 }: {
-  cache: Map<string, CacheEntry<T>>;
+  cache: BoundedTtlCache<T>;
   inFlight: Map<string, Promise<T>>;
   key: string;
   load: () => Promise<T>;
-  now: () => number;
   ttlMs: number;
 }) => {
-  const cachedValue = getCachedValue(cache, key, now());
+  const cachedValue = cache.get(key);
 
   if (cachedValue !== undefined) {
     return Promise.resolve(cachedValue);
@@ -316,10 +307,7 @@ const loadWithCache = <T>({
 
   const nextRequest = load()
     .then((value) => {
-      cache.set(key, {
-        expiresAt: now() + ttlMs,
-        value
-      });
+      cache.set(key, value, ttlMs);
 
       return value;
     })
@@ -334,17 +322,34 @@ const loadWithCache = <T>({
 export const createGeoapifyClient = ({
   apiKey,
   fetchFn = fetch,
+  geocodeCacheMaxEntries = DEFAULT_GEOCODE_CACHE_MAX_ENTRIES,
   geocodeCacheTtlMs = DEFAULT_GEOCODE_CACHE_TTL_MS,
+  maxConcurrentRequests = DEFAULT_MAX_CONCURRENT_REQUESTS,
   now = Date.now,
   requestTimeoutMs = DEFAULT_GEOAPIFY_REQUEST_TIMEOUT_MS,
-  routeCacheTtlMs = DEFAULT_ROUTE_CACHE_TTL_MS
+  routeCacheMaxBytes = DEFAULT_ROUTE_CACHE_MAX_BYTES,
+  routeCacheMaxEntries = DEFAULT_ROUTE_CACHE_MAX_ENTRIES,
+  routeCacheTtlMs = DEFAULT_ROUTE_CACHE_TTL_MS,
+  suggestionCacheMaxEntries = DEFAULT_SUGGESTION_CACHE_MAX_ENTRIES
 }: GeoapifyClientOptions): TripPlannerProvider => {
-  const geocodeCache = new Map<string, CacheEntry<TripPlannerResolvedLocation | null>>();
+  const geocodeCache = createBoundedTtlCache<TripPlannerResolvedLocation | null>({
+    maxEntries: geocodeCacheMaxEntries,
+    now
+  });
   const geocodeInFlight = new Map<string, Promise<TripPlannerResolvedLocation | null>>();
-  const routeCache = new Map<string, CacheEntry<TripPlannerRoute | null>>();
+  const routeCache = createBoundedTtlCache<TripPlannerRoute | null>({
+    estimateBytes: estimateSerializedBytes,
+    maxBytes: routeCacheMaxBytes,
+    maxEntries: routeCacheMaxEntries,
+    now
+  });
   const routeInFlight = new Map<string, Promise<TripPlannerRoute | null>>();
-  const suggestionCache = new Map<string, CacheEntry<TripPlannerSuggestion[]>>();
+  const suggestionCache = createBoundedTtlCache<TripPlannerSuggestion[]>({
+    maxEntries: suggestionCacheMaxEntries,
+    now
+  });
   const suggestionInFlight = new Map<string, Promise<TripPlannerSuggestion[]>>();
+  const runProviderRequest = createConcurrencyLimiter(maxConcurrentRequests);
 
   return {
     geocode: async (query) => {
@@ -352,18 +357,18 @@ export const createGeoapifyClient = ({
         cache: geocodeCache,
         inFlight: geocodeInFlight,
         key: normalizeGeocodeCacheKey(query),
-        load: async () => {
-          const response = await fetchJson<GeoapifyGeocodeResponse>(
-            fetchFn,
-            buildGeocodeUrl(apiKey, query.trim()),
-            requestTimeoutMs,
-            'geocode',
-            now
-          );
+        load: () =>
+          runProviderRequest(async () => {
+            const response = await fetchJson<GeoapifyGeocodeResponse>(
+              fetchFn,
+              buildGeocodeUrl(apiKey, query.trim()),
+              requestTimeoutMs,
+              'geocode',
+              now
+            );
 
-          return normalizeGeocodedLocation(response?.results?.[0]);
-        },
-        now,
+            return normalizeGeocodedLocation(response?.results?.[0]);
+          }),
         ttlMs: geocodeCacheTtlMs
       });
     },
@@ -372,18 +377,18 @@ export const createGeoapifyClient = ({
         cache: suggestionCache,
         inFlight: suggestionInFlight,
         key: normalizeGeocodeCacheKey(query),
-        load: async () => {
-          const response = await fetchJson<GeoapifyGeocodeResponse>(
-            fetchFn,
-            buildAutocompleteUrl(apiKey, query.trim()),
-            requestTimeoutMs,
-            'suggest',
-            now
-          );
+        load: () =>
+          runProviderRequest(async () => {
+            const response = await fetchJson<GeoapifyGeocodeResponse>(
+              fetchFn,
+              buildAutocompleteUrl(apiKey, query.trim()),
+              requestTimeoutMs,
+              'suggest',
+              now
+            );
 
-          return normalizeSuggestions(response?.results);
-        },
-        now,
+            return normalizeSuggestions(response?.results);
+          }),
         ttlMs: DEFAULT_SUGGESTION_CACHE_TTL_MS
       });
     },
@@ -392,18 +397,18 @@ export const createGeoapifyClient = ({
         cache: routeCache,
         inFlight: routeInFlight,
         key: createRouteCacheKey(origin, destination, mode),
-        load: async () => {
-          const response = await fetchJson<GeoapifyRoutingResponse>(
-            fetchFn,
-            buildRouteUrl(apiKey, origin, destination, mode),
-            requestTimeoutMs,
-            'route',
-            now
-          );
+        load: () =>
+          runProviderRequest(async () => {
+            const response = await fetchJson<GeoapifyRoutingResponse>(
+              fetchFn,
+              buildRouteUrl(apiKey, origin, destination, mode),
+              requestTimeoutMs,
+              'route',
+              now
+            );
 
-          return normalizeRoute(mode, response?.features?.[0]);
-        },
-        now,
+            return normalizeRoute(mode, response?.features?.[0]);
+          }),
         ttlMs: routeCacheTtlMs
       });
     }

@@ -39,6 +39,12 @@ Provider work is admitted through the shared libSQL/Turso database so separate A
 
 Requests above the 16 KiB planner JSON body limit return `413`. Exhausted client or provider budgets return `429` with `Retry-After`. The frontend proxy counts streamed request bytes before buffering and supplies the API with a server-issued opaque client ID. Requests that reach the API without that internal ID use a shared anonymous bucket. Confirm the daily unit ceiling and any platform-level rate rules against the actual provider subscription before production deployment.
 
+## Provider Cache Behavior
+
+The Geoapify adapter keeps short-lived, process-local caches to avoid repeating identical work on a warm API instance. Geocode and suggestion caches keep at most 256 entries each; route results keep at most 64 entries and approximately 16 MiB of serialized route data. Existing cache TTLs remain unchanged. Expired entries are removed during normal cache access or insertion, and least-recently-used entries are evicted when a bound is reached.
+
+Identical in-flight requests still share one provider call. Distinct provider calls are limited to eight active requests per API instance; queued work starts as earlier calls finish. Failed requests are not cached. These caches are performance optimizations for warm instances, not cross-instance rate limiting, durable route storage, or a replacement for the shared provider budget described above.
+
 ## Core Definitions
 
 - `corridor distance`
