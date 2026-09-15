@@ -9,7 +9,7 @@ import { createSessionToken } from '../../src/http/session.js';
 import { importParks } from '../../src/importer/import-parks.js';
 import { runUnusedMediaCleanup } from '../../src/media/unused-media-cleanup.js';
 import { createMemoryStorage } from '../../src/storage/memory-storage.js';
-import type { StorageClient } from '../../src/storage/types.js';
+import { type StorageClient, StorageObjectTooLargeError } from '../../src/storage/types.js';
 import { createLipasPark } from '../fixtures/lipas.js';
 import { createTestDatabase } from '../helpers/test-db.js';
 
@@ -269,6 +269,48 @@ describe('Visit image routes', () => {
     expect(storedKeys).toContain(initBody.key);
     expect(storedKeys.some((storedKey) => storedKey.endsWith('-full.jpg'))).toBe(true);
     expect(storedKeys.some((storedKey) => storedKey.endsWith('-thumb.jpg'))).toBe(true);
+  });
+
+  it('returns 200 when completion persistence reports an existing image', async () => {
+    const visitId = await createVisit();
+    const app = createAuthedApp({ allowServerImageUploads: false, storage });
+    const firstFile = new File([await createTestImageBuffer()], 'first.jpg', {
+      type: 'image/jpeg'
+    });
+    const firstPlan = await createDirectUploadPlan(visitId, firstFile, app);
+    const firstKey = ((await firstPlan.json()) as { key: string }).key;
+    await storage.upload(firstKey, await createTestImageBuffer(), firstFile.type);
+    await requestAsAdmin(app, `/api/visits/${visitId}/images/complete`, {
+      body: JSON.stringify({ key: firstKey, originalName: firstFile.name }),
+      headers: { 'content-type': 'application/json' },
+      method: 'POST'
+    });
+    const [existingImage] = await testDatabase.database
+      .select()
+      .from(visitImages)
+      .where(eq(visitImages.visitId, visitId));
+    const secondFile = new File([await createTestImageBuffer()], 'second.jpg', {
+      type: 'image/jpeg'
+    });
+    const secondPlan = await createDirectUploadPlan(visitId, secondFile, app);
+    const secondKey = ((await secondPlan.json()) as { key: string }).key;
+    await storage.upload(secondKey, await createTestImageBuffer(), secondFile.type);
+    const completeSpy = vi
+      .spyOn(repositories, 'completeVisitImage')
+      .mockResolvedValue({ created: false, row: existingImage! });
+
+    try {
+      const response = await requestAsAdmin(app, `/api/visits/${visitId}/images/complete`, {
+        body: JSON.stringify({ key: secondKey, originalName: secondFile.name }),
+        headers: { 'content-type': 'application/json' },
+        method: 'POST'
+      });
+
+      expect(response.status).toBe(200);
+      expect(completeSpy).toHaveBeenCalledTimes(1);
+    } finally {
+      completeSpy.mockRestore();
+    }
   });
 
   it('completes a valid staged upload that predates the upload ledger', async () => {
@@ -940,6 +982,70 @@ describe('Visit image routes', () => {
     await expect(response.json()).resolves.toEqual({ error: 'File too large.' });
   });
 
+  it('returns 413 when storage rejects the downloaded object for exceeding its read limit', async () => {
+    const visitId = await createVisit();
+    const app = createAuthedApp({ allowServerImageUploads: false, storage });
+    const initResponse = await createDirectUploadPlan(
+      visitId,
+      new File(['image'], 'storage-limit.jpg', { type: 'image/jpeg' }),
+      app
+    );
+    const initBody = (await initResponse.json()) as { key: string };
+
+    await storage.upload(initBody.key, await createTestImageBuffer(), 'image/jpeg');
+    vi.spyOn(storage, 'getObjectMetadata').mockResolvedValueOnce({
+      contentLength: 1,
+      contentType: 'image/jpeg'
+    });
+    const getObjectSpy = vi
+      .spyOn(storage, 'getObject')
+      .mockRejectedValueOnce(new StorageObjectTooLargeError());
+
+    try {
+      const response = await requestAsAdmin(app, `/api/visits/${visitId}/images/complete`, {
+        body: JSON.stringify({ key: initBody.key }),
+        headers: { 'content-type': 'application/json' },
+        method: 'POST'
+      });
+
+      expect(response.status).toBe(413);
+      await expect(response.json()).resolves.toEqual({ error: 'File too large.' });
+      expect(getObjectSpy).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.restoreAllMocks();
+    }
+  });
+
+  it('propagates unexpected storage read failures during direct completion', async () => {
+    const visitId = await createVisit();
+    const app = createAuthedApp({ allowServerImageUploads: false, storage });
+    const initResponse = await createDirectUploadPlan(
+      visitId,
+      new File(['image'], 'storage-error.jpg', { type: 'image/jpeg' }),
+      app
+    );
+    const initBody = (await initResponse.json()) as { key: string };
+
+    await storage.upload(initBody.key, await createTestImageBuffer(), 'image/jpeg');
+    vi.spyOn(storage, 'getObjectMetadata').mockResolvedValueOnce({
+      contentLength: 1,
+      contentType: 'image/jpeg'
+    });
+    vi.spyOn(storage, 'getObject').mockRejectedValueOnce(new Error('storage read failed'));
+
+    try {
+      const response = await requestAsAdmin(app, `/api/visits/${visitId}/images/complete`, {
+        body: JSON.stringify({ key: initBody.key }),
+        headers: { 'content-type': 'application/json' },
+        method: 'POST'
+      });
+
+      expect(response.status).toBe(500);
+    } finally {
+      vi.restoreAllMocks();
+    }
+  });
+
   it('returns a retryable server error when final derivative storage fails', async () => {
     const visitId = await createVisit();
     const app = createAuthedApp({ allowServerImageUploads: false, storage });
@@ -974,6 +1080,146 @@ describe('Visit image routes', () => {
         visitId: 99999
       })
     ).rejects.toThrow('Visit not found');
+  });
+
+  it('rejects completion when the processing claim has expired', async () => {
+    const visitId = await createVisit();
+
+    await expect(
+      repositories.completeVisitImage(testDatabase.database, {
+        createdAt: '2026-05-01T09:00:00.000Z',
+        displayOrder: 0,
+        fullKey: `visits/${visitId}/final/expired-full.jpg`,
+        mimeType: 'image/jpeg',
+        processingToken: 'expired-token',
+        thumbKey: `visits/${visitId}/final/expired-thumb.jpg`,
+        updatedAt: '2026-05-01T09:00:00.000Z',
+        visitId
+      })
+    ).rejects.toThrow('Upload completion claim expired');
+  });
+
+  it('returns the existing image when a retry presents an expired processing claim', async () => {
+    const visitId = await createVisit();
+    const uploadKey = `visits/${visitId}/staged/retry-existing.jpg`;
+    const values = {
+      createdAt: '2026-05-01T09:00:00.000Z',
+      displayOrder: 0,
+      fullKey: `visits/${visitId}/final/retry-existing-full.jpg`,
+      mimeType: 'image/jpeg' as const,
+      thumbKey: `visits/${visitId}/final/retry-existing-thumb.jpg`,
+      uploadKey,
+      updatedAt: '2026-05-01T09:00:00.000Z',
+      visitId
+    };
+    await repositories.completeVisitImage(testDatabase.database, values);
+
+    await expect(
+      repositories.completeVisitImage(testDatabase.database, values)
+    ).resolves.toMatchObject({ created: false, row: { uploadKey } });
+
+    await expect(
+      repositories.completeVisitImage(testDatabase.database, {
+        ...values,
+        processingToken: 'expired-token'
+      })
+    ).resolves.toMatchObject({ created: false, row: { uploadKey } });
+  });
+
+  it('returns 422 when a newly created upload ledger row cannot be read back', async () => {
+    const visitId = await createVisit();
+    const file = new File([await createTestImageBuffer()], 'missing-ledger.jpg', {
+      type: 'image/jpeg'
+    });
+    const app = createAuthedApp({ allowServerImageUploads: false, storage });
+    const initResponse = await createDirectUploadPlan(visitId, file, app);
+    const initBody = (await initResponse.json()) as { key: string };
+    const findSpy = vi.spyOn(repositories, 'findMediaUploadByUploadKey').mockResolvedValue(null);
+    const createSpy = vi
+      .spyOn(repositories, 'createPendingMediaUpload')
+      .mockResolvedValue(undefined);
+
+    try {
+      const response = await requestAsAdmin(app, `/api/visits/${visitId}/images/complete`, {
+        body: JSON.stringify({ key: initBody.key, originalName: file.name }),
+        headers: { 'content-type': 'application/json' },
+        method: 'POST'
+      });
+
+      expect(response.status).toBe(422);
+      await expect(response.json()).resolves.toEqual({
+        error: 'Upload could not be prepared for completion.'
+      });
+      expect(findSpy).toHaveBeenCalledTimes(2);
+      expect(createSpy).toHaveBeenCalledTimes(1);
+    } finally {
+      findSpy.mockRestore();
+      createSpy.mockRestore();
+    }
+  });
+
+  it('returns 422 when the upload ledger disappears before claiming completion', async () => {
+    const visitId = await createVisit();
+    const file = new File([await createTestImageBuffer()], 'missing-during-claim.jpg', {
+      type: 'image/jpeg'
+    });
+    const app = createAuthedApp({ allowServerImageUploads: false, storage });
+    const initResponse = await createDirectUploadPlan(visitId, file, app);
+    const initBody = (await initResponse.json()) as { key: string };
+    const pendingUpload = await repositories.findMediaUploadByUploadKey(
+      testDatabase.database,
+      initBody.key
+    );
+    await storage.upload(initBody.key, await createTestImageBuffer(), file.type);
+    const findSpy = vi
+      .spyOn(repositories, 'findMediaUploadByUploadKey')
+      .mockResolvedValueOnce(pendingUpload)
+      .mockResolvedValueOnce(null);
+
+    try {
+      const response = await requestAsAdmin(app, `/api/visits/${visitId}/images/complete`, {
+        body: JSON.stringify({ key: initBody.key, originalName: file.name }),
+        headers: { 'content-type': 'application/json' },
+        method: 'POST'
+      });
+
+      expect(response.status).toBe(422);
+      await expect(response.json()).resolves.toEqual({
+        error: 'Upload could not be prepared for completion.'
+      });
+    } finally {
+      findSpy.mockRestore();
+    }
+  });
+
+  it('returns 422 when another completion keeps the processing claim', async () => {
+    const visitId = await createVisit();
+    const file = new File([await createTestImageBuffer()], 'claim-in-progress.jpg', {
+      type: 'image/jpeg'
+    });
+    const app = createAuthedApp({ allowServerImageUploads: false, storage });
+    const initResponse = await createDirectUploadPlan(visitId, file, app);
+    const initBody = (await initResponse.json()) as { key: string };
+    await storage.upload(initBody.key, await createTestImageBuffer(), file.type);
+    const claimSpy = vi.spyOn(repositories, 'claimPendingMediaUpload').mockResolvedValue(null);
+    const dateNowSpy = vi.spyOn(Date, 'now').mockReturnValueOnce(0).mockReturnValueOnce(4_000);
+
+    try {
+      const response = await requestAsAdmin(app, `/api/visits/${visitId}/images/complete`, {
+        body: JSON.stringify({ key: initBody.key, originalName: file.name }),
+        headers: { 'content-type': 'application/json' },
+        method: 'POST'
+      });
+
+      expect(response.status).toBe(422);
+      await expect(response.json()).resolves.toEqual({
+        error: 'Upload completion is already in progress. Retry shortly.'
+      });
+      expect(claimSpy).toHaveBeenCalledTimes(1);
+    } finally {
+      claimSpy.mockRestore();
+      dateNowSpy.mockRestore();
+    }
   });
 
   it('uses the final key as an upload identity for compatible repository callers', async () => {

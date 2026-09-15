@@ -48,7 +48,138 @@ describe('trip planner budget', () => {
     await expect(budget.admit('suggestions', 'client_1234567890', undefined, 0)).rejects.toThrow(
       'Trip planner provider unit cost must be a positive integer.'
     );
-    expect(database.transaction).not.toHaveBeenCalled();
+    await expect(budget.reserveProvider?.(0)).rejects.toThrow(
+      'Trip planner provider unit cost must be a positive integer.'
+    );
+    await expect(budget.reserveProvider?.(1)).resolves.toEqual({ allowed: true });
+    expect(database.transaction).toHaveBeenCalledTimes(1);
+  });
+
+  it('fails closed when provider budget storage is unavailable', async () => {
+    const database = {
+      transaction: vi.fn().mockRejectedValue(new Error('database unavailable'))
+    } as unknown as Database;
+    const budget = createTripPlannerBudget({ database });
+
+    await expect(budget.reserveProvider?.(1)).resolves.toEqual({
+      allowed: false,
+      reason: 'unavailable'
+    });
+  });
+
+  it('returns unavailable after bounded provider budget retries', async () => {
+    const database = {
+      transaction: vi.fn().mockRejectedValue(new Error('database is locked'))
+    } as unknown as Database;
+    const budget = createTripPlannerBudget({ database });
+
+    await expect(budget.reserveProvider?.(1)).resolves.toEqual({
+      allowed: false,
+      reason: 'unavailable'
+    });
+    expect(database.transaction).toHaveBeenCalledTimes(10);
+  });
+
+  it('retries request admission failures and then rethrows the lock error', async () => {
+    const database = {
+      transaction: vi.fn().mockRejectedValue(new Error('database is locked'))
+    } as unknown as Database;
+    const budget = createTripPlannerBudget({ database });
+
+    await expect(budget.admitRequest?.('suggestions', 'client_1234567890')).rejects.toThrow(
+      'database is locked'
+    );
+    expect(database.transaction).toHaveBeenCalledTimes(10);
+  });
+
+  it('rethrows unexpected request admission failures without retrying', async () => {
+    const database = {
+      transaction: vi.fn().mockRejectedValue(new Error('database unavailable'))
+    } as unknown as Database;
+    const budget = createTripPlannerBudget({ database });
+
+    await expect(budget.admitRequest?.('suggestions', 'client_1234567890')).rejects.toThrow(
+      'database unavailable'
+    );
+    expect(database.transaction).toHaveBeenCalledTimes(1);
+  });
+
+  it('enforces the shared request operation ceiling in admitRequest', async () => {
+    const testDatabase = await createTestDatabase();
+    const budget = createTripPlannerBudget({
+      database: testDatabase.database,
+      now: () => 0,
+      suggestionsPerMinute: 1
+    });
+
+    try {
+      for (let index = 0; index < 10; index += 1) {
+        await expect(
+          budget.admitRequest?.('suggestions', `client_${String(index).padStart(10, '0')}`)
+        ).resolves.toEqual({ allowed: true });
+      }
+
+      await expect(budget.admitRequest?.('suggestions', 'client_0000000010')).resolves.toEqual({
+        allowed: false,
+        retryAfterSeconds: 60
+      });
+    } finally {
+      await testDatabase.dispose();
+    }
+  });
+
+  it('rejects provider reservations that exceed the daily budget', async () => {
+    const testDatabase = await createTestDatabase();
+    const budget = createTripPlannerBudget({
+      database: testDatabase.database,
+      dailyProviderUnits: 5,
+      now: () => 0
+    });
+
+    try {
+      await expect(budget.admit('route', 'client_1234567890', undefined, 6)).resolves.toEqual({
+        allowed: false,
+        retryAfterSeconds: 86_400
+      });
+    } finally {
+      await testDatabase.dispose();
+    }
+  });
+
+  it('rejects repeated requests from one client at the client limit', async () => {
+    const testDatabase = await createTestDatabase();
+    const budget = createTripPlannerBudget({
+      database: testDatabase.database,
+      now: () => 0,
+      suggestionsPerMinute: 1
+    });
+
+    try {
+      await expect(budget.admit('suggestions', 'client_1234567890')).resolves.toEqual({
+        allowed: true
+      });
+      await expect(budget.admit('suggestions', 'client_1234567890')).resolves.toEqual({
+        allowed: false,
+        retryAfterSeconds: 60
+      });
+    } finally {
+      await testDatabase.dispose();
+    }
+  });
+
+  it('uses the route-specific operation limit for route admissions', async () => {
+    const testDatabase = await createTestDatabase();
+    const budget = createTripPlannerBudget({
+      database: testDatabase.database,
+      now: () => 0,
+      routeRequestsPerMinute: 1
+    });
+
+    try {
+      await expect(budget.admit('route', 'client_1234567890')).resolves.toEqual({ allowed: true });
+    } finally {
+      await testDatabase.dispose();
+    }
   });
 
   it('rethrows an unexpected database failure', async () => {

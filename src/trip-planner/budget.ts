@@ -356,48 +356,42 @@ export const createTripPlannerBudget = ({
 
     const dayWindow = getWindowStart(requestedAt, DAY_MS);
 
-    try {
-      for (let attempt = 0; attempt < MAX_BUDGET_DB_ATTEMPTS; attempt += 1) {
-        try {
-          await database.transaction(async (transaction) => {
-            await transaction
-              .delete(tripPlannerBudgetWindows)
-              .where(
-                lt(tripPlannerBudgetWindows.windowStartedAt, requestedAt - BUDGET_RETENTION_MS)
-              );
+    for (let attempt = 0; attempt < MAX_BUDGET_DB_ATTEMPTS; attempt += 1) {
+      try {
+        await database.transaction(async (transaction) => {
+          await transaction
+            .delete(tripPlannerBudgetWindows)
+            .where(lt(tripPlannerBudgetWindows.windowStartedAt, requestedAt - BUDGET_RETENTION_MS));
 
-            const providerAllowed = await reserveWindow(
-              transaction,
-              `provider:${dayWindow}`,
-              dayWindow,
-              providerUnits,
-              limits.dailyProviderUnits
-            );
+          const providerAllowed = await reserveWindow(
+            transaction,
+            `provider:${dayWindow}`,
+            dayWindow,
+            providerUnits,
+            limits.dailyProviderUnits
+          );
 
-            if (!providerAllowed) {
-              throw new BudgetExceededError(getRetryAfterSeconds(requestedAt, DAY_MS));
-            }
-          });
-
-          return { allowed: true };
-        } catch (error) {
-          if (error instanceof BudgetExceededError) {
-            return {
-              allowed: false,
-              reason: 'exceeded' as const,
-              retryAfterSeconds: error.retryAfterSeconds
-            };
+          if (!providerAllowed) {
+            throw new BudgetExceededError(getRetryAfterSeconds(requestedAt, DAY_MS));
           }
+        });
 
-          if (!isRetryableDatabaseError(error) || attempt === MAX_BUDGET_DB_ATTEMPTS - 1) {
-            return { allowed: false, reason: 'unavailable' as const };
-          }
-
-          await wait(10 * (attempt + 1));
+        return { allowed: true };
+      } catch (error) {
+        if (error instanceof BudgetExceededError) {
+          return {
+            allowed: false,
+            reason: 'exceeded' as const,
+            retryAfterSeconds: error.retryAfterSeconds
+          };
         }
+
+        if (!isRetryableDatabaseError(error) || attempt === MAX_BUDGET_DB_ATTEMPTS - 1) {
+          return { allowed: false, reason: 'unavailable' as const };
+        }
+
+        await wait(10 * (attempt + 1));
       }
-    } catch {
-      return { allowed: false, reason: 'unavailable' };
     }
 
     return { allowed: false, reason: 'unavailable' };

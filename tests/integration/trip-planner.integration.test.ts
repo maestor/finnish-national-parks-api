@@ -431,6 +431,29 @@ describe('trip planner route', () => {
     expect(fetchFn).toHaveBeenCalledTimes(1);
   });
 
+  it('rejects route work after the per-client budget without calling the planner', async () => {
+    const fetchFn = mockGeoapifyFetch() as typeof fetch;
+    const app = createTripPlannerApp(fetchFn, {
+      routeRequestsPerMinute: 1
+    });
+    const body = {
+      destinationQuery: 'Destination',
+      mode: 'drive',
+      originQuery: 'Origin'
+    };
+
+    const firstResponse = await requestAsRemote(app, body, {
+      'x-trip-planner-client-id': 'client_1234567890'
+    });
+    const secondResponse = await requestAsRemote(app, body, {
+      'x-trip-planner-client-id': 'client_1234567890'
+    });
+
+    expect(firstResponse.status).toBe(200);
+    expect(secondResponse.status).toBe(429);
+    expect(fetchFn).toHaveBeenCalledTimes(3);
+  });
+
   it('fails closed when the trip planner budget store errors', async () => {
     const app = createApp({
       apiKey: 'test-api-key',
@@ -458,6 +481,33 @@ describe('trip planner route', () => {
     });
   });
 
+  it('continues planner requests when request admission succeeds', async () => {
+    const suggest = vi.fn(async () => []);
+    const app = createApp({
+      apiKey: 'test-api-key',
+      database: testDatabase.database,
+      tripPlannerBudget: {
+        admit: vi.fn(),
+        admitRequest: vi.fn().mockResolvedValue({ allowed: true })
+      },
+      tripPlanner: {
+        search: vi.fn(async () => {
+          throw new Error('not used in this test');
+        }),
+        searchNearby: vi.fn(async () => {
+          throw new Error('not used in this test');
+        }),
+        suggest
+      }
+    });
+
+    const response = await requestSuggestionsAsRemote(app, { query: 'He' });
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ suggestions: [] });
+    expect(suggest).toHaveBeenCalledWith('He');
+  });
+
   it('rejects an oversized planner body before provider work', async () => {
     const fetchFn = mockGeoapifyFetch() as typeof fetch;
     const app = createTripPlannerApp(fetchFn);
@@ -476,6 +526,23 @@ describe('trip planner route', () => {
 
     expect(response.status).toBe(413);
     expect(await response.json()).toEqual({ error: 'Request body too large.' });
+    expect(fetchFn).not.toHaveBeenCalled();
+  });
+
+  it('rejects a planner request with no body before provider work', async () => {
+    const fetchFn = mockGeoapifyFetch() as typeof fetch;
+    const app = createTripPlannerApp(fetchFn);
+    const response = await app.request('/api/trip-planner/suggestions', {
+      headers: {
+        authorization: 'Bearer test-api-key',
+        'content-type': 'application/json',
+        host: 'parks.example.com'
+      },
+      method: 'POST'
+    });
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({ error: 'Request body is required.' });
     expect(fetchFn).not.toHaveBeenCalled();
   });
 
