@@ -14,6 +14,7 @@ import {
   AdminAlreadyEnrolledError,
   AdminSelfModificationError,
   acceptAdminInvitation,
+  claimPendingMediaUpload,
   completeTripStopImage,
   completeVisitImage,
   countTripStopImages,
@@ -71,10 +72,12 @@ import {
   listVisits,
   listVisitsTimeline,
   listYearReviewTimelineVisits,
+  MEDIA_UPLOAD_PROCESSING_LEASE_MS,
   publishDateRangeReviewShare,
   publishYearReviewShare,
   RepositoryNotFoundError,
   RepositoryValidationError,
+  releasePendingMediaUploadClaim,
   removeAdminUser,
   reorderTripStopImages,
   reorderVisitImages,
@@ -255,6 +258,8 @@ const LOGO_PRESIGNED_URL_TTL_SECONDS = 7 * 24 * 60 * 60;
 const MAP_PRESIGNED_URL_TTL_SECONDS = 7 * 24 * 60 * 60;
 const PUBLIC_LOGO_REDIRECT_CACHE_CONTROL = 'public, max-age=86400';
 const TRIP_PLANNER_REQUEST_BODY_LIMIT_BYTES = 16 * 1024;
+const DIRECT_IMAGE_COMPLETION_WAIT_MS = 5_000;
+const DIRECT_IMAGE_COMPLETION_POLL_MS = 50;
 
 type StoredImageCompletionMetadata =
   | {
@@ -2794,13 +2799,33 @@ export const createApp = ({
           );
         }
 
-        const pendingUpload = await findMediaUploadByUploadKey(database, key);
+        let pendingUpload = await findMediaUploadByUploadKey(database, key);
 
         if (
           pendingUpload &&
           (pendingUpload.parentId !== id || pendingUpload.parentType !== 'trip-stop')
         ) {
           return context.json({ error: 'Upload key does not belong to this trip stop.' }, 422);
+        }
+
+        if (!pendingUpload) {
+          const timestamp = new Date().toISOString();
+          const finalKeys = createFinalImageKeys('trip-stops', id);
+          await createPendingMediaUpload(database, {
+            ...finalKeys,
+            expiresAt: new Date(
+              Date.now() + DIRECT_VISIT_UPLOAD_URL_TTL_SECONDS * 1000
+            ).toISOString(),
+            parentId: id,
+            parentType: 'trip-stop',
+            timestamp,
+            uploadKey: key
+          });
+          pendingUpload = await findMediaUploadByUploadKey(database, key);
+        }
+
+        if (!pendingUpload) {
+          return context.json({ error: 'Upload could not be prepared for completion.' }, 422);
         }
 
         const objectMetadata = await storage.getObjectMetadata(key);
@@ -2816,17 +2841,70 @@ export const createApp = ({
         }
 
         try {
-          const finalizedImage = await finalizeDirectImageUpload(
-            storage,
-            key,
-            'trip-stops',
-            id,
-            pendingUpload
-              ? { fullKey: pendingUpload.fullKey, thumbKey: pendingUpload.thumbKey }
-              : undefined
-          );
+          const completionDeadline = Date.now() + DIRECT_IMAGE_COMPLETION_WAIT_MS;
+          let claimedUpload: typeof pendingUpload | null = null;
+          let processingToken: string | null = null;
+
+          while (!claimedUpload) {
+            const completedImage = await findTripStopImageByUploadKey(database, id, key);
+
+            if (completedImage) {
+              return context.json(
+                {
+                  image: await toVisitImageResponse(storage, completedImage)
+                },
+                200
+              );
+            }
+
+            const currentUpload = await findMediaUploadByUploadKey(database, key);
+
+            if (!currentUpload) {
+              return context.json({ error: 'Upload could not be prepared for completion.' }, 422);
+            }
+
+            const timestamp = new Date().toISOString();
+            processingToken = randomUUID();
+            const finalKeys = createFinalImageKeys('trip-stops', id);
+            claimedUpload = await claimPendingMediaUpload(database, {
+              expectedFullKey: currentUpload.fullKey,
+              expectedThumbKey: currentUpload.thumbKey,
+              fullKey: finalKeys.fullKey,
+              parentId: id,
+              parentType: 'trip-stop',
+              processingStartedAt: timestamp,
+              processingToken,
+              staleBefore: new Date(
+                Date.parse(timestamp) - MEDIA_UPLOAD_PROCESSING_LEASE_MS
+              ).toISOString(),
+              thumbKey: finalKeys.thumbKey,
+              timestamp,
+              uploadKey: key
+            });
+
+            if (!claimedUpload && Date.now() >= completionDeadline) {
+              return context.json(
+                { error: 'Upload completion is already in progress. Retry shortly.' },
+                422
+              );
+            }
+
+            if (!claimedUpload) {
+              await new Promise((resolve) => setTimeout(resolve, DIRECT_IMAGE_COMPLETION_POLL_MS));
+            }
+          }
+
+          const finalizedImage = await finalizeDirectImageUpload(storage, key, 'trip-stops', id, {
+            fullKey: claimedUpload.fullKey,
+            thumbKey: claimedUpload.thumbKey
+          });
 
           if (!finalizedImage.valid) {
+            await releasePendingMediaUploadClaim(database, {
+              processingToken: processingToken!,
+              timestamp: new Date().toISOString(),
+              uploadKey: key
+            });
             return context.json({ error: finalizedImage.error }, finalizedImage.status);
           }
 
@@ -2845,7 +2923,8 @@ export const createApp = ({
             thumbWidth: finalizedImage.thumbWidth,
             tripStopId: id,
             updatedAt: timestamp,
-            uploadKey: key
+            uploadKey: key,
+            processingToken: processingToken ?? undefined
           });
 
           return context.json(
@@ -3132,13 +3211,33 @@ export const createApp = ({
           );
         }
 
-        const pendingUpload = await findMediaUploadByUploadKey(database, key);
+        let pendingUpload = await findMediaUploadByUploadKey(database, key);
 
         if (
           pendingUpload &&
           (pendingUpload.parentId !== id || pendingUpload.parentType !== 'visit')
         ) {
           return context.json({ error: 'Upload key does not belong to this visit.' }, 422);
+        }
+
+        if (!pendingUpload) {
+          const timestamp = new Date().toISOString();
+          const finalKeys = createFinalImageKeys('visits', id);
+          await createPendingMediaUpload(database, {
+            ...finalKeys,
+            expiresAt: new Date(
+              Date.now() + DIRECT_VISIT_UPLOAD_URL_TTL_SECONDS * 1000
+            ).toISOString(),
+            parentId: id,
+            parentType: 'visit',
+            timestamp,
+            uploadKey: key
+          });
+          pendingUpload = await findMediaUploadByUploadKey(database, key);
+        }
+
+        if (!pendingUpload) {
+          return context.json({ error: 'Upload could not be prepared for completion.' }, 422);
         }
 
         const objectMetadata = await storage.getObjectMetadata(key);
@@ -3153,17 +3252,70 @@ export const createApp = ({
           return context.json({ error: validatedMetadata.error }, validatedMetadata.status);
         }
 
-        const finalizedImage = await finalizeDirectImageUpload(
-          storage,
-          key,
-          'visits',
-          id,
-          pendingUpload
-            ? { fullKey: pendingUpload.fullKey, thumbKey: pendingUpload.thumbKey }
-            : undefined
-        );
+        const completionDeadline = Date.now() + DIRECT_IMAGE_COMPLETION_WAIT_MS;
+        let claimedUpload: typeof pendingUpload | null = null;
+        let processingToken: string | null = null;
+
+        while (!claimedUpload) {
+          const completedImage = await findVisitImageByUploadKey(database, id, key);
+
+          if (completedImage) {
+            return context.json(
+              {
+                image: await toVisitImageResponse(storage, completedImage)
+              },
+              200
+            );
+          }
+
+          const currentUpload = await findMediaUploadByUploadKey(database, key);
+
+          if (!currentUpload) {
+            return context.json({ error: 'Upload could not be prepared for completion.' }, 422);
+          }
+
+          const timestamp = new Date().toISOString();
+          processingToken = randomUUID();
+          const finalKeys = createFinalImageKeys('visits', id);
+          claimedUpload = await claimPendingMediaUpload(database, {
+            expectedFullKey: currentUpload.fullKey,
+            expectedThumbKey: currentUpload.thumbKey,
+            fullKey: finalKeys.fullKey,
+            parentId: id,
+            parentType: 'visit',
+            processingStartedAt: timestamp,
+            processingToken,
+            staleBefore: new Date(
+              Date.parse(timestamp) - MEDIA_UPLOAD_PROCESSING_LEASE_MS
+            ).toISOString(),
+            thumbKey: finalKeys.thumbKey,
+            timestamp,
+            uploadKey: key
+          });
+
+          if (!claimedUpload && Date.now() >= completionDeadline) {
+            return context.json(
+              { error: 'Upload completion is already in progress. Retry shortly.' },
+              422
+            );
+          }
+
+          if (!claimedUpload) {
+            await new Promise((resolve) => setTimeout(resolve, DIRECT_IMAGE_COMPLETION_POLL_MS));
+          }
+        }
+
+        const finalizedImage = await finalizeDirectImageUpload(storage, key, 'visits', id, {
+          fullKey: claimedUpload.fullKey,
+          thumbKey: claimedUpload.thumbKey
+        });
 
         if (!finalizedImage.valid) {
+          await releasePendingMediaUploadClaim(database, {
+            processingToken: processingToken!,
+            timestamp: new Date().toISOString(),
+            uploadKey: key
+          });
           return context.json({ error: finalizedImage.error }, finalizedImage.status);
         }
 
@@ -3182,6 +3334,7 @@ export const createApp = ({
           thumbWidth: finalizedImage.thumbWidth,
           updatedAt: timestamp,
           uploadKey: key,
+          processingToken: processingToken ?? undefined,
           visitId: id
         });
 

@@ -242,6 +242,8 @@ export const mediaUploads = sqliteTable(
     uploadKey: text('upload_key').notNull(),
     fullKey: text('full_key').notNull(),
     thumbKey: text('thumb_key').notNull(),
+    processingToken: text('processing_token'),
+    processingStartedAt: text('processing_started_at'),
     expiresAt: text('expires_at').notNull(),
     settledAt: text('settled_at'),
     createdAt: text('created_at').notNull(),
