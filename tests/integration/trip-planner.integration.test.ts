@@ -479,6 +479,100 @@ describe('trip planner route', () => {
     expect(fetchFn).not.toHaveBeenCalled();
   });
 
+  it('counts actual planner request bytes when content length is missing or inaccurate', async () => {
+    const fetchFn = mockGeoapifyFetch() as typeof fetch;
+    const app = createTripPlannerApp(fetchFn);
+    const validBody = JSON.stringify({ query: 'He' });
+    const paddedBody = `${validBody}${' '.repeat(
+      16 * 1024 - new TextEncoder().encode(validBody).byteLength
+    )}`;
+
+    const exactResponse = await app.fetch(
+      new Request('http://parks.example.com/api/trip-planner/suggestions', {
+        body: paddedBody,
+        headers: {
+          authorization: 'Bearer test-api-key',
+          'content-type': 'application/json',
+          host: 'parks.example.com'
+        },
+        method: 'POST'
+      })
+    );
+    const overLimitBody = `${paddedBody}x`;
+    const overLimitResponse = await app.fetch(
+      new Request('http://parks.example.com/api/trip-planner/suggestions', {
+        body: overLimitBody,
+        headers: {
+          authorization: 'Bearer test-api-key',
+          'content-length': '1',
+          'content-type': 'application/json',
+          host: 'parks.example.com'
+        },
+        method: 'POST'
+      })
+    );
+
+    expect(exactResponse.status).toBe(200);
+    expect(overLimitResponse.status).toBe(413);
+    expect(fetchFn).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects a multi-chunk planner stream that exceeds the limit before validation', async () => {
+    const fetchFn = mockGeoapifyFetch() as typeof fetch;
+    const app = createTripPlannerApp(fetchFn);
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new Uint8Array(8 * 1024));
+        controller.enqueue(new Uint8Array(8 * 1024));
+        controller.enqueue(new Uint8Array(1));
+        controller.close();
+      }
+    });
+
+    const response = await app.fetch(
+      new Request('http://parks.example.com/api/trip-planner/suggestions', {
+        body,
+        headers: {
+          authorization: 'Bearer test-api-key',
+          'content-type': 'application/json',
+          host: 'parks.example.com'
+        },
+        method: 'POST',
+        duplex: 'half'
+      } as RequestInit & { duplex: 'half' })
+    );
+
+    expect(response.status).toBe(413);
+    expect(fetchFn).not.toHaveBeenCalled();
+  });
+
+  it('returns a client error when the planner request stream fails', async () => {
+    const fetchFn = mockGeoapifyFetch() as typeof fetch;
+    const app = createTripPlannerApp(fetchFn);
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.error(new Error('broken request stream'));
+      }
+    });
+
+    const response = await app.fetch(
+      new Request('http://parks.example.com/api/trip-planner/suggestions', {
+        body,
+        headers: {
+          authorization: 'Bearer test-api-key',
+          'content-type': 'application/json',
+          host: 'parks.example.com'
+        },
+        method: 'POST',
+        duplex: 'half'
+      } as RequestInit & { duplex: 'half' })
+    );
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ error: 'Unable to read request body.' });
+    expect(fetchFn).not.toHaveBeenCalled();
+  });
+
   it('shares the provider budget across app instances', async () => {
     const firstFetch = mockGeoapifyFetch();
     const secondFetch = mockGeoapifyFetch();

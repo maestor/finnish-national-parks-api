@@ -60,6 +60,16 @@ describe('createMemoryStorage', () => {
     await expect(storage.getObject('missing.jpg')).resolves.toBeNull();
   });
 
+  it('enforces a maximum object read size', async () => {
+    const storage = createMemoryStorage();
+
+    await storage.upload('oversized.jpg', Buffer.from('photo'), 'image/jpeg');
+
+    await expect(storage.getObject('oversized.jpg', { maxBytes: 4 })).rejects.toThrow(
+      'Stored object exceeds the configured read limit.'
+    );
+  });
+
   it('lists objects by prefix in pages with object metadata', async () => {
     const storage = createMemoryStorage();
     await storage.upload('visits/a.jpg', Buffer.from('a'), 'image/jpeg');

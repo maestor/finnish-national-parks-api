@@ -67,6 +67,8 @@ const createBackfillDerivativeKeys = (record: LegacyImageDerivativeRecord) => {
   };
 };
 
+const MAX_IMAGE_SOURCE_BYTES = 15 * 1024 * 1024;
+
 const advanceCursor = (
   cursor: ImageDerivativeBackfillCursor,
   record: LegacyImageDerivativeRecord
@@ -111,7 +113,7 @@ export const runImageDerivativeBackfill = async ({
 
       if (!dryRun) {
         const sourceBuffer = await retryTransientStorageOperation(() =>
-          storage.getObject(record.sourceKey)
+          storage.getObject(record.sourceKey, { maxBytes: MAX_IMAGE_SOURCE_BYTES })
         );
 
         if (!sourceBuffer) {

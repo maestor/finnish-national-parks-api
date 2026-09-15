@@ -1,4 +1,4 @@
-import type { StorageClient } from './types.js';
+import { type StorageClient, StorageObjectTooLargeError } from './types.js';
 
 export const createMemoryStorage = (): StorageClient & { getStore(): Map<string, Buffer> } => {
   const store = new Map<string, Buffer>();
@@ -23,8 +23,13 @@ export const createMemoryStorage = (): StorageClient & { getStore(): Map<string,
         contentType: metadata.contentType
       };
     },
-    getObject: async (key: string) => {
+    getObject: async (key: string, options) => {
       const object = store.get(key);
+
+      if (object && options?.maxBytes !== undefined && object.length > options.maxBytes) {
+        throw new StorageObjectTooLargeError();
+      }
+
       return object ? Buffer.from(object) : null;
     },
     getPresignedUrl: async (key: string) => {

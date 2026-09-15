@@ -206,7 +206,11 @@ import {
   publishYearReviewRoute,
   unpublishYearReviewRoute
 } from './routes/year-review.js';
-import type { StorageClient, StoredObjectMetadata } from './storage/types.js';
+import {
+  type StorageClient,
+  StorageObjectTooLargeError,
+  type StoredObjectMetadata
+} from './storage/types.js';
 import {
   createTripPlannerBudget,
   getTripPlannerClientId,
@@ -259,6 +263,52 @@ const PUBLIC_LOGO_REDIRECT_CACHE_CONTROL = 'public, max-age=86400';
 const TRIP_PLANNER_REQUEST_BODY_LIMIT_BYTES = 16 * 1024;
 const DIRECT_IMAGE_COMPLETION_WAIT_MS = 5_000;
 const DIRECT_IMAGE_COMPLETION_POLL_MS = 50;
+
+const readRequestBodyWithinLimit = async (request: Request, maxBytes: number) => {
+  if (!request.body) {
+    return undefined;
+  }
+
+  const reader = request.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let totalBytes = 0;
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+
+      if (done) {
+        const body = new Uint8Array(totalBytes);
+        let offset = 0;
+        for (const chunk of chunks) {
+          body.set(chunk, offset);
+          offset += chunk.byteLength;
+        }
+
+        return body.buffer;
+      }
+
+      totalBytes += value.byteLength;
+      if (totalBytes > maxBytes) {
+        try {
+          await reader.cancel();
+        } catch {
+          // The source may already be errored after the limit was reached.
+        }
+        return 'too_large' as const;
+      }
+
+      chunks.push(value);
+    }
+  } catch {
+    try {
+      await reader.cancel();
+    } catch {
+      // Preserve the stable client error when cancellation races with a stream failure.
+    }
+    return 'read_error' as const;
+  }
+};
 
 type StoredImageCompletionMetadata =
   | {
@@ -832,7 +882,19 @@ const finalizeDirectImageUpload = async (
   parentId: number,
   finalKeys = createFinalImageKeys(parentPrefix, parentId)
 ): Promise<DirectImageFinalization> => {
-  const sourceBuffer = await storage.getObject(key);
+  let sourceBuffer: Buffer | null;
+  try {
+    sourceBuffer = await storage.getObject(key, {
+      maxBytes: MAX_VISIT_IMAGE_FILE_SIZE,
+      timeoutMs: 10_000
+    });
+  } catch (error) {
+    if (error instanceof StorageObjectTooLargeError) {
+      return { error: 'File too large.', status: 413, valid: false };
+    }
+
+    throw error;
+  }
 
   if (!sourceBuffer || sourceBuffer.length === 0) {
     return { error: 'Upload is missing from storage.', status: 422, valid: false };
@@ -1115,6 +1177,25 @@ export const createApp = ({
     if (Number.isFinite(contentLength) && contentLength > TRIP_PLANNER_REQUEST_BODY_LIMIT_BYTES) {
       context.header('Cache-Control', PRIVATE_CACHE_CONTROL);
       return context.json({ error: 'Request body too large.' }, 413);
+    }
+
+    const body = await readRequestBodyWithinLimit(
+      context.req.raw,
+      TRIP_PLANNER_REQUEST_BODY_LIMIT_BYTES
+    );
+
+    if (body === 'too_large') {
+      context.header('Cache-Control', PRIVATE_CACHE_CONTROL);
+      return context.json({ error: 'Request body too large.' }, 413);
+    }
+
+    if (body === 'read_error') {
+      context.header('Cache-Control', PRIVATE_CACHE_CONTROL);
+      return context.json({ error: 'Unable to read request body.' }, 400);
+    }
+
+    if (body) {
+      context.req.raw = new Request(context.req.raw, { body });
     }
 
     await next();
