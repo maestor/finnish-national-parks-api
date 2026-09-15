@@ -41,6 +41,16 @@ The deployment guardrail test for this lives in `tests/integration/vercel-entry.
 - Use `npm run db:verify-backup -- <local-backup.db>` to test that a downloaded backup restores into a temporary local database without reading production configuration. The complete drill and outstanding operator controls are in [docs/recovery.md](./recovery.md).
 - Keep the current hardening priorities in [docs/security.md](./security.md).
 
+## Resource Baseline
+
+Run `npm run test -- tests/integration/resource-baseline.integration.test.ts` to reproduce the
+deterministic O4 baseline. The test seeds 20 synthetic parks, a 20-visit trip, and a 13-image
+gallery, then measures public JSON bytes, ETag-hit query counts, gallery-page query counts, and
+stored full-versus-thumbnail bytes through the real Hono boundary. The absolute budgets live next
+to the fixture in the test; a deliberately inflated fixture should fail those assertions. Browser
+request and transfer measurements require an authorized production-mode runtime and are tracked
+separately from this CI gate.
+
 ## Branch And PR Workflow
 
 - Create a dedicated branch for every change: `feature/<name>`, `bugfix/<name>`, `chore/<name>`, `docs/<name>`, etc.
