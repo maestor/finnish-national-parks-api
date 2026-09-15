@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Env } from '../../src/env.js';
 import {
   createAuthConfig,
@@ -6,6 +6,7 @@ import {
   createStorage,
   createTripPlanner
 } from '../../src/runtime.js';
+import type { TripPlannerBudget } from '../../src/trip-planner/budget.js';
 
 const createEnv = (overrides: Partial<Env> = {}): Env => {
   return {
@@ -32,6 +33,10 @@ const createEnv = (overrides: Partial<Env> = {}): Env => {
 };
 
 describe('runtime helpers', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   it('creates memory storage only when explicitly enabled', async () => {
     const memoryStorage = createStorage(createEnv({ MEMORY_STORAGE: 'true' }));
     const noStorage = createStorage(createEnv());
@@ -146,5 +151,65 @@ describe('runtime helpers', () => {
     expect(typeof tripPlanner?.search).toBe('function');
     expect(typeof tripPlanner?.searchNearby).toBe('function');
     expect(typeof tripPlanner?.suggest).toBe('function');
+  });
+
+  it('admission-gates Geoapify provider work through the shared budget', async () => {
+    const fetchFn = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ results: [] }), {
+        headers: { 'content-type': 'application/json' },
+        status: 200
+      })
+    );
+    vi.stubGlobal('fetch', fetchFn);
+
+    const createBudget = (
+      reservation: Awaited<ReturnType<NonNullable<TripPlannerBudget['reserveProvider']>>>
+    ) => {
+      return {
+        reserveProvider: vi.fn().mockResolvedValue(reservation)
+      } as unknown as TripPlannerBudget;
+    };
+
+    const allowedPlanner = createTripPlanner(
+      createEnv({ GEOAPIFY_API_KEY: 'geoapify-key' }),
+      {} as never,
+      createBudget({ allowed: true })
+    );
+    await expect(allowedPlanner?.suggest('Helsinki')).resolves.toEqual([]);
+    await expect(
+      allowedPlanner?.buildRoundTripRoute?.({
+        mode: 'drive',
+        waypoints: [
+          { coordinate: { lat: 60.17, lon: 24.93 }, displayName: 'Origin', label: 'Origin' },
+          {
+            coordinate: { lat: 60.18, lon: 25.01 },
+            displayName: 'Destination',
+            label: 'Destination'
+          }
+        ]
+      })
+    ).rejects.toMatchObject({ code: 'provider_unavailable', status: 503 });
+
+    const exceededPlanner = createTripPlanner(
+      createEnv({ GEOAPIFY_API_KEY: 'geoapify-key' }),
+      {} as never,
+      createBudget({ allowed: false, reason: 'exceeded', retryAfterSeconds: 42 })
+    );
+    await expect(exceededPlanner?.suggest('Helsinki')).rejects.toMatchObject({
+      code: 'trip_planner_budget_exceeded',
+      status: 429
+    });
+
+    const unavailablePlanner = createTripPlanner(
+      createEnv({ GEOAPIFY_API_KEY: 'geoapify-key' }),
+      {} as never,
+      createBudget({ allowed: false, reason: 'unavailable' })
+    );
+    await expect(unavailablePlanner?.suggest('Helsinki')).rejects.toMatchObject({
+      code: 'trip_planner_budget_unavailable',
+      status: 503
+    });
+
+    expect(fetchFn).toHaveBeenCalledTimes(2);
   });
 });

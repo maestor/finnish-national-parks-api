@@ -2,6 +2,7 @@ import type { Database } from '../db/database.js';
 import { listTripPlannerCandidateParks } from '../db/repositories.js';
 import { createSlug } from '../parks/park-normalization.js';
 import { isTrailTypeSlug } from '../parks/park-types.js';
+import { TripPlannerBudgetError } from './budget.js';
 import {
   boundingBoxesIntersect,
   expandBoundingBoxByKm,
@@ -38,6 +39,8 @@ type TripPlannerErrorCode =
   | 'origin_not_found'
   | 'provider_unavailable'
   | 'route_not_found'
+  | 'trip_planner_budget_exceeded'
+  | 'trip_planner_budget_unavailable'
   | 'trip_planner_not_configured';
 
 type CreateTripPlannerServiceOptions = {
@@ -53,12 +56,12 @@ export class TripPlannerError extends Error {
   code: TripPlannerErrorCode;
   details?: TripPlannerErrorDetails | undefined;
   routeFailure?: TripPlannerRouteFailure | undefined;
-  status: 422 | 503;
+  status: 422 | 429 | 503;
 
   constructor(
     code: TripPlannerErrorCode,
     message: string,
-    status: 422 | 503,
+    status: 422 | 429 | 503,
     details?: TripPlannerErrorDetails
   ) {
     super(message);
@@ -259,6 +262,18 @@ const createProviderUnavailableError = () => {
   return new TripPlannerError('provider_unavailable', 'Trip planner provider is unavailable.', 503);
 };
 
+const rethrowPlannerError = (error: unknown): never => {
+  if (error instanceof TripPlannerError) {
+    throw error;
+  }
+
+  if (error instanceof TripPlannerBudgetError) {
+    throw new TripPlannerError(error.code, error.message, error.status);
+  }
+
+  throw createProviderUnavailableError();
+};
+
 const suggestLocations = async (
   provider: TripPlannerProvider,
   query: string
@@ -266,11 +281,7 @@ const suggestLocations = async (
   try {
     return await provider.suggest(query);
   } catch (error) {
-    if (error instanceof TripPlannerError) {
-      throw error;
-    }
-
-    throw createProviderUnavailableError();
+    return rethrowPlannerError(error);
   }
 };
 
@@ -449,11 +460,7 @@ const buildRoundTripRoute = async (
       waypointCount: effectiveWaypoints.length
     };
   } catch (error) {
-    if (error instanceof TripPlannerError) {
-      throw error;
-    }
-
-    throw createProviderUnavailableError();
+    return rethrowPlannerError(error);
   }
 };
 
@@ -639,11 +646,7 @@ export const createTripPlannerService = ({
           }
         };
       } catch (error) {
-        if (error instanceof TripPlannerError) {
-          throw error;
-        }
-
-        throw createProviderUnavailableError();
+        return rethrowPlannerError(error);
       }
     },
     searchNearby: async ({
@@ -695,11 +698,7 @@ export const createTripPlannerService = ({
           }
         };
       } catch (error) {
-        if (error instanceof TripPlannerError) {
-          throw error;
-        }
-
-        throw createProviderUnavailableError();
+        return rethrowPlannerError(error);
       }
     }
   };

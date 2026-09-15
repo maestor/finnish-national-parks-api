@@ -8,6 +8,7 @@ import { mediaUploads, tripStopImages } from '../../src/db/schema.js';
 import { createSessionToken } from '../../src/http/session.js';
 import { importParks } from '../../src/importer/import-parks.js';
 import { createMemoryStorage } from '../../src/storage/memory-storage.js';
+import type { StorageClient } from '../../src/storage/types.js';
 import { createLipasPark } from '../fixtures/lipas.js';
 import { createTestDatabase } from '../helpers/test-db.js';
 
@@ -322,6 +323,48 @@ describe('Trip stop image routes', () => {
     expect(completeBody.image.thumbWidth).toBe(480);
   });
 
+  it('returns 200 when trip stop completion persistence reports an existing image', async () => {
+    const { stopId } = await createTripStopFixture();
+    const app = createAuthedApp({ allowServerImageUploads: false, storage });
+    const firstFile = new File([await createTestImageBuffer()], 'first.jpg', {
+      type: 'image/jpeg'
+    });
+    const firstPlan = await createDirectUploadPlan(stopId, firstFile, app);
+    const firstKey = ((await firstPlan.json()) as { key: string }).key;
+    await storage.upload(firstKey, await createTestImageBuffer(), firstFile.type);
+    await requestAsAdmin(app, `/api/trip-stops/${stopId}/images/complete`, {
+      body: JSON.stringify({ key: firstKey, originalName: firstFile.name }),
+      headers: { 'content-type': 'application/json' },
+      method: 'POST'
+    });
+    const [existingImage] = await testDatabase.database
+      .select()
+      .from(tripStopImages)
+      .where(eq(tripStopImages.tripStopId, stopId));
+    const secondFile = new File([await createTestImageBuffer()], 'second.jpg', {
+      type: 'image/jpeg'
+    });
+    const secondPlan = await createDirectUploadPlan(stopId, secondFile, app);
+    const secondKey = ((await secondPlan.json()) as { key: string }).key;
+    await storage.upload(secondKey, await createTestImageBuffer(), secondFile.type);
+    const completeSpy = vi
+      .spyOn(repositories, 'completeTripStopImage')
+      .mockResolvedValue({ created: false, row: existingImage! });
+
+    try {
+      const response = await requestAsAdmin(app, `/api/trip-stops/${stopId}/images/complete`, {
+        body: JSON.stringify({ key: secondKey, originalName: secondFile.name }),
+        headers: { 'content-type': 'application/json' },
+        method: 'POST'
+      });
+
+      expect(response.status).toBe(200);
+      expect(completeSpy).toHaveBeenCalledTimes(1);
+    } finally {
+      completeSpy.mockRestore();
+    }
+  });
+
   it('completes a valid staged trip stop upload that predates the upload ledger', async () => {
     const { stopId } = await createTripStopFixture();
     const key = `trip-stops/${stopId}/staged/pre-ledger.jpg`;
@@ -368,6 +411,218 @@ describe('Trip stop image routes', () => {
     expect([firstResponse.status, retryResponse.status].sort()).toEqual([200, 201]);
     expect(firstBody.image.id).toBe(retryBody.image.id);
     expect(rows).toHaveLength(1);
+  });
+
+  it('returns 422 when a newly created trip stop upload ledger row cannot be read back', async () => {
+    const { stopId } = await createTripStopFixture();
+    const file = new File([await createTestImageBuffer()], 'missing-ledger.jpg', {
+      type: 'image/jpeg'
+    });
+    const app = createAuthedApp({ allowServerImageUploads: false, storage });
+    const initResponse = await createDirectUploadPlan(stopId, file, app);
+    const initBody = (await initResponse.json()) as { key: string };
+    const findSpy = vi.spyOn(repositories, 'findMediaUploadByUploadKey').mockResolvedValue(null);
+    const createSpy = vi
+      .spyOn(repositories, 'createPendingMediaUpload')
+      .mockResolvedValue(undefined);
+
+    try {
+      const response = await requestAsAdmin(app, `/api/trip-stops/${stopId}/images/complete`, {
+        body: JSON.stringify({ key: initBody.key, originalName: file.name }),
+        headers: { 'content-type': 'application/json' },
+        method: 'POST'
+      });
+
+      expect(response.status).toBe(422);
+      await expect(response.json()).resolves.toEqual({
+        error: 'Upload could not be prepared for completion.'
+      });
+    } finally {
+      findSpy.mockRestore();
+      createSpy.mockRestore();
+    }
+  });
+
+  it('returns 422 when the trip stop upload ledger disappears before claiming completion', async () => {
+    const { stopId } = await createTripStopFixture();
+    const file = new File([await createTestImageBuffer()], 'missing-during-claim.jpg', {
+      type: 'image/jpeg'
+    });
+    const app = createAuthedApp({ allowServerImageUploads: false, storage });
+    const initResponse = await createDirectUploadPlan(stopId, file, app);
+    const initBody = (await initResponse.json()) as { key: string };
+    const pendingUpload = await repositories.findMediaUploadByUploadKey(
+      testDatabase.database,
+      initBody.key
+    );
+    await storage.upload(initBody.key, await createTestImageBuffer(), file.type);
+    const findSpy = vi
+      .spyOn(repositories, 'findMediaUploadByUploadKey')
+      .mockResolvedValueOnce(pendingUpload)
+      .mockResolvedValueOnce(null);
+
+    try {
+      const response = await requestAsAdmin(app, `/api/trip-stops/${stopId}/images/complete`, {
+        body: JSON.stringify({ key: initBody.key, originalName: file.name }),
+        headers: { 'content-type': 'application/json' },
+        method: 'POST'
+      });
+
+      expect(response.status).toBe(422);
+      await expect(response.json()).resolves.toEqual({
+        error: 'Upload could not be prepared for completion.'
+      });
+    } finally {
+      findSpy.mockRestore();
+    }
+  });
+
+  it('returns 422 when another trip stop completion keeps the processing claim', async () => {
+    const { stopId } = await createTripStopFixture();
+    const file = new File([await createTestImageBuffer()], 'claim-in-progress.jpg', {
+      type: 'image/jpeg'
+    });
+    const app = createAuthedApp({ allowServerImageUploads: false, storage });
+    const initResponse = await createDirectUploadPlan(stopId, file, app);
+    const initBody = (await initResponse.json()) as { key: string };
+    await storage.upload(initBody.key, await createTestImageBuffer(), file.type);
+    const claimSpy = vi.spyOn(repositories, 'claimPendingMediaUpload').mockResolvedValue(null);
+    const dateNowSpy = vi.spyOn(Date, 'now').mockReturnValueOnce(0).mockReturnValueOnce(4_000);
+
+    try {
+      const response = await requestAsAdmin(app, `/api/trip-stops/${stopId}/images/complete`, {
+        body: JSON.stringify({ key: initBody.key, originalName: file.name }),
+        headers: { 'content-type': 'application/json' },
+        method: 'POST'
+      });
+
+      expect(response.status).toBe(422);
+      await expect(response.json()).resolves.toEqual({
+        error: 'Upload completion is already in progress. Retry shortly.'
+      });
+      expect(claimSpy).toHaveBeenCalledTimes(1);
+    } finally {
+      claimSpy.mockRestore();
+      dateNowSpy.mockRestore();
+    }
+  });
+
+  it('keeps the first published derivatives immutable when completion races across app instances', async () => {
+    const { stopId } = await createTripStopFixture();
+    const firstImage = await createTestImageBuffer(800, 600);
+    const secondImage = await createTestImageBuffer(400, 300);
+    const file = new File([firstImage], 'race.jpg', { type: 'image/jpeg' });
+    const baseStorage = createMemoryStorage();
+    const stagedReadGate = (() => {
+      let resolveGate: (() => void) | undefined;
+      const promise = new Promise<void>((resolve) => {
+        resolveGate = resolve;
+      });
+      return { promise, resolve: () => resolveGate?.() };
+    })();
+    const winnerUploadGate = (() => {
+      let resolveGate: (() => void) | undefined;
+      const promise = new Promise<void>((resolve) => {
+        resolveGate = resolve;
+      });
+      return { promise, resolve: () => resolveGate?.() };
+    })();
+    let stagedReads = 0;
+    let stagedMetadataReads = 0;
+    let fullUploads = 0;
+    const controlledStorage: StorageClient = {
+      ...baseStorage,
+      getObjectMetadata: async (key) => {
+        if (key.includes('/staged/')) {
+          stagedMetadataReads += 1;
+        }
+
+        return baseStorage.getObjectMetadata(key);
+      },
+      getObject: async (key) => {
+        if (key.includes('/staged/')) {
+          stagedReads += 1;
+          if (stagedReads === 2) {
+            await stagedReadGate.promise;
+            return Buffer.from(secondImage);
+          }
+
+          return Buffer.from(firstImage);
+        }
+
+        return baseStorage.getObject(key);
+      },
+      upload: async (key, buffer, contentType) => {
+        if (key.endsWith('-full.jpg')) {
+          fullUploads += 1;
+          if (fullUploads === 1) {
+            await winnerUploadGate.promise;
+          }
+        }
+
+        await baseStorage.upload(key, buffer, contentType);
+      }
+    };
+    const firstApp = createAuthedApp({
+      allowServerImageUploads: false,
+      storage: controlledStorage
+    });
+    const secondApp = createAuthedApp({
+      allowServerImageUploads: false,
+      storage: controlledStorage
+    });
+    const initResponse = await createDirectUploadPlan(stopId, file, firstApp);
+    const initBody = (await initResponse.json()) as { key: string };
+
+    await baseStorage.upload(initBody.key, firstImage, file.type);
+
+    const complete = (app: ReturnType<typeof createApp>) =>
+      requestAsAdmin(app, `/api/trip-stops/${stopId}/images/complete`, {
+        body: JSON.stringify({ key: initBody.key, originalName: file.name }),
+        headers: { 'content-type': 'application/json' },
+        method: 'POST'
+      });
+    const firstResponsePromise = complete(firstApp);
+
+    while (fullUploads < 1) {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    }
+
+    const secondResponsePromise = complete(secondApp);
+    while (stagedMetadataReads < 2) {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    }
+
+    winnerUploadGate.resolve();
+    const firstResponse = await firstResponsePromise;
+    stagedReadGate.resolve();
+    const secondResponse = await secondResponsePromise;
+    const [firstBody, secondBody] = (await Promise.all([
+      firstResponse.json(),
+      secondResponse.json()
+    ])) as [
+      { image: { fullHeight: number; fullWidth: number; id: number } },
+      { image: { id: number } }
+    ];
+    const [row] = await testDatabase.database
+      .select()
+      .from(tripStopImages)
+      .where(eq(tripStopImages.tripStopId, stopId));
+
+    expect([firstResponse.status, secondResponse.status].sort()).toEqual([200, 201]);
+    expect(firstBody.image.id).toBe(secondBody.image.id);
+    expect(firstBody.image.fullWidth).toBe(800);
+    expect(firstBody.image.fullHeight).toBe(600);
+    expect(fullUploads).toBe(1);
+    expect(row).toHaveProperty('fullKey');
+    expect((await sharp((await baseStorage.getObject(row!.fullKey))!).metadata()).width).toBe(800);
+    expect((await sharp((await baseStorage.getObject(row!.fullKey))!).metadata()).height).toBe(600);
+    expect(
+      await testDatabase.database
+        .select()
+        .from(tripStopImages)
+        .where(eq(tripStopImages.tripStopId, stopId))
+    ).toHaveLength(1);
   });
 
   it('returns the completed trip stop image when its staged upload has already been removed', async () => {
@@ -855,6 +1110,51 @@ describe('Trip stop image routes', () => {
     });
 
     expect(result).toMatchObject({ created: true, row: { uploadKey: fullKey } });
+  });
+
+  it('rejects completion when the processing claim has expired', async () => {
+    const { stopId } = await createTripStopFixture();
+
+    await expect(
+      repositories.completeTripStopImage(testDatabase.database, {
+        createdAt: '2026-05-01T09:00:00.000Z',
+        displayOrder: 0,
+        fullKey: `trip-stops/${stopId}/final/expired-full.jpg`,
+        mimeType: 'image/jpeg',
+        processingToken: 'expired-token',
+        thumbKey: `trip-stops/${stopId}/final/expired-thumb.jpg`,
+        uploadKey: `trip-stops/${stopId}/staged/expired.jpg`,
+        tripStopId: stopId,
+        updatedAt: '2026-05-01T09:00:00.000Z'
+      })
+    ).rejects.toThrow('Upload completion claim expired');
+  });
+
+  it('returns the existing image when a retry presents an expired processing claim', async () => {
+    const { stopId } = await createTripStopFixture();
+    const uploadKey = `trip-stops/${stopId}/staged/retry-existing.jpg`;
+    const values = {
+      createdAt: '2026-05-01T09:00:00.000Z',
+      displayOrder: 0,
+      fullKey: `trip-stops/${stopId}/final/retry-existing-full.jpg`,
+      mimeType: 'image/jpeg' as const,
+      thumbKey: `trip-stops/${stopId}/final/retry-existing-thumb.jpg`,
+      tripStopId: stopId,
+      uploadKey,
+      updatedAt: '2026-05-01T09:00:00.000Z'
+    };
+    await repositories.completeTripStopImage(testDatabase.database, values);
+
+    await expect(
+      repositories.completeTripStopImage(testDatabase.database, values)
+    ).resolves.toMatchObject({ created: false, row: { uploadKey } });
+
+    await expect(
+      repositories.completeTripStopImage(testDatabase.database, {
+        ...values,
+        processingToken: 'expired-token'
+      })
+    ).resolves.toMatchObject({ created: false, row: { uploadKey } });
   });
 
   it('rejects a seventh trip stop image', async () => {

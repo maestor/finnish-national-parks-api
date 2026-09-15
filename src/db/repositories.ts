@@ -49,6 +49,7 @@ import {
 } from './schema.js';
 
 export const MEDIA_CLEANUP_GRACE_PERIOD_MS = 8 * 24 * 60 * 60 * 1000;
+export const MEDIA_UPLOAD_PROCESSING_LEASE_MS = 2 * 60 * 1000;
 
 export type MediaUploadParentType = 'trip-stop' | 'visit';
 
@@ -92,16 +93,16 @@ export const createPendingMediaUpload = async (
     uploadKey: string;
   }
 ) => {
-  await database.insert(mediaUploads).values({
-    createdAt: input.timestamp,
-    expiresAt: input.expiresAt,
-    fullKey: input.fullKey,
-    parentId: input.parentId,
-    parentType: input.parentType,
-    thumbKey: input.thumbKey,
-    updatedAt: input.timestamp,
-    uploadKey: input.uploadKey
-  });
+  await database.run(sql`
+    INSERT INTO media_uploads (
+      parent_type, parent_id, upload_key, full_key, thumb_key,
+      expires_at, created_at, updated_at
+    ) VALUES (
+      ${input.parentType}, ${input.parentId}, ${input.uploadKey}, ${input.fullKey}, ${input.thumbKey},
+      ${input.expiresAt}, ${input.timestamp}, ${input.timestamp}
+    )
+    ON CONFLICT(upload_key) DO NOTHING
+  `);
 };
 
 export const findMediaUploadByUploadKey = async (database: DbClient, uploadKey: string) => {
@@ -114,11 +115,99 @@ export const findMediaUploadByUploadKey = async (database: DbClient, uploadKey: 
   return rows[0] ?? null;
 };
 
-const settleMediaUpload = async (database: DbClient, uploadKey: string, timestamp: string) => {
+export const claimPendingMediaUpload = async (
+  database: Database,
+  input: {
+    expectedFullKey: string;
+    expectedThumbKey: string;
+    fullKey: string;
+    parentId: number;
+    parentType: MediaUploadParentType;
+    processingStartedAt: string;
+    processingToken: string;
+    staleBefore: string;
+    thumbKey: string;
+    timestamp: string;
+    uploadKey: string;
+  }
+) => {
+  return database.transaction(async (transaction) => {
+    const result = await transaction.run(sql`
+      UPDATE media_uploads
+      SET
+        full_key = ${input.fullKey},
+        thumb_key = ${input.thumbKey},
+        processing_token = ${input.processingToken},
+        processing_started_at = ${input.processingStartedAt},
+        updated_at = ${input.timestamp}
+      WHERE upload_key = ${input.uploadKey}
+        AND parent_type = ${input.parentType}
+        AND parent_id = ${input.parentId}
+        AND settled_at IS NULL
+        AND full_key = ${input.expectedFullKey}
+        AND thumb_key = ${input.expectedThumbKey}
+        AND (
+          processing_token IS NULL
+          OR processing_started_at IS NULL
+          OR processing_started_at <= ${input.staleBefore}
+        )
+    `);
+
+    if (Number(result.rowsAffected) === 0) {
+      return null;
+    }
+
+    await enqueueMediaCleanup(
+      transaction,
+      [input.expectedFullKey, input.expectedThumbKey],
+      input.timestamp
+    );
+
+    return findMediaUploadByUploadKey(transaction, input.uploadKey);
+  });
+};
+
+export const releasePendingMediaUploadClaim = async (
+  database: DbClient,
+  input: { processingToken: string; timestamp: string; uploadKey: string }
+) => {
+  await database
+    .update(mediaUploads)
+    .set({
+      processingStartedAt: null,
+      processingToken: null,
+      updatedAt: input.timestamp
+    })
+    .where(
+      and(
+        eq(mediaUploads.processingToken, input.processingToken),
+        eq(mediaUploads.uploadKey, input.uploadKey)
+      )
+    );
+};
+
+const settleMediaUpload = async (
+  database: DbClient,
+  uploadKey: string,
+  timestamp: string,
+  processingToken?: string | undefined
+) => {
   const result = await database
     .update(mediaUploads)
-    .set({ settledAt: timestamp, updatedAt: timestamp })
-    .where(eq(mediaUploads.uploadKey, uploadKey));
+    .set({
+      processingStartedAt: null,
+      processingToken: null,
+      settledAt: timestamp,
+      updatedAt: timestamp
+    })
+    .where(
+      processingToken
+        ? and(
+            eq(mediaUploads.processingToken, processingToken),
+            eq(mediaUploads.uploadKey, uploadKey)
+          )
+        : eq(mediaUploads.uploadKey, uploadKey)
+    );
 
   return Number(result.rowsAffected) > 0;
 };
@@ -4524,13 +4613,41 @@ export const findTripStopImageByUploadKey = async (
 
 export const completeVisitImage = async (
   database: Database,
-  values: typeof visitImages.$inferInsert
+  values: typeof visitImages.$inferInsert & { processingToken?: string | undefined }
 ): Promise<CompletedImage<typeof visitImages.$inferSelect>> => {
   return database.transaction(async (transaction) => {
     const visit = await findVisitRecordById(transaction, values.visitId);
 
     if (!visit) {
       throw new RepositoryNotFoundError('Visit not found.');
+    }
+
+    if (values.processingToken) {
+      const claimRows = await transaction
+        .select({ id: mediaUploads.id })
+        .from(mediaUploads)
+        .where(
+          and(
+            eq(mediaUploads.processingToken, values.processingToken),
+            eq(mediaUploads.uploadKey, values.uploadKey ?? values.fullKey),
+            isNull(mediaUploads.settledAt)
+          )
+        )
+        .limit(1);
+
+      if (claimRows.length === 0) {
+        const existingImage = await findVisitImageByUploadKey(
+          transaction,
+          values.visitId,
+          values.uploadKey ?? values.fullKey
+        );
+
+        if (existingImage) {
+          return { created: false, row: existingImage };
+        }
+
+        throw new RepositoryValidationError('Upload completion claim expired. Retry completion.');
+      }
     }
 
     const originalName = values.originalName ?? null;
@@ -4561,7 +4678,7 @@ export const completeVisitImage = async (
       await bumpPublicVisitDataVersion(transaction, values.updatedAt);
     }
 
-    if (await settleMediaUpload(transaction, uploadKey, values.updatedAt)) {
+    if (await settleMediaUpload(transaction, uploadKey, values.updatedAt, values.processingToken)) {
       // The source upload is not referenced after the generated files are saved.
       // Keep it recoverable for the same window as a deleted image.
       await enqueueMediaCleanup(transaction, [uploadKey], values.updatedAt);
@@ -4573,7 +4690,7 @@ export const completeVisitImage = async (
 
 export const completeTripStopImage = async (
   database: Database,
-  values: typeof tripStopImages.$inferInsert
+  values: typeof tripStopImages.$inferInsert & { processingToken?: string | undefined }
 ): Promise<CompletedImage<typeof tripStopImages.$inferSelect>> => {
   return database.transaction(async (transaction) => {
     const uploadKey = values.uploadKey ?? values.fullKey;
@@ -4583,6 +4700,34 @@ export const completeTripStopImage = async (
     const thumbWidth = values.thumbWidth ?? null;
     const thumbHeight = values.thumbHeight ?? null;
     const fileSizeBytes = values.fileSizeBytes ?? null;
+
+    if (values.processingToken) {
+      const claimRows = await transaction
+        .select({ id: mediaUploads.id })
+        .from(mediaUploads)
+        .where(
+          and(
+            eq(mediaUploads.processingToken, values.processingToken),
+            eq(mediaUploads.uploadKey, uploadKey),
+            isNull(mediaUploads.settledAt)
+          )
+        )
+        .limit(1);
+
+      if (claimRows.length === 0) {
+        const existingImage = await findTripStopImageByUploadKey(
+          transaction,
+          values.tripStopId,
+          uploadKey
+        );
+
+        if (existingImage) {
+          return { created: false, row: existingImage };
+        }
+
+        throw new RepositoryValidationError('Upload completion claim expired. Retry completion.');
+      }
+    }
     const insertResult = await transaction.run(sql`
       INSERT INTO trip_stop_images (
         trip_stop_id, upload_key, full_key, thumb_key, original_name, mime_type,
@@ -4608,7 +4753,9 @@ export const completeTripStopImage = async (
         await bumpPublicVisitDataVersion(transaction, values.updatedAt);
       }
 
-      if (await settleMediaUpload(transaction, uploadKey, values.updatedAt)) {
+      if (
+        await settleMediaUpload(transaction, uploadKey, values.updatedAt, values.processingToken)
+      ) {
         // The source upload is not referenced after the generated files are saved.
         // Keep it recoverable for the same window as a deleted image.
         await enqueueMediaCleanup(transaction, [uploadKey], values.updatedAt);

@@ -3688,7 +3688,7 @@ describe('API routes', () => {
     });
   });
 
-  it('returns the public trip with a route budget error before provider work when its reservation exceeds the daily budget', async () => {
+  it('keeps public trip route reads independent from per-client request admission', async () => {
     const buildRoundTripRoute = vi.fn(async () => null);
     const app = createAuthedApp({
       tripPlannerBudget: createTripPlannerBudget({
@@ -3745,12 +3745,12 @@ describe('API routes', () => {
     expect(body.route).toEqual({
       data: null,
       error: {
-        error: 'Trip planner request budget exceeded.',
-        errorCode: 'trip_planner_budget_exceeded'
+        error: 'Driving route could not be found.',
+        errorCode: 'route_not_found'
       },
       success: false
     });
-    expect(buildRoundTripRoute).not.toHaveBeenCalled();
+    expect(buildRoundTripRoute).toHaveBeenCalledTimes(1);
   });
 
   it('returns 500 for unsupported public trip route planner error codes by slug', async () => {

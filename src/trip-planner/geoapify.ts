@@ -25,6 +25,7 @@ type GeoapifyClientOptions = {
   routeCacheMaxEntries?: number | undefined;
   routeCacheTtlMs?: number | undefined;
   suggestionCacheMaxEntries?: number | undefined;
+  providerAdmission?: ((operation: GeoapifyOperation) => Promise<void>) | undefined;
 };
 
 type GeoapifyGeocodeResponse = {
@@ -330,7 +331,8 @@ export const createGeoapifyClient = ({
   routeCacheMaxBytes = DEFAULT_ROUTE_CACHE_MAX_BYTES,
   routeCacheMaxEntries = DEFAULT_ROUTE_CACHE_MAX_ENTRIES,
   routeCacheTtlMs = DEFAULT_ROUTE_CACHE_TTL_MS,
-  suggestionCacheMaxEntries = DEFAULT_SUGGESTION_CACHE_MAX_ENTRIES
+  suggestionCacheMaxEntries = DEFAULT_SUGGESTION_CACHE_MAX_ENTRIES,
+  providerAdmission
 }: GeoapifyClientOptions): TripPlannerProvider => {
   const geocodeCache = createBoundedTtlCache<TripPlannerResolvedLocation | null>({
     maxEntries: geocodeCacheMaxEntries,
@@ -350,6 +352,12 @@ export const createGeoapifyClient = ({
   });
   const suggestionInFlight = new Map<string, Promise<TripPlannerSuggestion[]>>();
   const runProviderRequest = createConcurrencyLimiter(maxConcurrentRequests);
+  const runPaidProviderRequest = <T>(operation: GeoapifyOperation, request: () => Promise<T>) => {
+    return runProviderRequest(async () => {
+      await providerAdmission?.(operation);
+      return request();
+    });
+  };
 
   return {
     geocode: async (query) => {
@@ -358,7 +366,7 @@ export const createGeoapifyClient = ({
         inFlight: geocodeInFlight,
         key: normalizeGeocodeCacheKey(query),
         load: () =>
-          runProviderRequest(async () => {
+          runPaidProviderRequest('geocode', async () => {
             const response = await fetchJson<GeoapifyGeocodeResponse>(
               fetchFn,
               buildGeocodeUrl(apiKey, query.trim()),
@@ -378,7 +386,7 @@ export const createGeoapifyClient = ({
         inFlight: suggestionInFlight,
         key: normalizeGeocodeCacheKey(query),
         load: () =>
-          runProviderRequest(async () => {
+          runPaidProviderRequest('suggest', async () => {
             const response = await fetchJson<GeoapifyGeocodeResponse>(
               fetchFn,
               buildAutocompleteUrl(apiKey, query.trim()),
@@ -398,7 +406,7 @@ export const createGeoapifyClient = ({
         inFlight: routeInFlight,
         key: createRouteCacheKey(origin, destination, mode),
         load: () =>
-          runProviderRequest(async () => {
+          runPaidProviderRequest('route', async () => {
             const response = await fetchJson<GeoapifyRoutingResponse>(
               fetchFn,
               buildRouteUrl(apiKey, origin, destination, mode),

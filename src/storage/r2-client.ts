@@ -8,25 +8,93 @@ import {
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
-import type { StorageClient } from './types.js';
+import {
+  type StorageClient,
+  StorageObjectTooLargeError,
+  type StorageReadOptions
+} from './types.js';
 
 export type R2Config = {
   accessKeyId: string;
   bucketName: string;
+  client?: S3Client;
   endpoint: string;
   secretAccessKey: string;
 };
 
+const DEFAULT_STORAGE_READ_MAX_BYTES = 16 * 1024 * 1024;
+const DEFAULT_STORAGE_READ_TIMEOUT_MS = 10_000;
+
+const readBodyWithLimit = async (
+  body: { transformToWebStream: () => ReadableStream<Uint8Array> },
+  {
+    maxBytes = DEFAULT_STORAGE_READ_MAX_BYTES,
+    timeoutMs = DEFAULT_STORAGE_READ_TIMEOUT_MS
+  }: StorageReadOptions = {}
+) => {
+  const reader = body.transformToWebStream().getReader();
+  const chunks: Uint8Array[] = [];
+  const deadline = Date.now() + timeoutMs;
+  let totalBytes = 0;
+
+  try {
+    while (true) {
+      const remainingMs = deadline - Date.now();
+
+      if (remainingMs <= 0) {
+        await reader.cancel('Storage read timed out.');
+        throw new Error('Storage read timed out.');
+      }
+
+      let timeout: ReturnType<typeof setTimeout> | undefined;
+      const read = reader.read();
+      const timedOut = new Promise<never>((_, reject) => {
+        timeout = setTimeout(() => reject(new Error('Storage read timed out.')), remainingMs);
+      });
+
+      try {
+        const { done, value } = await Promise.race([read, timedOut]);
+
+        if (done) {
+          break;
+        }
+
+        totalBytes += value.byteLength;
+        if (totalBytes > maxBytes) {
+          await reader.cancel('Stored object is too large.');
+          throw new StorageObjectTooLargeError();
+        }
+
+        chunks.push(value);
+      } catch (error) {
+        await reader.cancel(error instanceof Error ? error.message : 'Storage read failed.');
+        throw error;
+      } finally {
+        if (timeout) {
+          clearTimeout(timeout);
+        }
+      }
+    }
+  } catch (error) {
+    await reader.cancel(error instanceof Error ? error.message : 'Storage read failed.');
+    throw error;
+  }
+
+  return Buffer.concat(chunks.map((chunk) => Buffer.from(chunk)));
+};
+
 export const createR2Client = (config: R2Config): StorageClient => {
-  const s3 = new S3Client({
-    credentials: {
-      accessKeyId: config.accessKeyId,
-      secretAccessKey: config.secretAccessKey
-    },
-    endpoint: config.endpoint,
-    forcePathStyle: true,
-    region: 'auto'
-  });
+  const s3 =
+    config.client ??
+    new S3Client({
+      credentials: {
+        accessKeyId: config.accessKeyId,
+        secretAccessKey: config.secretAccessKey
+      },
+      endpoint: config.endpoint,
+      forcePathStyle: true,
+      region: 'auto'
+    });
 
   return {
     delete: async (key: string) => {
@@ -59,7 +127,7 @@ export const createR2Client = (config: R2Config): StorageClient => {
         throw error;
       }
     },
-    getObject: async (key: string) => {
+    getObject: async (key: string, options) => {
       try {
         const response = await s3.send(
           new GetObjectCommand({
@@ -72,7 +140,15 @@ export const createR2Client = (config: R2Config): StorageClient => {
           return null;
         }
 
-        return Buffer.from(await response.Body.transformToByteArray());
+        if (
+          response.ContentLength !== undefined &&
+          options?.maxBytes !== undefined &&
+          response.ContentLength > options.maxBytes
+        ) {
+          throw new StorageObjectTooLargeError();
+        }
+
+        return readBodyWithLimit(response.Body, options);
       } catch (error) {
         const errorName = (error as { name?: string }).name;
         if (errorName === 'NotFound' || errorName === 'NoSuchKey') {

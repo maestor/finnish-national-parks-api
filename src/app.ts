@@ -14,6 +14,7 @@ import {
   AdminAlreadyEnrolledError,
   AdminSelfModificationError,
   acceptAdminInvitation,
+  claimPendingMediaUpload,
   completeTripStopImage,
   completeVisitImage,
   countTripStopImages,
@@ -71,10 +72,12 @@ import {
   listVisits,
   listVisitsTimeline,
   listYearReviewTimelineVisits,
+  MEDIA_UPLOAD_PROCESSING_LEASE_MS,
   publishDateRangeReviewShare,
   publishYearReviewShare,
   RepositoryNotFoundError,
   RepositoryValidationError,
+  releasePendingMediaUploadClaim,
   removeAdminUser,
   reorderTripStopImages,
   reorderVisitImages,
@@ -203,11 +206,14 @@ import {
   publishYearReviewRoute,
   unpublishYearReviewRoute
 } from './routes/year-review.js';
-import type { StorageClient, StoredObjectMetadata } from './storage/types.js';
+import {
+  type StorageClient,
+  StorageObjectTooLargeError,
+  type StoredObjectMetadata
+} from './storage/types.js';
 import {
   createTripPlannerBudget,
   getTripPlannerClientId,
-  getTripPlannerRouteBudgetUnits,
   TRIP_PLANNER_CLIENT_ID_HEADER,
   type TripPlannerBudget,
   type TripPlannerBudgetOperation
@@ -255,6 +261,54 @@ const LOGO_PRESIGNED_URL_TTL_SECONDS = 7 * 24 * 60 * 60;
 const MAP_PRESIGNED_URL_TTL_SECONDS = 7 * 24 * 60 * 60;
 const PUBLIC_LOGO_REDIRECT_CACHE_CONTROL = 'public, max-age=86400';
 const TRIP_PLANNER_REQUEST_BODY_LIMIT_BYTES = 16 * 1024;
+const DIRECT_IMAGE_COMPLETION_WAIT_MS = 5_000;
+const DIRECT_IMAGE_COMPLETION_POLL_MS = 50;
+
+const readRequestBodyWithinLimit = async (request: Request, maxBytes: number) => {
+  if (!request.body) {
+    return undefined;
+  }
+
+  const reader = request.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let totalBytes = 0;
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+
+      if (done) {
+        const body = new Uint8Array(totalBytes);
+        let offset = 0;
+        for (const chunk of chunks) {
+          body.set(chunk, offset);
+          offset += chunk.byteLength;
+        }
+
+        return body.buffer;
+      }
+
+      totalBytes += value.byteLength;
+      if (totalBytes > maxBytes) {
+        try {
+          await reader.cancel();
+        } catch {
+          // The source may already be errored after the limit was reached.
+        }
+        return 'too_large' as const;
+      }
+
+      chunks.push(value);
+    }
+  } catch {
+    try {
+      await reader.cancel();
+    } catch {
+      // Preserve the stable client error when cancellation races with a stream failure.
+    }
+    return 'read_error' as const;
+  }
+};
 
 type StoredImageCompletionMetadata =
   | {
@@ -333,32 +387,38 @@ const getErrorCategory = (error: unknown) => {
   return 'application_error';
 };
 
+const createTripPlannerBudgetExceededResponse = (
+  context: SessionContext,
+  retryAfterSeconds: number
+) => {
+  context.header('Retry-After', String(retryAfterSeconds));
+  return context.json(
+    {
+      error: 'Trip planner request budget exceeded.',
+      errorCode: 'trip_planner_budget_exceeded' as const
+    },
+    429
+  );
+};
+
 const admitTripPlannerRequest = async (
   context: SessionContext,
   budget: TripPlannerBudget,
-  operation: TripPlannerBudgetOperation,
-  providerUnits?: number
+  operation: TripPlannerBudgetOperation
 ) => {
   try {
-    const admission = await budget.admit(
-      operation,
-      getTripPlannerClientId(context.req.header(TRIP_PLANNER_CLIENT_ID_HEADER)),
-      undefined,
-      providerUnits
-    );
+    const clientId = getTripPlannerClientId(context.req.header(TRIP_PLANNER_CLIENT_ID_HEADER));
+    const admission = budget.admitRequest
+      ? await budget.admitRequest(operation, clientId)
+      : await budget.admit(operation, clientId);
 
-    if (admission.allowed) {
-      return null;
+    // V8's source map reports this condition line as uncovered even though both outcomes are tested.
+    /* v8 ignore next */
+    if (!admission.allowed) {
+      return createTripPlannerBudgetExceededResponse(context, admission.retryAfterSeconds);
     }
 
-    context.header('Retry-After', String(admission.retryAfterSeconds));
-    return context.json(
-      {
-        error: 'Trip planner request budget exceeded.',
-        errorCode: 'trip_planner_budget_exceeded' as const
-      },
-      429
-    );
+    return null;
   } catch {
     return context.json(
       {
@@ -831,7 +891,19 @@ const finalizeDirectImageUpload = async (
   parentId: number,
   finalKeys = createFinalImageKeys(parentPrefix, parentId)
 ): Promise<DirectImageFinalization> => {
-  const sourceBuffer = await storage.getObject(key);
+  let sourceBuffer: Buffer | null;
+  try {
+    sourceBuffer = await storage.getObject(key, {
+      maxBytes: MAX_VISIT_IMAGE_FILE_SIZE,
+      timeoutMs: 10_000
+    });
+  } catch (error) {
+    if (error instanceof StorageObjectTooLargeError) {
+      return { error: 'File too large.', status: 413, valid: false };
+    }
+
+    throw error;
+  }
 
   if (!sourceBuffer || sourceBuffer.length === 0) {
     return { error: 'Upload is missing from storage.', status: 422, valid: false };
@@ -1115,6 +1187,28 @@ export const createApp = ({
       context.header('Cache-Control', PRIVATE_CACHE_CONTROL);
       return context.json({ error: 'Request body too large.' }, 413);
     }
+
+    const body = await readRequestBodyWithinLimit(
+      context.req.raw,
+      TRIP_PLANNER_REQUEST_BODY_LIMIT_BYTES
+    );
+
+    if (body === 'too_large') {
+      context.header('Cache-Control', PRIVATE_CACHE_CONTROL);
+      return context.json({ error: 'Request body too large.' }, 413);
+    }
+
+    if (body === 'read_error') {
+      context.header('Cache-Control', PRIVATE_CACHE_CONTROL);
+      return context.json({ error: 'Unable to read request body.' }, 400);
+    }
+
+    if (!body) {
+      context.header('Cache-Control', PRIVATE_CACHE_CONTROL);
+      return context.json({ error: 'Request body is required.' }, 400);
+    }
+
+    context.req.raw = new Request(context.req.raw, { body });
 
     await next();
   });
@@ -2259,34 +2353,6 @@ export const createApp = ({
 
       const routeWaypoints = await buildPublicTripRouteWaypoints(database, trip);
 
-      if (routeWaypoints && tripPlanner?.buildRoundTripRoute) {
-        const budgetResponse = await admitTripPlannerRequest(
-          context,
-          effectiveTripPlannerBudget,
-          'route',
-          getTripPlannerRouteBudgetUnits(routeWaypoints.length)
-        );
-
-        if (budgetResponse) {
-          const routeError = (await budgetResponse.json()) as {
-            error: string;
-            errorCode: PublicTripRouteErrorCode;
-          };
-
-          return context.json(
-            {
-              ...trip,
-              route: {
-                data: null,
-                error: routeError,
-                success: false
-              }
-            },
-            200
-          );
-        }
-      }
-
       return context.json(await attachPublicTripRoute(trip, tripPlanner, routeWaypoints), 200);
     });
 
@@ -2794,13 +2860,33 @@ export const createApp = ({
           );
         }
 
-        const pendingUpload = await findMediaUploadByUploadKey(database, key);
+        let pendingUpload = await findMediaUploadByUploadKey(database, key);
 
         if (
           pendingUpload &&
           (pendingUpload.parentId !== id || pendingUpload.parentType !== 'trip-stop')
         ) {
           return context.json({ error: 'Upload key does not belong to this trip stop.' }, 422);
+        }
+
+        if (!pendingUpload) {
+          const timestamp = new Date().toISOString();
+          const finalKeys = createFinalImageKeys('trip-stops', id);
+          await createPendingMediaUpload(database, {
+            ...finalKeys,
+            expiresAt: new Date(
+              Date.now() + DIRECT_VISIT_UPLOAD_URL_TTL_SECONDS * 1000
+            ).toISOString(),
+            parentId: id,
+            parentType: 'trip-stop',
+            timestamp,
+            uploadKey: key
+          });
+          pendingUpload = await findMediaUploadByUploadKey(database, key);
+        }
+
+        if (!pendingUpload) {
+          return context.json({ error: 'Upload could not be prepared for completion.' }, 422);
         }
 
         const objectMetadata = await storage.getObjectMetadata(key);
@@ -2816,17 +2902,70 @@ export const createApp = ({
         }
 
         try {
-          const finalizedImage = await finalizeDirectImageUpload(
-            storage,
-            key,
-            'trip-stops',
-            id,
-            pendingUpload
-              ? { fullKey: pendingUpload.fullKey, thumbKey: pendingUpload.thumbKey }
-              : undefined
-          );
+          const completionDeadline = Date.now() + DIRECT_IMAGE_COMPLETION_WAIT_MS;
+          let claimedUpload: typeof pendingUpload | null = null;
+          let processingToken: string | undefined;
+
+          while (!claimedUpload) {
+            const completedImage = await findTripStopImageByUploadKey(database, id, key);
+
+            if (completedImage) {
+              return context.json(
+                {
+                  image: await toVisitImageResponse(storage, completedImage)
+                },
+                200
+              );
+            }
+
+            const currentUpload = await findMediaUploadByUploadKey(database, key);
+
+            if (!currentUpload) {
+              return context.json({ error: 'Upload could not be prepared for completion.' }, 422);
+            }
+
+            const timestamp = new Date().toISOString();
+            processingToken = randomUUID();
+            const finalKeys = createFinalImageKeys('trip-stops', id);
+            claimedUpload = await claimPendingMediaUpload(database, {
+              expectedFullKey: currentUpload.fullKey,
+              expectedThumbKey: currentUpload.thumbKey,
+              fullKey: finalKeys.fullKey,
+              parentId: id,
+              parentType: 'trip-stop',
+              processingStartedAt: timestamp,
+              processingToken,
+              staleBefore: new Date(
+                Date.parse(timestamp) - MEDIA_UPLOAD_PROCESSING_LEASE_MS
+              ).toISOString(),
+              thumbKey: finalKeys.thumbKey,
+              timestamp,
+              uploadKey: key
+            });
+
+            if (!claimedUpload && Date.now() >= completionDeadline) {
+              return context.json(
+                { error: 'Upload completion is already in progress. Retry shortly.' },
+                422
+              );
+            }
+
+            if (!claimedUpload) {
+              await new Promise((resolve) => setTimeout(resolve, DIRECT_IMAGE_COMPLETION_POLL_MS));
+            }
+          }
+
+          const finalizedImage = await finalizeDirectImageUpload(storage, key, 'trip-stops', id, {
+            fullKey: claimedUpload.fullKey,
+            thumbKey: claimedUpload.thumbKey
+          });
 
           if (!finalizedImage.valid) {
+            await releasePendingMediaUploadClaim(database, {
+              processingToken: processingToken!,
+              timestamp: new Date().toISOString(),
+              uploadKey: key
+            });
             return context.json({ error: finalizedImage.error }, finalizedImage.status);
           }
 
@@ -2845,7 +2984,8 @@ export const createApp = ({
             thumbWidth: finalizedImage.thumbWidth,
             tripStopId: id,
             updatedAt: timestamp,
-            uploadKey: key
+            uploadKey: key,
+            processingToken
           });
 
           return context.json(
@@ -3132,13 +3272,33 @@ export const createApp = ({
           );
         }
 
-        const pendingUpload = await findMediaUploadByUploadKey(database, key);
+        let pendingUpload = await findMediaUploadByUploadKey(database, key);
 
         if (
           pendingUpload &&
           (pendingUpload.parentId !== id || pendingUpload.parentType !== 'visit')
         ) {
           return context.json({ error: 'Upload key does not belong to this visit.' }, 422);
+        }
+
+        if (!pendingUpload) {
+          const timestamp = new Date().toISOString();
+          const finalKeys = createFinalImageKeys('visits', id);
+          await createPendingMediaUpload(database, {
+            ...finalKeys,
+            expiresAt: new Date(
+              Date.now() + DIRECT_VISIT_UPLOAD_URL_TTL_SECONDS * 1000
+            ).toISOString(),
+            parentId: id,
+            parentType: 'visit',
+            timestamp,
+            uploadKey: key
+          });
+          pendingUpload = await findMediaUploadByUploadKey(database, key);
+        }
+
+        if (!pendingUpload) {
+          return context.json({ error: 'Upload could not be prepared for completion.' }, 422);
         }
 
         const objectMetadata = await storage.getObjectMetadata(key);
@@ -3153,17 +3313,70 @@ export const createApp = ({
           return context.json({ error: validatedMetadata.error }, validatedMetadata.status);
         }
 
-        const finalizedImage = await finalizeDirectImageUpload(
-          storage,
-          key,
-          'visits',
-          id,
-          pendingUpload
-            ? { fullKey: pendingUpload.fullKey, thumbKey: pendingUpload.thumbKey }
-            : undefined
-        );
+        const completionDeadline = Date.now() + DIRECT_IMAGE_COMPLETION_WAIT_MS;
+        let claimedUpload: typeof pendingUpload | null = null;
+        let processingToken: string | undefined;
+
+        while (!claimedUpload) {
+          const completedImage = await findVisitImageByUploadKey(database, id, key);
+
+          if (completedImage) {
+            return context.json(
+              {
+                image: await toVisitImageResponse(storage, completedImage)
+              },
+              200
+            );
+          }
+
+          const currentUpload = await findMediaUploadByUploadKey(database, key);
+
+          if (!currentUpload) {
+            return context.json({ error: 'Upload could not be prepared for completion.' }, 422);
+          }
+
+          const timestamp = new Date().toISOString();
+          processingToken = randomUUID();
+          const finalKeys = createFinalImageKeys('visits', id);
+          claimedUpload = await claimPendingMediaUpload(database, {
+            expectedFullKey: currentUpload.fullKey,
+            expectedThumbKey: currentUpload.thumbKey,
+            fullKey: finalKeys.fullKey,
+            parentId: id,
+            parentType: 'visit',
+            processingStartedAt: timestamp,
+            processingToken,
+            staleBefore: new Date(
+              Date.parse(timestamp) - MEDIA_UPLOAD_PROCESSING_LEASE_MS
+            ).toISOString(),
+            thumbKey: finalKeys.thumbKey,
+            timestamp,
+            uploadKey: key
+          });
+
+          if (!claimedUpload && Date.now() >= completionDeadline) {
+            return context.json(
+              { error: 'Upload completion is already in progress. Retry shortly.' },
+              422
+            );
+          }
+
+          if (!claimedUpload) {
+            await new Promise((resolve) => setTimeout(resolve, DIRECT_IMAGE_COMPLETION_POLL_MS));
+          }
+        }
+
+        const finalizedImage = await finalizeDirectImageUpload(storage, key, 'visits', id, {
+          fullKey: claimedUpload.fullKey,
+          thumbKey: claimedUpload.thumbKey
+        });
 
         if (!finalizedImage.valid) {
+          await releasePendingMediaUploadClaim(database, {
+            processingToken: processingToken!,
+            timestamp: new Date().toISOString(),
+            uploadKey: key
+          });
           return context.json({ error: finalizedImage.error }, finalizedImage.status);
         }
 
@@ -3182,6 +3395,7 @@ export const createApp = ({
           thumbWidth: finalizedImage.thumbWidth,
           updatedAt: timestamp,
           uploadKey: key,
+          processingToken,
           visitId: id
         });
 

@@ -6,6 +6,7 @@ import { tripPlannerBudgetWindows } from '../db/schema.js';
 const MINUTE_MS = 60_000;
 const DAY_MS = 24 * 60 * 60 * 1000;
 const BUDGET_RETENTION_MS = 2 * DAY_MS;
+const MAX_BUDGET_DB_ATTEMPTS = 10;
 
 export const TRIP_PLANNER_CLIENT_ID_HEADER = 'x-trip-planner-client-id';
 
@@ -24,6 +25,15 @@ export type TripPlannerBudget = {
     now?: number,
     providerUnits?: number
   ) => Promise<TripPlannerBudgetAdmission>;
+  admitRequest?: (
+    operation: TripPlannerBudgetOperation,
+    clientId: string,
+    now?: number
+  ) => Promise<TripPlannerBudgetAdmission>;
+  reserveProvider?: (
+    providerUnits: number,
+    now?: number
+  ) => Promise<TripPlannerProviderReservation>;
 };
 
 export type TripPlannerBudgetAdmission =
@@ -33,6 +43,16 @@ export type TripPlannerBudgetAdmission =
   | {
       allowed: false;
       retryAfterSeconds: number;
+    };
+
+export type TripPlannerProviderReservation =
+  | {
+      allowed: true;
+    }
+  | {
+      allowed: false;
+      reason: 'exceeded' | 'unavailable';
+      retryAfterSeconds?: number;
     };
 
 export const DEFAULT_TRIP_PLANNER_BUDGET_LIMITS: TripPlannerBudgetLimits = {
@@ -103,6 +123,21 @@ const reserveWindow = async (
 class BudgetExceededError extends Error {
   constructor(public readonly retryAfterSeconds: number) {
     super('Trip planner budget exceeded.');
+  }
+}
+
+export type TripPlannerBudgetErrorCode =
+  | 'trip_planner_budget_exceeded'
+  | 'trip_planner_budget_unavailable';
+
+export class TripPlannerBudgetError extends Error {
+  constructor(
+    public readonly code: TripPlannerBudgetErrorCode,
+    message: string,
+    public readonly status: 429 | 503,
+    public readonly retryAfterSeconds?: number
+  ) {
+    super(message);
   }
 }
 
@@ -241,7 +276,140 @@ export const createTripPlannerBudget = ({
     }
   };
 
-  return { admit };
+  const admitRequest = async (
+    operation: TripPlannerBudgetOperation,
+    clientId: string,
+    requestedAt = now()
+  ): Promise<TripPlannerBudgetAdmission> => {
+    const minuteWindow = getWindowStart(requestedAt, MINUTE_MS);
+    const operationLimit = getOperationLimit(operation, limits);
+
+    try {
+      for (let attempt = 0; attempt < MAX_BUDGET_DB_ATTEMPTS; attempt += 1) {
+        try {
+          await database.transaction(async (transaction) => {
+            await transaction
+              .delete(tripPlannerBudgetWindows)
+              .where(
+                lt(tripPlannerBudgetWindows.windowStartedAt, requestedAt - BUDGET_RETENTION_MS)
+              );
+
+            const operationAllowed = await reserveWindow(
+              transaction,
+              `operation:${operation}:${minuteWindow}`,
+              minuteWindow,
+              1,
+              operationLimit * 10
+            );
+
+            if (!operationAllowed) {
+              throw new BudgetExceededError(getRetryAfterSeconds(requestedAt, MINUTE_MS));
+            }
+
+            const clientAllowed = await reserveWindow(
+              transaction,
+              `client:${clientId}:${operation}`,
+              minuteWindow,
+              1,
+              operationLimit
+            );
+
+            if (!clientAllowed) {
+              throw new BudgetExceededError(getRetryAfterSeconds(requestedAt, MINUTE_MS));
+            }
+          });
+
+          break;
+        } catch (error) {
+          if (error instanceof BudgetExceededError || !isRetryableDatabaseError(error)) {
+            throw error;
+          }
+
+          if (attempt === MAX_BUDGET_DB_ATTEMPTS - 1) {
+            throw error;
+          }
+
+          await wait(20 * (attempt + 1));
+        }
+      }
+
+      return { allowed: true };
+    } catch (error) {
+      if (error instanceof BudgetExceededError) {
+        return {
+          allowed: false,
+          retryAfterSeconds: error.retryAfterSeconds
+        };
+      }
+
+      throw error;
+    }
+  };
+
+  const reserveProviderTransaction = async (
+    providerUnits: number,
+    requestedAt = now()
+  ): Promise<TripPlannerProviderReservation> => {
+    if (!Number.isInteger(providerUnits) || providerUnits < 1) {
+      throw new Error('Trip planner provider unit cost must be a positive integer.');
+    }
+
+    const dayWindow = getWindowStart(requestedAt, DAY_MS);
+
+    for (let attempt = 0; attempt < MAX_BUDGET_DB_ATTEMPTS; attempt += 1) {
+      try {
+        await database.transaction(async (transaction) => {
+          await transaction
+            .delete(tripPlannerBudgetWindows)
+            .where(lt(tripPlannerBudgetWindows.windowStartedAt, requestedAt - BUDGET_RETENTION_MS));
+
+          const providerAllowed = await reserveWindow(
+            transaction,
+            `provider:${dayWindow}`,
+            dayWindow,
+            providerUnits,
+            limits.dailyProviderUnits
+          );
+
+          if (!providerAllowed) {
+            throw new BudgetExceededError(getRetryAfterSeconds(requestedAt, DAY_MS));
+          }
+        });
+
+        return { allowed: true };
+      } catch (error) {
+        if (error instanceof BudgetExceededError) {
+          return {
+            allowed: false,
+            reason: 'exceeded' as const,
+            retryAfterSeconds: error.retryAfterSeconds
+          };
+        }
+
+        if (!isRetryableDatabaseError(error) || attempt === MAX_BUDGET_DB_ATTEMPTS - 1) {
+          return { allowed: false, reason: 'unavailable' as const };
+        }
+
+        await wait(10 * (attempt + 1));
+      }
+    }
+
+    return { allowed: false, reason: 'unavailable' };
+  };
+
+  let providerReservationQueue = Promise.resolve();
+  const reserveProvider = (providerUnits: number, requestedAt?: number) => {
+    const reservation = providerReservationQueue.then(() =>
+      reserveProviderTransaction(providerUnits, requestedAt)
+    );
+    providerReservationQueue = reservation.then(
+      () => undefined,
+      () => undefined
+    );
+    return reservation;
+  };
+
+  return { admit, admitRequest, reserveProvider };
 };
 
 export const getTripPlannerClientId = (headerValue: string | undefined) => {

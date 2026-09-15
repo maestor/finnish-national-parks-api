@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createApp } from '../../src/app.js';
 import { createVisit } from '../../src/db/repositories.js';
 import { importParks } from '../../src/importer/import-parks.js';
-import { createTripPlannerBudget } from '../../src/trip-planner/budget.js';
+import { createTripPlannerBudget, TripPlannerBudgetError } from '../../src/trip-planner/budget.js';
 import { createGeoapifyClient } from '../../src/trip-planner/geoapify.js';
 import { createTripPlannerService, TripPlannerError } from '../../src/trip-planner/search.js';
 import { createLipasPark, createLipasTrail, parkTypeFixtures } from '../fixtures/lipas.js';
@@ -246,18 +246,44 @@ describe('trip planner route', () => {
       suggestionsPerMinute?: number;
     } = {}
   ) => {
+    const tripPlannerBudget = createTripPlannerBudget({
+      database: testDatabase.database,
+      ...budgetOptions
+    });
+
     return createApp({
       apiKey: 'test-api-key',
       database: testDatabase.database,
-      tripPlannerBudget: createTripPlannerBudget({
-        database: testDatabase.database,
-        ...budgetOptions
-      }),
+      tripPlannerBudget,
       tripPlanner: createTripPlannerService({
         database: testDatabase.database,
         provider: createGeoapifyClient({
           apiKey: 'geoapify-test',
-          fetchFn
+          fetchFn,
+          providerAdmission: async (operation) => {
+            const reservation = await tripPlannerBudget.reserveProvider?.(
+              operation === 'route' ? 5 : 1
+            );
+
+            if (reservation?.allowed) {
+              return;
+            }
+
+            if (reservation?.reason === 'exceeded') {
+              throw new TripPlannerBudgetError(
+                'trip_planner_budget_exceeded',
+                'Trip planner provider budget exceeded.',
+                429,
+                reservation.retryAfterSeconds
+              );
+            }
+
+            throw new TripPlannerBudgetError(
+              'trip_planner_budget_unavailable',
+              'Trip planner budget is unavailable.',
+              503
+            );
+          }
         })
       })
     });
@@ -405,6 +431,29 @@ describe('trip planner route', () => {
     expect(fetchFn).toHaveBeenCalledTimes(1);
   });
 
+  it('rejects route work after the per-client budget without calling the planner', async () => {
+    const fetchFn = mockGeoapifyFetch() as typeof fetch;
+    const app = createTripPlannerApp(fetchFn, {
+      routeRequestsPerMinute: 1
+    });
+    const body = {
+      destinationQuery: 'Destination',
+      mode: 'drive',
+      originQuery: 'Origin'
+    };
+
+    const firstResponse = await requestAsRemote(app, body, {
+      'x-trip-planner-client-id': 'client_1234567890'
+    });
+    const secondResponse = await requestAsRemote(app, body, {
+      'x-trip-planner-client-id': 'client_1234567890'
+    });
+
+    expect(firstResponse.status).toBe(200);
+    expect(secondResponse.status).toBe(429);
+    expect(fetchFn).toHaveBeenCalledTimes(3);
+  });
+
   it('fails closed when the trip planner budget store errors', async () => {
     const app = createApp({
       apiKey: 'test-api-key',
@@ -432,6 +481,33 @@ describe('trip planner route', () => {
     });
   });
 
+  it('continues planner requests when request admission succeeds', async () => {
+    const suggest = vi.fn(async () => []);
+    const app = createApp({
+      apiKey: 'test-api-key',
+      database: testDatabase.database,
+      tripPlannerBudget: {
+        admit: vi.fn(),
+        admitRequest: vi.fn().mockResolvedValue({ allowed: true })
+      },
+      tripPlanner: {
+        search: vi.fn(async () => {
+          throw new Error('not used in this test');
+        }),
+        searchNearby: vi.fn(async () => {
+          throw new Error('not used in this test');
+        }),
+        suggest
+      }
+    });
+
+    const response = await requestSuggestionsAsRemote(app, { query: 'He' });
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ suggestions: [] });
+    expect(suggest).toHaveBeenCalledWith('He');
+  });
+
   it('rejects an oversized planner body before provider work', async () => {
     const fetchFn = mockGeoapifyFetch() as typeof fetch;
     const app = createTripPlannerApp(fetchFn);
@@ -453,39 +529,191 @@ describe('trip planner route', () => {
     expect(fetchFn).not.toHaveBeenCalled();
   });
 
+  it('rejects a planner request with no body before provider work', async () => {
+    const fetchFn = mockGeoapifyFetch() as typeof fetch;
+    const app = createTripPlannerApp(fetchFn);
+    const response = await app.request('/api/trip-planner/suggestions', {
+      headers: {
+        authorization: 'Bearer test-api-key',
+        'content-type': 'application/json',
+        host: 'parks.example.com'
+      },
+      method: 'POST'
+    });
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({ error: 'Request body is required.' });
+    expect(fetchFn).not.toHaveBeenCalled();
+  });
+
+  it('counts actual planner request bytes when content length is missing or inaccurate', async () => {
+    const fetchFn = mockGeoapifyFetch() as typeof fetch;
+    const app = createTripPlannerApp(fetchFn);
+    const validBody = JSON.stringify({ query: 'He' });
+    const paddedBody = `${validBody}${' '.repeat(
+      16 * 1024 - new TextEncoder().encode(validBody).byteLength
+    )}`;
+
+    const exactResponse = await app.fetch(
+      new Request('http://parks.example.com/api/trip-planner/suggestions', {
+        body: paddedBody,
+        headers: {
+          authorization: 'Bearer test-api-key',
+          'content-type': 'application/json',
+          host: 'parks.example.com'
+        },
+        method: 'POST'
+      })
+    );
+    const overLimitBody = `${paddedBody}x`;
+    const overLimitResponse = await app.fetch(
+      new Request('http://parks.example.com/api/trip-planner/suggestions', {
+        body: overLimitBody,
+        headers: {
+          authorization: 'Bearer test-api-key',
+          'content-length': '1',
+          'content-type': 'application/json',
+          host: 'parks.example.com'
+        },
+        method: 'POST'
+      })
+    );
+
+    expect(exactResponse.status).toBe(200);
+    expect(overLimitResponse.status).toBe(413);
+    expect(fetchFn).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects a multi-chunk planner stream that exceeds the limit before validation', async () => {
+    const fetchFn = mockGeoapifyFetch() as typeof fetch;
+    const app = createTripPlannerApp(fetchFn);
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new Uint8Array(8 * 1024));
+        controller.enqueue(new Uint8Array(8 * 1024));
+        controller.enqueue(new Uint8Array(1));
+        controller.close();
+      }
+    });
+
+    const response = await app.fetch(
+      new Request('http://parks.example.com/api/trip-planner/suggestions', {
+        body,
+        headers: {
+          authorization: 'Bearer test-api-key',
+          'content-type': 'application/json',
+          host: 'parks.example.com'
+        },
+        method: 'POST',
+        duplex: 'half'
+      } as RequestInit & { duplex: 'half' })
+    );
+
+    expect(response.status).toBe(413);
+    expect(fetchFn).not.toHaveBeenCalled();
+  });
+
+  it('returns a client error when the planner request stream fails', async () => {
+    const fetchFn = mockGeoapifyFetch() as typeof fetch;
+    const app = createTripPlannerApp(fetchFn);
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.error(new Error('broken request stream'));
+      }
+    });
+
+    const response = await app.fetch(
+      new Request('http://parks.example.com/api/trip-planner/suggestions', {
+        body,
+        headers: {
+          authorization: 'Bearer test-api-key',
+          'content-type': 'application/json',
+          host: 'parks.example.com'
+        },
+        method: 'POST',
+        duplex: 'half'
+      } as RequestInit & { duplex: 'half' })
+    );
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ error: 'Unable to read request body.' });
+    expect(fetchFn).not.toHaveBeenCalled();
+  });
+
   it('shares the provider budget across app instances', async () => {
     const firstFetch = mockGeoapifyFetch();
     const secondFetch = mockGeoapifyFetch();
     const budgetOptions = {
-      dailyProviderUnits: 5,
+      dailyProviderUnits: 7,
       routeRequestsPerMinute: 10
     };
     const firstApp = createTripPlannerApp(firstFetch as typeof fetch, budgetOptions);
     const secondApp = createTripPlannerApp(secondFetch as typeof fetch, budgetOptions);
 
-    const [firstResponse, secondResponse] = await Promise.all([
-      requestAsRemote(
-        firstApp,
-        {
-          destinationQuery: 'Destination',
-          mode: 'drive',
-          originQuery: 'Origin'
-        },
-        { 'x-trip-planner-client-id': 'client-one' }
-      ),
-      requestAsRemote(
-        secondApp,
-        {
-          destinationQuery: 'Destination',
-          mode: 'drive',
-          originQuery: 'Origin'
-        },
-        { 'x-trip-planner-client-id': 'client-two' }
-      )
-    ]);
+    const firstResponse = await requestAsRemote(
+      firstApp,
+      {
+        destinationQuery: 'Destination',
+        mode: 'drive',
+        originQuery: 'Origin'
+      },
+      { 'x-trip-planner-client-id': 'client-one' }
+    );
+    const secondResponse = await requestAsRemote(
+      secondApp,
+      {
+        destinationQuery: 'Destination',
+        mode: 'drive',
+        originQuery: 'Origin'
+      },
+      { 'x-trip-planner-client-id': 'client-two' }
+    );
 
     expect([firstResponse.status, secondResponse.status].sort()).toEqual([200, 429]);
     expect(firstFetch.mock.calls.length + secondFetch.mock.calls.length).toBe(3);
+  });
+
+  it('does not reserve provider work for a cached route read', async () => {
+    const fetchFn = mockGeoapifyFetch() as typeof fetch;
+    const app = createTripPlannerApp(fetchFn, { dailyProviderUnits: 7 });
+    const body = {
+      destinationQuery: 'Destination',
+      mode: 'drive',
+      originQuery: 'Origin'
+    };
+
+    const firstResponse = await requestAsRemote(app, body, {
+      'x-trip-planner-client-id': 'client_one_123456'
+    });
+    const secondResponse = await requestAsRemote(app, body, {
+      'x-trip-planner-client-id': 'client_two_123456'
+    });
+
+    expect(firstResponse.status).toBe(200);
+    expect(secondResponse.status).toBe(200);
+    expect(fetchFn).toHaveBeenCalledTimes(3);
+  });
+
+  it('denies an uncached provider attempt before upstream work after daily exhaustion', async () => {
+    const fetchFn = mockGeoapifyFetch() as typeof fetch;
+    const app = createTripPlannerApp(fetchFn, { dailyProviderUnits: 7 });
+    const body = {
+      destinationQuery: 'Destination',
+      mode: 'drive',
+      originQuery: 'Origin'
+    };
+
+    expect((await requestAsRemote(app, body)).status).toBe(200);
+    const exhaustedResponse = await requestAsRemote(app, {
+      ...body,
+      originQuery: 'A different origin'
+    });
+
+    expect(exhaustedResponse.status).toBe(429);
+    expect(await exhaustedResponse.json()).toMatchObject({
+      errorCode: 'trip_planner_budget_exceeded'
+    });
+    expect(fetchFn).toHaveBeenCalledTimes(3);
   });
 
   it('returns unvisited areas first, then unvisited trails, then visited results', async () => {

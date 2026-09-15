@@ -35,6 +35,7 @@ The deployment guardrail test for this lives in `tests/integration/vercel-entry.
 - All write routes and `GET /api/admin/parks/visibility` should stay admin-session protected.
 - When adding or changing an env var, update `src/env.ts`, `.env.example`, `README.md`, and the relevant docs in the same change.
 - Treat direct uploads as a storage-cost surface: enforce size and content-type limits against the actual stored object, not only the client request.
+- Planner request limits count the actual request stream before OpenAPI JSON validation. Storage reads use explicit byte ceilings and finite deadlines; callers must pass an appropriate bound instead of reading unbounded object bodies.
 - Keep browser uploads staged and server-finalized: decode with a bounded pixel budget, normalize orientation and metadata, and publish distinct full/thumbnail objects. Do not treat browser preprocessing or a declared MIME type as a trust boundary.
 - Prefer owned data and cached verification over new live third-party request-path dependencies.
 - Before risky imports, migrations, or large manual catalog updates against Turso, take a fresh `npm run db:backup`.
@@ -45,11 +46,13 @@ The deployment guardrail test for this lives in `tests/integration/vercel-entry.
 
 Run `npm run test -- tests/integration/resource-baseline.integration.test.ts` to reproduce the
 deterministic O4 baseline. The test seeds 20 synthetic parks, a 20-visit trip, and a 13-image
-gallery, then measures public JSON bytes, ETag-hit query counts, gallery-page query counts, and
-stored full-versus-thumbnail bytes through the real Hono boundary. The absolute budgets live next
-to the fixture in the test; a deliberately inflated fixture should fail those assertions. Browser
-request and transfer measurements require an authorized production-mode runtime and are tracked
-separately from this CI gate.
+gallery, finalizes deterministic generated images through the direct completion path, and measures
+public JSON bytes, ETag-hit query counts, gallery-page query counts, and persisted derivative bytes
+through the real Hono boundary. The first detailed fixture currently measures 772,939 B full and
+67,259 B thumbnail output; the test asserts the real 2,560 px / 480 px dimension bounds and a
+150 KiB thumbnail ceiling. The absolute budgets live next to the fixture; a deliberately reused
+full image fails the derivative assertion. Browser request and transfer measurements require an
+authorized production-mode runtime and are tracked separately from this CI gate.
 
 ## Branch And PR Workflow
 
@@ -114,7 +117,7 @@ OAuth routes (`/auth/*`) are only registered when `GOOGLE_CLIENT_ID`, `GOOGLE_CL
 `GOOGLE_REDIRECT_URI` is optional and only needed when the public OAuth callback is exposed through a frontend proxy or rewrite instead of the API domain itself.
 `POST /api/trip-planner/suggestions`, `POST /api/trip-planner/search`, and `POST /api/trip-planner/nearby` are available whenever the app boots with a database, but all three return `503` until `GEOAPIFY_API_KEY` is configured. `GET /api/trips/slug/:slug` also depends on that key when a trip has enough stored waypoints to build a route.
 Keep `GEOAPIFY_API_KEY` server-side only. The browser-facing UI should go through the frontend server proxy and the existing backend API-key boundary.
-Trip planner provider work is admitted through a shared libSQL/Turso budget. Suggestions allow 30 requests per client per minute, route and nearby searches allow 5 requests per client per minute, and a provider-wide daily ceiling is configured with `GEOAPIFY_DAILY_REQUEST_LIMIT` (default 3,000 credits; a two-point route search reserves 5 credits to cover the routing API's long-distance surcharge, while public multi-leg routes reserve 5 per leg). Requests over the 16 KiB planner JSON body limit return `413`; exhausted budgets return `429` with `Retry-After`. The UI proxy counts streamed bytes before buffering and supplies the API with a server-issued opaque planner client ID.
+Trip planner request admission and provider reservations are separate shared libSQL/Turso controls. Suggestions allow 30 requests per client per minute, route and nearby searches allow 5 requests per client per minute, and a provider-wide daily ceiling is configured with `GEOAPIFY_DAILY_REQUEST_LIMIT` (default 3,000 credits). Every uncached or new in-flight Geoapify attempt reserves its conservative work-unit cost immediately before the upstream request; cache hits and in-flight followers reserve nothing. Public trip reads do not consume the per-client request bucket, but cold route construction is still bounded by the provider ceiling. Requests over the 16 KiB planner JSON body limit return `413`; exhausted budgets return `429` with `Retry-After`. The UI proxy counts streamed bytes before buffering and supplies the API with a server-issued opaque planner client ID.
 For the current trip-planner search heuristics, start-zone behavior, and tuning definitions, see [docs/trip-planner.md](./trip-planner.md).
 
 Turso/Vercel deployment variables should use the same names where possible:
@@ -337,7 +340,7 @@ Key route behavior:
 - Localhost-style server uploads also support `POST /api/trip-stops/:id/images`, which uses the same Sharp-based processing path and enforces the 6-image trip-stop cap.
 - Deployed clients should use the Vercel-safe direct flow instead: `POST /api/visits/:id/images/upload-url`, upload the file to the returned presigned `PUT` URL, then call `POST /api/visits/:id/images/complete`. Repeating completion with the same key returns the already-created image with `200`; a first completion returns `201`.
 - Trip-stop images use the same Vercel-safe direct flow: `POST /api/trip-stops/:id/images/upload-url`, upload the file to the returned presigned `PUT` URL, then call `POST /api/trip-stops/:id/images/complete`. The same key is idempotent, and atomic completion admission preserves the six-image limit even when multiple upload URLs are outstanding.
-- The direct flow currently stores the uploaded object as both the full-size and thumbnail asset, so it avoids Vercel body and Sharp runtime limits without requiring server-side image processing.
+- The direct flow stores the uploaded object temporarily, then completion validates and processes it into separate immutable JPEG full-size and thumbnail assets. Durable completion claims ensure concurrent retries publish only one derivative pair, while the temporary source remains eligible for delayed cleanup.
 - Image responses include time-limited presigned URLs so the R2 bucket can remain private.
 
 ## Deployment Direction

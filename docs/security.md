@@ -38,9 +38,10 @@ Restrict log access and retention to operational roles. Treat any confirmed hist
 
 - Keep R2 private and use presigned URLs for non-public media.
 - Validate limits against stored-object metadata, not only client-declared metadata. Direct-upload completion requires a positive integer stored size no greater than 15 MiB; missing or invalid metadata returns `422`, while an oversized stored object returns `413` and creates no image row.
+- Completion GETs use a bounded, deadline-limited object stream and stop reading when the 15 MiB source limit is exceeded; they do not buffer an unbounded `transformToByteArray()` result. The derivative backfill uses the same explicit source bound and keeps retained sources when a read fails.
 - Direct browser PUTs target parent-scoped temporary keys. Completion reads the stored object, limits decoding to 40 megapixels, applies orientation, strips EXIF/GPS metadata, and creates separate server-owned JPEG full (maximum 2,560 px) and thumbnail (maximum 480 px; 150 KiB quality budget) keys. The temporary key is separately persisted as the parent-scoped completion identity, so a retry returns the original image with `200` and fresh read URLs even after staging cleanup; a first successful completion returns `201`. The database enforces that identity and atomically admits no more than six trip-stop images.
 - Before applying migration `0034_image_completion_identity.sql` to an existing database, run `npm run db:check-image-duplicates`. It is read-only and exits nonzero with every duplicate parent/key group, its ordering, and featured-image references. Repair any reported group manually before migrating; do not delete ambiguous rows automatically.
-- Apply `0035_image_derivative_upload_identity.sql` before deploying the image-processing completion handler. Before production promotion, prove one disposable direct upload through the deployed R2/Vercel runtime; local Sharp tests do not establish function memory or duration limits.
+- Apply `0035_image_derivative_upload_identity.sql` and `0037_media_upload_processing_claim.sql` before deploying the image-processing completion handler. Completion claims each staged upload with a durable fencing token and publishes to unique derivative keys, so concurrent retries cannot overwrite the committed image. Before production promotion, prove one disposable direct upload through the deployed R2/Vercel runtime; local Sharp tests do not establish function memory or duration limits.
 - `npm run media:convert-existing-images` converts photos uploaded before thumbnail support into a normal-size JPEG and a thumbnail. It keeps the old source image initially and does not delete anything. The separate source-file cleanup below can remove that old copy only after checking published review snapshots.
 - Keep upload and object-retention limits documented so bandwidth and storage remain predictable.
 - Do not remove media based only on absence from ordinary image rows; published review snapshots can still reference frozen image keys.
@@ -48,6 +49,8 @@ Restrict log access and retention to operational roles. Treat any confirmed hist
 ### Convert existing images
 
 Run this only after the image-processing handler and migration are deployed. One command converts all older images that still need a thumbnail. It works through images in small groups so it does not try to hold the whole library in memory, but you run the command only once. Each finished image is saved immediately.
+
+The database must already be current. The preview and `--apply` command validate migration readiness but never apply migrations; run the separate migration workflow first when they report pending files.
 
 1. Start with a preview. It writes nothing and reports every older image that still needs conversion:
 
@@ -79,6 +82,8 @@ The preview result uses `imagesToConvert` for the number of images it would conv
 
 Run this only after the existing-image conversion has completed successfully. It is a one-time storage cleanup for the old root image files that M1 kept alongside the new normal-size image and thumbnail. It does **not** remove either current image size.
 
+The database must already be current. This preview and its `--apply` operation never apply pending migrations.
+
 1. Start with a preview. It scans all visit and trip-stop image folders internally, identifies only files created by the completed M1 conversion, and checks every published year-review and date-range-review snapshot:
 
    ```sh
@@ -103,6 +108,8 @@ Deleting an image, visit, trip stop, or trip removes it from the application imm
 
 Run the review command from a trusted operator machine with the production database and restricted R2 credentials:
 
+The database must already be current. This preview and its `--apply` operation never apply pending migrations; apply schema changes through the separate migration workflow first.
+
 ```sh
 npm run media:cleanup-unused-images
 ```
@@ -119,7 +126,7 @@ Run a preview after bulk imports or large deletions and at least monthly. Produc
 
 ## External services
 
-Normal reads use the owned database rather than live upstream catalog requests. Geoapify is limited to the trip-planner operations, remains server-side, uses short timeouts, reuses identical requests in process, and returns `503` when unavailable. Public provider work uses an atomic shared libSQL/Turso budget with separate per-client suggestion, route, and nearby limits plus a provider-wide daily credit ceiling. Two-point route searches reserve five credits to cover geocoding plus the routing API's long-distance surcharge; public multi-leg routes reserve five per leg; suggestions and nearby searches reserve one. The paired UI proxy counts and caps planner request bodies at 16 KiB before buffering; the API repeats the declared-size guard. Confirm the daily limit and edge rules against the provider subscription before production exposure.
+Normal reads use the owned database rather than live upstream catalog requests. Geoapify is limited to the trip-planner operations, remains server-side, uses short timeouts, reuses identical requests in process, and returns `503` when unavailable. Shared libSQL/Turso controls separate per-client request admission from provider-credit reservations. Suggestions, route searches, and nearby searches retain their per-client minute limits; each actual uncached or new in-flight provider attempt reserves a conservative work-unit cost before network work, while cache hits and in-flight followers reserve zero. Public trip reads do not consume the per-client request bucket; cold route construction remains subject to the provider-wide daily ceiling. The paired UI proxy counts and caps planner request bodies at 16 KiB before buffering; the API counts actual request bytes before JSON validation. Confirm the daily limit, provider work-unit policy, and edge rules against the provider subscription before production exposure.
 
 ## Deployment requirements
 

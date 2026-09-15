@@ -1,12 +1,12 @@
 import { createDatabaseClient } from '../db/client.js';
 import { createDatabase } from '../db/database.js';
-import { migrateDatabase } from '../db/migrate.js';
 import { getEnv } from '../env.js';
 import {
   runUnusedMediaCleanup,
   UNUSED_MEDIA_MINIMUM_AGE_MS
 } from '../media/unused-media-cleanup.js';
 import { createR2Client } from '../storage/r2-client.js';
+import { assertReadOnlyMediaDatabaseIsCurrent } from './assert-read-only-media-database.js';
 
 const usage =
   'Usage: npm run media:cleanup-unused-images -- [--apply] [--older-than-days <minimum 8>]';
@@ -68,17 +68,18 @@ const getR2Config = () => {
 };
 
 const args = parseArgs(process.argv.slice(2));
+const r2Config = getR2Config();
 const client = createDatabaseClient();
 
 try {
-  await migrateDatabase(client);
+  await assertReadOnlyMediaDatabaseIsCurrent(client);
 
   const result = await runUnusedMediaCleanup({
     apply: args.apply,
     database: createDatabase(client),
     minimumAgeMs: args.olderThanDays * 24 * 60 * 60 * 1000,
     now: new Date(),
-    storage: createR2Client(getR2Config())
+    storage: createR2Client(r2Config)
   });
   const status =
     result.failures.length > 0

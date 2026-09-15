@@ -14,10 +14,21 @@ export type StoredObjectPage = {
   nextCursor: string | null;
 };
 
+export type StorageReadOptions = {
+  maxBytes?: number | undefined;
+  timeoutMs?: number | undefined;
+};
+
+export class StorageObjectTooLargeError extends Error {
+  constructor() {
+    super('Stored object exceeds the configured read limit.');
+  }
+}
+
 export interface StorageClient {
   upload(key: string, buffer: Buffer, contentType: string): Promise<void>;
   delete(key: string): Promise<void>;
-  getObject(key: string): Promise<Buffer | null>;
+  getObject(key: string, options?: StorageReadOptions): Promise<Buffer | null>;
   getPresignedUrl(key: string, expiresInSeconds: number): Promise<string>;
   getPresignedUploadUrl(
     key: string,
