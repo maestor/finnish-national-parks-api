@@ -1,9 +1,9 @@
 import { createDatabaseClient } from '../db/client.js';
 import { createDatabase } from '../db/database.js';
-import { migrateDatabase } from '../db/migrate.js';
 import { getEnv } from '../env.js';
 import { runConvertedImageOriginalRetirement } from '../media/retire-converted-image-originals.js';
 import { createR2Client } from '../storage/r2-client.js';
+import { assertReadOnlyMediaDatabaseIsCurrent } from './assert-read-only-media-database.js';
 
 const usage = 'Usage: npm run media:remove-converted-originals -- [--apply]';
 
@@ -43,15 +43,16 @@ const getR2Config = () => {
 };
 
 const args = parseArgs(process.argv.slice(2));
+const r2Config = getR2Config();
 const client = createDatabaseClient();
 
 try {
-  await migrateDatabase(client);
+  await assertReadOnlyMediaDatabaseIsCurrent(client);
 
   const result = await runConvertedImageOriginalRetirement({
     apply: args.apply,
     database: createDatabase(client),
-    storage: createR2Client(getR2Config())
+    storage: createR2Client(r2Config)
   });
   const status =
     result.failures.length > 0

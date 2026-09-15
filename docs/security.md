@@ -49,6 +49,8 @@ Restrict log access and retention to operational roles. Treat any confirmed hist
 
 Run this only after the image-processing handler and migration are deployed. One command converts all older images that still need a thumbnail. It works through images in small groups so it does not try to hold the whole library in memory, but you run the command only once. Each finished image is saved immediately.
 
+The database must already be current. The preview and `--apply` command validate migration readiness but never apply migrations; run the separate migration workflow first when they report pending files.
+
 1. Start with a preview. It writes nothing and reports every older image that still needs conversion:
 
    ```sh
@@ -79,6 +81,8 @@ The preview result uses `imagesToConvert` for the number of images it would conv
 
 Run this only after the existing-image conversion has completed successfully. It is a one-time storage cleanup for the old root image files that M1 kept alongside the new normal-size image and thumbnail. It does **not** remove either current image size.
 
+The database must already be current. This preview and its `--apply` operation never apply pending migrations.
+
 1. Start with a preview. It scans all visit and trip-stop image folders internally, identifies only files created by the completed M1 conversion, and checks every published year-review and date-range-review snapshot:
 
    ```sh
@@ -102,6 +106,8 @@ This command is intentionally separate from `media:cleanup-unused-images`: the l
 Deleting an image, visit, trip stop, or trip removes it from the application immediately. Its stored image files are recorded for delayed cleanup instead of being deleted during the user request. This preserves a recovery window and means a temporary R2 failure never makes a successful user deletion fail unpredictably.
 
 Run the review command from a trusted operator machine with the production database and restricted R2 credentials:
+
+The database must already be current. This preview and its `--apply` operation never apply pending migrations; apply schema changes through the separate migration workflow first.
 
 ```sh
 npm run media:cleanup-unused-images

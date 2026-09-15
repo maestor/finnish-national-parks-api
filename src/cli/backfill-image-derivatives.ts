@@ -1,9 +1,9 @@
 import { createDatabaseClient } from '../db/client.js';
 import { createDatabase } from '../db/database.js';
-import { migrateDatabase } from '../db/migrate.js';
 import { getEnv } from '../env.js';
 import { runImageDerivativeBackfillToCompletion } from '../images/backfill-image-derivatives.js';
 import { createR2Client } from '../storage/r2-client.js';
+import { assertReadOnlyMediaDatabaseIsCurrent } from './assert-read-only-media-database.js';
 
 const usage = 'Usage: npm run media:convert-existing-images -- [--apply] [--batch-size <1-100>]';
 
@@ -69,16 +69,17 @@ const getR2Config = () => {
 };
 
 const args = parseArgs(process.argv.slice(2));
+const r2Config = getR2Config();
 const client = createDatabaseClient();
 
 try {
-  await migrateDatabase(client);
+  await assertReadOnlyMediaDatabaseIsCurrent(client);
 
   const result = await runImageDerivativeBackfillToCompletion({
     ...args,
     cursor: defaultCursor,
     database: createDatabase(client),
-    storage: createR2Client(getR2Config())
+    storage: createR2Client(r2Config)
   });
 
   const problems = result.failures.map((failure) => ({
