@@ -174,7 +174,9 @@ When a production platform behavior cannot be reproduced locally, add the smalle
 
 ## CI
 
-Pull requests against `main` trigger a GitHub Actions workflow that runs `npm run verify`. The build must pass before review and merge.
+Pull requests against `main` trigger a GitHub Actions workflow that runs `npm run verify`. The workflow grants `contents: read`, stops after 30 minutes, and cancels an older verification run for the same pull request when a newer commit arrives. Its checkout and Node setup actions are pinned to immutable official release SHAs; Dependabot updates those pins weekly. The build must pass before review and merge.
+
+The weekly `Dependency Audit` workflow can also be started manually. It installs the locked dependency tree and runs `npm audit --audit-level=high`, including development dependencies, without production secrets or an application build. A failed scheduled run is the owner-facing signal to inspect the advisory and decide whether to update, constrain, or document the affected dependency. The production migration workflow remains separately serialized and non-cancelled.
 Pushes to `main` trigger the `Production Migration` workflow, which first checks whether production has pending SQL migrations, then backs up and migrates only when needed. That job is intended to be selected as a Vercel Deployment Check before production auto-promotion.
 
 The Vitest `testTimeout` is raised to 20 seconds because full-catalog importer integration tests insert 148 fixture records per test and can exceed the 5-second default on constrained CI runners even though they finish in well under a second locally.
