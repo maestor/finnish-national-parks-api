@@ -21,6 +21,7 @@ const createEnv = (overrides: Partial<Env> = {}): Env => {
     GOOGLE_CLIENT_ID: undefined,
     GOOGLE_CLIENT_SECRET: undefined,
     GOOGLE_REDIRECT_URI: undefined,
+    LOCAL_AGENT_AUTH_ENABLED: 'false',
     MEMORY_STORAGE: 'false',
     PORT: undefined,
     PUBLIC_API_BASE_URL: undefined,
@@ -81,6 +82,53 @@ describe('runtime helpers', () => {
       googleClientId: 'google-client-id',
       googleClientSecret: 'google-client-secret',
       jwtSecret: '12345678901234567890123456789012'
+    });
+  });
+
+  it('creates local agent auth only when explicitly enabled outside deployment', () => {
+    expect(
+      createAuthConfig(
+        createEnv({
+          AUTH_JWT_SECRET: '12345678901234567890123456789012',
+          LOCAL_AGENT_AUTH_ENABLED: 'true'
+        }),
+        { NODE_ENV: 'development' }
+      )
+    ).toEqual({
+      cookieName: '__session',
+      frontendUrl: 'https://parks.example.com',
+      jwtSecret: '12345678901234567890123456789012',
+      localAgentAuthEnabled: true
+    });
+
+    expect(
+      createAuthConfig(
+        createEnv({
+          AUTH_JWT_SECRET: '12345678901234567890123456789012',
+          LOCAL_AGENT_AUTH_ENABLED: 'false'
+        }),
+        { NODE_ENV: 'development' }
+      )
+    ).toBeUndefined();
+
+    expect(
+      createAuthConfig(
+        createEnv({
+          AUTH_JWT_SECRET: '12345678901234567890123456789012',
+          DATABASE_URL: 'file:./data/local.db',
+          GOOGLE_CLIENT_ID: 'google-client-id',
+          GOOGLE_CLIENT_SECRET: 'google-client-secret',
+          LOCAL_AGENT_AUTH_ENABLED: 'true'
+        }),
+        { NODE_ENV: 'development' }
+      )
+    ).toEqual({
+      cookieName: '__session',
+      frontendUrl: 'https://parks.example.com',
+      googleClientId: 'google-client-id',
+      googleClientSecret: 'google-client-secret',
+      jwtSecret: '12345678901234567890123456789012',
+      localAgentAuthEnabled: true
     });
   });
 

@@ -38,25 +38,51 @@ export const createStorage = (env: Env) => {
   return undefined;
 };
 
-export const createAuthConfig = (env: Env) => {
-  if (!(env.AUTH_JWT_SECRET && env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET)) {
+export const createAuthConfig = (env: Env, runtimeEnv: NodeJS.ProcessEnv = process.env) => {
+  const googleOAuthEnabled = Boolean(
+    env.AUTH_JWT_SECRET && env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET
+  );
+  const localAgentAuthEnabled =
+    env.LOCAL_AGENT_AUTH_ENABLED === 'true' && !isVercelDeployment(runtimeEnv);
+
+  if (!(env.AUTH_JWT_SECRET && (googleOAuthEnabled || localAgentAuthEnabled))) {
     return undefined;
   }
 
   const authConfig = {
     cookieName: env.AUTH_COOKIE_NAME,
     frontendUrl: env.FRONTEND_URL,
-    googleClientId: env.GOOGLE_CLIENT_ID,
-    googleClientSecret: env.GOOGLE_CLIENT_SECRET,
     jwtSecret: env.AUTH_JWT_SECRET
   };
 
+  const configuredAuth = googleOAuthEnabled
+    ? {
+        ...authConfig,
+        googleClientId: env.GOOGLE_CLIENT_ID,
+        googleClientSecret: env.GOOGLE_CLIENT_SECRET
+      }
+    : authConfig;
+
+  const authWithLocalAgent = localAgentAuthEnabled
+    ? { ...authConfig, localAgentAuthEnabled: true }
+    : configuredAuth;
+
+  if (!(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET)) {
+    return authWithLocalAgent;
+  }
+
+  const authWithGoogle = {
+    ...authWithLocalAgent,
+    googleClientId: env.GOOGLE_CLIENT_ID,
+    googleClientSecret: env.GOOGLE_CLIENT_SECRET
+  };
+
   if (!env.GOOGLE_REDIRECT_URI) {
-    return authConfig;
+    return authWithGoogle;
   }
 
   return {
-    ...authConfig,
+    ...authWithGoogle,
     googleRedirectUri: env.GOOGLE_REDIRECT_URI
   };
 };

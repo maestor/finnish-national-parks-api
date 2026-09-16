@@ -95,6 +95,7 @@ GOOGLE_CLIENT_SECRET=
 GOOGLE_REDIRECT_URI=
 AUTH_JWT_SECRET=change-me-to-a-long-random-string
 AUTH_COOKIE_NAME=__session
+LOCAL_AGENT_AUTH_ENABLED=false
 FRONTEND_URL=http://localhost:4300
 
 # Geoapify trip planner (optional — only needed when testing the route planner backend)
@@ -113,8 +114,9 @@ MEMORY_STORAGE=false
 All variables are optional for local development — sensible defaults are built in. `API_KEY` is only required if you want to test authenticated access locally; localhost requests bypass auth even when it is set.
 The importer's LIPAS source URL and supported type-code list are internal configuration rather than `.env` settings.
 
-OAuth routes (`/auth/*`) are only registered when `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, and `AUTH_JWT_SECRET` are all provided.
+OAuth routes (`/auth/google*`) are available when `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, and `AUTH_JWT_SECRET` are all provided.
 `GOOGLE_REDIRECT_URI` is optional and only needed when the public OAuth callback is exposed through a frontend proxy or rewrite instead of the API domain itself.
+For AI-agent work against a local admin UI, set `LOCAL_AGENT_AUTH_ENABLED=true` in the local API, then open `http://localhost:4300/auth/dev-login` through the paired UI. The backend creates a normal 24-hour admin session for a synthetic local identity and redirects to `/hallinta`; no admin row or Google account is created. The endpoint is loopback-only, the local server binds to `127.0.0.1`, and Vercel rejects the setting. Enable it only when the local API is connected to a development database that is safe for agent edits.
 `POST /api/trip-planner/suggestions`, `POST /api/trip-planner/search`, and `POST /api/trip-planner/nearby` are available whenever the app boots with a database, but all three return `503` until `GEOAPIFY_API_KEY` is configured. `GET /api/trips/slug/:slug` also depends on that key when a trip has enough stored waypoints to build a route.
 Keep `GEOAPIFY_API_KEY` server-side only. The browser-facing UI should go through the frontend server proxy and the existing backend API-key boundary.
 Trip planner request admission and provider reservations are separate shared libSQL/Turso controls. Suggestions allow 30 requests per client per minute, route and nearby searches allow 5 requests per client per minute, and a provider-wide daily ceiling is configured with `GEOAPIFY_DAILY_REQUEST_LIMIT` (default 3,000 credits). Every uncached or new in-flight Geoapify attempt reserves its conservative work-unit cost immediately before the upstream request; cache hits and in-flight followers reserve nothing. Public trip reads do not consume the per-client request bucket, but cold route construction is still bounded by the provider ceiling. Requests over the 16 KiB planner JSON body limit return `413`; exhausted budgets return `429` with `Retry-After`. The UI proxy counts streamed bytes before buffering and supplies the API with a server-issued opaque planner client ID.

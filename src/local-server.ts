@@ -8,6 +8,7 @@ const port = Number.parseInt(env.PORT ?? '3004', 10);
 const server = serve(
   {
     fetch: app.fetch,
+    hostname: '127.0.0.1',
     port
   },
   (info) => {
