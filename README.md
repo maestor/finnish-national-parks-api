@@ -61,6 +61,7 @@ GOOGLE_CLIENT_ID=
 GOOGLE_CLIENT_SECRET=
 GOOGLE_REDIRECT_URI=
 AUTH_JWT_SECRET=change-me-to-a-long-random-string
+LOCAL_AGENT_AUTH_ENABLED=false
 FRONTEND_URL=http://localhost:4300
 
 # Optional: enable the backend trip planner with Geoapify geocoding + routing
@@ -171,6 +172,7 @@ Auth endpoints for control-panel login:
 
 - `GET /auth/google`
 - `GET /auth/google/callback`
+- `GET /auth/dev-login` — local AI-agent login only; unavailable unless explicitly enabled in the local API
 - `GET /auth/me`
 - `POST /auth/logout`
 

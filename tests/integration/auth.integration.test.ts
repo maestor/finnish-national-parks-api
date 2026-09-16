@@ -13,6 +13,19 @@ const authConfig = {
   jwtSecret: 'test-jwt-secret-at-least-32-characters-long'
 };
 
+const localAgentAuthConfig = {
+  cookieName: '__session',
+  frontendUrl: 'http://localhost:4300',
+  jwtSecret: 'test-jwt-secret-at-least-32-characters-long',
+  localAgentAuthEnabled: true
+};
+
+const getSessionCookieValue = (response: Response) => {
+  const cookie = response.headers.getSetCookie().find((value) => value.startsWith('__session='));
+
+  return cookie?.split(';', 1)[0]?.slice('__session='.length);
+};
+
 const createAdminSessionCookie = async () => {
   const token = await createSessionToken(
     {
@@ -188,6 +201,63 @@ describe('auth middleware', () => {
     for (const response of responses) {
       expect(response.headers.get('cache-control')).toBe('private, no-store');
     }
+  });
+
+  it('creates a local agent session only for loopback requests', async () => {
+    const app = createApp({ auth: localAgentAuthConfig, database: testDatabase.database });
+
+    const response = await app.request('/auth/dev-login', {
+      headers: { host: 'localhost:3004' }
+    });
+
+    expect(response.status).toBe(302);
+    expect(response.headers.get('location')).toBe('http://localhost:4300/control-panel');
+    expect(response.headers.get('cache-control')).toBe('private, no-store');
+
+    const sessionCookie = getSessionCookieValue(response);
+    expect(sessionCookie).toBeDefined();
+
+    const meResponse = await app.request('/auth/me', {
+      headers: {
+        cookie: `__session=${sessionCookie}`,
+        host: 'localhost:3004'
+      }
+    });
+
+    expect(meResponse.status).toBe(200);
+    expect(await meResponse.json()).toEqual({
+      email: 'ai-agent@localhost.invalid',
+      id: 'local-ai-agent',
+      isSuperAdmin: false,
+      name: 'Local AI agent',
+      picture: ''
+    });
+
+    const remoteResponse = await app.request('/auth/dev-login', {
+      headers: {
+        host: 'localhost:3004',
+        'x-forwarded-for': '203.0.113.1'
+      }
+    });
+
+    expect(remoteResponse.status).toBe(404);
+
+    const wrongHostResponse = await app.request('https://example.com/auth/dev-login');
+
+    expect(wrongHostResponse.status).toBe(404);
+  });
+
+  it('does not expose the local agent login when it is disabled', async () => {
+    const app = createApp({
+      auth: { ...localAgentAuthConfig, localAgentAuthEnabled: false },
+      database: testDatabase.database
+    });
+
+    const response = await app.request('/auth/dev-login', {
+      headers: { host: 'localhost:3004' }
+    });
+
+    expect(response.status).toBe(404);
   });
 
   it('leaves health and openapi.json unprotected', async () => {

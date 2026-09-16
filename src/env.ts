@@ -15,6 +15,7 @@ const envSchema = z.object({
   GOOGLE_CLIENT_ID: z.string().optional(),
   GOOGLE_CLIENT_SECRET: z.string().optional(),
   GOOGLE_REDIRECT_URI: z.string().url().optional(),
+  LOCAL_AGENT_AUTH_ENABLED: z.enum(['true', 'false']).default('false'),
   MEMORY_STORAGE: z.enum(['true', 'false']).default('false'),
   PORT: z.string().optional(),
   PUBLIC_API_BASE_URL: z.string().url().optional(),
@@ -45,6 +46,10 @@ export const assertDeploymentEnv = (env: Env, runtimeEnv: NodeJS.ProcessEnv = pr
 
   if (!env.API_KEY) {
     throw new Error('Vercel deployments require API_KEY to protect non-public endpoints.');
+  }
+
+  if (env.LOCAL_AGENT_AUTH_ENABLED === 'true') {
+    throw new Error('Vercel deployments cannot enable LOCAL_AGENT_AUTH_ENABLED.');
   }
 
   if (env.DATABASE_URL.startsWith('file:')) {

@@ -24,6 +24,8 @@ Enrolled super admins can create an invitation with `POST /api/admin/invitations
 
 Sessions are HS256 JWTs with a 24-hour lifetime, issuer `reissuvihko-api`, audience `reissuvihko-ui`, and role `admin`. The `__session` cookie is `HttpOnly`, `SameSite=Lax`, `Path=/`, and `Secure` in production. Admin and private responses use `Cache-Control: private, no-store`.
 
+Local AI-agent login is a separate development-only shortcut at `GET /auth/dev-login`. It is enabled only by the explicit `LOCAL_AGENT_AUTH_ENABLED=true` setting, rejects Vercel deployments and non-loopback requests, and issues the same signed session shape as Google login for the synthetic `local-ai-agent` identity. It does not create an admin database row or grant super-admin access. Because it grants ordinary admin access to whatever database the local API uses, enable it only for a development database that is safe for agent edits.
+
 The frontend must independently validate session issuer, audience, expiry, and admin role before proxying admin operations. OAuth/session failures fail closed.
 
 ## Logging

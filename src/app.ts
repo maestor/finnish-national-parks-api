@@ -137,6 +137,7 @@ import {
   updateAdminUserRoute
 } from './routes/admin-users.js';
 import {
+  devAgentAuthRoute,
   getAuthMeRoute,
   googleAuthCallbackRoute,
   googleAuthRoute,
@@ -230,10 +231,11 @@ import {
 type AuthConfig = {
   cookieName: string;
   frontendUrl: string;
-  googleClientId: string;
-  googleClientSecret: string;
+  googleClientId?: string;
+  googleClientSecret?: string;
   googleRedirectUri?: string;
   jwtSecret: string;
+  localAgentAuthEnabled?: boolean;
 };
 
 type AppDependencies = {
@@ -263,6 +265,7 @@ const PUBLIC_LOGO_REDIRECT_CACHE_CONTROL = 'public, max-age=86400';
 const TRIP_PLANNER_REQUEST_BODY_LIMIT_BYTES = 16 * 1024;
 const DIRECT_IMAGE_COMPLETION_WAIT_MS = 5_000;
 const DIRECT_IMAGE_COMPLETION_POLL_MS = 50;
+const LOOPBACK_HOSTNAMES = new Set(['127.0.0.1', '::1', 'localhost']);
 
 const readRequestBodyWithinLimit = async (request: Request, maxBytes: number) => {
   if (!request.body) {
@@ -1035,6 +1038,11 @@ const requireAdminSession = async (context: SessionContext, auth?: AuthConfig) =
   return null;
 };
 
+const isLoopbackRequest = (context: SessionContext) => {
+  const hostname = new URL(context.req.url).hostname;
+  return !context.req.header('x-forwarded-for') && LOOPBACK_HOSTNAMES.has(hostname);
+};
+
 const getAuthenticatedSession = async (context: SessionContext, auth?: AuthConfig) => {
   if (!auth) {
     return null;
@@ -1259,8 +1267,29 @@ export const createApp = ({
   if (database) {
     const effectiveTripPlannerBudget = tripPlannerBudget ?? createTripPlannerBudget({ database });
 
+    app.openapi(devAgentAuthRoute, async (c) => {
+      if (!auth?.localAgentAuthEnabled || !isLoopbackRequest(c)) {
+        return c.json({ error: 'Not found.' }, 404);
+      }
+
+      const sessionToken = await createSessionToken(
+        {
+          email: 'ai-agent@localhost.invalid',
+          name: 'Local AI agent',
+          picture: '',
+          role: 'admin',
+          sub: 'local-ai-agent'
+        },
+        new TextEncoder().encode(auth.jwtSecret)
+      );
+
+      setSessionCookie(c, sessionToken, auth.cookieName);
+
+      return c.redirect(`${auth.frontendUrl}/control-panel`, 302);
+    });
+
     app.openapi(googleAuthRoute, async (c) => {
-      if (!auth) {
+      if (!(auth?.googleClientId && auth.googleClientSecret)) {
         return c.json({ error: 'OAuth not configured.' }, 503);
       }
 
@@ -1295,7 +1324,7 @@ export const createApp = ({
     });
 
     app.openapi(googleAuthCallbackRoute, async (c) => {
-      if (!auth) {
+      if (!(auth?.googleClientId && auth.googleClientSecret)) {
         return c.json({ error: 'OAuth not configured.' }, 503);
       }
 

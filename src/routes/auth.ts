@@ -2,6 +2,32 @@ import { createRoute, z } from '@hono/zod-openapi';
 import { authUserSchema } from '../contracts/auth.js';
 import { errorSchema } from '../contracts/common.js';
 
+export const devAgentAuthRoute = createRoute({
+  method: 'get',
+  path: '/auth/dev-login',
+  security: [],
+  tags: ['Auth'],
+  responses: {
+    302: {
+      description: 'Create a local AI-agent session and redirect to the control panel',
+      headers: {
+        Location: {
+          description: 'Frontend control-panel URL',
+          schema: { type: 'string' }
+        }
+      }
+    },
+    404: {
+      content: {
+        'application/json': {
+          schema: errorSchema
+        }
+      },
+      description: 'Local AI-agent auth is unavailable for this request'
+    }
+  }
+});
+
 export const googleAuthRoute = createRoute({
   method: 'get',
   path: '/auth/google',

@@ -15,6 +15,7 @@ const createEnv = (overrides: Partial<Env> = {}): Env => {
     GOOGLE_CLIENT_ID: undefined,
     GOOGLE_CLIENT_SECRET: undefined,
     GOOGLE_REDIRECT_URI: undefined,
+    LOCAL_AGENT_AUTH_ENABLED: 'false',
     MEMORY_STORAGE: 'false',
     PORT: undefined,
     PUBLIC_API_BASE_URL: undefined,
@@ -89,5 +90,14 @@ describe('deployment environment guardrails', () => {
         }
       )
     ).toThrow('Vercel deployments with Google OAuth enabled require GOOGLE_REDIRECT_URI');
+  });
+
+  it('rejects local agent auth on Vercel', () => {
+    expect(() =>
+      assertDeploymentEnv(createEnv({ LOCAL_AGENT_AUTH_ENABLED: 'true' }), {
+        VERCEL: '1',
+        VERCEL_ENV: 'preview'
+      })
+    ).toThrow('Vercel deployments cannot enable LOCAL_AGENT_AUTH_ENABLED.');
   });
 });
