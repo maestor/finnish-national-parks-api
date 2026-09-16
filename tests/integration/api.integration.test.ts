@@ -17,7 +17,7 @@ import {
   getParkBySlug,
   getYearReviewTripFeaturedImageAssetsByTripId
 } from '../../src/db/repositories.js';
-import { parks } from '../../src/db/schema.js';
+import { parks, tripRoutes } from '../../src/db/schema.js';
 import { createSessionToken } from '../../src/http/session.js';
 import { importParks } from '../../src/importer/import-parks.js';
 import { importSpecialParks } from '../../src/importer/import-special-parks.js';
@@ -2621,11 +2621,11 @@ describe('API routes', () => {
     ]);
   });
 
-  it('returns page-ready trip detail by slug with derived counts and route data', async () => {
+  it('returns page-ready trip detail by slug and loads its route separately', async () => {
     const buildRoundTripRoute: NonNullable<TripPlannerService['buildRoundTripRoute']> = vi.fn(
       async (): Promise<TripPlannerRoundTripRoute> => ({
         distanceMeters: 482_500,
-        durationSeconds: 21_600,
+        durationSeconds: 21_600.5,
         geometry: {
           coordinates: [
             [24.9384, 60.1699] as [number, number],
@@ -2874,9 +2874,23 @@ describe('API routes', () => {
       }
     ]);
     expect(body.route).toEqual({
+      data: null,
+      error: null,
+      success: true
+    });
+
+    const routeResponse = await app.request('/api/trips/slug/kesareissu-2026/route');
+    const routeBody = (await routeResponse.json()) as {
+      data: NonNullable<typeof body.route.data>;
+      error: null;
+      success: boolean;
+    };
+
+    expect(routeResponse.status).toBe(200);
+    expect(routeBody).toEqual({
       data: {
         distanceMeters: 482_500,
-        durationSeconds: 21_600,
+        durationSeconds: 21_600.5,
         geometry: {
           coordinates: [
             [24.9384, 60.1699],
@@ -2941,6 +2955,63 @@ describe('API routes', () => {
         })
       ]
     });
+
+    const cachedRouteResponse = await app.request('/api/trips/slug/kesareissu-2026/route');
+    expect(cachedRouteResponse.status).toBe(200);
+    expect(await cachedRouteResponse.json()).toEqual(routeBody);
+    expect(buildRoundTripRoute).toHaveBeenCalledTimes(1);
+
+    await testDatabase.database
+      .update(tripRoutes)
+      .set({ routeJson: '{malformed-route-cache' })
+      .where(eq(tripRoutes.tripId, trip.id));
+
+    const repairedRouteResponse = await app.request('/api/trips/slug/kesareissu-2026/route');
+    expect(repairedRouteResponse.status).toBe(200);
+    expect(await repairedRouteResponse.json()).toEqual(routeBody);
+    expect(buildRoundTripRoute).toHaveBeenCalledTimes(2);
+
+    await testDatabase.database
+      .update(tripRoutes)
+      .set({ routeJson: '{}' })
+      .where(eq(tripRoutes.tripId, trip.id));
+
+    const replannedInvalidRouteResponse = await app.request(
+      '/api/trips/slug/kesareissu-2026/route'
+    );
+    expect(replannedInvalidRouteResponse.status).toBe(200);
+    expect(await replannedInvalidRouteResponse.json()).toEqual(routeBody);
+    expect(buildRoundTripRoute).toHaveBeenCalledTimes(3);
+
+    const descriptionUpdateResponse = await requestAsAdmin(app, `/api/trips/${trip.id}`, {
+      body: JSON.stringify({ description: 'Päivitetty kuvaus.' }),
+      headers: { 'content-type': 'application/json' },
+      method: 'PATCH'
+    });
+    expect(descriptionUpdateResponse.status).toBe(200);
+
+    const stillCachedRouteResponse = await app.request('/api/trips/slug/kesareissu-2026/route');
+    expect(stillCachedRouteResponse.status).toBe(200);
+    expect(buildRoundTripRoute).toHaveBeenCalledTimes(3);
+
+    const startingPointUpdateResponse = await requestAsAdmin(app, `/api/trips/${trip.id}`, {
+      body: JSON.stringify({
+        startingPoint: {
+          coordinate: {
+            lat: 60.2,
+            lon: 24.9
+          },
+          label: 'Uusi lähtöpiste'
+        }
+      }),
+      headers: { 'content-type': 'application/json' },
+      method: 'PATCH'
+    });
+    expect(startingPointUpdateResponse.status).toBe(200);
+
+    const refreshedRouteResponse = await app.request('/api/trips/slug/kesareissu-2026/route');
+    expect(refreshedRouteResponse.status).toBe(200);
+    expect(buildRoundTripRoute).toHaveBeenCalledTimes(4);
   });
 
   it('returns only one public trip visit image page without loading the trip route', async () => {
@@ -3034,6 +3105,11 @@ describe('API routes', () => {
     );
 
     expect(hiddenParentResponse.status).toBe(404);
+
+    const missingStopResponse = await app.request(
+      `/api/trips/slug/${trip.slug}/stops/999999/images`
+    );
+    expect(missingStopResponse.status).toBe(404);
   });
 
   it('returns a successful empty route state by slug when the trip does not meet route prerequisites', async () => {
@@ -3098,6 +3174,18 @@ describe('API routes', () => {
       success: true
     });
     expect(buildRoundTripRoute).not.toHaveBeenCalled();
+
+    const routeResponse = await app.request('/api/trips/slug/yksinainen-retki/route');
+    expect(routeResponse.status).toBe(200);
+    expect(await routeResponse.json()).toEqual({
+      data: null,
+      error: null,
+      success: true
+    });
+    expect(buildRoundTripRoute).not.toHaveBeenCalled();
+
+    const missingTripResponse = await app.request('/api/trips/slug/missing-trip');
+    expect(missingTripResponse.status).toBe(404);
   });
 
   it('keeps excluded visits in the trip payload but omits them from route calculation', async () => {
@@ -3173,11 +3261,12 @@ describe('API routes', () => {
           id: number;
         };
       }>;
-      route: {
-        data: TripPlannerRoundTripRoute | null;
-        error: null;
-        success: boolean;
-      };
+    };
+    const routeResponse = await app.request('/api/trips/slug/marker-only-visit/route');
+    const routeBody = (await routeResponse.json()) as {
+      data: TripPlannerRoundTripRoute | null;
+      error: null;
+      success: boolean;
     };
 
     expect(secondPark).not.toBeNull();
@@ -3200,7 +3289,8 @@ describe('API routes', () => {
         tripStopOrder: 3
       })
     ]);
-    expect(body.route).toEqual({
+    expect(routeResponse.status).toBe(200);
+    expect(routeBody).toEqual({
       data: routeData,
       error: null,
       success: true
@@ -3288,19 +3378,21 @@ describe('API routes', () => {
 
     const response = await app.request('/api/trips/slug/sekalainen-retki');
     const body = (await response.json()) as {
-      route: {
-        data: TripPlannerRoundTripRoute | null;
-        error: null;
-        success: boolean;
-      };
       stopCount: number;
       visitCount: number;
+    };
+    const routeResponse = await app.request('/api/trips/slug/sekalainen-retki/route');
+    const routeBody = (await routeResponse.json()) as {
+      data: TripPlannerRoundTripRoute | null;
+      error: null;
+      success: boolean;
     };
 
     expect(response.status).toBe(200);
     expect(body.visitCount).toBe(1);
     expect(body.stopCount).toBe(1);
-    expect(body.route).toEqual({
+    expect(routeResponse.status).toBe(200);
+    expect(routeBody).toEqual({
       data: routeData,
       error: null,
       success: true
@@ -3348,20 +3440,18 @@ describe('API routes', () => {
       visitedOn: '2026-06-08'
     });
 
-    const response = await app.request('/api/trips/slug/konfiguroimaton-reitti');
+    const response = await app.request('/api/trips/slug/konfiguroimaton-reitti/route');
     const body = (await response.json()) as {
-      route: {
-        data: null;
-        error: {
-          error: string;
-          errorCode: string;
-        };
-        success: boolean;
+      data: null;
+      error: {
+        error: string;
+        errorCode: string;
       };
+      success: boolean;
     };
 
     expect(response.status).toBe(200);
-    expect(body.route).toEqual({
+    expect(body).toEqual({
       data: null,
       error: {
         error: 'Trip planner is not configured.',
@@ -3422,20 +3512,18 @@ describe('API routes', () => {
     });
 
     try {
-      const response = await app.request('/api/trips/slug/tyhja-reitti');
+      const response = await app.request('/api/trips/slug/tyhja-reitti/route');
       const body = (await response.json()) as {
-        route: {
-          data: null;
-          error: {
-            error: string;
-            errorCode: string;
-          };
-          success: boolean;
+        data: null;
+        error: {
+          error: string;
+          errorCode: string;
         };
+        success: boolean;
       };
 
       expect(response.status).toBe(200);
-      expect(body.route).toEqual({
+      expect(body).toEqual({
         data: null,
         error: {
           error: 'Driving route could not be found.',
@@ -3524,31 +3612,29 @@ describe('API routes', () => {
       visitedOn: '2026-06-08'
     });
 
-    const response = await app.request('/api/trips/slug/retki-virhepolulla');
+    const response = await app.request('/api/trips/slug/retki-virhepolulla/route');
     const body = (await response.json()) as {
-      route: {
-        data: null;
-        error: {
-          error: string;
-          errorCode: string;
-          routeFailure: {
-            destination: {
-              displayName: string;
-              label: string;
-            };
-            origin: {
-              displayName: string;
-              label: string;
-            };
-            waypointIndex: number;
+      data: null;
+      error: {
+        error: string;
+        errorCode: string;
+        routeFailure: {
+          destination: {
+            displayName: string;
+            label: string;
           };
+          origin: {
+            displayName: string;
+            label: string;
+          };
+          waypointIndex: number;
         };
-        success: boolean;
       };
+      success: boolean;
     };
 
     expect(response.status).toBe(200);
-    expect(body.route).toEqual({
+    expect(body).toEqual({
       data: null,
       error: {
         error: 'Driving route could not be found from A to B.',
@@ -3617,7 +3703,7 @@ describe('API routes', () => {
       visitedOn: '2026-06-08'
     });
 
-    const response = await app.request('/api/trips/slug/rikkoutuva-julkinen-reitti');
+    const response = await app.request('/api/trips/slug/rikkoutuva-julkinen-reitti/route');
 
     expect(response.status).toBe(500);
   });
@@ -3665,20 +3751,18 @@ describe('API routes', () => {
       visitedOn: '2026-06-08'
     });
 
-    const response = await app.request('/api/trips/slug/palvelu-poissa-kaytosta');
+    const response = await app.request('/api/trips/slug/palvelu-poissa-kaytosta/route');
     const body = (await response.json()) as {
-      route: {
-        data: null;
-        error: {
-          error: string;
-          errorCode: string;
-        };
-        success: boolean;
+      data: null;
+      error: {
+        error: string;
+        errorCode: string;
       };
+      success: boolean;
     };
 
     expect(response.status).toBe(200);
-    expect(body.route).toEqual({
+    expect(body).toEqual({
       data: null,
       error: {
         error: 'Trip planner provider is unavailable.',
@@ -3730,19 +3814,15 @@ describe('API routes', () => {
       visitedOn: '2026-06-08'
     });
 
-    const response = await app.request('/api/trips/slug/liian-moniosainen-julkinen-reitti');
+    const response = await app.request('/api/trips/slug/liian-moniosainen-julkinen-reitti/route');
     const body = (await response.json()) as {
-      name: string;
-      route: {
-        data: null;
-        error: { error: string; errorCode: string };
-        success: boolean;
-      };
+      data: null;
+      error: { error: string; errorCode: string };
+      success: boolean;
     };
 
     expect(response.status).toBe(200);
-    expect(body.name).toBe('Liian moniosainen julkinen reitti');
-    expect(body.route).toEqual({
+    expect(body).toEqual({
       data: null,
       error: {
         error: 'Driving route could not be found.',
@@ -3792,14 +3872,14 @@ describe('API routes', () => {
       visitedOn: '2026-06-08'
     });
 
-    const response = await app.request('/api/trips/slug/vaaraehto-reitilla');
+    const response = await app.request('/api/trips/slug/vaaraehto-reitilla/route');
 
     expect(response.status).toBe(500);
   });
 
   it('returns 404 for an unknown trip slug', async () => {
     const app = createAuthedApp();
-    const response = await app.request('/api/trips/slug/missing-trip');
+    const response = await app.request('/api/trips/slug/missing-trip/route');
     const body = (await response.json()) as { error: string };
 
     expect(response.status).toBe(404);

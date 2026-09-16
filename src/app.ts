@@ -20,6 +20,7 @@ import {
   countTripStopImages,
   createAdminInvitation,
   createPendingMediaUpload,
+  createPublicTripRouteFingerprint,
   createTrip,
   createTripStop,
   createTripStopImage,
@@ -48,6 +49,8 @@ import {
   getPublicHomeSummary,
   getPublicMapSummary,
   getPublicTripBySlug,
+  getPublicTripRouteCache,
+  getPublicTripStopImagesBySlug,
   getPublicTripVisitImagesBySlug,
   getPublicVisitDataVersion,
   getPublicVisitSummaryEtagSeed,
@@ -81,6 +84,7 @@ import {
   removeAdminUser,
   reorderTripStopImages,
   reorderVisitImages,
+  savePublicTripRouteCache,
   unpublishDateRangeReviewShare,
   unpublishDateRangeReviewShareByShareId,
   unpublishYearReviewShare,
@@ -189,6 +193,8 @@ import {
   deleteTripStopImageRoute,
   deleteTripStopRoute,
   getAdminTripFeaturedImageRoute,
+  getPublicTripRouteRoute,
+  getPublicTripStopImagesRoute,
   getPublicTripVisitImagesRoute,
   getTripBySlugRoute,
   getTripRoute,
@@ -776,33 +782,31 @@ type PublicTripRouteWaypoints = NonNullable<
   Awaited<ReturnType<typeof buildPublicTripRouteWaypoints>>
 >;
 
-const attachPublicTripRoute = async (
+const buildPublicTripRouteState = async (
+  database: Database,
   trip: PublicTripDetail,
   tripPlanner: TripPlannerService | undefined,
   waypoints: PublicTripRouteWaypoints | null
 ) => {
   if (!waypoints) {
-    return {
-      ...trip,
-      route: {
-        data: null,
-        error: null,
-        success: true
-      }
-    };
+    return { data: null, error: null, success: true as const };
+  }
+
+  const fingerprint = createPublicTripRouteFingerprint(waypoints);
+  const cachedRoute = await getPublicTripRouteCache(database, trip.id, fingerprint);
+
+  if (cachedRoute) {
+    return { data: cachedRoute, error: null, success: true as const };
   }
 
   if (!tripPlanner?.buildRoundTripRoute) {
     return {
-      ...trip,
-      route: {
-        data: null,
-        error: {
-          error: 'Trip planner is not configured.',
-          errorCode: 'trip_planner_not_configured' as const
-        },
-        success: false
-      }
+      data: null,
+      error: {
+        error: 'Trip planner is not configured.',
+        errorCode: 'trip_planner_not_configured' as const
+      },
+      success: false as const
     };
   }
 
@@ -812,28 +816,34 @@ const attachPublicTripRoute = async (
       waypoints
     });
 
-    return {
-      ...trip,
-      route: {
-        data: route,
-        error: route
-          ? null
-          : {
-              error: 'Driving route could not be found.',
-              errorCode: 'route_not_found' as const
-            },
-        success: route !== null
-      }
+    const state = {
+      data: route,
+      error: route
+        ? null
+        : {
+            error: 'Driving route could not be found.',
+            errorCode: 'route_not_found' as const
+          },
+      success: route !== null
     };
+
+    if (state.success && state.data !== null) {
+      await savePublicTripRouteCache(
+        database,
+        trip.id,
+        fingerprint,
+        state.data,
+        new Date().toISOString()
+      );
+    }
+
+    return state;
   } catch (error) {
     if (error instanceof TripPlannerError) {
       return {
-        ...trip,
-        route: {
-          data: null,
-          error: toPublicTripRouteErrorResponse(error),
-          success: false
-        }
+        data: null,
+        error: toPublicTripRouteErrorResponse(error),
+        success: false as const
       };
     }
 
@@ -2380,9 +2390,33 @@ export const createApp = ({
         return context.json(jsonNotFound('Trip not found.'), 404);
       }
 
-      const routeWaypoints = await buildPublicTripRouteWaypoints(database, trip);
+      return context.json(
+        {
+          ...trip,
+          route: {
+            data: null,
+            error: null,
+            success: true
+          }
+        },
+        200
+      );
+    });
 
-      return context.json(await attachPublicTripRoute(trip, tripPlanner, routeWaypoints), 200);
+    app.openapi(getPublicTripRouteRoute, async (context) => {
+      context.header('Cache-Control', PRIVATE_CACHE_CONTROL);
+
+      const { slug } = context.req.valid('param');
+      const trip = await getPublicTripBySlug(database, slug, getImagePublicUrl);
+
+      if (!trip) {
+        return context.json(jsonNotFound('Trip not found.'), 404);
+      }
+
+      const routeWaypoints = await buildPublicTripRouteWaypoints(database, trip);
+      const route = await buildPublicTripRouteState(database, trip, tripPlanner, routeWaypoints);
+
+      return context.json(route, 200);
     });
 
     app.openapi(getPublicTripVisitImagesRoute, async (context) => {
@@ -2401,6 +2435,27 @@ export const createApp = ({
 
       if (!images) {
         return context.json(jsonNotFound('Trip visit not found.'), 404);
+      }
+
+      return context.json(images, 200);
+    });
+
+    app.openapi(getPublicTripStopImagesRoute, async (context) => {
+      context.header('Cache-Control', PRIVATE_CACHE_CONTROL);
+
+      const { slug, stopId } = context.req.valid('param');
+      const { limit, offset } = context.req.valid('query');
+      const images = await getPublicTripStopImagesBySlug(
+        database,
+        slug,
+        stopId,
+        limit,
+        offset,
+        getImagePublicUrl
+      );
+
+      if (!images) {
+        return context.json(jsonNotFound('Trip stop not found.'), 404);
       }
 
       return context.json(images, 200);

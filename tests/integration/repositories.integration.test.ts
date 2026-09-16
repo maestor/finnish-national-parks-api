@@ -37,7 +37,7 @@ import {
   updateTripStop,
   updateVisit
 } from '../../src/db/repositories.js';
-import { mediaCleanupTasks, parks, parkVisits, trips } from '../../src/db/schema.js';
+import { mediaCleanupTasks, parks, parkVisits, tripRoutes, trips } from '../../src/db/schema.js';
 import { importParks } from '../../src/importer/import-parks.js';
 import { createLipasPark, parkTypeFixtures } from '../fixtures/lipas.js';
 import { createTestDatabase } from '../helpers/test-db.js';
@@ -473,6 +473,47 @@ describe('repositories', () => {
     });
   });
 
+  it('updates locations on route-relevant visits and invalidates their route cache', async () => {
+    const trip = await createTrip(testDatabase.database, {
+      name: 'Location update trip'
+    });
+    const visit = await createVisit(testDatabase.database, 'akasmannyn-kansallispuisto', {
+      location: {
+        lat: 60.3141,
+        lon: 24.2718
+      },
+      tripId: trip.id,
+      tripStopOrder: 1,
+      visitedOn: '2026-04-13'
+    });
+
+    const latitudeUpdate = await updateVisit(testDatabase.database, visit.id, {
+      location: {
+        lat: 60.3142,
+        lon: 24.2718
+      }
+    });
+    const longitudeUpdate = await updateVisit(testDatabase.database, visit.id, {
+      location: {
+        lat: 60.3142,
+        lon: 24.2719
+      }
+    });
+
+    expect(latitudeUpdate).toMatchObject({
+      location: {
+        lat: 60.3142,
+        lon: 24.2718
+      }
+    });
+    expect(longitudeUpdate).toMatchObject({
+      location: {
+        lat: 60.3142,
+        lon: 24.2719
+      }
+    });
+  });
+
   it('creates, updates, lists, and deletes trips while clearing assigned visits', async () => {
     const trip = await createTrip(testDatabase.database, {
       description: 'Lapin kansallispuistoja.',
@@ -594,6 +635,27 @@ describe('repositories', () => {
           lon: 23.761
         },
         label: 'Tampere'
+      }
+    });
+
+    const longitudeOnlyTrip = await updateTrip(testDatabase.database, trip.id, {
+      startingPoint: {
+        coordinate: {
+          lat: 61.4978,
+          lon: 23.762
+        },
+        label: 'Tampereen keskusta'
+      }
+    });
+
+    expect(longitudeOnlyTrip).toMatchObject({
+      id: trip.id,
+      startingPoint: {
+        coordinate: {
+          lat: 61.4978,
+          lon: 23.762
+        },
+        label: 'Tampereen keskusta'
       }
     });
 
@@ -802,6 +864,27 @@ describe('repositories', () => {
       },
       note: 'Lunch break',
       tripStopOrder: 2
+    });
+
+    const longitudeOnlyRelocation = await updateTripStop(testDatabase.database, stop.id, {
+      location: {
+        coordinate: {
+          lat: 61.451,
+          lon: 23.857
+        },
+        label: 'Yöpyminen Tampereen keskustassa'
+      }
+    });
+
+    expect(longitudeOnlyRelocation).toMatchObject({
+      id: stop.id,
+      location: {
+        coordinate: {
+          lat: 61.451,
+          lon: 23.857
+        },
+        label: 'Yöpyminen Tampereen keskustassa'
+      }
     });
 
     const movedStop = await updateTripStop(testDatabase.database, stop.id, {
@@ -1748,9 +1831,14 @@ describe('repositories', () => {
       })
     });
 
+    const trip = await createTrip(testDatabase.database, {
+      name: 'Reassign cache trip'
+    });
     const sourceVisit = await createVisit(testDatabase.database, 'aleksanterin-kierros', {
       note: 'Route visit note',
       route: 'Aleksanterin kierros',
+      tripId: trip.id,
+      tripStopOrder: 1,
       visitedOn: '2026-04-10'
     });
     await createVisit(testDatabase.database, 'vallisaari', {
@@ -1770,6 +1858,13 @@ describe('repositories', () => {
       thumbWidth: 50,
       updatedAt: '2026-05-01T10:00:00.000Z',
       visitId: sourceVisit.id
+    });
+
+    await testDatabase.database.insert(tripRoutes).values({
+      fingerprint: 'route-fingerprint',
+      routeJson: JSON.stringify({ distanceMeters: 1 }),
+      tripId: trip.id,
+      updatedAt: '2026-05-01T10:00:00.000Z'
     });
 
     const beforeSummary = await getPublicHomeSummary(testDatabase.database);
@@ -1792,6 +1887,10 @@ describe('repositories', () => {
     const flatVisits = await listVisits(testDatabase.database, async () => '');
     const movedVisit = flatVisits.find((visit) => visit.id === sourceVisit.id);
     const afterSummary = await getPublicHomeSummary(testDatabase.database);
+    const invalidatedRouteCache = await testDatabase.database
+      .select()
+      .from(tripRoutes)
+      .where(eq(tripRoutes.tripId, trip.id));
 
     expect(result).toMatchObject({
       dryRun: false,
@@ -1831,6 +1930,7 @@ describe('repositories', () => {
         slug: 'vallisaari'
       }
     });
+    expect(invalidatedRouteCache).toEqual([]);
     expect(afterSummary.version).toBeGreaterThan(beforeSummary.version);
   });
 

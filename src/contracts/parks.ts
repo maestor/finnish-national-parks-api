@@ -194,6 +194,10 @@ export const tripStopSchema = z.object({
   visitedOn: visitDateSchema
 });
 
+export const publicTripStopSchema = tripStopSchema.omit({ images: true }).extend({
+  imageCount: z.number().int().nonnegative()
+});
+
 export const directVisitImageUploadRequestSchema = z.object({
   contentType: z.enum(['image/jpeg', 'image/png', 'image/webp']),
   fileSizeBytes: z.number().int().positive(),
@@ -306,8 +310,8 @@ export const publicTripItineraryVisitEntrySchema = z.object({
 });
 
 export const publicTripRouteSchema = z.object({
-  distanceMeters: z.number().int().nonnegative(),
-  durationSeconds: z.number().int().nonnegative(),
+  distanceMeters: z.number().nonnegative(),
+  durationSeconds: z.number().nonnegative(),
   geometry: geoJsonLineStringSchema,
   returnsToStart: z.boolean(),
   waypointCount: z.number().int().positive()
@@ -341,7 +345,11 @@ export const publicTripRouteStateSchema = z.object({
 
 export const publicTripItineraryEntrySchema = z.union([
   publicTripItineraryVisitEntrySchema,
-  tripItineraryStopEntrySchema
+  z.object({
+    kind: z.literal('stop'),
+    tripStopOrder: z.number().int().positive(),
+    stop: publicTripStopSchema
+  })
 ]);
 
 export const publicTripDetailSchema = tripSchema.extend({
@@ -356,6 +364,8 @@ export const publicTripVisitImagesResponseSchema = z.object({
   images: z.array(visitImageSchema),
   nextOffset: z.number().int().nonnegative().nullable()
 });
+
+export const publicTripRouteResponseSchema = publicTripRouteStateSchema;
 
 export const visitWithParkSchema = visitSchema.extend({
   park: visitParkSchema

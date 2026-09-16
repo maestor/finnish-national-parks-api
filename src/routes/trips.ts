@@ -9,6 +9,7 @@ import {
   directVisitImageUploadPlanSchema,
   directVisitImageUploadRequestSchema,
   publicTripDetailSchema,
+  publicTripRouteResponseSchema,
   publicTripVisitImagesResponseSchema,
   reorderVisitImagesRequestSchema,
   tripArchiveResponseSchema,
@@ -272,6 +273,28 @@ export const getTripBySlugRoute = createRoute({
   }
 });
 
+export const getPublicTripRouteRoute = createRoute({
+  method: 'get',
+  path: '/api/trips/slug/{slug}/route',
+  tags: ['Trips'],
+  security: [{ bearerAuth: [] }],
+  request: {
+    params: z.object({
+      slug: z.string().trim().min(1)
+    })
+  },
+  responses: {
+    200: {
+      description: 'Calculated public trip route state',
+      content: { 'application/json': { schema: publicTripRouteResponseSchema } }
+    },
+    404: {
+      description: 'Trip was not found',
+      content: { 'application/json': { schema: errorSchema } }
+    }
+  }
+});
+
 export const getPublicTripVisitImagesRoute = createRoute({
   method: 'get',
   path: '/api/trips/slug/{slug}/visits/{visitId}/images',
@@ -294,6 +317,33 @@ export const getPublicTripVisitImagesRoute = createRoute({
     },
     404: {
       description: 'Trip visit was not found or is not publicly visible',
+      content: { 'application/json': { schema: errorSchema } }
+    }
+  }
+});
+
+export const getPublicTripStopImagesRoute = createRoute({
+  method: 'get',
+  path: '/api/trips/slug/{slug}/stops/{stopId}/images',
+  tags: ['Trips'],
+  security: [{ bearerAuth: [] }],
+  request: {
+    params: z.object({
+      slug: z.string().trim().min(1),
+      stopId: z.coerce.number().int().positive()
+    }),
+    query: z.object({
+      limit: z.coerce.number().int().min(1).max(24).default(12),
+      offset: z.coerce.number().int().min(0).default(0)
+    })
+  },
+  responses: {
+    200: {
+      description: 'One public trip stop image page',
+      content: { 'application/json': { schema: publicTripVisitImagesResponseSchema } }
+    },
+    404: {
+      description: 'Trip stop was not found',
       content: { 'application/json': { schema: errorSchema } }
     }
   }

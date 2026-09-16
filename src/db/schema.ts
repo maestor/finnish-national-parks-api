@@ -107,6 +107,15 @@ export const trips = sqliteTable(
   })
 );
 
+export const tripRoutes = sqliteTable('trip_routes', {
+  tripId: integer('trip_id')
+    .primaryKey()
+    .references(() => trips.id, { onDelete: 'cascade' }),
+  fingerprint: text('fingerprint').notNull(),
+  routeJson: text('route_json').notNull(),
+  updatedAt: text('updated_at').notNull()
+});
+
 export const tripStops = sqliteTable(
   'trip_stops',
   {

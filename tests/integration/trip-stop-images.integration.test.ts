@@ -245,7 +245,7 @@ describe('Trip stop image routes', () => {
             kind: 'stop';
             stop: {
               id: number;
-              images: Array<{ originalName: string | null }>;
+              imageCount: number;
             };
           }
       >;
@@ -256,8 +256,36 @@ describe('Trip stop image routes', () => {
       kind: 'stop',
       stop: {
         id: stopId,
-        images: [{ originalName: 'second.jpg' }, { originalName: 'first.jpg' }]
+        imageCount: 2
       }
+    });
+
+    const publicStopImagesResponse = await app.request(
+      `/api/trips/slug/${tripSlug}/stops/${stopId}/images`
+    );
+    const publicStopImagesBody = (await publicStopImagesResponse.json()) as {
+      images: Array<{ originalName: string | null }>;
+      nextOffset: number | null;
+    };
+
+    expect(publicStopImagesResponse.status).toBe(200);
+    expect(publicStopImagesBody).toMatchObject({
+      images: [{ originalName: 'second.jpg' }, { originalName: 'first.jpg' }],
+      nextOffset: null
+    });
+
+    const publicStopImagesPageResponse = await app.request(
+      `/api/trips/slug/${tripSlug}/stops/${stopId}/images?limit=1`
+    );
+    const publicStopImagesPageBody = (await publicStopImagesPageResponse.json()) as {
+      images: Array<{ originalName: string | null }>;
+      nextOffset: number | null;
+    };
+
+    expect(publicStopImagesPageResponse.status).toBe(200);
+    expect(publicStopImagesPageBody).toMatchObject({
+      images: [{ originalName: 'second.jpg' }],
+      nextOffset: 1
     });
 
     const deleteResponse = await requestAsAdmin(
