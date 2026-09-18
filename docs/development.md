@@ -30,7 +30,7 @@ The deployment guardrail test for this lives in `tests/integration/vercel-entry.
 ## Security And Sustainability Baseline
 
 - Route naming is not the auth policy. Catalog and visit `GET` data is public from an end-user perspective when accessed through the Reissuvihko UI, but the backend remains a separate API boundary: frontend-facing `/api/*` routes generally require the server-side API key outside localhost when `API_KEY` is configured, including `GET /api/year-review/shares/:shareId` for server-rendered share pages.
-- `GET /health`, `GET /openapi.json`, and `GET /assets/logos/*` are the anonymous backend reads today. `/auth/*` is anonymous login control flow, not anonymous data access. The public UI can expose catalog and visit data without login because it calls the backend through its server-side API-key boundary. Do not describe other backend routes as anonymously public unless middleware and tests prove that policy.
+- `GET /health`, `GET /openapi.json`, `GET /assets/logos/*`, and `GET /assets/media/*` are the anonymous backend reads today. `/auth/*` is anonymous login control flow, not anonymous data access. The public UI can expose catalog and visit data without login because it calls the backend through its server-side API-key boundary. Do not describe other backend routes as anonymously public unless middleware and tests prove that policy.
 - Do not expose the shared `API_KEY` in browser-delivered code.
 - All write routes and `GET /api/admin/parks/visibility` should stay admin-session protected.
 - When adding or changing an env var, update `src/env.ts`, `.env.example`, `README.md`, and the relevant docs in the same change.
@@ -101,9 +101,9 @@ FRONTEND_URL=http://localhost:4300
 # Geoapify trip planner (optional — only needed when testing the route planner backend)
 GEOAPIFY_API_KEY=
 
-# Cloudflare R2 (optional — needed for visit image uploads and park logo uploads)
-# The bucket can stay private. PUBLIC_API_BASE_URL enables stable public park-logo
-# URLs through this API while visit images still use presigned read URLs.
+# Cloudflare R2 (optional — needed for visit images, trip-stop images, and park media)
+# The bucket can stay private. PUBLIC_API_BASE_URL enables stable public media URLs
+# through this API; local development falls back to presigned read URLs.
 R2_BUCKET_NAME=
 R2_ENDPOINT=
 R2_ACCESS_KEY_ID=
@@ -212,13 +212,16 @@ That command:
 - stores the logo key plus a logo timestamp on the matching park row so catalog ETags and logo URLs change together
 
 When `PUBLIC_API_BASE_URL` is set, catalog APIs return stable park logo URLs like
-`https://api.example.com/assets/logos/<slug>.png?v=<logoUpdatedAt>&policy=2`. That
-anonymous asset route redirects to a fresh seven-day presigned R2 GET URL, but its
+`https://api.example.com/assets/logos/<slug>.png?v=<logoUpdatedAt>&policy=2`. Public
+visit, trip-stop, trip, review, and park-map payloads likewise use stable URLs under
+`https://api.example.com/assets/media/...`. The anonymous asset routes
+redirect to a fresh seven-day presigned R2 GET URL, but their
 redirect is reusable for only one day. The policy component changes when redirect
 caching rules change, so clients with the earlier year-long redirect discover the
 corrected URL. The bucket can therefore stay private without a redirect outliving
-its target signature. Without `PUBLIC_API_BASE_URL`, catalog APIs fall back to
-presigned logo URLs directly.
+its target signature. Media redirects are resolved only for currently public database
+rows and use `private, no-store`; hidden media returns `404`. Without
+`PUBLIC_API_BASE_URL`, local APIs fall back to presigned URLs directly.
 
 ## Database
 
@@ -310,11 +313,11 @@ Key route behavior:
 - `GET /api/admin/date-range-review/shares` returns an admin-session-protected listing of all published date-range-review shares with their share ids, overview metadata, public share URLs, and story summary counts for admin management UIs.
 - `PATCH /api/admin/date-range-review/shares/{shareId}` refreshes or edits one published date-range-review share in place for admin management while preserving its existing `shareId` and public frontend path. It accepts the same `name`, `startDate`, and `endDate` payload shape as publish, regenerates the story snapshot, and returns `409` if another published share already owns the requested overview name.
 - `DELETE /api/admin/date-range-review/shares/{shareId}` removes one published date-range-review share directly by share id and returns `404` when that exact share no longer exists.
-- `GET /api/date-range-review/shares/{shareId}` returns the published named date-range-review snapshot for trusted API-key callers such as the frontend share page. The snapshot can include optional visit-based `featuredImage` assets for photo-highlight, `new-parks`, `revisited-parks`, and `trip-summary` cards; `trip-summary` cards also list their included park visits, and the story can end with an `other-visits` card for still-unmentioned visits. The stored share freezes only stable image keys and dimensions, while each read resolves fresh presigned `fullUrl` and `thumbUrl` values and uses `private, no-store` so refresh, unpublish, and missing-share state are read from the origin.
+- `GET /api/date-range-review/shares/{shareId}` returns the published named date-range-review snapshot for trusted API-key callers such as the frontend share page. The snapshot can include optional visit-based `featuredImage` assets for photo-highlight, `new-parks`, `revisited-parks`, and `trip-summary` cards; `trip-summary` cards also list their included park visits, and the story can end with an `other-visits` card for still-unmentioned visits. The stored share freezes only stable image keys and dimensions, while each read resolves stable application `fullUrl` and `thumbUrl` values and uses `private, no-store` so refresh, unpublish, and missing-share state are read from the origin.
 - `GET /api/year-review/{year}/preview` returns an admin-session-protected generated preview for one year-review story. The backend derives the story automatically from existing visit timeline and trip data rather than requiring per-card authoring.
 - `POST /api/year-review/{year}/publish` snapshots the current generated year review into one published share token for that year and returns the token plus the intended frontend share path.
 - `DELETE /api/year-review/{year}/publish` removes the currently published share snapshot for that year.
-- `GET /api/year-review/shares/{shareId}` returns the published year-review snapshot for trusted API-key callers such as the frontend share page. The snapshot can now include optional visit-based `featuredImage` assets for milestone, photo-highlight, trip-highlight, and `new-parks` cards; the stored share freezes only stable image keys and dimensions, while each read resolves fresh presigned `fullUrl` and `thumbUrl` values and uses `private, no-store` so refresh, unpublish, and missing-share state are read from the origin.
+- `GET /api/year-review/shares/{shareId}` returns the published year-review snapshot for trusted API-key callers such as the frontend share page. The snapshot can now include optional visit-based `featuredImage` assets for milestone, photo-highlight, trip-highlight, and `new-parks` cards; the stored share freezes only stable image keys and dimensions, while each read resolves stable application `fullUrl` and `thumbUrl` values and uses `private, no-store` so refresh, unpublish, and missing-share state are read from the origin.
 - `POST /api/trip-planner/suggestions` returns up to three Geoapify-backed place suggestions with labels and coordinates for origin/destination selection, scoped to Finland, Sweden, and Norway.
 - `POST /api/trip-planner/search` first resolves exact known park and trail names from the local catalog, falls back to Geoapify geocoding scoped to Finland, Sweden, and Norway only for unmatched free-text endpoints, fetches a real Geoapify driving route, filters visible parks by a configurable corridor distance, and returns list-ready results with visited summaries plus a map-ready route `LineString`, backend-provided route and park bounding boxes, and top-level `maxDistanceKm` / `defaultDistanceKm` filter metadata. On longer trips, the first 30 km from the origin uses a stricter start-zone filter so dense departure areas do not flood the list. Route failures return `422` with failed-leg details instead of a silent success payload.
 - `POST /api/trip-planner/nearby` first resolves exact known park and trail names from the local catalog, falls back to Geoapify geocoding scoped to Finland, Sweden, and Norway only for unmatched free-text origins, and returns list-ready results with visited summaries plus a backend-provided `searchArea` bounding box and top-level `maxDistanceKm` / `defaultDistanceKm` filter metadata for map rendering without route geometry.
@@ -336,7 +339,7 @@ Key route behavior:
 - `POST /api/parks/:slug/visits` and `PATCH /api/visits/:id` accept `tripId`, with `null` clearing an existing trip assignment, plus optional `tripStopOrder` for explicit stop ordering inside a named trip and optional `excludeFromRoute` when a visit should remain visible without participating in route generation.
 - Timeline and visit list responses expose `tripStopOrder`, and same-day visits from the same trip use that field to preserve the real stop sequence instead of sorting by entry creation time.
 - Auth routes (`/auth/*`) bypass API key authentication so the OAuth flow can complete without a bearer token.
-- `GET /health`, `GET /openapi.json`, and `GET /assets/logos/*` are the anonymous backend read endpoints.
+- `GET /health`, `GET /openapi.json`, `GET /assets/logos/*`, and `GET /assets/media/*` are the anonymous backend read endpoints.
 - `/auth/*` routes are anonymous control-flow endpoints for login, not anonymous data endpoints.
 - All `/api/*` endpoints currently require the API key outside localhost unless they use admin-session auth instead.
 - Image routes are only registered when R2 credentials (or `MEMORY_STORAGE=true`) are configured.
@@ -345,7 +348,7 @@ Key route behavior:
 - Deployed clients should use the Vercel-safe direct flow instead: `POST /api/visits/:id/images/upload-url`, upload the file to the returned presigned `PUT` URL, then call `POST /api/visits/:id/images/complete`. Repeating completion with the same key returns the already-created image with `200`; a first completion returns `201`.
 - Trip-stop images use the same Vercel-safe direct flow: `POST /api/trip-stops/:id/images/upload-url`, upload the file to the returned presigned `PUT` URL, then call `POST /api/trip-stops/:id/images/complete`. The same key is idempotent, and atomic completion admission preserves the six-image limit even when multiple upload URLs are outstanding.
 - The direct flow stores the uploaded object temporarily, then completion validates and processes it into separate immutable JPEG full-size and thumbnail assets. Durable completion claims ensure concurrent retries publish only one derivative pair, while the temporary source remains eligible for delayed cleanup.
-- Image responses include time-limited presigned URLs so the R2 bucket can remain private.
+- Public image and map response fields use stable application URLs under `/assets/media/*`; that route checks current database visibility and redirects to a fresh presigned R2 target while keeping the bucket private. Admin and private image responses continue to use time-limited presigned URLs.
 
 ## Deployment Direction
 

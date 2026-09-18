@@ -3,6 +3,7 @@ import type { Env } from '../../src/env.js';
 import {
   createAuthConfig,
   createLogoPublicUrl,
+  createPublicMediaUrl,
   createStorage,
   createTripPlanner
 } from '../../src/runtime.js';
@@ -162,6 +163,18 @@ describe('runtime helpers', () => {
       )
     ).toBe(
       'https://api.example.com/assets/logos/ukko-kolin-kansallismaisema.png?v=2026-07-28T12%3A00%3A00.000Z&policy=2'
+    );
+  });
+
+  it('creates stable public media URLs with encoded storage key segments', () => {
+    expect(createPublicMediaUrl(createEnv())).toBeUndefined();
+
+    const getPublicMediaUrl = createPublicMediaUrl(
+      createEnv({ PUBLIC_API_BASE_URL: 'https://api.example.com/' })
+    );
+
+    expect(getPublicMediaUrl?.('visits/one image/full.jpg')).toBe(
+      'https://api.example.com/assets/media/visits/one%20image/full.jpg'
     );
   });
 

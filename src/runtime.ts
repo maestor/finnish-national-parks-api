@@ -147,6 +147,16 @@ export const createLogoPublicUrl = (env: Env) => {
   };
 };
 
+export const createPublicMediaUrl = (env: Env) => {
+  if (!env.PUBLIC_API_BASE_URL) {
+    return undefined;
+  }
+
+  const baseUrl = normalizeBaseUrl(env.PUBLIC_API_BASE_URL);
+
+  return (key: string) => new URL(`assets/media/${encodeKeyPath(key)}`, baseUrl).toString();
+};
+
 export const env = getEnv();
 export const databaseClient = createDatabaseClient();
 export const database = createDatabase(databaseClient);
@@ -161,7 +171,7 @@ export const app = createApp({
   auth: createAuthConfig(env),
   database,
   getLogoPublicUrl: createLogoPublicUrl(env),
-  getMapPublicUrl: undefined,
+  getPublicMediaUrl: createPublicMediaUrl(env),
   storage: createStorage(env),
   tripPlannerBudget,
   tripPlanner

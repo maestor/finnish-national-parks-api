@@ -814,10 +814,14 @@ describe('date range review routes', () => {
     });
   });
 
-  it('builds, publishes, and shares a named overview with fresh image urls', async () => {
+  it('builds, publishes, and shares a named overview with stable public image urls', async () => {
     const apiKey = 'test-secret-key';
     const storage = createMemoryStorage();
-    const app = createAuthedApp({ apiKey, storage });
+    const app = createAuthedApp({
+      apiKey,
+      getPublicMediaUrl: (key) => `https://api.example.test/assets/media/${key}`,
+      storage
+    });
     type StoryImage = {
       alt: string | null;
       fullHeight: number | null;
@@ -1148,7 +1152,9 @@ describe('date range review routes', () => {
       shareSlug: 'summer-vacation',
       startDate: '2026-06-01'
     });
-    expect(shareTripCard?.featuredImage?.thumbUrl).toContain('https://memory-storage.test/');
+    expect(shareTripCard?.featuredImage?.thumbUrl).toContain(
+      'https://api.example.test/assets/media/'
+    );
     expect(shareTripCard?.trip.visits).toEqual(previewTripCard?.trip.visits);
     expect(shareOtherVisitsCard?.visits).toEqual(previewOtherVisitsCard?.visits);
 

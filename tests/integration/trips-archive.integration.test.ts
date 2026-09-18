@@ -165,7 +165,10 @@ describe('trip archive API', () => {
 
   it('returns one explicitly selected visible cover and omits hidden covers', async () => {
     const storage = createMemoryStorage();
-    const app = createAuthedApp({ storage });
+    const app = createAuthedApp({
+      getPublicMediaUrl: (key) => `https://api.example.test/assets/media/${key}`,
+      storage
+    });
     const trip = await createTrip(app, { name: 'Kuvallinen arkistoretki' });
     const visit = await createVisit(app, trip.id, '2026-06-07');
     const image = await createVisitImage(testDatabase.database, {
@@ -192,7 +195,7 @@ describe('trip archive API', () => {
     };
     expect(archiveBody.trips[0]?.featuredImage).toEqual({
       height: 800,
-      url: 'https://memory-storage.test/visits/archive/full.jpg',
+      url: 'https://api.example.test/assets/media/visits/archive/full.jpg',
       width: 1200
     });
 
@@ -228,7 +231,7 @@ describe('trip archive API', () => {
     };
     expect(archiveWithoutDimensionsBody.trips[0]?.featuredImage).toEqual({
       height: null,
-      url: 'https://memory-storage.test/visits/archive/no-dimensions-full.jpg',
+      url: 'https://api.example.test/assets/media/visits/archive/no-dimensions-full.jpg',
       width: null
     });
 
@@ -283,9 +286,11 @@ describe('trip archive API', () => {
     };
     expect(archiveWithStopImageBody.trips[0]?.featuredImage).toEqual({
       height: 600,
-      url: 'https://memory-storage.test/stops/archive/full.jpg',
+      url: 'https://api.example.test/assets/media/stops/archive/full.jpg',
       width: 900
     });
+    const stopAssetResponse = await app.request('/assets/media/stops/archive/full.jpg');
+    expect(stopAssetResponse.status).toBe(302);
   });
 
   it('rejects invalid cursors and protects remote direct access with the API key', async () => {

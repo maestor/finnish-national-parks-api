@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { createApp } from '../../src/app.js';
 import * as repositories from '../../src/db/repositories.js';
-import { mediaCleanupTasks, mediaUploads, visitImages } from '../../src/db/schema.js';
+import { mediaCleanupTasks, mediaUploads, parks, visitImages } from '../../src/db/schema.js';
 import { createSessionToken } from '../../src/http/session.js';
 import { importParks } from '../../src/importer/import-parks.js';
 import { runUnusedMediaCleanup } from '../../src/media/unused-media-cleanup.js';
@@ -583,6 +583,49 @@ describe('Visit image routes', () => {
     expect(response.status).toBe(200);
     expect(body.visits[0]!.images).toHaveLength(1);
     expect(body.visits[0]!.images[0]!.fullUrl).toContain('memory-storage.test');
+  });
+
+  it('returns stable public media URLs and resolves them through private storage', async () => {
+    const visitId = await createVisit();
+    await repositories.createVisitImage(testDatabase.database, {
+      createdAt: '2026-05-02T09:00:00.000Z',
+      displayOrder: 0,
+      fullKey: 'visits/public/full.jpg',
+      mimeType: 'image/jpeg',
+      originalName: 'public.jpg',
+      thumbKey: 'visits/public/thumb.jpg',
+      updatedAt: '2026-05-02T09:00:00.000Z',
+      visitId
+    });
+
+    const app = createAuthedApp({
+      getPublicMediaUrl: (key) => `https://api.example.test/assets/media/${key}`,
+      storage
+    });
+    const publicResponse = await app.request('/api/parks/akasmannyn-kansallispuisto/visits');
+    const publicBody = (await publicResponse.json()) as {
+      visits: Array<{ images: Array<{ fullUrl: string; thumbUrl: string }> }>;
+    };
+
+    expect(publicResponse.status).toBe(200);
+    expect(publicBody.visits[0]!.images[0]).toMatchObject({
+      fullUrl: 'https://api.example.test/assets/media/visits/public/full.jpg',
+      thumbUrl: 'https://api.example.test/assets/media/visits/public/thumb.jpg'
+    });
+
+    const assetResponse = await app.request('/assets/media/visits/public/full.jpg');
+
+    expect(assetResponse.status).toBe(302);
+    expect(assetResponse.headers.get('location')).toContain('memory-storage.test');
+
+    await testDatabase.database
+      .update(parks)
+      .set({ removed: true })
+      .where(eq(parks.slug, 'akasmannyn-kansallispuisto'));
+
+    const hiddenAssetResponse = await app.request('/assets/media/visits/public/full.jpg');
+
+    expect(hiddenAssetResponse.status).toBe(404);
   });
 
   it('removes an image from the visit immediately and schedules its stored files for safe cleanup', async () => {

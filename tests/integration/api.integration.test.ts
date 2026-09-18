@@ -462,6 +462,30 @@ describe('API routes', () => {
     await expect(response.json()).resolves.toEqual({ error: 'Logo storage not configured.' });
   });
 
+  it('keeps anonymous media paths bounded to known public storage keys', async () => {
+    const app = createApp({
+      database: testDatabase.database,
+      storage: createMemoryStorage()
+    });
+
+    const emptyPathResponse = await app.request('/assets/media/');
+    const unknownPathResponse = await app.request('/assets/media/unknown.jpg');
+    const encodedSlashResponse = await app.request('/assets/media/unknown%2Fkey.jpg');
+    const malformedEncodingResponse = await app.request('/assets/media/%E0%A4%A');
+    const noStorageResponse = await createApp({ database: testDatabase.database }).request(
+      '/assets/media/unknown.jpg'
+    );
+
+    expect(emptyPathResponse.status).toBe(404);
+    expect(unknownPathResponse.status).toBe(404);
+    expect(encodedSlashResponse.status).toBe(404);
+    expect(malformedEncodingResponse.status).toBe(404);
+    expect(noStorageResponse.status).toBe(404);
+    await expect(noStorageResponse.json()).resolves.toEqual({
+      error: 'Media storage not configured.'
+    });
+  });
+
   it('exposes map details in park list and park detail responses when a map is set', async () => {
     await testDatabase.database
       .update(parks)
@@ -474,6 +498,7 @@ describe('API routes', () => {
 
     const app = createApp({
       database: testDatabase.database,
+      getPublicMediaUrl: (key) => `https://api.example.test/assets/media/${key}`,
       storage: createMemoryStorage()
     });
     const listResponse = await app.request('/api/parks');
@@ -490,16 +515,61 @@ describe('API routes', () => {
       map: {
         key: 'pdf-maps/akasmannyn-kansallispuisto.pdf',
         updatedAt: '2026-05-02T08:00:00.000Z',
-        url: 'https://memory-storage.test/pdf-maps/akasmannyn-kansallispuisto.pdf'
+        url: 'https://api.example.test/assets/media/pdf-maps/akasmannyn-kansallispuisto.pdf'
       }
     });
     expect(detailBody).toMatchObject({
       map: {
         key: 'pdf-maps/akasmannyn-kansallispuisto.pdf',
         updatedAt: '2026-05-02T08:00:00.000Z',
-        url: 'https://memory-storage.test/pdf-maps/akasmannyn-kansallispuisto.pdf'
+        url: 'https://api.example.test/assets/media/pdf-maps/akasmannyn-kansallispuisto.pdf'
       }
     });
+    const mapAssetResponse = await app.request(
+      '/assets/media/pdf-maps/akasmannyn-kansallispuisto.pdf'
+    );
+    expect(mapAssetResponse.status).toBe(302);
+  });
+
+  it('falls back to presigned map URLs for local storage and removed-park admin reads', async () => {
+    await testDatabase.database
+      .update(parks)
+      .set({
+        mapKey: 'pdf-maps/akasmannyn-kansallispuisto.pdf',
+        mapUpdatedAt: '2026-05-02T08:00:00.000Z',
+        updatedAt: '2026-05-02T08:00:00.000Z'
+      })
+      .where(eq(parks.slug, 'akasmannyn-kansallispuisto'));
+
+    const storage = createMemoryStorage();
+    const app = createApp({ database: testDatabase.database, storage });
+    const publicResponse = await app.request('/api/parks/akasmannyn-kansallispuisto');
+    const publicBody = (await publicResponse.json()) as {
+      map: { url: string };
+    };
+
+    expect(publicResponse.status).toBe(200);
+    expect(publicBody.map.url).toBe(
+      'https://memory-storage.test/pdf-maps/akasmannyn-kansallispuisto.pdf'
+    );
+
+    await testDatabase.database
+      .update(parks)
+      .set({ removed: true })
+      .where(eq(parks.slug, 'akasmannyn-kansallispuisto'));
+
+    const adminResponse = await requestAsAdmin(
+      createAuthedApp({ storage }),
+      '/api/parks/akasmannyn-kansallispuisto'
+    );
+    const adminBody = (await adminResponse.json()) as {
+      map: { url: string };
+    };
+
+    expect(adminResponse.status).toBe(200);
+    expect(adminBody.map.url).toBe(
+      'https://memory-storage.test/pdf-maps/akasmannyn-kansallispuisto.pdf'
+    );
   });
 
   it('includes an optional display type name for manual catalog parks', async () => {
@@ -2275,7 +2345,10 @@ describe('API routes', () => {
 
   it('lists and updates a trip featured image from visits and stops', async () => {
     const storage = createMemoryStorage();
-    const app = createAuthedApp({ storage });
+    const app = createAuthedApp({
+      getPublicMediaUrl: (key) => `https://api.example.test/assets/media/${key}`,
+      storage
+    });
     const { body: trip } = await createTrip(app, {
       name: 'Kuvallinen retki',
       slug: 'kuvallinen-retki'
@@ -2442,7 +2515,12 @@ describe('API routes', () => {
     expect(unavailableRead.status).toBe(503);
     const publicTrip = await app.request('/api/trips/slug/kuvallinen-retki');
     expect(publicTrip.status).toBe(200);
-    expect((await publicTrip.json()) as { featuredImage: unknown }).toHaveProperty('featuredImage');
+    expect((await publicTrip.json()) as { featuredImage: unknown }).toMatchObject({
+      featuredImage: {
+        fullUrl: 'https://api.example.test/assets/media/stops/featured/full.jpg',
+        thumbUrl: 'https://api.example.test/assets/media/stops/featured/thumb.jpg'
+      }
+    });
 
     const cleared = await requestAsAdmin(app, `/api/admin/trips/${trip.id}/featured-image`, {
       method: 'PATCH',
@@ -3019,6 +3097,7 @@ describe('API routes', () => {
       throw new Error('The image page must not load a trip route.');
     });
     const app = createAuthedApp({
+      getPublicMediaUrl: (key) => `https://api.example.test/assets/media/${key}`,
       tripPlanner: {
         buildRoundTripRoute,
         search: vi.fn(async () => {
@@ -3059,13 +3138,23 @@ describe('API routes', () => {
       `/api/trips/slug/${trip.slug}/visits/${visit.id}/images`
     );
     const firstBody = (await firstResponse.json()) as {
-      images: Array<{ displayOrder: number; id: number; originalName: string | null }>;
+      images: Array<{
+        displayOrder: number;
+        fullUrl: string;
+        id: number;
+        originalName: string | null;
+        thumbUrl: string;
+      }>;
       nextOffset: number | null;
     };
 
     expect(firstResponse.status).toBe(200);
     expect(firstResponse.headers.get('cache-control')).toBe('private, no-store');
     expect(firstBody.images).toHaveLength(12);
+    expect(firstBody.images[0]).toMatchObject({
+      fullUrl: `https://api.example.test/assets/media/visits/${visit.id}/final/0-full.jpg`,
+      thumbUrl: `https://api.example.test/assets/media/visits/${visit.id}/final/0-thumb.jpg`
+    });
     expect(firstBody.images.map((image) => image.displayOrder)).toEqual(
       Array.from({ length: 12 }, (_, index) => index)
     );

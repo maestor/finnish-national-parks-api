@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { createApp } from '../../src/app.js';
 import { createSessionToken } from '../../src/http/session.js';
+import { createMemoryStorage } from '../../src/storage/memory-storage.js';
 import { createTestDatabase } from '../helpers/test-db.js';
 
 const authConfig = {
@@ -261,7 +262,11 @@ describe('auth middleware', () => {
   });
 
   it('leaves health and openapi.json unprotected', async () => {
-    const app = createApp({ apiKey, database: testDatabase.database });
+    const app = createApp({
+      apiKey,
+      database: testDatabase.database,
+      storage: createMemoryStorage()
+    });
 
     const healthResponse = await app.request('/health', {
       headers: {
@@ -273,9 +278,15 @@ describe('auth middleware', () => {
         'x-forwarded-for': '203.0.113.1'
       }
     });
+    const mediaResponse = await app.request('/assets/media/missing.jpg', {
+      headers: {
+        'x-forwarded-for': '203.0.113.1'
+      }
+    });
 
     expect(healthResponse.status).toBe(200);
     expect(openApiResponse.status).toBe(200);
+    expect(mediaResponse.status).toBe(404);
   });
 
   it('protects published year review share reads with the api key while keeping previews admin-only', async () => {

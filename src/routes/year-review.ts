@@ -134,7 +134,8 @@ export const getYearReviewShareRoute = createRoute({
   },
   responses: {
     200: {
-      description: 'Published year review share snapshot for trusted callers',
+      description:
+        'Published year review share snapshot with stable public media URLs for trusted callers',
       content: {
         'application/json': {
           schema: yearReviewShareResponseSchema
