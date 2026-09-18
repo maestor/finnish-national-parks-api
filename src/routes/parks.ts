@@ -228,7 +228,7 @@ export const getParkVisitsRoute = createRoute({
   },
   responses: {
     200: {
-      description: 'Park visit history',
+      description: 'Park visit history with stable public media URLs',
       content: {
         'application/json': {
           schema: parkVisitsResponseSchema
@@ -273,7 +273,7 @@ export const getPublicMapSummaryRoute = createRoute({
   security: [{ bearerAuth: [] }],
   responses: {
     200: {
-      description: 'Frontend park and visit summary for the map page',
+      description: 'Frontend park and visit summary for the map page with stable public media URLs',
       content: {
         'application/json': {
           schema: publicMapSummaryResponseSchema

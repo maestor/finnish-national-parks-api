@@ -2916,6 +2916,42 @@ export const getPublicTripStopImagesBySlug = async (
   };
 };
 
+export const findPublicMediaKey = async (database: Database, key: string) => {
+  const publicVisitImage = await database
+    .select({ fullKey: visitImages.fullKey, thumbKey: visitImages.thumbKey })
+    .from(visitImages)
+    .innerJoin(parkVisits, eq(parkVisits.id, visitImages.visitId))
+    .innerJoin(parks, eq(parks.id, parkVisits.parkId))
+    .where(
+      and(eq(parks.removed, false), or(eq(visitImages.fullKey, key), eq(visitImages.thumbKey, key)))
+    )
+    .limit(1);
+
+  if (publicVisitImage[0]) {
+    return key;
+  }
+
+  const publicTripStopImage = await database
+    .select({ fullKey: tripStopImages.fullKey, thumbKey: tripStopImages.thumbKey })
+    .from(tripStopImages)
+    .innerJoin(tripStops, eq(tripStops.id, tripStopImages.tripStopId))
+    .innerJoin(trips, eq(trips.id, tripStops.tripId))
+    .where(or(eq(tripStopImages.fullKey, key), eq(tripStopImages.thumbKey, key)))
+    .limit(1);
+
+  if (publicTripStopImage[0]) {
+    return key;
+  }
+
+  const publicParkMap = await database
+    .select({ mapKey: parks.mapKey })
+    .from(parks)
+    .where(and(eq(parks.mapKey, key), eq(parks.removed, false)))
+    .limit(1);
+
+  return publicParkMap[0]?.mapKey ?? null;
+};
+
 export const syncParkTypes = async (database: DbClient) => {
   await database
     .insert(parkTypes)

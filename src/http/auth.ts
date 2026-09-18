@@ -11,7 +11,8 @@ export const createAuthMiddleware = (apiKey: string | undefined) => {
       path === '/health' ||
       path === '/openapi.json' ||
       path.startsWith('/auth/') ||
-      path.startsWith('/assets/logos/')
+      path.startsWith('/assets/logos/') ||
+      path.startsWith('/assets/media/')
     ) {
       return next();
     }

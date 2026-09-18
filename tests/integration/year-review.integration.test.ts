@@ -296,7 +296,11 @@ describe('year review routes', () => {
   it('resolves milestone, photo, trip, and new national park images to fresh public urls for preview and share reads', async () => {
     const apiKey = 'test-secret-key';
     const storage = createMemoryStorage();
-    const app = createAuthedApp({ apiKey, storage });
+    const app = createAuthedApp({
+      apiKey,
+      getPublicMediaUrl: (key) => `https://api.example.test/assets/media/${key}`,
+      storage
+    });
     type StoryImage = {
       alt: string | null;
       fullHeight: number | null;
@@ -543,13 +547,21 @@ describe('year review routes', () => {
         visitedOn: '2026-06-18'
       })
     ]);
-    expect(shareFirstVisitCard?.featuredImage?.fullUrl).toContain('https://memory-storage.test/');
-    expect(shareLastVisitCard?.featuredImage?.thumbUrl).toContain('https://memory-storage.test/');
-    expect(sharePhotoCard?.featuredImage?.fullUrl).toContain('https://memory-storage.test/');
-    expect(shareTripCard?.featuredImage?.thumbUrl).toContain('https://memory-storage.test/');
+    expect(shareFirstVisitCard?.featuredImage?.fullUrl).toContain(
+      'https://api.example.test/assets/media/'
+    );
+    expect(shareLastVisitCard?.featuredImage?.thumbUrl).toContain(
+      'https://api.example.test/assets/media/'
+    );
+    expect(sharePhotoCard?.featuredImage?.fullUrl).toContain(
+      'https://api.example.test/assets/media/'
+    );
+    expect(shareTripCard?.featuredImage?.thumbUrl).toContain(
+      'https://api.example.test/assets/media/'
+    );
     expect(
       shareNewParksCard?.parks.every((parkMoment) =>
-        parkMoment.featuredImage?.thumbUrl.includes('https://memory-storage.test/')
+        parkMoment.featuredImage?.thumbUrl.includes('https://api.example.test/assets/media/')
       )
     ).toBe(true);
   });

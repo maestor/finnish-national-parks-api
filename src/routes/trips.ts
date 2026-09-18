@@ -153,7 +153,7 @@ export const listTripArchiveRoute = createRoute({
   },
   responses: {
     200: {
-      description: 'Cursor-paginated public trip archive cards',
+      description: 'Cursor-paginated public trip archive cards with stable featured-media URLs',
       content: {
         'application/json': {
           schema: tripArchiveResponseSchema
@@ -255,7 +255,7 @@ export const getTripBySlugRoute = createRoute({
   },
   responses: {
     200: {
-      description: 'Page-ready trip detail by slug',
+      description: 'Page-ready trip detail by slug with stable featured-media URLs',
       content: {
         'application/json': {
           schema: publicTripDetailSchema
@@ -312,7 +312,7 @@ export const getPublicTripVisitImagesRoute = createRoute({
   },
   responses: {
     200: {
-      description: 'One public trip visit image page',
+      description: 'One public trip visit image page with stable full and thumbnail URLs',
       content: { 'application/json': { schema: publicTripVisitImagesResponseSchema } }
     },
     404: {
@@ -339,7 +339,7 @@ export const getPublicTripStopImagesRoute = createRoute({
   },
   responses: {
     200: {
-      description: 'One public trip stop image page',
+      description: 'One public trip stop image page with stable full and thumbnail URLs',
       content: { 'application/json': { schema: publicTripVisitImagesResponseSchema } }
     },
     404: {

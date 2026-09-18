@@ -174,7 +174,8 @@ export const getDateRangeReviewShareRoute = createRoute({
   },
   responses: {
     200: {
-      description: 'Published named date range review share snapshot for trusted callers',
+      description:
+        'Published named date range review share snapshot with stable public media URLs for trusted callers',
       content: {
         'application/json': {
           schema: dateRangeReviewShareResponseSchema

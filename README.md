@@ -68,7 +68,7 @@ FRONTEND_URL=http://localhost:4300
 GEOAPIFY_API_KEY=
 GEOAPIFY_DAILY_REQUEST_LIMIT=3000
 
-# Optional: Cloudflare R2 storage for visit images and park logos
+# Optional: Cloudflare R2 storage for visit images, trip-stop images, and park media
 PUBLIC_API_BASE_URL=
 R2_BUCKET_NAME=
 R2_ENDPOINT=
@@ -99,17 +99,18 @@ Production notes:
 - `npm run media:remove-converted-originals [-- --apply]` is the one-time cleanup for old source files retained by the completed conversion. The database must already have all migrations applied; this command never migrates it. It checks published review snapshots, lists the exact reclaimable bytes, and changes nothing until `--apply` is supplied. It never removes normal-size images or thumbnails. See [the source-file cleanup guide](docs/security.md#remove-old-conversion-source-files).
 - `npm run media:cleanup-unused-images [-- --apply]` reviews unused visit and trip-stop image files older than eight days. The database must already have all migrations applied; this command never migrates it. It scans all pages internally, keeps active uploads/current rows/published-review references, and changes nothing unless `--apply` is supplied after reviewing its report. See [the cleanup guide](docs/security.md#remove-unused-image-files-safely).
 - `npm run park:move-visits -- (--from <source-slug> | --visit-id <visit-id>) --to <target-slug> [--dry-run]` reassigns either all visits for one park slug or one specific visit to another park. Visit images stay attached automatically because they belong to the visit rows.
-- `npm run park:logo -- <park-slug>` uploads either `data/logos/<park-slug>.png` or, when multiple parks share one `displayTypeName`, `data/logos/display-types/<normalized-display-type>.png`. Shared display-type logos are stored once under `logos/display-types/` in R2 and linked from every matching park row. When `PUBLIC_API_BASE_URL` is set, park APIs expose stable versioned logo URLs through `GET /assets/logos/*`; those redirects are cached for one day, shorter than their seven-day presigned targets. Otherwise APIs fall back to presigned logo URLs.
+- `npm run park:logo -- <park-slug>` uploads either `data/logos/<park-slug>.png` or, when multiple parks share one `displayTypeName`, `data/logos/display-types/<normalized-display-type>.png`. Shared display-type logos are stored once under `logos/display-types/` in R2 and linked from every matching park row. When `PUBLIC_API_BASE_URL` is set, park APIs expose stable versioned logo URLs through `GET /assets/logos/*`; those redirects are cached for one day, shorter than their seven-day presigned targets. Public visit, trip-stop, trip, review, and park-map media use stable `GET /assets/media/*` URLs that redirect through the private bucket. Otherwise APIs fall back to presigned media URLs for local development.
 
 The importer's LIPAS source URL and supported type-code list are internal configuration, not a normal `.env` setting.
 
 ## API Shape
 
-The paired UI presents catalog and visit `GET` data publicly to end users without login. Direct backend access is a separate boundary: outside localhost, `/api/*` routes generally require the server-side `API_KEY`; `GET /health`, `GET /openapi.json`, and `GET /assets/logos/*` are anonymous backend reads, while `/auth/*` is anonymous login control flow. The Zod/OpenAPI definitions in this repository are the contract source of truth for the frontend's generated types.
+The paired UI presents catalog and visit `GET` data publicly to end users without login. Direct backend access is a separate boundary: outside localhost, `/api/*` routes generally require the server-side `API_KEY`; `GET /health`, `GET /openapi.json`, `GET /assets/logos/*`, and `GET /assets/media/*` are anonymous backend reads, while `/auth/*` is anonymous login control flow. The Zod/OpenAPI definitions in this repository are the contract source of truth for the frontend's generated types.
 
 - `GET /health`
 - `GET /openapi.json`
 - `GET /assets/logos/*`
+- `GET /assets/media/*`
 - `GET /api/parks`
 - `GET /api/parks/search`
 - `GET /api/trips/slug/:slug/visits/:visitId/images` — one visible trip visit's image page; private/no-store, ordered, default 12 and maximum 24 images
@@ -206,11 +207,11 @@ Catalog endpoints stay cache-friendly and database-backed:
 - `GET /api/admin/date-range-review/shares` is an admin-session-protected management listing of all published date-range-review shares, including overview metadata, public share URLs, and story summary counts.
 - `PATCH /api/admin/date-range-review/shares/:shareId` is an admin-session-protected management action that refreshes or edits one published date-range-review share in place while preserving its existing `shareId` and public share URL. It accepts the same `name`, `startDate`, and `endDate` payload shape as publish and returns `409` if another published share already owns the requested overview name.
 - `DELETE /api/admin/date-range-review/shares/:shareId` is an admin-session-protected management action that removes one published date-range-review share directly by share id and returns `404` when that exact share does not exist.
-- `GET /api/date-range-review/shares/:shareId` is an API-key-protected frontend-facing snapshot read route for named date-range review share pages. It serves only previously published snapshots, can expose optional visit-based `featuredImage` assets for photo-highlight, `new-parks`, `revisited-parks`, and `trip-summary` story cards with fresh presigned `fullUrl` and `thumbUrl` values resolved at response time from frozen image keys, and uses `Cache-Control: private, no-store` so refresh and unpublish state are read from the origin.
+- `GET /api/date-range-review/shares/:shareId` is an API-key-protected frontend-facing snapshot read route for named date-range review share pages. It serves only previously published snapshots, can expose optional visit-based `featuredImage` assets for photo-highlight, `new-parks`, `revisited-parks`, and `trip-summary` story cards with stable application `fullUrl` and `thumbUrl` values resolved from frozen image keys, and uses `Cache-Control: private, no-store` so refresh and unpublish state are read from the origin.
 - `GET /api/year-review/:year/preview` is an admin-session-protected generated preview of the year review story for one year. It derives the story automatically from existing visit and trip data and reports any current published share token for that year.
 - `POST /api/year-review/:year/publish` is an admin-session-protected publish action that snapshots the current generated year review into one tokenized share for that year and returns the share token plus the intended frontend share URL.
 - `DELETE /api/year-review/:year/publish` is an admin-session-protected unpublish action that removes the current published share snapshot for that year.
-- `GET /api/year-review/shares/:shareId` is an API-key-protected frontend-facing snapshot read route for the share page. It serves only previously published snapshots, can now expose optional visit-based `featuredImage` assets for milestone, photo-highlight, trip-highlight, and `new-parks` story cards with fresh presigned `fullUrl` and `thumbUrl` values resolved at response time from the frozen image keys in the snapshot, and uses `Cache-Control: private, no-store` so refresh and unpublish state are read from the origin.
+- `GET /api/year-review/shares/:shareId` is an API-key-protected frontend-facing snapshot read route for the share page. It serves only previously published snapshots, can now expose optional visit-based `featuredImage` assets for milestone, photo-highlight, trip-highlight, and `new-parks` story cards with stable application `fullUrl` and `thumbUrl` values resolved from frozen image keys in the snapshot, and uses `Cache-Control: private, no-store` so refresh and unpublish state are read from the origin.
 - `POST /api/trip-planner/suggestions` returns up to three Geoapify-backed place suggestions with labels and coordinates for origin/destination pickers, scoped to Finland, Sweden, and Norway.
 - `POST /api/trip-planner/search` resolves exact known park and trail names from the local catalog before falling back to Geoapify geocoding scoped to Finland, Sweden, and Norway, fetches a real driving route from Geoapify, and returns visible catalog parks within a route corridor using stored park geometry plus visited summaries, route `LineString` geometry, backend-provided route and park bounding boxes for map rendering, and top-level `maxDistanceKm` / `defaultDistanceKm` filter metadata. On longer trips, the first 30 km from the origin is treated as a stricter start zone so dense departure-area clusters do not dominate the results. Route failures return `422` with failed-leg details instead of a silent empty success.
 - `POST /api/trip-planner/nearby` resolves exact known park and trail names from the local catalog before falling back to Geoapify geocoding scoped to Finland, Sweden, and Norway, filters visible catalog parks by straight-line proximity to that point, and returns visited summaries plus a backend-provided `searchArea` bounding box and top-level `maxDistanceKm` / `defaultDistanceKm` filter metadata for map rendering without route geometry.
@@ -237,7 +238,7 @@ Catalog endpoints stay cache-friendly and database-backed:
 - `POST /api/visits/:id/images`, `DELETE /api/visits/:visitId/images/:imageId`, and `PATCH /api/visits/:id/images/reorder` are also admin-session write routes.
 - `POST /api/trip-stops/:id/images` remains available for localhost-style server uploads, but trip-stop images still enforce the 6-image cap.
 - `POST /api/visits/:id/images` remains available for localhost-style server uploads, but Vercel runtime disables that Sharp-based path so uploads do not pass through the function body limit.
-- `GET /health`, `GET /openapi.json`, and `GET /assets/logos/*` are the anonymous read endpoints today.
+- `GET /health`, `GET /openapi.json`, `GET /assets/logos/*`, and `GET /assets/media/*` are the anonymous read endpoints today.
 - `/auth/*` routes are anonymous login-control endpoints, not public data endpoints.
 - Frontend-facing `GET` routes such as `/api/home-summary`, `/api/map-summary`, `/api/trips`, `/api/trips/slug/:slug`, `/api/visits-timeline`, `GET /api/date-range-review/shares/:shareId`, and `GET /api/year-review/shares/:shareId` still require the API key outside localhost when `API_KEY` is configured.
 

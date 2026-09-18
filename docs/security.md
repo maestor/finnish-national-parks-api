@@ -4,7 +4,7 @@ This document describes the current security and operational baseline for the AP
 
 ## Route access
 
-- Anonymous backend reads: `GET /health`, `GET /openapi.json`, `GET /assets/logos/*`, and `/auth/*` login-control routes.
+- Anonymous backend reads: `GET /health`, `GET /openapi.json`, `GET /assets/logos/*`, `GET /assets/media/*`, and `/auth/*` login-control routes.
 - API-key boundary: frontend-facing `/api/*` reads outside localhost.
 - Admin session: all writes and admin-only reads.
 - Super-admin session: `GET /api/admin/admins`, admin role changes/removal, and `POST /api/admin/invitations`.
@@ -38,7 +38,7 @@ Restrict log access and retention to operational roles. Treat any confirmed hist
 
 ## Storage and uploads
 
-- Keep R2 private and use presigned URLs for non-public media.
+- Keep R2 private. Public visit, trip-stop, trip, review, and park-map payloads use stable `/assets/media/*` application URLs; the route checks the current public database relationship before redirecting to a fresh presigned R2 target. Admin and private media responses continue to use presigned URLs.
 - Validate limits against stored-object metadata, not only client-declared metadata. Direct-upload completion requires a positive integer stored size no greater than 15 MiB; missing or invalid metadata returns `422`, while an oversized stored object returns `413` and creates no image row.
 - Completion GETs use a bounded, deadline-limited object stream and stop reading when the 15 MiB source limit is exceeded; they do not buffer an unbounded `transformToByteArray()` result. The derivative backfill uses the same explicit source bound and keeps retained sources when a read fails.
 - Direct browser PUTs target parent-scoped temporary keys. Completion reads the stored object, limits decoding to 40 megapixels, applies orientation, strips EXIF/GPS metadata, and creates separate server-owned JPEG full (maximum 2,560 px) and thumbnail (maximum 480 px; 150 KiB quality budget) keys. The temporary key is separately persisted as the parent-scoped completion identity, so a retry returns the original image with `200` and fresh read URLs even after staging cleanup; a first successful completion returns `201`. The database enforces that identity and atomically admits no more than six trip-stop images.

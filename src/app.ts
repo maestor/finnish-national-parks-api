@@ -36,6 +36,7 @@ import {
   findAdminByGoogleSub,
   findMediaUploadByUploadKey,
   findParkRecordBySlugIncludingRemoved,
+  findPublicMediaKey,
   findTripStopImageById,
   findTripStopImageByUploadKey,
   findTripStopRecordById,
@@ -251,6 +252,7 @@ type AppDependencies = {
   database?: Database | undefined;
   getLogoPublicUrl?: ((key: string, updatedAt: string) => string | Promise<string>) | undefined;
   getMapPublicUrl?: ((key: string, updatedAt: string) => string | Promise<string>) | undefined;
+  getPublicMediaUrl?: ((key: string) => string | Promise<string>) | undefined;
   storage?: StorageClient | undefined;
   tripPlannerBudget?: TripPlannerBudget | undefined;
   tripPlanner?: TripPlannerService | undefined;
@@ -268,6 +270,7 @@ const DIRECT_VISIT_UPLOAD_URL_TTL_SECONDS = 15 * 60;
 const LOGO_PRESIGNED_URL_TTL_SECONDS = 7 * 24 * 60 * 60;
 const MAP_PRESIGNED_URL_TTL_SECONDS = 7 * 24 * 60 * 60;
 const PUBLIC_LOGO_REDIRECT_CACHE_CONTROL = 'public, max-age=86400';
+const PUBLIC_MEDIA_REDIRECT_CACHE_CONTROL = 'private, no-store';
 const TRIP_PLANNER_REQUEST_BODY_LIMIT_BYTES = 16 * 1024;
 const DIRECT_IMAGE_COMPLETION_WAIT_MS = 5_000;
 const DIRECT_IMAGE_COMPLETION_POLL_MS = 50;
@@ -1131,6 +1134,7 @@ export const createApp = ({
   database,
   getLogoPublicUrl,
   getMapPublicUrl,
+  getPublicMediaUrl,
   storage,
   tripPlannerBudget,
   tripPlanner
@@ -1142,6 +1146,12 @@ export const createApp = ({
       : undefined);
 
   const mapPublicUrl =
+    (getPublicMediaUrl ? async (key: string) => getPublicMediaUrl(key) : getMapPublicUrl) ??
+    (storage
+      ? async (key: string) => storage.getPresignedUrl(key, MAP_PRESIGNED_URL_TTL_SECONDS)
+      : undefined);
+
+  const mapPrivateUrl =
     getMapPublicUrl ??
     (storage
       ? async (key: string) => storage.getPresignedUrl(key, MAP_PRESIGNED_URL_TTL_SECONDS)
@@ -1152,6 +1162,12 @@ export const createApp = ({
       return storage.getPresignedUrl(key, 3600);
     }
     return '';
+  };
+  const publicMediaUrl = async (key: string) => {
+    if (getPublicMediaUrl) {
+      return getPublicMediaUrl(key);
+    }
+    return getImagePublicUrl(key);
   };
   const app = new OpenAPIHono();
 
@@ -1275,6 +1291,42 @@ export const createApp = ({
   });
 
   if (database) {
+    app.get('/assets/media/*', async (context) => {
+      const mediaPath = context.req.path.slice('/assets/media/'.length);
+      const segments = mediaPath.split('/').filter(Boolean);
+
+      let decodedSegments: string[];
+      try {
+        decodedSegments = segments.map((segment) => decodeURIComponent(segment));
+      } catch {
+        return context.json({ error: 'Media not found.' }, 404);
+      }
+
+      const hasInvalidSegment = decodedSegments.some(
+        (segment) =>
+          segment === '.' || segment === '..' || segment.includes('/') || segment.includes('\\')
+      );
+
+      if (decodedSegments.length === 0 || hasInvalidSegment) {
+        return context.json({ error: 'Media not found.' }, 404);
+      }
+
+      if (!storage) {
+        return context.json({ error: 'Media storage not configured.' }, 404);
+      }
+
+      const mediaKey = decodedSegments.join('/');
+      const publicMediaKey = await findPublicMediaKey(database, mediaKey);
+
+      if (!publicMediaKey) {
+        return context.json({ error: 'Media not found.' }, 404);
+      }
+
+      const location = await storage.getPresignedUrl(publicMediaKey, 3600);
+      context.header('Cache-Control', PUBLIC_MEDIA_REDIRECT_CACHE_CONTROL);
+      return context.redirect(location, 302);
+    });
+
     const effectiveTripPlannerBudget = tripPlannerBudget ?? createTripPlannerBudget({ database });
 
     app.openapi(devAgentAuthRoute, async (c) => {
@@ -1649,7 +1701,7 @@ export const createApp = ({
         : null;
       const canViewRemovedPark = Boolean(adminSession && removedPark?.removed);
       const park = canViewRemovedPark
-        ? await getParkBySlugIncludingRemoved(database, slug, logoPublicUrl, mapPublicUrl)
+        ? await getParkBySlugIncludingRemoved(database, slug, logoPublicUrl, mapPrivateUrl)
         : await getParkBySlug(database, slug, logoPublicUrl, mapPublicUrl);
 
       if (!park) {
@@ -1704,7 +1756,7 @@ export const createApp = ({
       const body = context.req.valid('json');
 
       try {
-        const park = await updateParkDetails(database, slug, body, logoPublicUrl, mapPublicUrl);
+        const park = await updateParkDetails(database, slug, body, logoPublicUrl, mapPrivateUrl);
 
         if (!park) {
           return context.json(jsonNotFound('Park not found.'), 404);
@@ -1726,7 +1778,7 @@ export const createApp = ({
       context.header('Cache-Control', PRIVATE_CACHE_CONTROL);
 
       const { slug } = context.req.valid('param');
-      const parkVisits = await getParkVisitsBySlug(database, slug, getImagePublicUrl);
+      const parkVisits = await getParkVisitsBySlug(database, slug, publicMediaUrl);
 
       if (!parkVisits) {
         return context.json(jsonNotFound('Park not found.'), 404);
@@ -1850,7 +1902,7 @@ export const createApp = ({
         return context.json({ error: 'Invalid archive cursor.' }, 400);
       }
 
-      const archive = await listTripArchive(database, limit, cursor, getImagePublicUrl);
+      const archive = await listTripArchive(database, limit, cursor, publicMediaUrl);
 
       return context.json(archive, 200);
     });
@@ -2244,7 +2296,7 @@ export const createApp = ({
           }),
           publishedAt: share.publishedAt,
           shareId: share.shareId,
-          story: await resolveDateRangeReviewStoryForResponse(share.story, getImagePublicUrl)
+          story: await resolveDateRangeReviewStoryForResponse(share.story, publicMediaUrl)
         },
         200
       );
@@ -2373,7 +2425,7 @@ export const createApp = ({
         {
           publishedAt: share.publishedAt,
           shareId: share.shareId,
-          story: await resolveYearReviewStoryForResponse(share.story, getImagePublicUrl),
+          story: await resolveYearReviewStoryForResponse(share.story, publicMediaUrl),
           year: share.year
         },
         200
@@ -2384,7 +2436,7 @@ export const createApp = ({
       context.header('Cache-Control', PRIVATE_CACHE_CONTROL);
 
       const { slug } = context.req.valid('param');
-      const trip = await getPublicTripBySlug(database, slug, getImagePublicUrl);
+      const trip = await getPublicTripBySlug(database, slug, publicMediaUrl);
 
       if (!trip) {
         return context.json(jsonNotFound('Trip not found.'), 404);
@@ -2407,7 +2459,7 @@ export const createApp = ({
       context.header('Cache-Control', PRIVATE_CACHE_CONTROL);
 
       const { slug } = context.req.valid('param');
-      const trip = await getPublicTripBySlug(database, slug, getImagePublicUrl);
+      const trip = await getPublicTripBySlug(database, slug, publicMediaUrl);
 
       if (!trip) {
         return context.json(jsonNotFound('Trip not found.'), 404);
@@ -2430,7 +2482,7 @@ export const createApp = ({
         visitId,
         limit,
         offset,
-        getImagePublicUrl
+        publicMediaUrl
       );
 
       if (!images) {
@@ -2451,7 +2503,7 @@ export const createApp = ({
         stopId,
         limit,
         offset,
-        getImagePublicUrl
+        publicMediaUrl
       );
 
       if (!images) {
