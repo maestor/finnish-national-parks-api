@@ -7,6 +7,7 @@ This document describes the current security and operational baseline for the AP
 - Anonymous backend reads: `GET /health`, `GET /openapi.json`, `GET /assets/logos/*`, `GET /assets/media/*`, and `/auth/*` login-control routes.
 - API-key boundary: frontend-facing `/api/*` reads outside localhost.
 - Admin session: all writes and admin-only reads.
+- Trip route-waypoint CRUD and the full trip-editing itinerary are admin-session-only. Public trip responses omit waypoint labels and coordinates; route construction may use the private coordinates, and failures involving a hidden waypoint do not return its leg details.
 - Super-admin session: `GET /api/admin/admins`, admin role changes/removal, and `POST /api/admin/invitations`.
 - Local-only operations: imports, migrations, backups, and repair commands.
 

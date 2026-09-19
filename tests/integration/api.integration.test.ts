@@ -25,6 +25,7 @@ import { createMemoryStorage } from '../../src/storage/memory-storage.js';
 import { createTripPlannerBudget } from '../../src/trip-planner/budget.js';
 import { TripPlannerError } from '../../src/trip-planner/search.js';
 import type {
+  TripPlannerRoundTripInput,
   TripPlannerRoundTripRoute,
   TripPlannerService
 } from '../../src/trip-planner/types.js';
@@ -2699,6 +2700,370 @@ describe('API routes', () => {
     ]);
   });
 
+  it('keeps route waypoints private while shaping the public trip route', async () => {
+    const buildRoundTripRoute = vi.fn<NonNullable<TripPlannerService['buildRoundTripRoute']>>(
+      async ({ waypoints }: TripPlannerRoundTripInput): Promise<TripPlannerRoundTripRoute> => ({
+        distanceMeters: 123_000,
+        durationSeconds: 4_200,
+        geometry: {
+          coordinates: waypoints.map((waypoint) => [
+            waypoint.coordinate.lon,
+            waypoint.coordinate.lat
+          ]),
+          type: 'LineString'
+        },
+        returnsToStart: true,
+        waypointCount: waypoints.length
+      })
+    );
+    const app = createAuthedApp({
+      tripPlanner: {
+        buildRoundTripRoute,
+        search: vi.fn(async () => {
+          throw new Error('not used in this test');
+        }),
+        searchNearby: vi.fn(async () => {
+          throw new Error('not used in this test');
+        }),
+        suggest: vi.fn(async () => {
+          throw new Error('not used in this test');
+        })
+      }
+    });
+    const { body: trip } = await createTrip(app, {
+      name: 'Reittivalinta-reissu',
+      slug: 'reittivalinta-reissu',
+      startingPoint: {
+        coordinate: { lat: 60.1699, lon: 24.9384 },
+        label: 'Helsinki'
+      }
+    });
+    const { body: firstVisit } = await createVisit(app, 'akasmannyn-kansallispuisto', {
+      tripId: trip.id,
+      tripStopOrder: 1,
+      visitedOn: '2026-06-07'
+    });
+    const { body: secondVisit } = await createVisit(app, 'seitsemisen-kansallispuisto', {
+      tripId: trip.id,
+      tripStopOrder: 2,
+      visitedOn: '2026-06-08'
+    });
+
+    const createWaypointResponse = await requestAsAdmin(
+      app,
+      `/api/trips/${trip.id}/route-waypoints`,
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          location: {
+            coordinate: { lat: 61.4978, lon: 23.761 },
+            label: 'Tampereen reittivalinta'
+          },
+          tripStopOrder: 2
+        }),
+        headers: { 'content-type': 'application/json' }
+      }
+    );
+    expect(createWaypointResponse.status).toBe(201);
+    const createdWaypoint = (await createWaypointResponse.json()) as {
+      id: number;
+      location: { label: string };
+      tripStopOrder: number;
+    };
+
+    expect(createdWaypoint).toMatchObject({
+      location: { label: 'Tampereen reittivalinta' },
+      tripStopOrder: 2
+    });
+
+    const adminDetailResponse = await app.request(`/api/trips/${trip.id}`);
+    const adminDetailBody = (await adminDetailResponse.json()) as {
+      itinerary: Array<{
+        kind: 'route-waypoint' | 'visit';
+        tripStopOrder: number;
+        routeWaypoint?: { id: number };
+        visit?: { id: number };
+      }>;
+    };
+    const publicDetailResponse = await app.request('/api/trips/slug/reittivalinta-reissu');
+    const publicDetailBody = (await publicDetailResponse.json()) as {
+      itinerary: Array<{ kind: 'visit'; tripStopOrder: number; visit: { id: number } }>;
+      route: { available: boolean };
+    };
+
+    expect(adminDetailBody.itinerary).toEqual([
+      { kind: 'visit', tripStopOrder: 1, visit: expect.objectContaining({ id: firstVisit.id }) },
+      {
+        kind: 'route-waypoint',
+        tripStopOrder: 2,
+        routeWaypoint: expect.objectContaining({ id: createdWaypoint.id })
+      },
+      { kind: 'visit', tripStopOrder: 3, visit: expect.objectContaining({ id: secondVisit.id }) }
+    ]);
+    expect(publicDetailBody.route).toMatchObject({ available: true });
+    expect(publicDetailBody.itinerary).toEqual([
+      { kind: 'visit', tripStopOrder: 1, visit: expect.objectContaining({ id: firstVisit.id }) },
+      { kind: 'visit', tripStopOrder: 2, visit: expect.objectContaining({ id: secondVisit.id }) }
+    ]);
+    expect(JSON.stringify(publicDetailBody)).not.toContain('route-waypoint');
+    expect(JSON.stringify(publicDetailBody)).not.toContain('Tampereen reittivalinta');
+
+    const publicRouteResponse = await app.request('/api/trips/slug/reittivalinta-reissu/route');
+    const publicRouteBody = await publicRouteResponse.json();
+
+    expect(publicRouteResponse.status).toBe(200);
+    expect(buildRoundTripRoute).toHaveBeenCalledTimes(1);
+    expect(buildRoundTripRoute.mock.calls[0]?.[0].waypoints).toEqual([
+      expect.objectContaining({ coordinate: { lat: 60.1699, lon: 24.9384 } }),
+      expect.objectContaining({ coordinate: expect.any(Object) }),
+      expect.objectContaining({ coordinate: { lat: 61.4978, lon: 23.761 } }),
+      expect.objectContaining({ coordinate: expect.any(Object) }),
+      expect.objectContaining({ coordinate: { lat: 60.1699, lon: 24.9384 } })
+    ]);
+    expect(JSON.stringify(publicRouteBody)).not.toContain('Tampereen reittivalinta');
+
+    const unchangedWaypointResponse = await requestAsAdmin(
+      app,
+      `/api/trip-route-waypoints/${createdWaypoint.id}`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify({ tripStopOrder: 2 }),
+        headers: { 'content-type': 'application/json' }
+      }
+    );
+
+    expect(unchangedWaypointResponse.status).toBe(200);
+
+    const sameLocationWaypointResponse = await requestAsAdmin(
+      app,
+      `/api/trip-route-waypoints/${createdWaypoint.id}`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify({
+          location: {
+            coordinate: { lat: 61.4978, lon: 23.761 },
+            label: 'Tampereen reittivalinta'
+          }
+        }),
+        headers: { 'content-type': 'application/json' }
+      }
+    );
+
+    expect(sameLocationWaypointResponse.status).toBe(200);
+
+    const updateWaypointResponse = await requestAsAdmin(
+      app,
+      `/api/trip-route-waypoints/${createdWaypoint.id}`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify({
+          location: {
+            coordinate: { lat: 61.5, lon: 23.8 },
+            label: 'Tampereen uusi reittivalinta'
+          },
+          tripStopOrder: 1
+        }),
+        headers: { 'content-type': 'application/json' }
+      }
+    );
+    const updatedWaypoint = (await updateWaypointResponse.json()) as {
+      location: { coordinate: { lat: number; lon: number }; label: string };
+      tripStopOrder: number;
+    };
+
+    expect(updateWaypointResponse.status).toBe(200);
+    expect(updatedWaypoint).toMatchObject({
+      location: {
+        coordinate: { lat: 61.5, lon: 23.8 },
+        label: 'Tampereen uusi reittivalinta'
+      },
+      tripStopOrder: 1
+    });
+
+    const deleteWaypointResponse = await requestAsAdmin(
+      app,
+      `/api/trip-route-waypoints/${createdWaypoint.id}`,
+      { method: 'DELETE' }
+    );
+    const afterDeleteAdminDetailResponse = await app.request(`/api/trips/${trip.id}`);
+    const afterDeleteAdminDetailBody = (await afterDeleteAdminDetailResponse.json()) as {
+      itinerary: Array<{ kind: 'visit'; tripStopOrder: number }>;
+    };
+
+    expect(deleteWaypointResponse.status).toBe(204);
+    expect(afterDeleteAdminDetailBody.itinerary).toEqual([
+      expect.objectContaining({ kind: 'visit', tripStopOrder: 1 }),
+      expect.objectContaining({ kind: 'visit', tripStopOrder: 2 })
+    ]);
+  });
+
+  it('handles route waypoint authorization and missing-resource paths', async () => {
+    const app = createAuthedApp();
+    const waypointBody = JSON.stringify({
+      location: {
+        coordinate: { lat: 61.4978, lon: 23.761 },
+        label: 'Tampereen reittivalinta'
+      },
+      tripStopOrder: 1
+    });
+    const authorizedHeaders = { 'content-type': 'application/json' };
+
+    const unauthorizedCreateResponse = await app.request('/api/trips/99999/route-waypoints', {
+      method: 'POST',
+      body: waypointBody,
+      headers: authorizedHeaders
+    });
+    const unauthorizedUpdateResponse = await app.request('/api/trip-route-waypoints/99999', {
+      method: 'PATCH',
+      body: waypointBody,
+      headers: authorizedHeaders
+    });
+    const unauthorizedDeleteResponse = await app.request('/api/trip-route-waypoints/99999', {
+      method: 'DELETE'
+    });
+
+    expect(unauthorizedCreateResponse.status).toBe(401);
+    expect(unauthorizedUpdateResponse.status).toBe(401);
+    expect(unauthorizedDeleteResponse.status).toBe(401);
+
+    const missingCreateResponse = await requestAsAdmin(app, '/api/trips/99999/route-waypoints', {
+      method: 'POST',
+      body: waypointBody,
+      headers: authorizedHeaders
+    });
+    const missingUpdateResponse = await requestAsAdmin(app, '/api/trip-route-waypoints/99999', {
+      method: 'PATCH',
+      body: waypointBody,
+      headers: authorizedHeaders
+    });
+    const missingDeleteResponse = await requestAsAdmin(app, '/api/trip-route-waypoints/99999', {
+      method: 'DELETE'
+    });
+
+    expect(missingCreateResponse.status).toBe(404);
+    expect(missingUpdateResponse.status).toBe(404);
+    expect(missingDeleteResponse.status).toBe(404);
+    expect(await repositories.getPublicTripRouteInputByTripId(testDatabase.database, 99999)).toBe(
+      null
+    );
+
+    const { body: trip } = await createTrip(app, { name: 'Reittivalinnan virhepolut' });
+    const validationSpy = vi
+      .spyOn(repositories, 'createTripRouteWaypoint')
+      .mockRejectedValueOnce(
+        new repositories.RepositoryValidationError('Route waypoint validation failed.')
+      );
+    const validationResponse = await requestAsAdmin(app, `/api/trips/${trip.id}/route-waypoints`, {
+      method: 'POST',
+      body: waypointBody,
+      headers: authorizedHeaders
+    });
+
+    validationSpy.mockRestore();
+
+    expect(validationResponse.status).toBe(422);
+    await expect(validationResponse.json()).resolves.toEqual({
+      error: 'Route waypoint validation failed.'
+    });
+
+    const unexpectedSpy = vi
+      .spyOn(repositories, 'createTripRouteWaypoint')
+      .mockRejectedValueOnce(new Error('Unexpected route waypoint failure.'));
+    const unexpectedResponse = await requestAsAdmin(app, `/api/trips/${trip.id}/route-waypoints`, {
+      method: 'POST',
+      body: waypointBody,
+      headers: authorizedHeaders
+    });
+
+    unexpectedSpy.mockRestore();
+
+    expect(unexpectedResponse.status).toBe(500);
+  });
+
+  it('filters public route entries that have no usable coordinate', async () => {
+    const buildRoundTripRoute = vi.fn<NonNullable<TripPlannerService['buildRoundTripRoute']>>(
+      async ({ waypoints }: TripPlannerRoundTripInput): Promise<TripPlannerRoundTripRoute> => ({
+        distanceMeters: 1,
+        durationSeconds: 1,
+        geometry: {
+          coordinates: waypoints.map((waypoint) => [
+            waypoint.coordinate.lon,
+            waypoint.coordinate.lat
+          ]),
+          type: 'LineString'
+        },
+        returnsToStart: true,
+        waypointCount: waypoints.length
+      })
+    );
+    const app = createAuthedApp({
+      tripPlanner: {
+        buildRoundTripRoute,
+        search: vi.fn(async () => {
+          throw new Error('not used in this test');
+        }),
+        searchNearby: vi.fn(async () => {
+          throw new Error('not used in this test');
+        }),
+        suggest: vi.fn(async () => {
+          throw new Error('not used in this test');
+        })
+      }
+    });
+    const { body: trip } = await createTrip(app, { name: 'Koordinaatiton reitti' });
+    const publicTripSpy = vi
+      .spyOn(repositories, 'getPublicTripBySlug')
+      .mockResolvedValueOnce({ id: trip.id, itinerary: [] } as unknown as NonNullable<
+        Awaited<ReturnType<typeof repositories.getPublicTripBySlug>>
+      >);
+    const routeInputSpy = vi
+      .spyOn(repositories, 'getPublicTripRouteInputByTripId')
+      .mockResolvedValueOnce({
+        available: true,
+        entries: [
+          {
+            excludeFromRoute: false,
+            kind: 'visit',
+            location: null,
+            markerPoint: { lat: Number.NaN, lon: Number.NaN },
+            parkName: 'Koordinaatiton puisto',
+            parkSlug: 'koordinaatiton-puisto',
+            tripStopOrder: 1
+          },
+          {
+            displayName: 'Tampere',
+            kind: 'route-waypoint',
+            label: 'Tampere',
+            location: { lat: 61.4978, lon: 23.761 },
+            tripStopOrder: 2
+          },
+          {
+            excludeFromRoute: false,
+            kind: 'visit',
+            location: { lat: 61.5, lon: 23.8 },
+            markerPoint: { lat: Number.NaN, lon: Number.NaN },
+            parkName: 'Toinen koordinaatiton puisto',
+            parkSlug: 'toinen-koordinaatiton-puisto',
+            tripStopOrder: 3
+          }
+        ],
+        startingPoint: {
+          coordinate: { lat: 60.1699, lon: 24.9384 },
+          displayName: 'Helsinki',
+          label: 'Helsinki'
+        },
+        tripId: trip.id
+      });
+
+    const response = await app.request('/api/trips/slug/koordinaatiton-reitti/route');
+
+    publicTripSpy.mockRestore();
+    routeInputSpy.mockRestore();
+
+    expect(response.status).toBe(200);
+    expect(buildRoundTripRoute.mock.calls[0]?.[0].waypoints).toHaveLength(4);
+  });
+
   it('returns page-ready trip detail by slug and loads its route separately', async () => {
     const buildRoundTripRoute: NonNullable<TripPlannerService['buildRoundTripRoute']> = vi.fn(
       async (): Promise<TripPlannerRoundTripRoute> => ({
@@ -2952,6 +3317,7 @@ describe('API routes', () => {
       }
     ]);
     expect(body.route).toEqual({
+      available: true,
       data: null,
       error: null,
       success: true
@@ -2966,6 +3332,7 @@ describe('API routes', () => {
 
     expect(routeResponse.status).toBe(200);
     expect(routeBody).toEqual({
+      available: true,
       data: {
         distanceMeters: 482_500,
         durationSeconds: 21_600.5,
@@ -3258,6 +3625,7 @@ describe('API routes', () => {
     expect(body.visitCount).toBe(1);
     expect(body.stopCount).toBe(0);
     expect(body.route).toEqual({
+      available: false,
       data: null,
       error: null,
       success: true
@@ -3267,6 +3635,7 @@ describe('API routes', () => {
     const routeResponse = await app.request('/api/trips/slug/yksinainen-retki/route');
     expect(routeResponse.status).toBe(200);
     expect(await routeResponse.json()).toEqual({
+      available: false,
       data: null,
       error: null,
       success: true
@@ -3380,6 +3749,7 @@ describe('API routes', () => {
     ]);
     expect(routeResponse.status).toBe(200);
     expect(routeBody).toEqual({
+      available: true,
       data: routeData,
       error: null,
       success: true
@@ -3482,6 +3852,7 @@ describe('API routes', () => {
     expect(body.stopCount).toBe(1);
     expect(routeResponse.status).toBe(200);
     expect(routeBody).toEqual({
+      available: true,
       data: routeData,
       error: null,
       success: true
@@ -3541,6 +3912,7 @@ describe('API routes', () => {
 
     expect(response.status).toBe(200);
     expect(body).toEqual({
+      available: true,
       data: null,
       error: {
         error: 'Trip planner is not configured.',
@@ -3613,6 +3985,7 @@ describe('API routes', () => {
 
       expect(response.status).toBe(200);
       expect(body).toEqual({
+        available: true,
         data: null,
         error: {
           error: 'Driving route could not be found.',
@@ -3724,6 +4097,7 @@ describe('API routes', () => {
 
     expect(response.status).toBe(200);
     expect(body).toEqual({
+      available: true,
       data: null,
       error: {
         error: 'Driving route could not be found from A to B.',
@@ -3751,6 +4125,102 @@ describe('API routes', () => {
       success: false
     });
     expect(buildRoundTripRoute).toHaveBeenCalledTimes(1);
+  });
+
+  it('redacts public route failure details when a hidden waypoint is involved', async () => {
+    const app = createAuthedApp({
+      tripPlanner: {
+        buildRoundTripRoute: vi.fn(async () => {
+          throw new TripPlannerError(
+            'route_not_found',
+            'Driving route could not be found from A to B.',
+            422,
+            {
+              routeFailure: {
+                destination: {
+                  coordinate: { lat: 61, lon: 25 },
+                  displayName: 'B',
+                  label: 'B'
+                },
+                origin: {
+                  coordinate: { lat: 60, lon: 24 },
+                  displayName: 'A',
+                  label: 'A'
+                },
+                waypointIndex: 2
+              }
+            }
+          );
+        }),
+        search: vi.fn(async () => {
+          throw new Error('not used in this test');
+        }),
+        searchNearby: vi.fn(async () => {
+          throw new Error('not used in this test');
+        }),
+        suggest: vi.fn(async () => {
+          throw new Error('not used in this test');
+        })
+      }
+    });
+    const { body: trip } = await createTrip(app, {
+      name: 'Piilotettu reittivirhe',
+      startingPoint: {
+        coordinate: { lat: 60.1699, lon: 24.9384 },
+        label: 'Helsinki'
+      }
+    });
+
+    await createVisit(app, 'akasmannyn-kansallispuisto', {
+      tripId: trip.id,
+      tripStopOrder: 1,
+      visitedOn: '2026-06-07'
+    });
+    const waypointResponse = await requestAsAdmin(app, `/api/trips/${trip.id}/route-waypoints`, {
+      method: 'POST',
+      body: JSON.stringify({
+        location: {
+          coordinate: { lat: 61.4978, lon: 23.761 },
+          label: 'Tampereen reittivalinta'
+        },
+        tripStopOrder: 2
+      }),
+      headers: { 'content-type': 'application/json' }
+    });
+
+    expect(waypointResponse.status).toBe(201);
+    const response = await app.request('/api/trips/slug/piilotettu-reittivirhe/route');
+    const body = (await response.json()) as {
+      error: { error: string; errorCode: string; routeFailure?: unknown };
+      success: boolean;
+    };
+
+    expect(response.status).toBe(200);
+    expect(body).toEqual({
+      available: true,
+      data: null,
+      error: {
+        error: 'Driving route could not be found from A to B.',
+        errorCode: 'route_not_found'
+      },
+      success: false
+    });
+  });
+
+  it('defaults public trip route availability when route input is unavailable', async () => {
+    const app = createAuthedApp();
+    const { body: trip } = await createTrip(app, { name: 'Reittiä ei saatavilla' });
+    const routeInputSpy = vi
+      .spyOn(repositories, 'getPublicTripRouteInputByTripId')
+      .mockResolvedValueOnce(null);
+
+    const response = await app.request(`/api/trips/slug/${trip.slug}`);
+    const body = (await response.json()) as { route: { available: boolean } };
+
+    routeInputSpy.mockRestore();
+
+    expect(response.status).toBe(200);
+    expect(body.route.available).toBe(false);
   });
 
   it('returns 500 for an unexpected public trip route failure by slug', async () => {
@@ -3852,6 +4322,7 @@ describe('API routes', () => {
 
     expect(response.status).toBe(200);
     expect(body).toEqual({
+      available: true,
       data: null,
       error: {
         error: 'Trip planner provider is unavailable.',
@@ -3912,6 +4383,7 @@ describe('API routes', () => {
 
     expect(response.status).toBe(200);
     expect(body).toEqual({
+      available: true,
       data: null,
       error: {
         error: 'Driving route could not be found.',

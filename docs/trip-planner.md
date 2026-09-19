@@ -7,6 +7,8 @@ It is meant to answer two questions quickly:
 - what the trip-planner endpoints do
 - why the current search heuristics behave the way they do
 
+Trip-page routes can also contain admin-only `Reittivalinta` waypoints. They are stored separately from visits and trip stops, share the same ordered itinerary sequence, and are passed to the route planner without being included in the public trip itinerary. The public route payload exposes only the resulting route state; if a provider failure points at a hidden waypoint, the API redacts the failed-leg details.
+
 ## Endpoints
 
 - `POST /api/trip-planner/suggestions`

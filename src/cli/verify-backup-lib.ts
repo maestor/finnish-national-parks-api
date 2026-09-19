@@ -11,6 +11,7 @@ const LOCAL_BACKUP_FILE_ERROR = 'Backup verification requires a local SQLite bac
 type RecordCounts = {
   dateRangeReviewShares: number;
   parks: number;
+  tripRouteWaypoints: number;
   tripStopImages: number;
   tripStops: number;
   trips: number;
@@ -54,6 +55,7 @@ const getRecordCounts = async (client: Client): Promise<RecordCounts> => {
   const [
     dateRangeReviewShares,
     parks,
+    tripRouteWaypoints,
     tripStopImages,
     tripStops,
     trips,
@@ -63,6 +65,7 @@ const getRecordCounts = async (client: Client): Promise<RecordCounts> => {
   ] = await Promise.all([
     getCount(client, 'SELECT COUNT(*) AS count FROM date_range_review_shares'),
     getCount(client, 'SELECT COUNT(*) AS count FROM parks'),
+    getCount(client, 'SELECT COUNT(*) AS count FROM trip_route_waypoints'),
     getCount(client, 'SELECT COUNT(*) AS count FROM trip_stop_images'),
     getCount(client, 'SELECT COUNT(*) AS count FROM trip_stops'),
     getCount(client, 'SELECT COUNT(*) AS count FROM trips'),
@@ -74,6 +77,7 @@ const getRecordCounts = async (client: Client): Promise<RecordCounts> => {
   return {
     dateRangeReviewShares,
     parks,
+    tripRouteWaypoints,
     tripStopImages,
     tripStops,
     trips,

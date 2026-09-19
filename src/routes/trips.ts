@@ -5,6 +5,7 @@ import {
   completeDirectVisitImageUploadRequestSchema,
   completeDirectVisitImageUploadResponseSchema,
   createTripRequestSchema,
+  createTripRouteWaypointRequestSchema,
   createTripStopRequestSchema,
   directVisitImageUploadPlanSchema,
   directVisitImageUploadRequestSchema,
@@ -17,10 +18,12 @@ import {
   tripFeaturedImageResponseSchema,
   tripImageCandidatesResponseSchema,
   tripListResponseSchema,
+  tripRouteWaypointSchema,
   tripSchema,
   tripStopSchema,
   updateTripFeaturedImageRequestSchema,
   updateTripRequestSchema,
+  updateTripRouteWaypointRequestSchema,
   updateTripStopRequestSchema,
   visitImageSchema
 } from '../contracts/parks.js';
@@ -463,6 +466,39 @@ export const createTripStopRoute = createRoute({
   }
 });
 
+export const createTripRouteWaypointRoute = createRoute({
+  method: 'post',
+  path: '/api/trips/{id}/route-waypoints',
+  tags: ['Trips'],
+  security: [{ bearerAuth: [], sessionAuth: [] }],
+  request: {
+    params: z.object({ id: z.coerce.number().int() }),
+    body: { content: { 'application/json': { schema: createTripRouteWaypointRequestSchema } } }
+  },
+  responses: {
+    201: {
+      description: 'Created trip route waypoint',
+      content: { 'application/json': { schema: tripRouteWaypointSchema } }
+    },
+    401: {
+      description: 'Admin session required',
+      content: { 'application/json': { schema: errorSchema } }
+    },
+    404: {
+      description: 'Trip was not found',
+      content: { 'application/json': { schema: errorSchema } }
+    },
+    422: {
+      description: 'Invalid trip route waypoint payload',
+      content: { 'application/json': { schema: errorSchema } }
+    },
+    503: {
+      description: 'OAuth not configured',
+      content: { 'application/json': { schema: errorSchema } }
+    }
+  }
+});
+
 export const updateTripStopRoute = createRoute({
   method: 'patch',
   path: '/api/trip-stops/{id}',
@@ -524,6 +560,39 @@ export const updateTripStopRoute = createRoute({
   }
 });
 
+export const updateTripRouteWaypointRoute = createRoute({
+  method: 'patch',
+  path: '/api/trip-route-waypoints/{id}',
+  tags: ['Trips'],
+  security: [{ bearerAuth: [], sessionAuth: [] }],
+  request: {
+    params: z.object({ id: z.coerce.number().int() }),
+    body: { content: { 'application/json': { schema: updateTripRouteWaypointRequestSchema } } }
+  },
+  responses: {
+    200: {
+      description: 'Updated trip route waypoint',
+      content: { 'application/json': { schema: tripRouteWaypointSchema } }
+    },
+    401: {
+      description: 'Admin session required',
+      content: { 'application/json': { schema: errorSchema } }
+    },
+    404: {
+      description: 'Trip route waypoint was not found',
+      content: { 'application/json': { schema: errorSchema } }
+    },
+    422: {
+      description: 'Invalid trip route waypoint payload',
+      content: { 'application/json': { schema: errorSchema } }
+    },
+    503: {
+      description: 'OAuth not configured',
+      content: { 'application/json': { schema: errorSchema } }
+    }
+  }
+});
+
 export const deleteTripStopRoute = createRoute({
   method: 'delete',
   path: '/api/trip-stops/{id}',
@@ -561,6 +630,29 @@ export const deleteTripStopRoute = createRoute({
           schema: errorSchema
         }
       }
+    }
+  }
+});
+
+export const deleteTripRouteWaypointRoute = createRoute({
+  method: 'delete',
+  path: '/api/trip-route-waypoints/{id}',
+  tags: ['Trips'],
+  security: [{ bearerAuth: [], sessionAuth: [] }],
+  request: { params: z.object({ id: z.coerce.number().int() }) },
+  responses: {
+    204: { description: 'Deleted trip route waypoint' },
+    401: {
+      description: 'Admin session required',
+      content: { 'application/json': { schema: errorSchema } }
+    },
+    404: {
+      description: 'Trip route waypoint was not found',
+      content: { 'application/json': { schema: errorSchema } }
+    },
+    503: {
+      description: 'OAuth not configured',
+      content: { 'application/json': { schema: errorSchema } }
     }
   }
 });

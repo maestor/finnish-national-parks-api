@@ -43,6 +43,7 @@ import {
   publicDataVersions,
   tripFeaturedImages,
   tripRoutes,
+  tripRouteWaypoints,
   tripStopImages,
   tripStops,
   trips,
@@ -313,6 +314,22 @@ type PutTripStopInput = {
   visitedOn: string;
 };
 
+type PutTripRouteWaypointInput = {
+  location: {
+    coordinate: {
+      lat: number;
+      lon: number;
+    };
+    label: string;
+  };
+  tripStopOrder?: number | undefined;
+};
+
+type UpdateTripRouteWaypointInput = {
+  location?: PutTripRouteWaypointInput['location'] | undefined;
+  tripStopOrder?: number | undefined;
+};
+
 type UpdateTripStopInput = {
   displayName?: string | null | undefined;
   location?:
@@ -468,6 +485,7 @@ export type TripArchiveCursor = {
 };
 
 type TripStopRow = typeof tripStops.$inferSelect;
+type TripRouteWaypointRow = typeof tripRouteWaypoints.$inferSelect;
 
 type TripDetailVisitRow = {
   author: string | null;
@@ -1235,6 +1253,7 @@ export type TripImageCandidate = {
 export type PublicTripRouteWaypoint = {
   coordinate: { lat: number; lon: number };
   displayName: string;
+  isHidden?: boolean;
   label: string;
   routeFallbackQueries: string[] | undefined;
 };
@@ -1367,6 +1386,19 @@ const toTripStop = (row: TripStopRow, images: VisitImage[] = []) => {
   };
 };
 
+const toTripRouteWaypoint = (row: TripRouteWaypointRow) => ({
+  createdAt: row.createdAt,
+  id: row.id,
+  location: {
+    coordinate: { lat: row.lat, lon: row.lon },
+    displayName: deriveDisplayNameFromLabel(row.label),
+    label: row.label
+  },
+  tripId: row.tripId,
+  tripStopOrder: row.tripStopOrder,
+  updatedAt: row.updatedAt
+});
+
 const toPublicTripStop = (row: TripStopRow, imageCount: number) => {
   return {
     createdAt: row.createdAt,
@@ -1440,6 +1472,12 @@ const toTripItineraryStopEntry = (row: TripStopRow, images: VisitImage[] = []) =
     stop: toTripStop(row, images)
   };
 };
+
+const toTripItineraryRouteWaypointEntry = (row: TripRouteWaypointRow) => ({
+  kind: 'route-waypoint' as const,
+  routeWaypoint: toTripRouteWaypoint(row),
+  tripStopOrder: row.tripStopOrder
+});
 
 const toPublicTripItineraryStopEntry = (row: TripStopRow, imageCount: number) => {
   return {
@@ -2168,6 +2206,13 @@ const listTripStopRowsByTripId = async (database: Database, tripId: number) => {
   });
 };
 
+const listTripRouteWaypointRowsByTripId = async (database: Database, tripId: number) => {
+  return database.query.tripRouteWaypoints.findMany({
+    orderBy: [asc(tripRouteWaypoints.tripStopOrder), asc(tripRouteWaypoints.id)],
+    where: eq(tripRouteWaypoints.tripId, tripId)
+  });
+};
+
 const listTripDetailVisitRowsByTripId = async (
   database: Database,
   tripId: number
@@ -2295,7 +2340,7 @@ const listVisitTimelineRows = async (database: Database): Promise<VisitTimelineR
 
 type TripOrderedItemRef = {
   id: number;
-  kind: 'stop' | 'visit';
+  kind: 'route-waypoint' | 'stop' | 'visit';
 };
 
 type TripOrderedItemRecord = {
@@ -2309,7 +2354,7 @@ const getTripItemCount = async (database: DbClient, tripId: number, excludeVisit
       ? and(eq(parkVisits.tripId, tripId), sql`${parkVisits.id} <> ${excludeVisitId}`)
       : eq(parkVisits.tripId, tripId);
 
-  const [visitRows, tripStopRows] = await Promise.all([
+  const [visitRows, tripStopRows, routeWaypointRows] = await Promise.all([
     database
       .select({
         count: sql<number>`COUNT(*)`
@@ -2321,10 +2366,20 @@ const getTripItemCount = async (database: DbClient, tripId: number, excludeVisit
         count: sql<number>`COUNT(*)`
       })
       .from(tripStops)
-      .where(eq(tripStops.tripId, tripId))
+      .where(eq(tripStops.tripId, tripId)),
+    database
+      .select({
+        count: sql<number>`COUNT(*)`
+      })
+      .from(tripRouteWaypoints)
+      .where(eq(tripRouteWaypoints.tripId, tripId))
   ]);
 
-  return Number(visitRows[0]!.count) + Number(tripStopRows[0]!.count);
+  return (
+    Number(visitRows[0]!.count) +
+    Number(tripStopRows[0]!.count) +
+    Number(routeWaypointRows[0]!.count)
+  );
 };
 
 const normalizeTripStopOrder = (requestedOrder: number | undefined, maxOrder: number) => {
@@ -2355,7 +2410,16 @@ const shiftTripStopOrdersUpFrom = async (
         tripStopOrder: sql`${tripStops.tripStopOrder} + 1`,
         updatedAt: timestamp
       })
-      .where(and(eq(tripStops.tripId, tripId), gte(tripStops.tripStopOrder, fromOrder)))
+      .where(and(eq(tripStops.tripId, tripId), gte(tripStops.tripStopOrder, fromOrder))),
+    database
+      .update(tripRouteWaypoints)
+      .set({
+        tripStopOrder: sql`${tripRouteWaypoints.tripStopOrder} + 1`,
+        updatedAt: timestamp
+      })
+      .where(
+        and(eq(tripRouteWaypoints.tripId, tripId), gte(tripRouteWaypoints.tripStopOrder, fromOrder))
+      )
   ]);
 };
 
@@ -2379,7 +2443,19 @@ const closeTripStopOrderGap = async (
         tripStopOrder: sql`${tripStops.tripStopOrder} - 1`,
         updatedAt: timestamp
       })
-      .where(and(eq(tripStops.tripId, tripId), gt(tripStops.tripStopOrder, removedOrder)))
+      .where(and(eq(tripStops.tripId, tripId), gt(tripStops.tripStopOrder, removedOrder))),
+    database
+      .update(tripRouteWaypoints)
+      .set({
+        tripStopOrder: sql`${tripRouteWaypoints.tripStopOrder} - 1`,
+        updatedAt: timestamp
+      })
+      .where(
+        and(
+          eq(tripRouteWaypoints.tripId, tripId),
+          gt(tripRouteWaypoints.tripStopOrder, removedOrder)
+        )
+      )
   ]);
 };
 
@@ -2493,6 +2569,19 @@ const resolveUpdatedTripStopOrder = async (
             gte(tripStops.tripStopOrder, nextOrder),
             lt(tripStops.tripStopOrder, currentOrder)
           )
+        ),
+      database
+        .update(tripRouteWaypoints)
+        .set({
+          tripStopOrder: sql`${tripRouteWaypoints.tripStopOrder} + 1`,
+          updatedAt: timestamp
+        })
+        .where(
+          and(
+            eq(tripRouteWaypoints.tripId, nextTripId),
+            gte(tripRouteWaypoints.tripStopOrder, nextOrder),
+            lt(tripRouteWaypoints.tripStopOrder, currentOrder)
+          )
         )
     ]);
   } else {
@@ -2521,6 +2610,19 @@ const resolveUpdatedTripStopOrder = async (
             eq(tripStops.tripId, nextTripId),
             gt(tripStops.tripStopOrder, currentOrder),
             lte(tripStops.tripStopOrder, nextOrder)
+          )
+        ),
+      database
+        .update(tripRouteWaypoints)
+        .set({
+          tripStopOrder: sql`${tripRouteWaypoints.tripStopOrder} - 1`,
+          updatedAt: timestamp
+        })
+        .where(
+          and(
+            eq(tripRouteWaypoints.tripId, nextTripId),
+            gt(tripRouteWaypoints.tripStopOrder, currentOrder),
+            lte(tripRouteWaypoints.tripStopOrder, nextOrder)
           )
         )
     ]);
@@ -3115,9 +3217,10 @@ export const getTripById = async (
   tripId: number,
   getImagePublicUrl: (key: string) => Promise<string>
 ) => {
-  const [tripRows, tripStopRows, tripVisitRows] = await Promise.all([
+  const [tripRows, tripStopRows, tripRouteWaypointRows, tripVisitRows] = await Promise.all([
     listTripRows(database),
     listTripStopRowsByTripId(database, tripId),
+    listTripRouteWaypointRowsByTripId(database, tripId),
     listTripDetailVisitRowsByTripId(database, tripId)
   ]);
   const trip = tripRows.find((row) => row.id === tripId);
@@ -3136,7 +3239,8 @@ export const getTripById = async (
     ...tripVisitRows.map((row) => toTripItineraryVisitEntry(row)),
     ...tripStopRows.map((row) =>
       toTripItineraryStopEntry(row, tripStopImagesByTripStopId.get(row.id))
-    )
+    ),
+    ...tripRouteWaypointRows.map((row) => toTripItineraryRouteWaypointEntry(row))
   ].sort((a, b) => a.tripStopOrder - b.tripStopOrder);
 
   return {
@@ -3173,6 +3277,17 @@ export const getPublicTripBySlug = async (
       toPublicTripItineraryStopEntry(row, resolvedTripStopImageCounts.get(row.id) ?? 0)
     )
   ].sort((a, b) => a.tripStopOrder - b.tripStopOrder);
+  const publicItinerary = itinerary.map((entry, index) => {
+    const tripStopOrder = index + 1;
+
+    return entry.kind === 'visit'
+      ? { ...entry, tripStopOrder }
+      : {
+          ...entry,
+          stop: { ...entry.stop, tripStopOrder },
+          tripStopOrder
+        };
+  });
 
   const featuredImageCandidate = await getTripFeaturedImage(
     database,
@@ -3187,8 +3302,60 @@ export const getPublicTripBySlug = async (
     imageCount:
       tripVisitRows.reduce((total, row) => total + row.imageCount, 0) +
       Array.from(resolvedTripStopImageCounts.values()).reduce((total, count) => total + count, 0),
-    itinerary,
+    itinerary: publicItinerary,
     stopCount: tripStopRows.length
+  };
+};
+
+export const getPublicTripRouteInputByTripId = async (database: Database, tripId: number) => {
+  const [tripRows, tripStopRows, tripRouteWaypointRows, tripVisitRows] = await Promise.all([
+    listTripRows(database),
+    listTripStopRowsByTripId(database, tripId),
+    listTripRouteWaypointRowsByTripId(database, tripId),
+    listPublicTripDetailVisitRowsByTripId(database, tripId)
+  ]);
+  const trip = tripRows.find((row) => row.id === tripId);
+
+  if (!trip) {
+    return null;
+  }
+
+  const entries = [
+    ...tripVisitRows.map((row) => ({
+      excludeFromRoute: row.excludeFromRoute,
+      kind: 'visit' as const,
+      location:
+        row.locationLat === null || row.locationLon === null
+          ? null
+          : { lat: row.locationLat, lon: row.locationLon },
+      markerPoint: { lat: row.markerLat, lon: row.markerLon },
+      parkName: row.parkName,
+      parkSlug: row.parkSlug,
+      tripStopOrder: row.tripStopOrder
+    })),
+    ...tripStopRows.map((row) => ({
+      displayName: row.displayName ?? deriveDisplayNameFromLabel(row.label),
+      kind: 'stop' as const,
+      location: { lat: row.lat, lon: row.lon },
+      label: row.label,
+      tripStopOrder: row.tripStopOrder
+    })),
+    ...tripRouteWaypointRows.map((row) => ({
+      displayName: deriveDisplayNameFromLabel(row.label),
+      kind: 'route-waypoint' as const,
+      location: { lat: row.lat, lon: row.lon },
+      label: row.label,
+      tripStopOrder: row.tripStopOrder
+    }))
+  ].sort((left, right) => left.tripStopOrder - right.tripStopOrder);
+  const routeEntries = entries.filter((entry) => entry.kind !== 'visit' || !entry.excludeFromRoute);
+  const startingPoint = toTrip(trip).startingPoint;
+
+  return {
+    available: startingPoint !== null && routeEntries.length >= 2,
+    entries: routeEntries,
+    startingPoint,
+    tripId
   };
 };
 
@@ -3963,6 +4130,49 @@ export const createTripStop = async (
   });
 };
 
+export const createTripRouteWaypoint = async (
+  database: Database,
+  tripId: number,
+  input: PutTripRouteWaypointInput
+) => {
+  const trip = await getTripRecordById(database, tripId);
+
+  if (!trip) {
+    throw new RepositoryNotFoundError('Trip not found.');
+  }
+
+  const location = normalizeTripStopLocation(input.location);
+  const timestamp = new Date().toISOString();
+
+  return database.transaction(async (tx) => {
+    const tripStopOrder = await resolveCreateTripStopOrder(
+      tx,
+      tripId,
+      input.tripStopOrder,
+      timestamp
+    );
+    const row = (
+      await tx
+        .insert(tripRouteWaypoints)
+        .values({
+          createdAt: timestamp,
+          label: location.label,
+          lat: location.lat,
+          lon: location.lon,
+          tripId,
+          tripStopOrder: tripStopOrder!,
+          updatedAt: timestamp
+        })
+        .returning()
+    )[0]!;
+
+    await bumpPublicVisitDataVersion(tx, timestamp);
+    await invalidatePublicTripRouteCache(tx, tripId);
+
+    return toTripRouteWaypoint(row);
+  });
+};
+
 export const createVisit = async (database: Database, slug: string, input: PutVisitInput) => {
   const park = await getParkRecordBySlug(database, slug);
 
@@ -4438,6 +4648,70 @@ export const updateTripStop = async (
   });
 };
 
+export const updateTripRouteWaypoint = async (
+  database: Database,
+  tripRouteWaypointId: number,
+  input: UpdateTripRouteWaypointInput
+) => {
+  const existingRouteWaypoint = await database.query.tripRouteWaypoints.findFirst({
+    where: eq(tripRouteWaypoints.id, tripRouteWaypointId)
+  });
+
+  if (!existingRouteWaypoint) {
+    return null;
+  }
+
+  const nextLocation =
+    input.location === undefined ? undefined : normalizeTripStopLocation(input.location);
+  const timestamp = new Date().toISOString();
+
+  return database.transaction(async (tx) => {
+    const tripStopOrder = await resolveUpdatedTripStopOrder(
+      tx,
+      {
+        id: existingRouteWaypoint.id,
+        kind: 'route-waypoint',
+        tripId: existingRouteWaypoint.tripId,
+        tripStopOrder: existingRouteWaypoint.tripStopOrder
+      },
+      existingRouteWaypoint.tripId,
+      input.tripStopOrder,
+      timestamp
+    );
+
+    await tx
+      .update(tripRouteWaypoints)
+      .set({
+        label: nextLocation?.label ?? existingRouteWaypoint.label,
+        lat: nextLocation?.lat ?? existingRouteWaypoint.lat,
+        lon: nextLocation?.lon ?? existingRouteWaypoint.lon,
+        tripStopOrder: tripStopOrder!,
+        updatedAt: timestamp
+      })
+      .where(eq(tripRouteWaypoints.id, tripRouteWaypointId));
+
+    const updatedRouteWaypoint = (
+      await tx
+        .select()
+        .from(tripRouteWaypoints)
+        .where(eq(tripRouteWaypoints.id, tripRouteWaypointId))
+    )[0]!;
+
+    await bumpPublicVisitDataVersion(tx, timestamp);
+    const routeChanged =
+      (nextLocation !== undefined &&
+        (nextLocation.lat !== existingRouteWaypoint.lat ||
+          nextLocation.lon !== existingRouteWaypoint.lon)) ||
+      (input.tripStopOrder !== undefined && tripStopOrder !== existingRouteWaypoint.tripStopOrder);
+
+    if (routeChanged) {
+      await invalidatePublicTripRouteCache(tx, existingRouteWaypoint.tripId);
+    }
+
+    return toTripRouteWaypoint(updatedRouteWaypoint);
+  });
+};
+
 export const updateVisit = async (database: Database, visitId: number, input: UpdateVisitInput) => {
   const [existingVisit] = await database
     .select()
@@ -4625,6 +4899,32 @@ export const deleteTripStop = async (database: Database, tripStopId: number) => 
     );
     await bumpPublicVisitDataVersion(tx, timestamp);
     await invalidatePublicTripRouteCache(tx, existingTripStop.tripId);
+
+    return true;
+  });
+};
+
+export const deleteTripRouteWaypoint = async (database: Database, tripRouteWaypointId: number) => {
+  const timestamp = new Date().toISOString();
+
+  return database.transaction(async (tx) => {
+    const existingRouteWaypoint = await tx.query.tripRouteWaypoints.findFirst({
+      where: eq(tripRouteWaypoints.id, tripRouteWaypointId)
+    });
+
+    if (!existingRouteWaypoint) {
+      return false;
+    }
+
+    await tx.delete(tripRouteWaypoints).where(eq(tripRouteWaypoints.id, tripRouteWaypointId));
+    await closeTripStopOrderGap(
+      tx,
+      existingRouteWaypoint.tripId,
+      existingRouteWaypoint.tripStopOrder,
+      timestamp
+    );
+    await bumpPublicVisitDataVersion(tx, timestamp);
+    await invalidatePublicTripRouteCache(tx, existingRouteWaypoint.tripId);
 
     return true;
   });
