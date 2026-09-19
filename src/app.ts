@@ -22,12 +22,14 @@ import {
   createPendingMediaUpload,
   createPublicTripRouteFingerprint,
   createTrip,
+  createTripRouteWaypoint,
   createTripStop,
   createTripStopImage,
   createVisit,
   createVisitImage,
   decodeTripArchiveCursor,
   deleteTrip,
+  deleteTripRouteWaypoint,
   deleteTripStop,
   deleteTripStopImage,
   deleteVisit,
@@ -51,6 +53,7 @@ import {
   getPublicMapSummary,
   getPublicTripBySlug,
   getPublicTripRouteCache,
+  getPublicTripRouteInputByTripId,
   getPublicTripStopImagesBySlug,
   getPublicTripVisitImagesBySlug,
   getPublicVisitDataVersion,
@@ -95,6 +98,7 @@ import {
   updatePublishedDateRangeReviewShareByShareId,
   updateTrip,
   updateTripFeaturedImage,
+  updateTripRouteWaypoint,
   updateTripStop,
   updateVisit
 } from './db/repositories.js';
@@ -188,9 +192,11 @@ import {
 import {
   completeTripStopImageUploadRoute,
   createTripRoute,
+  createTripRouteWaypointRoute,
   createTripStopImageUploadUrlRoute,
   createTripStopRoute,
   deleteTripRoute,
+  deleteTripRouteWaypointRoute,
   deleteTripStopImageRoute,
   deleteTripStopRoute,
   getAdminTripFeaturedImageRoute,
@@ -205,6 +211,7 @@ import {
   reorderTripStopImagesRoute,
   updateAdminTripFeaturedImageRoute,
   updateTripRoute,
+  updateTripRouteWaypointRoute,
   updateTripStopRoute,
   uploadTripStopImagesRoute
 } from './routes/trips.js';
@@ -734,23 +741,36 @@ const normalizeRouteFallbackQueries = (...queries: Array<string | null | undefin
 };
 
 const buildPublicTripRouteWaypoints = async (database: Database, trip: PublicTripDetail) => {
-  const routeEntries = trip.itinerary.filter(
-    (entry) => entry.kind === 'stop' || !entry.visit.excludeFromRoute
-  );
+  const routeInput = await getPublicTripRouteInputByTripId(database, trip.id);
 
-  if (!trip.startingPoint || routeEntries.length < 2) {
+  if (!routeInput?.available || !routeInput.startingPoint) {
     return null;
   }
 
   const routeWaypoints = await Promise.all(
-    routeEntries.map(async (entry) => {
+    routeInput.entries.map(async (entry) => {
       if (entry.kind === 'visit') {
-        const park = await getParkBySlug(database, entry.visit.park.slug);
+        const park = await getParkBySlug(database, entry.parkSlug);
+        const publicVisit = trip.itinerary.find(
+          (itineraryEntry) =>
+            itineraryEntry.kind === 'visit' && itineraryEntry.visit.park.slug === entry.parkSlug
+        );
+        const publicVisitPark = publicVisit?.kind === 'visit' ? publicVisit.visit.park : null;
+        const markerPoint =
+          Number.isFinite(entry.markerPoint.lat) && Number.isFinite(entry.markerPoint.lon)
+            ? entry.markerPoint
+            : (publicVisitPark?.markerPoint ?? park?.markerPoint);
+        const coordinate = entry.location ?? markerPoint;
+
+        if (!coordinate) {
+          return null;
+        }
 
         return {
-          coordinate: entry.visit.park.markerPoint,
-          displayName: entry.visit.park.name,
-          label: entry.visit.park.name,
+          coordinate,
+          displayName: park?.name ?? publicVisitPark?.name ?? entry.parkName,
+          isHidden: false,
+          label: park?.name ?? publicVisitPark?.name ?? entry.parkName,
           routeFallbackQueries: normalizeRouteFallbackQueries(
             park?.address,
             park?.locationLabel,
@@ -760,23 +780,29 @@ const buildPublicTripRouteWaypoints = async (database: Database, trip: PublicTri
       }
 
       return {
-        coordinate: entry.stop.location.coordinate,
-        displayName: entry.stop.displayName ?? entry.stop.location.displayName,
-        label: entry.stop.location.label,
-        routeFallbackQueries: normalizeRouteFallbackQueries(entry.stop.location.label)
+        coordinate: entry.location,
+        displayName: entry.displayName,
+        isHidden: entry.kind === 'route-waypoint',
+        label: entry.label,
+        routeFallbackQueries: normalizeRouteFallbackQueries(entry.label)
       };
     })
+  );
+  const resolvedRouteWaypoints = routeWaypoints.filter(
+    (waypoint): waypoint is NonNullable<typeof waypoint> => waypoint !== null
   );
 
   return [
     {
-      ...trip.startingPoint,
-      routeFallbackQueries: normalizeRouteFallbackQueries(trip.startingPoint.label)
+      ...routeInput.startingPoint,
+      isHidden: false,
+      routeFallbackQueries: normalizeRouteFallbackQueries(routeInput.startingPoint.label)
     },
-    ...routeWaypoints,
+    ...resolvedRouteWaypoints,
     {
-      ...trip.startingPoint,
-      routeFallbackQueries: normalizeRouteFallbackQueries(trip.startingPoint.label)
+      ...routeInput.startingPoint,
+      isHidden: false,
+      routeFallbackQueries: normalizeRouteFallbackQueries(routeInput.startingPoint.label)
     }
   ];
 };
@@ -792,18 +818,19 @@ const buildPublicTripRouteState = async (
   waypoints: PublicTripRouteWaypoints | null
 ) => {
   if (!waypoints) {
-    return { data: null, error: null, success: true as const };
+    return { available: false, data: null, error: null, success: true as const };
   }
 
   const fingerprint = createPublicTripRouteFingerprint(waypoints);
   const cachedRoute = await getPublicTripRouteCache(database, trip.id, fingerprint);
 
   if (cachedRoute) {
-    return { data: cachedRoute, error: null, success: true as const };
+    return { available: true, data: cachedRoute, error: null, success: true as const };
   }
 
   if (!tripPlanner?.buildRoundTripRoute) {
     return {
+      available: true,
       data: null,
       error: {
         error: 'Trip planner is not configured.',
@@ -820,6 +847,7 @@ const buildPublicTripRouteState = async (
     });
 
     const state = {
+      available: true,
       data: route,
       error: route
         ? null
@@ -843,9 +871,18 @@ const buildPublicTripRouteState = async (
     return state;
   } catch (error) {
     if (error instanceof TripPlannerError) {
+      const routeFailure = error.routeFailure;
+      const hiddenFailure =
+        routeFailure !== undefined &&
+        [waypoints[routeFailure.waypointIndex - 1], waypoints[routeFailure.waypointIndex]].some(
+          (waypoint) => waypoint?.isHidden === true
+        );
+      const publicError = toPublicTripRouteErrorResponse(error);
+
       return {
+        available: true,
         data: null,
-        error: toPublicTripRouteErrorResponse(error),
+        error: hiddenFailure ? { ...publicError, routeFailure: undefined } : publicError,
         success: false as const
       };
     }
@@ -2446,6 +2483,8 @@ export const createApp = ({
         {
           ...trip,
           route: {
+            available:
+              (await getPublicTripRouteInputByTripId(database, trip.id))?.available ?? false,
             data: null,
             error: null,
             success: true
@@ -2734,6 +2773,33 @@ export const createApp = ({
       }
     });
 
+    app.openapi(createTripRouteWaypointRoute, async (context) => {
+      context.header('Cache-Control', PRIVATE_CACHE_CONTROL);
+      const authFailure = await requireAdminSession(context, auth);
+
+      if (authFailure) {
+        return authFailure;
+      }
+
+      const { id } = context.req.valid('param');
+      const body = context.req.valid('json');
+
+      try {
+        const routeWaypoint = await createTripRouteWaypoint(database, id, body);
+        return context.json(routeWaypoint, 201);
+      } catch (error) {
+        if (error instanceof RepositoryNotFoundError) {
+          return context.json(jsonNotFound(error.message), 404);
+        }
+
+        if (error instanceof RepositoryValidationError) {
+          return context.json({ error: error.message }, 422);
+        }
+
+        throw error;
+      }
+    });
+
     app.openapi(updateParkRemovedRoute, async (context) => {
       context.header('Cache-Control', PRIVATE_CACHE_CONTROL);
       const authFailure = await requireAdminSession(context, auth);
@@ -2837,6 +2903,25 @@ export const createApp = ({
       return context.json(tripStop, 200);
     });
 
+    app.openapi(updateTripRouteWaypointRoute, async (context) => {
+      context.header('Cache-Control', PRIVATE_CACHE_CONTROL);
+      const authFailure = await requireAdminSession(context, auth);
+
+      if (authFailure) {
+        return authFailure;
+      }
+
+      const { id } = context.req.valid('param');
+      const body = context.req.valid('json');
+      const routeWaypoint = await updateTripRouteWaypoint(database, id, body);
+
+      if (!routeWaypoint) {
+        return context.json(jsonNotFound('Trip route waypoint not found.'), 404);
+      }
+
+      return context.json(routeWaypoint, 200);
+    });
+
     app.openapi(deleteTripRoute, async (context) => {
       context.header('Cache-Control', PRIVATE_CACHE_CONTROL);
       const authFailure = await requireAdminSession(context, auth);
@@ -2871,6 +2956,27 @@ export const createApp = ({
 
       if (!deleted) {
         return context.json(jsonNotFound('Trip stop not found.'), 404);
+      }
+
+      return new Response(null, {
+        headers: context.res.headers,
+        status: 204
+      });
+    });
+
+    app.openapi(deleteTripRouteWaypointRoute, async (context) => {
+      context.header('Cache-Control', PRIVATE_CACHE_CONTROL);
+      const authFailure = await requireAdminSession(context, auth);
+
+      if (authFailure) {
+        return authFailure;
+      }
+
+      const { id } = context.req.valid('param');
+      const deleted = await deleteTripRouteWaypoint(database, id);
+
+      if (!deleted) {
+        return context.json(jsonNotFound('Trip route waypoint not found.'), 404);
       }
 
       return new Response(null, {

@@ -43,6 +43,7 @@ describe('backup verification', () => {
       recordCounts: {
         dateRangeReviewShares: 0,
         parks: 0,
+        tripRouteWaypoints: 0,
         tripStopImages: 0,
         tripStops: 0,
         trips: 0,

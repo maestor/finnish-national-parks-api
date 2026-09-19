@@ -194,6 +194,15 @@ export const tripStopSchema = z.object({
   visitedOn: visitDateSchema
 });
 
+export const tripRouteWaypointSchema = z.object({
+  createdAt: z.string().datetime(),
+  id: z.number().int(),
+  location: labeledPointSchema,
+  tripId: z.number().int(),
+  tripStopOrder: z.number().int().positive(),
+  updatedAt: z.string().datetime()
+});
+
 export const publicTripStopSchema = tripStopSchema.omit({ images: true }).extend({
   imageCount: z.number().int().nonnegative()
 });
@@ -284,9 +293,16 @@ export const tripItineraryStopEntrySchema = z.object({
   stop: tripStopSchema
 });
 
+export const tripItineraryRouteWaypointEntrySchema = z.object({
+  kind: z.literal('route-waypoint'),
+  routeWaypoint: tripRouteWaypointSchema,
+  tripStopOrder: z.number().int().positive()
+});
+
 export const tripItineraryEntrySchema = z.union([
   tripItineraryVisitEntrySchema,
-  tripItineraryStopEntrySchema
+  tripItineraryStopEntrySchema,
+  tripItineraryRouteWaypointEntrySchema
 ]);
 
 export const tripDetailSchema = tripSchema.extend({
@@ -338,6 +354,7 @@ export const publicTripRouteErrorSchema = z.object({
 });
 
 export const publicTripRouteStateSchema = z.object({
+  available: z.boolean(),
   data: publicTripRouteSchema.nullable(),
   error: publicTripRouteErrorSchema.nullable(),
   success: z.boolean()
@@ -536,6 +553,11 @@ export const createTripStopRequestSchema = z.object({
   visitedOn: visitDateSchema
 });
 
+export const createTripRouteWaypointRequestSchema = z.object({
+  location: labeledPointInputSchema,
+  tripStopOrder: z.number().int().positive().optional()
+});
+
 export const updateParkRemovedRequestSchema = z.object({
   removed: z.boolean()
 });
@@ -615,6 +637,12 @@ export const updateTripStopRequestSchema = createTripStopRequestSchema
       message: 'Provide at least one field to update.'
     }
   );
+
+export const updateTripRouteWaypointRequestSchema = createTripRouteWaypointRequestSchema
+  .partial()
+  .refine((input) => input.location !== undefined || input.tripStopOrder !== undefined, {
+    message: 'Provide at least one field to update.'
+  });
 
 export const reorderVisitImagesRequestSchema = z.object({
   imageIds: z.array(z.number().int()).min(1)
