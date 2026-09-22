@@ -194,7 +194,8 @@ const generatedLuontoonDestinationSources: GeneratedLuontoonDestinationSource[] 
   { name: 'Auttiköngäs', slug: 'auttikongas' },
   { name: 'Pinkjärvi', slug: 'pinkjarvi' },
   { name: 'Soiperoinen', slug: 'soiperoinen' },
-  { name: 'Unarinköngäs', slug: 'unarinkongas' }
+  { name: 'Unarinköngäs', slug: 'unarinkongas' },
+  { name: 'Iivaara', slug: 'iivaara', surfaceArea: 25_675_776.79507149 }
 ];
 
 const createPolygonFeature = (
