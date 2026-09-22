@@ -56,7 +56,7 @@ describe('manual catalog imports', () => {
       now: () => '2026-05-27T08:00:00.000Z'
     });
 
-    expect(result.results).toHaveLength(157);
+    expect(result.results).toHaveLength(158);
 
     const merenkurkku = await getParkBySlug(
       testDatabase.database,
@@ -321,6 +321,19 @@ describe('manual catalog imports', () => {
     });
     expect(paistjarvi?.boundaryGeoJson?.features).toHaveLength(1);
     expect(paistjarvi?.boundaryGeoJson?.features[0]?.geometry.type).toBe('Polygon');
+
+    const iivaara = await getParkBySlug(testDatabase.database, 'iivaara');
+    expect(iivaara).toMatchObject({
+      address: 'Iivaara, 93700 Kuusamo',
+      areaKm2: 25.68,
+      locationLabel: 'Iivaara',
+      name: 'Iivaara',
+      parkUrl: 'https://www.luontoon.fi/fi/kohteet/iivaara',
+      postalCode: '93700',
+      postalOffice: 'Kuusamo',
+      type: { slug: 'nature-reserve-area' }
+    });
+    expect(iivaara?.boundaryGeoJson?.features.length).toBeGreaterThan(0);
 
     const saanaJaKilpisjarvi = await getParkBySlug(testDatabase.database, 'saana-ja-kilpisjarvi');
     expect(saanaJaKilpisjarvi).toMatchObject({
@@ -1400,7 +1413,7 @@ describe('manual catalog imports', () => {
     );
     const kevo = await getParkBySlug(testDatabase.database, 'kevon-luonnonpuisto');
 
-    expect(allParks).toHaveLength(157);
+    expect(allParks).toHaveLength(158);
     expect(merenkurkku).toMatchObject({ catalogStatus: 'active' });
     expect(kevo).toMatchObject({ catalogStatus: 'active' });
   });
@@ -1477,7 +1490,7 @@ describe('manual catalog imports', () => {
       database: testDatabase.database
     });
 
-    expect(result.results).toHaveLength(157);
+    expect(result.results).toHaveLength(158);
 
     const merenkurkku = await getParkBySlug(
       testDatabase.database,
@@ -1771,7 +1784,7 @@ describe('manual catalog imports', () => {
       now: () => '2026-05-27T08:00:00.000Z'
     });
 
-    expect(result.results).toHaveLength(157);
+    expect(result.results).toHaveLength(158);
   });
 
   it('fails clearly when a selected special-park slug is unknown', async () => {

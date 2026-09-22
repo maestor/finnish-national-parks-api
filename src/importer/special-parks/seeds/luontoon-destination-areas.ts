@@ -104,5 +104,15 @@ export const sourceReadyLuontoonDestinationAreaSeeds: LuontoonDestinationAreaSee
     parkTypeSlug: 'outdoor-recreation-area',
     slug: 'unarinkongas',
     syntheticLipasId: 9_001_057
+  },
+  {
+    displayTypeName: null,
+    parkUrl: 'https://www.luontoon.fi/fi/kohteet/iivaara',
+    name: 'Iivaara',
+    parkTypeSlug: 'nature-reserve-area',
+    postalCode: '93700',
+    postalOffice: 'Kuusamo',
+    slug: 'iivaara',
+    syntheticLipasId: 9_001_091
   }
 ];
