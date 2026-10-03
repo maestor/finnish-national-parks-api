@@ -1,4 +1,12 @@
-import { index, integer, real, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
+import {
+  index,
+  integer,
+  primaryKey,
+  real,
+  sqliteTable,
+  text,
+  uniqueIndex
+} from 'drizzle-orm/sqlite-core';
 
 export const importRuns = sqliteTable('import_runs', {
   id: integer('id').primaryKey({ autoIncrement: true }),
@@ -95,6 +103,9 @@ export const trips = sqliteTable(
     name: text('name').notNull(),
     slug: text('slug').notNull(),
     description: text('description'),
+    status: text('status', { enum: ['draft', 'published'] })
+      .notNull()
+      .default('draft'),
     startingPointLabel: text('starting_point_label'),
     startingPointLat: real('starting_point_lat'),
     startingPointLon: real('starting_point_lon'),
@@ -107,14 +118,20 @@ export const trips = sqliteTable(
   })
 );
 
-export const tripRoutes = sqliteTable('trip_routes', {
-  tripId: integer('trip_id')
-    .primaryKey()
-    .references(() => trips.id, { onDelete: 'cascade' }),
-  fingerprint: text('fingerprint').notNull(),
-  routeJson: text('route_json').notNull(),
-  updatedAt: text('updated_at').notNull()
-});
+export const tripRoutes = sqliteTable(
+  'trip_routes',
+  {
+    tripId: integer('trip_id')
+      .notNull()
+      .references(() => trips.id, { onDelete: 'cascade' }),
+    fingerprint: text('fingerprint').notNull(),
+    routeJson: text('route_json').notNull(),
+    updatedAt: text('updated_at').notNull()
+  },
+  (table) => ({
+    primaryKey: primaryKey({ columns: [table.tripId, table.fingerprint] })
+  })
+);
 
 export const tripStops = sqliteTable(
   'trip_stops',
@@ -180,6 +197,9 @@ export const parkVisits = sqliteTable(
     note: text('note'),
     route: text('route'),
     excludeFromRoute: integer('exclude_from_route', { mode: 'boolean' }).notNull().default(false),
+    status: text('status', { enum: ['draft', 'published'] })
+      .notNull()
+      .default('draft'),
     author: text('author'),
     createdAt: text('created_at').notNull(),
     updatedAt: text('updated_at').notNull()

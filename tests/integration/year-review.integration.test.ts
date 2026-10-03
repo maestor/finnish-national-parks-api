@@ -111,6 +111,7 @@ describe('year review routes', () => {
     slug: string,
     body: {
       route?: string;
+      status?: 'draft' | 'published';
       tripId?: number | null;
       tripStopOrder?: number;
       visitedOn: string;
@@ -118,7 +119,7 @@ describe('year review routes', () => {
   ) => {
     return requestAsAdmin(app, `/api/parks/${slug}/visits`, {
       method: 'POST',
-      body: JSON.stringify(body),
+      body: JSON.stringify({ status: 'published', ...body }),
       headers: {
         'content-type': 'application/json'
       }
@@ -131,11 +132,12 @@ describe('year review routes', () => {
       description?: string | null;
       name: string;
       slug?: string;
+      status?: 'draft' | 'published';
     }
   ) => {
     return requestAsAdmin(app, '/api/trips', {
       method: 'POST',
-      body: JSON.stringify(body),
+      body: JSON.stringify({ status: 'published', ...body }),
       headers: {
         'content-type': 'application/json'
       }

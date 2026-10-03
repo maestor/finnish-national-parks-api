@@ -246,6 +246,7 @@ type PutVisitInput = {
     | undefined;
   note?: string | null | undefined;
   route?: string | null | undefined;
+  status?: 'draft' | 'published' | undefined;
   tripId?: number | null | undefined;
   tripStopOrder?: number | undefined;
   visitedOn: string;
@@ -263,6 +264,7 @@ type UpdateVisitInput = {
     | undefined;
   note?: string | null | undefined;
   route?: string | null | undefined;
+  status?: 'draft' | 'published' | undefined;
   tripId?: number | null | undefined;
   tripStopOrder?: number | undefined;
   visitedOn?: string | undefined;
@@ -271,6 +273,7 @@ type UpdateVisitInput = {
 type PutTripInput = {
   description?: string | null | undefined;
   name: string;
+  status?: 'draft' | 'published' | undefined;
   slug?: string | undefined;
   startingPoint?:
     | {
@@ -287,6 +290,7 @@ type PutTripInput = {
 type UpdateTripInput = {
   description?: string | null | undefined;
   name?: string | undefined;
+  status?: 'draft' | 'published' | undefined;
   slug?: string | undefined;
   startingPoint?:
     | {
@@ -466,6 +470,7 @@ type TripRow = {
   id: number;
   name: string;
   slug: string;
+  status: 'draft' | 'published';
   startingPointLabel: string | null;
   startingPointLat: number | null;
   startingPointLon: number | null;
@@ -1250,6 +1255,10 @@ export type TripImageCandidate = {
   visitedOn: string;
 };
 
+type TripImageCandidateWithParkVisibility = TripImageCandidate & {
+  isParkVisible: boolean;
+};
+
 export type PublicTripRouteWaypoint = {
   coordinate: { lat: number; lon: number };
   displayName: string;
@@ -1307,7 +1316,7 @@ export const savePublicTripRouteCache = async (
         routeJson: JSON.stringify(parsedRoute),
         updatedAt
       },
-      target: tripRoutes.tripId
+      target: [tripRoutes.tripId, tripRoutes.fingerprint]
     });
 };
 
@@ -1366,6 +1375,7 @@ const toTrip = (row: TripRow) => {
     id: row.id,
     name: row.name,
     slug: row.slug,
+    status: row.status,
     startingPoint: toTripStartingPoint(row),
     updatedAt: row.updatedAt,
     visitCount: row.visitCount
@@ -1490,7 +1500,8 @@ const toPublicTripItineraryStopEntry = (row: TripStopRow, imageCount: number) =>
 const toVisit = (
   row: typeof parkVisits.$inferSelect,
   images: VisitImage[] = [],
-  trip: TripReference | null = null
+  trip: TripReference | null = null,
+  tripStopOrder = row.tripStopOrder
 ) => {
   return {
     author: row.author,
@@ -1501,8 +1512,9 @@ const toVisit = (
     location: toOptionalMarkerPoint(row),
     note: row.note,
     route: row.route,
+    status: row.status,
     trip,
-    tripStopOrder: row.tripStopOrder,
+    tripStopOrder,
     updatedAt: row.updatedAt,
     visitedOn: row.visitedOn
   };
@@ -1761,7 +1773,7 @@ const listLightweightParkRows = async (
 const getVisitsForPark = async (database: Database, parkId: number) => {
   const visitRows = await database.query.parkVisits.findMany({
     orderBy: [desc(parkVisits.visitedOn), desc(parkVisits.id)],
-    where: eq(parkVisits.parkId, parkId)
+    where: and(eq(parkVisits.parkId, parkId), eq(parkVisits.status, 'published'))
   });
 
   return sortTripAwareVisitRows(visitRows);
@@ -1935,7 +1947,8 @@ const getTripStopImageCountsByTripStopId = async (database: DbClient, tripStopId
 
 const buildVisitTripsByTripId = async (
   database: Database,
-  visitRows: (typeof parkVisits.$inferSelect)[]
+  visitRows: (typeof parkVisits.$inferSelect)[],
+  includeDrafts: boolean
 ) => {
   const tripIds = [
     ...new Set(
@@ -1948,7 +1961,10 @@ const buildVisitTripsByTripId = async (
   }
 
   const tripRows = await database.query.trips.findMany({
-    where: inArray(trips.id, tripIds)
+    where: and(
+      inArray(trips.id, tripIds),
+      ...(includeDrafts ? [] : [eq(trips.status, 'published')])
+    )
   });
 
   return new Map(tripRows.map((trip) => [trip.id, toTripReference(trip)]));
@@ -1957,7 +1973,8 @@ const buildVisitTripsByTripId = async (
 const buildVisits = async (
   database: Database,
   visitRows: (typeof parkVisits.$inferSelect)[],
-  getImagePublicUrl: (key: string) => Promise<string>
+  getImagePublicUrl: (key: string) => Promise<string>,
+  includeDraftTrips = false
 ) => {
   const visitIds = visitRows.map((visit) => visit.id);
   const visitImagesByVisitId = await buildVisitImagesByVisitId(
@@ -1965,15 +1982,17 @@ const buildVisits = async (
     visitIds,
     getImagePublicUrl
   );
-  const visitTripsByTripId = await buildVisitTripsByTripId(database, visitRows);
+  const visitTripsByTripId = await buildVisitTripsByTripId(database, visitRows, includeDraftTrips);
 
-  return visitRows.map((visit) =>
-    toVisit(
+  return visitRows.map((visit) => {
+    const trip = visit.tripId === null ? null : (visitTripsByTripId.get(visit.tripId) ?? null);
+    return toVisit(
       visit,
       visitImagesByVisitId.get(visit.id)!,
-      visit.tripId === null ? null : visitTripsByTripId.get(visit.tripId)!
-    )
-  );
+      trip,
+      visit.tripId !== null && trip === null ? null : visit.tripStopOrder
+    );
+  });
 };
 
 const toVisitedSummary = (visits: Array<{ visitedOn: string }>) => {
@@ -2012,7 +2031,8 @@ const countVisitsBySeason = (visits: Array<{ visitedOn: string }>) => {
   return counts;
 };
 
-const listVisitRowsWithPark = async (database: Database) => {
+const listVisitRowsWithPark = async (database: Database, publicOnly: boolean) => {
+  const visibilityWhere = and(eq(parks.removed, false), eq(parkVisits.status, 'published'));
   const visitRows = await database
     .select({
       park: parks,
@@ -2020,7 +2040,7 @@ const listVisitRowsWithPark = async (database: Database) => {
     })
     .from(parkVisits)
     .innerJoin(parks, eq(parkVisits.parkId, parks.id))
-    .where(eq(parks.removed, false))
+    .where(publicOnly ? visibilityWhere : undefined)
     .orderBy(desc(parkVisits.visitedOn), desc(parkVisits.id));
 
   return sortTripAwareVisitRows(visitRows.map((row) => row.visit)).map(
@@ -2043,11 +2063,11 @@ const listPublicVisitRows = async (database: Database) => {
     })
     .from(parkVisits)
     .innerJoin(parks, eq(parkVisits.parkId, parks.id))
-    .where(eq(parks.removed, false))
+    .where(and(eq(parks.removed, false), eq(parkVisits.status, 'published')))
     .orderBy(desc(parkVisits.createdAt), desc(parkVisits.id));
 };
 
-const listTripRows = async (database: Database): Promise<TripRow[]> => {
+const listTripRows = async (database: Database, publicOnly = false): Promise<TripRow[]> => {
   const activeTripVisitStats = database
     .select({
       visitEndVisitedOn: sql<string | null>`MAX(${parkVisits.visitedOn})`.as(
@@ -2061,7 +2081,11 @@ const listTripRows = async (database: Database): Promise<TripRow[]> => {
     })
     .from(parkVisits)
     .innerJoin(parks, eq(parkVisits.parkId, parks.id))
-    .where(eq(parks.removed, false))
+    .where(
+      publicOnly
+        ? and(eq(parks.removed, false), eq(parkVisits.status, 'published'))
+        : eq(parks.removed, false)
+    )
     .groupBy(parkVisits.tripId)
     .as('active_trip_visit_stats');
 
@@ -2091,6 +2115,7 @@ const listTripRows = async (database: Database): Promise<TripRow[]> => {
       id: trips.id,
       name: trips.name,
       slug: trips.slug,
+      status: trips.status,
       startingPointLabel: trips.startingPointLabel,
       startingPointLat: trips.startingPointLat,
       startingPointLon: trips.startingPointLon,
@@ -2108,6 +2133,11 @@ const listTripRows = async (database: Database): Promise<TripRow[]> => {
     .leftJoin(activeTripVisitStats, eq(activeTripVisitStats.tripId, trips.id))
     .leftJoin(tripStopDateStats, eq(tripStopDateStats.tripId, trips.id))
     .orderBy(asc(trips.name), asc(trips.id));
+};
+
+const listPublicTripRows = async (database: Database): Promise<TripRow[]> => {
+  const rows = await listTripRows(database, true);
+  return rows.filter((row) => row.status === 'published');
 };
 
 const listTripArchiveRows = async (
@@ -2128,7 +2158,7 @@ const listTripArchiveRows = async (
     })
     .from(parkVisits)
     .innerJoin(parks, eq(parkVisits.parkId, parks.id))
-    .where(eq(parks.removed, false))
+    .where(and(eq(parks.removed, false), eq(parkVisits.status, 'published')))
     .groupBy(parkVisits.tripId)
     .as('archive_active_trip_visit_stats');
 
@@ -2183,6 +2213,7 @@ const listTripArchiveRows = async (
       id: trips.id,
       name: trips.name,
       slug: trips.slug,
+      status: trips.status,
       startVisitedOn,
       startingPointLabel: trips.startingPointLabel,
       startingPointLat: trips.startingPointLat,
@@ -2194,7 +2225,9 @@ const listTripArchiveRows = async (
     .from(trips)
     .leftJoin(activeTripVisitStats, eq(activeTripVisitStats.tripId, trips.id))
     .leftJoin(tripStopStats, eq(tripStopStats.tripId, trips.id))
-    .where(cursorWhere)
+    .where(
+      cursorWhere ? and(eq(trips.status, 'published'), cursorWhere) : eq(trips.status, 'published')
+    )
     .orderBy(desc(startVisitedOn), desc(trips.createdAt), desc(trips.id))
     .limit(limit + 1) as Promise<TripArchiveRow[]>;
 };
@@ -2241,7 +2274,8 @@ const listTripDetailVisitRowsByTripId = async (
 
 const listPublicTripDetailVisitRowsByTripId = async (
   database: Database,
-  tripId: number
+  tripId: number,
+  includeDrafts = false
 ): Promise<PublicTripDetailVisitRow[]> => {
   return database
     .select({
@@ -2268,7 +2302,13 @@ const listPublicTripDetailVisitRowsByTripId = async (
     .innerJoin(parks, eq(parkVisits.parkId, parks.id))
     .innerJoin(parkTypes, eq(parks.typeId, parkTypes.id))
     .leftJoin(visitImages, eq(visitImages.visitId, parkVisits.id))
-    .where(and(eq(parkVisits.tripId, tripId), eq(parks.removed, false)))
+    .where(
+      and(
+        eq(parkVisits.tripId, tripId),
+        ...(includeDrafts ? [] : [eq(parkVisits.status, 'published')]),
+        eq(parks.removed, false)
+      )
+    )
     .groupBy(
       parkVisits.id,
       parkVisits.author,
@@ -2307,7 +2347,9 @@ const listVisitTimelineRows = async (database: Database): Promise<VisitTimelineR
       tripId: trips.id,
       tripName: trips.name,
       tripSlug: trips.slug,
-      tripStopOrder: parkVisits.tripStopOrder,
+      tripStopOrder: sql<
+        number | null
+      >`CASE WHEN ${trips.id} IS NULL THEN NULL ELSE ${parkVisits.tripStopOrder} END`,
       typeName: parkTypes.name,
       typeSlug: parkTypes.slug,
       visitedOn: parkVisits.visitedOn
@@ -2315,9 +2357,9 @@ const listVisitTimelineRows = async (database: Database): Promise<VisitTimelineR
     .from(parkVisits)
     .innerJoin(parks, eq(parkVisits.parkId, parks.id))
     .innerJoin(parkTypes, eq(parks.typeId, parkTypes.id))
-    .leftJoin(trips, eq(parkVisits.tripId, trips.id))
+    .leftJoin(trips, and(eq(parkVisits.tripId, trips.id), eq(trips.status, 'published')))
     .leftJoin(visitImages, eq(visitImages.visitId, parkVisits.id))
-    .where(visibleCatalogWhere())
+    .where(and(visibleCatalogWhere(), eq(parkVisits.status, 'published')))
     .groupBy(
       parkVisits.id,
       parkVisits.createdAt,
@@ -2912,9 +2954,10 @@ const getVisitRowWithParkById = async (database: Database, visitId: number) => {
 const buildVisitWithPark = async (
   database: Database,
   row: VisitRowWithPark,
-  getImagePublicUrl: (key: string) => Promise<string>
+  getImagePublicUrl: (key: string) => Promise<string>,
+  includeDraftTrips = false
 ) => {
-  const [visit] = await buildVisits(database, [row.visit], getImagePublicUrl);
+  const [visit] = await buildVisits(database, [row.visit], getImagePublicUrl, includeDraftTrips);
 
   return {
     ...visit!,
@@ -2922,6 +2965,22 @@ const buildVisitWithPark = async (
       name: row.park.name,
       slug: row.park.slug
     }
+  };
+};
+
+const buildAdminVisitWithPark = async (
+  database: Database,
+  row: VisitRowWithPark,
+  getImagePublicUrl: (key: string) => Promise<string>
+) => {
+  const visit = await buildVisitWithPark(database, row, getImagePublicUrl, true);
+  const trip =
+    visit.trip && row.visit.tripId !== null
+      ? await getTripRecordById(database, row.visit.tripId)
+      : null;
+  return {
+    ...visit,
+    trip: visit.trip && trip ? { ...visit.trip, status: trip.status } : null
   };
 };
 
@@ -2945,20 +3004,50 @@ export const getParkVisitsBySlug = async (
   };
 };
 
+export const getAdminParkVisitsBySlug = async (
+  database: Database,
+  slug: string,
+  getImagePublicUrl: (key: string) => Promise<string>
+) => {
+  const park = await getParkRecordBySlug(database, slug);
+
+  if (!park) {
+    return null;
+  }
+
+  const rows = await database
+    .select({ park: parks, visit: parkVisits })
+    .from(parkVisits)
+    .innerJoin(parks, eq(parkVisits.parkId, parks.id))
+    .where(and(eq(parks.id, park.id), eq(parks.removed, false)))
+    .orderBy(desc(parkVisits.visitedOn), desc(parkVisits.id));
+
+  return Promise.all(rows.map((row) => buildAdminVisitWithPark(database, row, getImagePublicUrl)));
+};
+
 export const getPublicTripVisitImagesBySlug = async (
   database: Database,
   slug: string,
   visitId: number,
   limit: number,
   offset: number,
-  getImagePublicUrl: (key: string) => Promise<string>
+  getImagePublicUrl: (key: string) => Promise<string>,
+  options: { includeDrafts?: boolean; tripId?: number } = {}
 ) => {
   const visit = await database
     .select({ id: parkVisits.id })
     .from(parkVisits)
     .innerJoin(trips, eq(trips.id, parkVisits.tripId))
     .innerJoin(parks, eq(parks.id, parkVisits.parkId))
-    .where(and(eq(trips.slug, slug), eq(parkVisits.id, visitId), eq(parks.removed, false)))
+    .where(
+      and(
+        options.tripId === undefined ? eq(trips.slug, slug) : eq(trips.id, options.tripId),
+        ...(options.includeDrafts === true ? [] : [eq(trips.status, 'published')]),
+        eq(parkVisits.id, visitId),
+        ...(options.includeDrafts === true ? [] : [eq(parkVisits.status, 'published')]),
+        eq(parks.removed, false)
+      )
+    )
     .limit(1);
 
   if (!visit[0]) {
@@ -2986,13 +3075,20 @@ export const getPublicTripStopImagesBySlug = async (
   tripStopId: number,
   limit: number,
   offset: number,
-  getImagePublicUrl: (key: string) => Promise<string>
+  getImagePublicUrl: (key: string) => Promise<string>,
+  options: { includeDrafts?: boolean; tripId?: number } = {}
 ) => {
   const stop = await database
     .select({ id: tripStops.id })
     .from(tripStops)
     .innerJoin(trips, eq(trips.id, tripStops.tripId))
-    .where(and(eq(trips.slug, slug), eq(tripStops.id, tripStopId)))
+    .where(
+      and(
+        options.tripId === undefined ? eq(trips.slug, slug) : eq(trips.id, options.tripId),
+        ...(options.includeDrafts === true ? [] : [eq(trips.status, 'published')]),
+        eq(tripStops.id, tripStopId)
+      )
+    )
     .limit(1);
 
   if (!stop[0]) {
@@ -3025,7 +3121,11 @@ export const findPublicMediaKey = async (database: Database, key: string) => {
     .innerJoin(parkVisits, eq(parkVisits.id, visitImages.visitId))
     .innerJoin(parks, eq(parks.id, parkVisits.parkId))
     .where(
-      and(eq(parks.removed, false), or(eq(visitImages.fullKey, key), eq(visitImages.thumbKey, key)))
+      and(
+        eq(parks.removed, false),
+        eq(parkVisits.status, 'published'),
+        or(eq(visitImages.fullKey, key), eq(visitImages.thumbKey, key))
+      )
     )
     .limit(1);
 
@@ -3038,7 +3138,12 @@ export const findPublicMediaKey = async (database: Database, key: string) => {
     .from(tripStopImages)
     .innerJoin(tripStops, eq(tripStops.id, tripStopImages.tripStopId))
     .innerJoin(trips, eq(trips.id, tripStops.tripId))
-    .where(or(eq(tripStopImages.fullKey, key), eq(tripStopImages.thumbKey, key)))
+    .where(
+      and(
+        eq(trips.status, 'published'),
+        or(eq(tripStopImages.fullKey, key), eq(tripStopImages.thumbKey, key))
+      )
+    )
     .limit(1);
 
   if (publicTripStopImage[0]) {
@@ -3202,13 +3307,26 @@ export const listVisits = async (
   database: Database,
   getImagePublicUrl: (key: string) => Promise<string>
 ) => {
-  const rows = await listVisitRowsWithPark(database);
+  const rows = await listVisitRowsWithPark(database, true);
 
   return Promise.all(rows.map((row) => buildVisitWithPark(database, row, getImagePublicUrl)));
 };
 
+export const listAdminVisits = async (
+  database: Database,
+  getImagePublicUrl: (key: string) => Promise<string>
+) => {
+  const rows = await listVisitRowsWithPark(database, false);
+  return Promise.all(rows.map((row) => buildAdminVisitWithPark(database, row, getImagePublicUrl)));
+};
+
 export const listTrips = async (database: Database) => {
   const rows = await listTripRows(database);
+  return rows.map((row) => toTrip(row));
+};
+
+export const listPublicTrips = async (database: Database) => {
+  const rows = await listPublicTripRows(database);
   return rows.map((row) => toTrip(row));
 };
 
@@ -3256,12 +3374,12 @@ export const getPublicTripBySlug = async (
 ) => {
   const tripRecord = await findTripRecordBySlug(database, slug);
 
-  if (!tripRecord) {
+  if (tripRecord?.status !== 'published') {
     return null;
   }
 
   const [tripRows, tripStopRows, tripVisitRows] = await Promise.all([
-    listTripRows(database),
+    listTripRows(database, true),
     listTripStopRowsByTripId(database, tripRecord.id),
     listPublicTripDetailVisitRowsByTripId(database, tripRecord.id)
   ]);
@@ -3307,16 +3425,65 @@ export const getPublicTripBySlug = async (
   };
 };
 
-export const getPublicTripRouteInputByTripId = async (database: Database, tripId: number) => {
-  const [tripRows, tripStopRows, tripRouteWaypointRows, tripVisitRows] = await Promise.all([
+export const getAdminTripPreviewById = async (
+  database: Database,
+  tripId: number,
+  getImagePublicUrl: (key: string) => Promise<string>,
+  getRouteInput: typeof getPublicTripRouteInputByTripId = getPublicTripRouteInputByTripId
+) => {
+  const [tripRows, tripStopRows, tripVisitRows] = await Promise.all([
     listTripRows(database),
     listTripStopRowsByTripId(database, tripId),
+    listPublicTripDetailVisitRowsByTripId(database, tripId, true)
+  ]);
+  const trip = tripRows.find((row) => row.id === tripId);
+  if (!trip) return null;
+
+  const resolvedTripStopImageCounts = await getTripStopImageCountsByTripStopId(
+    database,
+    tripStopRows.map((row) => row.id)
+  );
+  const itinerary = [
+    ...tripVisitRows.map((row) => toPublicTripItineraryVisitEntry(row)),
+    ...tripStopRows.map((row) =>
+      toPublicTripItineraryStopEntry(row, resolvedTripStopImageCounts.get(row.id) ?? 0)
+    )
+  ].sort((left, right) => left.tripStopOrder - right.tripStopOrder);
+  const featuredImageCandidate = await getTripFeaturedImage(
+    database,
+    tripId,
+    getImagePublicUrl,
+    true,
+    true
+  );
+  const routeInput = await getRouteInput(database, tripId, true);
+
+  return {
+    ...toTrip(trip),
+    featuredImage: featuredImageCandidate?.image ?? null,
+    imageCount:
+      tripVisitRows.reduce((total, row) => total + row.imageCount, 0) +
+      Array.from(resolvedTripStopImageCounts.values()).reduce((total, count) => total + count, 0),
+    itinerary: itinerary.map((entry, index) => ({ ...entry, tripStopOrder: index + 1 })),
+    route: { available: routeInput?.available ?? false, data: null, error: null, success: true },
+    stopCount: tripStopRows.length
+  };
+};
+
+export const getPublicTripRouteInputByTripId = async (
+  database: Database,
+  tripId: number,
+  includeDrafts = false
+) => {
+  const [tripRows, tripStopRows, tripRouteWaypointRows, tripVisitRows] = await Promise.all([
+    listTripRows(database, !includeDrafts),
+    listTripStopRowsByTripId(database, tripId),
     listTripRouteWaypointRowsByTripId(database, tripId),
-    listPublicTripDetailVisitRowsByTripId(database, tripId)
+    listPublicTripDetailVisitRowsByTripId(database, tripId, includeDrafts)
   ]);
   const trip = tripRows.find((row) => row.id === tripId);
 
-  if (!trip) {
+  if (!trip || (!includeDrafts && trip.status !== 'published')) {
     return null;
   }
 
@@ -3370,13 +3537,15 @@ const getTripImageCandidate = async (
   tripId: number,
   reference: TripImageReference,
   getImagePublicUrl: (key: string) => Promise<string>
-): Promise<TripImageCandidate | null> => {
+): Promise<TripImageCandidateWithParkVisibility | null> => {
   if (reference.source === 'visit-image') {
     const rows = await database
       .select({
         image: visitImages,
         parkName: parks.name,
         parkRemoved: parks.removed,
+        tripStatus: trips.status,
+        visitStatus: parkVisits.status,
         tripId: parkVisits.tripId,
         visitId: parkVisits.id,
         visitedOn: parkVisits.visitedOn
@@ -3384,6 +3553,7 @@ const getTripImageCandidate = async (
       .from(visitImages)
       .innerJoin(parkVisits, eq(parkVisits.id, visitImages.visitId))
       .innerJoin(parks, eq(parks.id, parkVisits.parkId))
+      .innerJoin(trips, eq(trips.id, parkVisits.tripId))
       .where(eq(visitImages.id, reference.imageId));
     const row = rows[0];
 
@@ -3393,7 +3563,9 @@ const getTripImageCandidate = async (
 
     return {
       image: await toVisitImage(row.image, getImagePublicUrl),
-      isPubliclyVisible: !row.parkRemoved,
+      isParkVisible: !row.parkRemoved,
+      isPubliclyVisible:
+        !row.parkRemoved && row.visitStatus === 'published' && row.tripStatus === 'published',
       reference,
       sourceId: row.visitId,
       sourceLabel: row.parkName,
@@ -3407,11 +3579,13 @@ const getTripImageCandidate = async (
       sourceId: tripStops.id,
       sourceLabel: tripStops.displayName,
       fallbackLabel: tripStops.label,
+      tripStatus: trips.status,
       tripId: tripStops.tripId,
       visitedOn: tripStops.visitedOn
     })
     .from(tripStopImages)
     .innerJoin(tripStops, eq(tripStops.id, tripStopImages.tripStopId))
+    .innerJoin(trips, eq(trips.id, tripStops.tripId))
     .where(eq(tripStopImages.id, reference.imageId));
   const row = rows[0];
 
@@ -3421,7 +3595,8 @@ const getTripImageCandidate = async (
 
   return {
     image: await toVisitImage(row.image, getImagePublicUrl),
-    isPubliclyVisible: true,
+    isParkVisible: true,
+    isPubliclyVisible: row.tripStatus === 'published',
     reference,
     sourceId: row.sourceId,
     sourceLabel: row.sourceLabel ?? row.fallbackLabel,
@@ -3433,7 +3608,8 @@ export const getTripFeaturedImage = async (
   database: DbClient,
   tripId: number,
   getImagePublicUrl: (key: string) => Promise<string>,
-  includeHidden = true
+  includeHidden = true,
+  previewMode = false
 ) => {
   const selection = await getTripFeaturedImageRow(database, tripId);
 
@@ -3456,7 +3632,20 @@ export const getTripFeaturedImage = async (
   const candidate = await getTripImageCandidate(database, tripId, reference, getImagePublicUrl);
 
   /* c8 ignore next -- hidden/public filtering is covered by the public read path. */
-  return candidate && (includeHidden || candidate.isPubliclyVisible) ? candidate : null;
+  if (
+    !candidate ||
+    (previewMode ? !candidate.isParkVisible : !includeHidden && !candidate.isPubliclyVisible)
+  ) {
+    return null;
+  }
+  return {
+    image: candidate.image,
+    isPubliclyVisible: candidate.isPubliclyVisible,
+    reference: candidate.reference,
+    sourceId: candidate.sourceId,
+    sourceLabel: candidate.sourceLabel,
+    visitedOn: candidate.visitedOn
+  };
 };
 
 type TripArchiveFeaturedImageSource = {
@@ -3749,7 +3938,19 @@ export const getVisitById = async (
   getImagePublicUrl: (key: string) => Promise<string>
 ) => {
   const row = await getVisitRowWithParkById(database, visitId);
-  return row ? buildVisitWithPark(database, row, getImagePublicUrl) : null;
+  if (row?.visit.status !== 'published') {
+    return null;
+  }
+  return buildVisitWithPark(database, row, getImagePublicUrl);
+};
+
+export const getAdminVisitById = async (
+  database: Database,
+  visitId: number,
+  getImagePublicUrl: (key: string) => Promise<string>
+) => {
+  const row = await getVisitRowWithParkById(database, visitId);
+  return row ? buildAdminVisitWithPark(database, row, getImagePublicUrl) : null;
 };
 
 export const getPublicVisitDataVersion = async (
@@ -3761,7 +3962,7 @@ export const getPublicVisitDataVersion = async (
 export const getPublicHomeSummary = async (database: Database) => {
   const [parkRows, tripRows, visitRows, version] = await Promise.all([
     listPublicParkRows(database),
-    listTripRows(database),
+    listPublicTripRows(database),
     listPublicVisitRows(database),
     getPublicVisitDataVersion(database)
   ]);
@@ -4055,6 +4256,7 @@ export const createTrip = async (database: Database, input: PutTripInput) => {
         createdAt: timestamp,
         description: normalizeOptionalText(input.description),
         name,
+        status: input.status ?? 'draft',
         slug,
         startingPointLabel: startingPoint?.label ?? null,
         startingPointLat: startingPoint?.lat ?? null,
@@ -4073,6 +4275,7 @@ export const createTrip = async (database: Database, input: PutTripInput) => {
     id: row.id,
     name: row.name,
     slug: row.slug,
+    status: row.status,
     startingPointLabel: row.startingPointLabel,
     startingPointLat: row.startingPointLat,
     startingPointLon: row.startingPointLon,
@@ -4181,6 +4384,9 @@ export const createVisit = async (database: Database, slug: string, input: PutVi
   }
 
   const tripId = await resolveTripId(database, input.tripId);
+  if (tripId !== undefined && tripId !== null && (input.status ?? 'draft') !== 'published') {
+    throw new RepositoryValidationError('Only published visits can be added to a trip.');
+  }
   const timestamp = new Date().toISOString();
 
   return database.transaction(async (tx) => {
@@ -4202,6 +4408,7 @@ export const createVisit = async (database: Database, slug: string, input: PutVi
           locationLon: location?.lon ?? null,
           note: input.note?.trim() || null,
           parkId: park.id,
+          status: input.status ?? 'draft',
           route: input.route?.trim() || null,
           tripId: tripId ?? null,
           tripStopOrder,
@@ -4544,36 +4751,45 @@ export const updateTrip = async (database: Database, tripId: number, input: Upda
       existingTrip.startingPointLon !== (nextStartingPoint?.lon ?? null));
   const timestamp = new Date().toISOString();
 
-  await database
-    .update(trips)
-    .set({
-      description:
-        input.description === undefined
-          ? existingTrip.description
-          : normalizeOptionalText(input.description),
-      name: nextName,
-      slug: nextSlug,
-      startingPointLabel:
-        nextStartingPoint === undefined
-          ? existingTrip.startingPointLabel
-          : (nextStartingPoint?.label ?? null),
-      startingPointLat:
-        nextStartingPoint === undefined
-          ? existingTrip.startingPointLat
-          : (nextStartingPoint?.lat ?? null),
-      startingPointLon:
-        nextStartingPoint === undefined
-          ? existingTrip.startingPointLon
-          : (nextStartingPoint?.lon ?? null),
-      updatedAt: timestamp
-    })
-    .where(eq(trips.id, tripId));
+  const tripWasUpdated = await database.transaction(async (tx) => {
+    const currentTrip = await getTripRecordById(tx, tripId);
+    if (!currentTrip) return false;
 
-  await bumpPublicVisitDataVersion(database, timestamp);
+    await tx
+      .update(trips)
+      .set({
+        status: input.status ?? currentTrip.status,
+        description:
+          input.description === undefined
+            ? existingTrip.description
+            : normalizeOptionalText(input.description),
+        name: nextName,
+        slug: nextSlug,
+        startingPointLabel:
+          nextStartingPoint === undefined
+            ? existingTrip.startingPointLabel
+            : (nextStartingPoint?.label ?? null),
+        startingPointLat:
+          nextStartingPoint === undefined
+            ? existingTrip.startingPointLat
+            : (nextStartingPoint?.lat ?? null),
+        startingPointLon:
+          nextStartingPoint === undefined
+            ? existingTrip.startingPointLon
+            : (nextStartingPoint?.lon ?? null),
+        updatedAt: timestamp
+      })
+      .where(eq(trips.id, tripId));
 
-  if (startingPointChanged) {
-    await invalidatePublicTripRouteCache(database, tripId);
-  }
+    await bumpPublicVisitDataVersion(tx, timestamp);
+
+    if (startingPointChanged || input.status !== undefined) {
+      await invalidatePublicTripRouteCache(tx, tripId);
+    }
+    return true;
+  });
+
+  if (!tripWasUpdated) return null;
 
   const row = (await listTripRows(database)).find((trip) => trip.id === tripId)!;
 
@@ -4723,6 +4939,15 @@ export const updateVisit = async (database: Database, visitId: number, input: Up
   }
 
   const nextTripId = await resolveTripId(database, input.tripId);
+  const nextStatus = input.status ?? existingVisit.status;
+  if (
+    nextTripId !== undefined &&
+    nextTripId !== null &&
+    nextTripId !== existingVisit.tripId &&
+    nextStatus !== 'published'
+  ) {
+    throw new RepositoryValidationError('Only published visits can be added to a trip.');
+  }
   const timestamp = new Date().toISOString();
 
   return database.transaction(async (tx) => {
@@ -4772,6 +4997,7 @@ export const updateVisit = async (database: Database, visitId: number, input: Up
           input.location === undefined ? existingVisit.locationLon : (input.location?.lon ?? null),
         note: input.note === undefined ? existingVisit.note : input.note?.trim() || null,
         route: input.route === undefined ? existingVisit.route : input.route?.trim() || null,
+        status: input.status ?? existingVisit.status,
         tripId: resolvedTripId,
         tripStopOrder,
         updatedAt: timestamp,
@@ -4787,6 +5013,7 @@ export const updateVisit = async (database: Database, visitId: number, input: Up
     const updatedRouteRelevant = updatedVisit.tripId !== null && !updatedVisit.excludeFromRoute;
     const routeChanged =
       existingRouteRelevant !== updatedRouteRelevant ||
+      existingVisit.status !== updatedVisit.status ||
       (updatedRouteRelevant &&
         ((input.location !== undefined &&
           ((input.location?.lat ?? null) !== existingVisit.locationLat ||
@@ -4822,6 +5049,8 @@ export const deleteTrip = async (database: Database, tripId: number) => {
   const timestamp = new Date().toISOString();
 
   return database.transaction(async (tx) => {
+    const existingTrip = await getTripRecordById(tx, tripId);
+    if (!existingTrip) return false;
     const tripStopImageRows = await tx
       .select({
         fullKey: tripStopImages.fullKey,
@@ -4850,16 +5079,15 @@ export const deleteTrip = async (database: Database, tripId: number) => {
 
     const result = await tx.delete(trips).where(eq(trips.id, tripId));
 
-    if (Number(result.rowsAffected) > 0) {
-      await enqueueMediaCleanup(
-        tx,
-        [...tripStopImageRows, ...pendingUploadRows].flatMap(getMediaUploadKeys),
-        timestamp
-      );
-      await bumpPublicVisitDataVersion(tx, timestamp);
-    }
+    if (Number(result.rowsAffected) === 0) return false;
 
-    return Number(result.rowsAffected) > 0;
+    await enqueueMediaCleanup(
+      tx,
+      [...tripStopImageRows, ...pendingUploadRows].flatMap(getMediaUploadKeys),
+      timestamp
+    );
+    await bumpPublicVisitDataVersion(tx, timestamp);
+    return true;
   });
 };
 

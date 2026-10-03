@@ -177,10 +177,14 @@ export const tripSchema = z.object({
   id: z.number().int(),
   name: z.string(),
   slug: z.string(),
+  status: z.enum(['draft', 'published']).optional(),
   startingPoint: labeledPointSchema.nullable(),
   updatedAt: z.string().datetime(),
   visitCount: z.number().int()
 });
+
+export const publicationStatusSchema = z.enum(['draft', 'published']);
+export const adminTripSchema = tripSchema.extend({ status: publicationStatusSchema });
 
 export const tripStopSchema = z.object({
   createdAt: z.string().datetime(),
@@ -243,10 +247,17 @@ export const visitSchema = z.object({
   location: pointSchema.nullable(),
   note: z.string().nullable(),
   route: z.string().nullable(),
+  status: z.enum(['draft', 'published']).optional(),
   trip: visitTripSchema.nullable(),
   tripStopOrder: z.number().int().positive().nullable(),
   updatedAt: z.string(),
   visitedOn: visitDateSchema
+});
+
+export const adminVisitTripSchema = visitTripSchema.extend({ status: publicationStatusSchema });
+export const adminVisitSchema = visitSchema.extend({
+  status: publicationStatusSchema,
+  trip: adminVisitTripSchema.nullable()
 });
 
 export const visitedSummarySchema = z.object({
@@ -306,6 +317,10 @@ export const tripItineraryEntrySchema = z.union([
 ]);
 
 export const tripDetailSchema = tripSchema.extend({
+  itinerary: z.array(tripItineraryEntrySchema)
+});
+
+export const adminTripDetailSchema = adminTripSchema.extend({
   itinerary: z.array(tripItineraryEntrySchema)
 });
 
@@ -486,6 +501,10 @@ export const tripListResponseSchema = z.object({
   trips: z.array(tripSchema)
 });
 
+export const adminTripListResponseSchema = z.object({
+  trips: z.array(adminTripSchema)
+});
+
 export const tripArchiveFeaturedImageSchema = z.object({
   height: z.number().int().positive().nullable(),
   url: z.string().url(),
@@ -527,12 +546,23 @@ export const visitListResponseSchema = z.object({
   visits: z.array(visitWithParkSchema)
 });
 
+export const adminVisitWithParkSchema = adminVisitSchema.extend({
+  park: visitParkSchema
+});
+
+export const adminVisitListResponseSchema = z.object({
+  visits: z.array(adminVisitWithParkSchema)
+});
+
+export const adminParkVisitsResponseSchema = adminVisitListResponseSchema;
+
 export const createVisitRequestSchema = z.object({
   author: z.string().max(50).nullable().optional(),
   excludeFromRoute: z.boolean().optional(),
   location: pointSchema.nullable().optional(),
   note: z.string().max(5000).nullable().optional(),
   route: z.string().max(80).nullable().optional(),
+  status: publicationStatusSchema.optional(),
   tripId: z.number().int().nullable().optional(),
   tripStopOrder: z.number().int().positive().optional(),
   visitedOn: visitDateSchema
@@ -541,6 +571,7 @@ export const createVisitRequestSchema = z.object({
 export const createTripRequestSchema = z.object({
   description: z.string().max(5000).nullable().optional(),
   name: z.string().trim().min(1).max(120),
+  status: publicationStatusSchema.optional(),
   slug: z.string().trim().min(1).max(255).optional(),
   startingPoint: labeledPointInputSchema.nullable().optional()
 });
@@ -603,6 +634,7 @@ export const updateVisitRequestSchema = createVisitRequestSchema
       input.location !== undefined ||
       input.note !== undefined ||
       input.route !== undefined ||
+      input.status !== undefined ||
       input.tripId !== undefined ||
       input.tripStopOrder !== undefined ||
       input.visitedOn !== undefined,
@@ -618,6 +650,7 @@ export const updateTripRequestSchema = createTripRequestSchema
       input.description !== undefined ||
       input.name !== undefined ||
       input.slug !== undefined ||
+      input.status !== undefined ||
       input.startingPoint !== undefined,
     {
       message: 'Provide at least one field to update.'

@@ -3,6 +3,9 @@ import { createRoute, z } from '@hono/zod-openapi';
 import { errorSchema } from '../contracts/common.js';
 import {
   adminParkVisibilityResponseSchema,
+  adminParkVisitsResponseSchema,
+  adminVisitListResponseSchema,
+  adminVisitWithParkSchema,
   completeDirectVisitImageUploadRequestSchema,
   completeDirectVisitImageUploadResponseSchema,
   createVisitRequestSchema,
@@ -246,6 +249,34 @@ export const getParkVisitsRoute = createRoute({
   }
 });
 
+export const getAdminParkVisitsRoute = createRoute({
+  method: 'get',
+  path: '/api/admin/parks/{slug}/visits',
+  tags: ['Visits'],
+  security: [{ bearerAuth: [], sessionAuth: [] }],
+  request: {
+    params: z.object({ slug: z.string() })
+  },
+  responses: {
+    200: {
+      description: 'Admin park visit history including drafts',
+      content: { 'application/json': { schema: adminParkVisitsResponseSchema } }
+    },
+    401: {
+      description: 'Admin session required',
+      content: { 'application/json': { schema: errorSchema } }
+    },
+    404: {
+      description: 'Park was not found',
+      content: { 'application/json': { schema: errorSchema } }
+    },
+    503: {
+      description: 'OAuth or storage unavailable',
+      content: { 'application/json': { schema: errorSchema } }
+    }
+  }
+});
+
 export const getPublicHomeSummaryRoute = createRoute({
   method: 'get',
   path: '/api/home-summary',
@@ -353,6 +384,53 @@ export const getVisitRoute = createRoute({
   }
 });
 
+export const listAdminVisitsRoute = createRoute({
+  method: 'get',
+  path: '/api/admin/visits',
+  tags: ['Visits'],
+  security: [{ bearerAuth: [], sessionAuth: [] }],
+  responses: {
+    200: {
+      description: 'Admin visit list including drafts',
+      content: { 'application/json': { schema: adminVisitListResponseSchema } }
+    },
+    401: {
+      description: 'Admin session required',
+      content: { 'application/json': { schema: errorSchema } }
+    },
+    503: {
+      description: 'OAuth or storage unavailable',
+      content: { 'application/json': { schema: errorSchema } }
+    }
+  }
+});
+
+export const getAdminVisitRoute = createRoute({
+  method: 'get',
+  path: '/api/admin/visits/{id}',
+  tags: ['Visits'],
+  security: [{ bearerAuth: [], sessionAuth: [] }],
+  request: { params: z.object({ id: z.coerce.number().int().positive() }) },
+  responses: {
+    200: {
+      description: 'Admin visit detail including drafts',
+      content: { 'application/json': { schema: adminVisitWithParkSchema } }
+    },
+    401: {
+      description: 'Admin session required',
+      content: { 'application/json': { schema: errorSchema } }
+    },
+    404: {
+      description: 'Visit was not found',
+      content: { 'application/json': { schema: errorSchema } }
+    },
+    503: {
+      description: 'OAuth or storage unavailable',
+      content: { 'application/json': { schema: errorSchema } }
+    }
+  }
+});
+
 export const createVisitRoute = createRoute({
   method: 'post',
   path: '/api/parks/{slug}/visits',
@@ -396,7 +474,7 @@ export const createVisitRoute = createRoute({
       }
     },
     422: {
-      description: 'Visit payload is invalid for the requested trip ordering',
+      description: 'Visit cannot be created for the requested trip or ordering',
       content: {
         'application/json': {
           schema: errorSchema
@@ -505,7 +583,7 @@ export const updateVisitRoute = createRoute({
       }
     },
     422: {
-      description: 'Visit payload is invalid for the requested trip ordering',
+      description: 'Visit cannot be assigned to the requested trip or ordering',
       content: {
         'application/json': {
           schema: errorSchema
