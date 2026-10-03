@@ -865,7 +865,6 @@ const sortTripAwareVisitRows = <T extends TripAwareVisitOrder>(visitRows: T[]) =
   return [...visitRows].sort(compareTripAwareVisitOrder);
 };
 
-const HOME_SUMMARY_MAX_ITEMS = 5;
 const TRIP_ARCHIVE_CURSOR_VERSION = 1;
 
 export class TripArchiveCursorError extends Error {}
@@ -2229,7 +2228,7 @@ const listTripArchiveRows = async (
       cursorWhere ? and(eq(trips.status, 'published'), cursorWhere) : eq(trips.status, 'published')
     )
     .orderBy(desc(startVisitedOn), desc(trips.createdAt), desc(trips.id))
-    .limit(limit + 1) as Promise<TripArchiveRow[]>;
+    .limit(limit) as Promise<TripArchiveRow[]>;
 };
 
 const listTripStopRowsByTripId = async (database: Database, tripId: number) => {
@@ -3665,6 +3664,8 @@ const getTripArchiveFeaturedImages = async (
     return imagesByTripId;
   }
 
+  // Both callers select published trips. Source ownership below keeps stop covers
+  // within those trips; visit covers additionally require their own publication.
   const selections = await database
     .select()
     .from(tripFeaturedImages)
@@ -3682,6 +3683,7 @@ const getTripArchiveFeaturedImages = async (
           .select({
             image: visitImages,
             parkRemoved: parks.removed,
+            visitStatus: parkVisits.status,
             tripId: parkVisits.tripId
           })
           .from(visitImages)
@@ -3710,7 +3712,9 @@ const getTripArchiveFeaturedImages = async (
       const tripStopImage =
         tripStopImageId === null ? undefined : tripStopImagesById.get(tripStopImageId);
       const selectedImage =
-        visitImage?.tripId === selection.tripId && !visitImage.parkRemoved
+        visitImage?.tripId === selection.tripId &&
+        !visitImage.parkRemoved &&
+        visitImage.visitStatus === 'published'
           ? visitImage.image
           : tripStopImage?.tripId === selection.tripId
             ? tripStopImage.image
@@ -3737,6 +3741,40 @@ const getTripArchiveFeaturedImages = async (
   return imagesByTripId;
 };
 
+const toTripPreview = (
+  row: TripArchiveRow,
+  featuredImage: TripArchiveFeaturedImageSource | null | undefined
+) => {
+  return {
+    dateRange:
+      row.startVisitedOn && row.endVisitedOn
+        ? {
+            end: row.endVisitedOn,
+            start: row.startVisitedOn
+          }
+        : null,
+    descriptionExcerpt: createTripDescriptionExcerpt(row.description),
+    featuredImage: featuredImage
+      ? {
+          height:
+            featuredImage.fullHeight !== null && featuredImage.fullHeight > 0
+              ? featuredImage.fullHeight
+              : null,
+          url: featuredImage.fullKey,
+          width:
+            featuredImage.fullWidth !== null && featuredImage.fullWidth > 0
+              ? featuredImage.fullWidth
+              : null
+        }
+      : null,
+    id: row.id,
+    name: row.name,
+    slug: row.slug,
+    stopCount: Number(row.stopCount),
+    visitCount: Number(row.visitCount)
+  };
+};
+
 export const listTripArchive = async (
   database: Database,
   limit: number,
@@ -3744,7 +3782,7 @@ export const listTripArchive = async (
   getImagePublicUrl?: (key: string) => Promise<string>
 ) => {
   const [rows, totalRows] = await Promise.all([
-    listTripArchiveRows(database, limit, cursor),
+    listTripArchiveRows(database, limit + 1, cursor),
     database.select({ count: sql<number>`COUNT(*)` }).from(trips)
   ]);
   const pageRows = rows.slice(0, limit);
@@ -3768,35 +3806,7 @@ export const listTripArchive = async (
     trips: await Promise.all(
       pageRows.map(async (row) => {
         const featuredImage = featuredImagesByTripId.get(row.id);
-        return {
-          createdAt: row.createdAt,
-          dateRange:
-            row.startVisitedOn && row.endVisitedOn
-              ? {
-                  end: row.endVisitedOn,
-                  start: row.startVisitedOn
-                }
-              : null,
-          descriptionExcerpt: createTripDescriptionExcerpt(row.description),
-          featuredImage: featuredImage
-            ? {
-                height:
-                  featuredImage.fullHeight !== null && featuredImage.fullHeight > 0
-                    ? featuredImage.fullHeight
-                    : null,
-                url: featuredImage.fullKey,
-                width:
-                  featuredImage.fullWidth !== null && featuredImage.fullWidth > 0
-                    ? featuredImage.fullWidth
-                    : null
-              }
-            : null,
-          id: row.id,
-          name: row.name,
-          slug: row.slug,
-          stopCount: Number(row.stopCount),
-          visitCount: Number(row.visitCount)
-        };
+        return { createdAt: row.createdAt, ...toTripPreview(row, featuredImage) };
       })
     )
   };
@@ -3959,16 +3969,74 @@ export const getPublicVisitDataVersion = async (
   return toPublicVisitVersion(await getPublicVisitDataVersionRecord(database));
 };
 
-export const getPublicHomeSummary = async (database: Database) => {
-  const [parkRows, tripRows, visitRows, version] = await Promise.all([
-    listPublicParkRows(database),
-    listPublicTripRows(database),
-    listPublicVisitRows(database),
-    getPublicVisitDataVersion(database)
+const getLatestStandaloneVisitPreview = async (
+  database: Database,
+  getImagePublicUrl: (key: string) => Promise<string>
+) => {
+  const [visit] = await database
+    .select({
+      id: parkVisits.id,
+      note: parkVisits.note,
+      parkName: parks.name,
+      parkSlug: parks.slug,
+      visitedOn: parkVisits.visitedOn
+    })
+    .from(parkVisits)
+    .innerJoin(parks, eq(parks.id, parkVisits.parkId))
+    .leftJoin(trips, eq(trips.id, parkVisits.tripId))
+    .where(
+      and(
+        eq(parks.removed, false),
+        eq(parkVisits.status, 'published'),
+        or(isNull(trips.id), eq(trips.status, 'draft'))
+      )
+    )
+    .orderBy(desc(parkVisits.visitedOn), desc(parkVisits.createdAt), desc(parkVisits.id))
+    .limit(1);
+  if (!visit) return null;
+  const [images, counts] = await Promise.all([
+    database
+      .select()
+      .from(visitImages)
+      .where(eq(visitImages.visitId, visit.id))
+      .orderBy(asc(visitImages.displayOrder), asc(visitImages.id))
+      .limit(1),
+    database
+      .select({ count: sql<number>`COUNT(*)` })
+      .from(visitImages)
+      .where(eq(visitImages.visitId, visit.id))
   ]);
+  const image = images[0];
+  const url = image ? await getImagePublicUrl(image.fullKey) : null;
+  return {
+    id: visit.id,
+    park: { name: visit.parkName, slug: visit.parkSlug },
+    visitedOn: visit.visitedOn,
+    imageCount: Number(counts[0]!.count),
+    descriptionExcerpt: createTripDescriptionExcerpt(visit.note),
+    featuredImage:
+      image && url
+        ? {
+            url,
+            width: image.fullWidth !== null && image.fullWidth > 0 ? image.fullWidth : null,
+            height: image.fullHeight !== null && image.fullHeight > 0 ? image.fullHeight : null
+          }
+        : null
+  };
+};
 
+export const getPublicHomeSummary = async (
+  database: Database,
+  getImagePublicUrl: (key: string) => Promise<string>
+) => {
+  const [parkRows, tripRows, visitRows, version, latestStandaloneVisit] = await Promise.all([
+    listPublicParkRows(database),
+    listTripArchiveRows(database, 1, null),
+    listPublicVisitRows(database),
+    getPublicVisitDataVersion(database),
+    getLatestStandaloneVisitPreview(database, getImagePublicUrl)
+  ]);
   const publicParks = await Promise.all(parkRows.map((row) => toPublicPark(row)));
-  const parksById = new Map(publicParks.map((park, index) => [parkRows[index]!.parkId, park]));
   const visitsByParkId = new Map<number, PublicVisitRow[]>();
 
   for (const visit of visitRows) {
@@ -3983,8 +4051,7 @@ export const getPublicHomeSummary = async (database: Database) => {
         SupportedParkTypeSlug,
         {
           totalParks: number;
-          totalVisits: number;
-          type: (typeof publicParks)[number]['type'];
+          type: Pick<(typeof publicParks)[number]['type'], 'name' | 'slug'>;
           visible: boolean;
           visitedParks: number;
         }
@@ -3992,8 +4059,7 @@ export const getPublicHomeSummary = async (database: Database) => {
     >((accumulator, park, index) => {
       const existing = accumulator.get(park.type.slug) ?? {
         totalParks: 0,
-        totalVisits: 0,
-        type: park.type,
+        type: { name: park.type.name, slug: park.type.slug },
         visible:
           !isTrailTypeSlug(park.type.slug) && !isHikingAndWildernessAreaTypeSlug(park.type.slug),
         visitedParks: 0
@@ -4001,7 +4067,6 @@ export const getPublicHomeSummary = async (database: Database) => {
       const parkVisits = visitsByParkId.get(parkRows[index]!.parkId) ?? [];
 
       existing.totalParks += 1;
-      existing.totalVisits += parkVisits.length;
       if (parkVisits.length > 0) {
         existing.visitedParks += 1;
       }
@@ -4020,7 +4085,6 @@ export const getPublicHomeSummary = async (database: Database) => {
         {
           category: (typeof publicParks)[number]['category'];
           totalParks: number;
-          totalVisits: number;
           visitedParks: number;
         }
       >
@@ -4028,13 +4092,11 @@ export const getPublicHomeSummary = async (database: Database) => {
       const existing = accumulator.get(park.category.slug) ?? {
         category: park.category,
         totalParks: 0,
-        totalVisits: 0,
         visitedParks: 0
       };
       const parkVisits = visitsByParkId.get(parkRows[index]!.parkId) ?? [];
 
       existing.totalParks += 1;
-      existing.totalVisits += parkVisits.length;
       if (parkVisits.length > 0) {
         existing.visitedParks += 1;
       }
@@ -4046,90 +4108,29 @@ export const getPublicHomeSummary = async (database: Database) => {
     .map(([, value]) => value)
     .sort((a, b) => a.category.name.localeCompare(b.category.name));
 
-  const parkVisitSummaries = Array.from(visitsByParkId.entries()).map(([parkId, visits]) => {
-    const park = parksById.get(parkId)!;
-
-    return {
-      park: {
-        name: park.name,
-        slug: park.slug
-      },
-      visitedSummary: toVisitedSummary(visits)
-    };
-  });
-
-  const mostVisitedParks = [...parkVisitSummaries]
-    .sort((a, b) => {
-      if (b.visitedSummary.visitCount !== a.visitedSummary.visitCount) {
-        return b.visitedSummary.visitCount - a.visitedSummary.visitCount;
-      }
-
-      if (b.visitedSummary.lastVisitedOn !== a.visitedSummary.lastVisitedOn) {
-        return b.visitedSummary.lastVisitedOn!.localeCompare(a.visitedSummary.lastVisitedOn!);
-      }
-
-      return a.park.name.localeCompare(b.park.name);
-    })
-    .map(({ park, visitedSummary }) => ({
-      lastVisitedOn: visitedSummary.lastVisitedOn,
-      park,
-      visitCount: visitedSummary.visitCount
-    }))
-    .slice(0, HOME_SUMMARY_MAX_ITEMS);
-
-  const recentVisits = [...parkVisitSummaries]
-    .sort((a, b) => {
-      if (b.visitedSummary.lastVisitedOn !== a.visitedSummary.lastVisitedOn) {
-        return b.visitedSummary.lastVisitedOn!.localeCompare(a.visitedSummary.lastVisitedOn!);
-      }
-
-      return a.park.name.localeCompare(b.park.name);
-    })
-    .slice(0, HOME_SUMMARY_MAX_ITEMS);
-
-  const latestTrips = [...tripRows]
-    .sort((a, b) => {
-      if (a.startVisitedOn !== b.startVisitedOn) {
-        if (b.startVisitedOn === null) {
-          return -1;
-        }
-
-        if (a.startVisitedOn === null) {
-          return 1;
-        }
-
-        return b.startVisitedOn.localeCompare(a.startVisitedOn);
-      }
-
-      if (b.createdAt !== a.createdAt) {
-        return b.createdAt.localeCompare(a.createdAt);
-      }
-
-      return b.id - a.id;
-    })
-    .slice(0, HOME_SUMMARY_MAX_ITEMS)
-    .map((trip) => ({
-      name: trip.name,
-      slug: trip.slug,
-      startDate: trip.startVisitedOn
-    }));
-
+  const trip = tripRows[0];
+  const featuredImages = await getTripArchiveFeaturedImages(
+    database,
+    trip ? [trip.id] : [],
+    getImagePublicUrl
+  );
+  const magnetParkIds = new Set(
+    parkRows
+      .filter(
+        (_, index) =>
+          publicParks[index]!.type.slug === 'national-park' || publicParks[index]!.hasMagnet
+      )
+      .map((row) => row.parkId)
+  );
   return {
-    latestTrips,
-    latestVisitEntries: visitRows.slice(0, HOME_SUMMARY_MAX_ITEMS).map((visit) => ({
-      createdAt: visit.createdAt,
-      id: visit.id,
-      park: {
-        name: visit.parkName,
-        slug: visit.parkSlug
-      },
-      updatedAt: visit.updatedAt,
-      visitedOn: visit.visitedOn
-    })),
-    mostVisitedParks,
+    latestTrip: trip ? toTripPreview(trip, featuredImages.get(trip.id)) : null,
+    latestStandaloneVisit,
+    magnetProgress: {
+      totalParks: magnetParkIds.size,
+      visitedParks: [...visitsByParkId.keys()].filter((id) => magnetParkIds.has(id)).length
+    },
     progressByCategory,
     progressByType,
-    recentVisits,
     seasonalVisitCounts: countVisitsBySeason(visitRows),
     totalVisits: visitRows.length,
     uniqueVisitedParks: visitsByParkId.size,
