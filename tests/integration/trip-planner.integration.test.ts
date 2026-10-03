@@ -228,6 +228,7 @@ describe('trip planner route', () => {
     });
 
     await createVisit(testDatabase.database, 'reittipuisto', {
+      status: 'published',
       visitedOn: '2026-07-10'
     });
   });

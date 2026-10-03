@@ -49,8 +49,12 @@ describe('image derivative backfill', () => {
 
   const createLegacyRecords = async () => {
     const timestamp = '2026-09-12T10:00:00.000Z';
-    const trip = await createTrip(testDatabase.database, { name: 'Syysretki' });
+    const trip = await createTrip(testDatabase.database, {
+      name: 'Syysretki',
+      status: 'published'
+    });
     const visit = await createVisit(testDatabase.database, 'akasmannyn-kansallispuisto', {
+      status: 'published',
       tripId: trip.id,
       visitedOn: '2026-09-12'
     });

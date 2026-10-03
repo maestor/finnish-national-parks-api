@@ -137,6 +137,7 @@ describe('resource baseline API', () => {
     const trip = await createTrip(testDatabase.database, {
       description: 'A deterministic trip spanning twenty synthetic parks.',
       name: 'Synthetic 20 Park Trip',
+      status: 'published',
       slug: BASELINE_TRIP_SLUG,
       startingPoint: {
         coordinate: { lat: 60.1699, lon: 24.9384 },
@@ -150,6 +151,7 @@ describe('resource baseline API', () => {
         location: { lat: 60 + index / 10, lon: 24 + index / 10 },
         note: `Synthetic timeline visit ${index + 1}`,
         route: `Synthetic route ${index + 1}`,
+        status: 'published',
         tripId: trip.id,
         tripStopOrder: index + 1,
         visitedOn: `2026-08-${String(index + 1).padStart(2, '0')}`

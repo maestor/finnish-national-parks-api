@@ -212,6 +212,7 @@ describe('importParks', () => {
       author: 'Alice',
       note: 'Snowy trail.',
       route: 'North loop',
+      status: 'published',
       visitedOn: '2026-04-10'
     });
 

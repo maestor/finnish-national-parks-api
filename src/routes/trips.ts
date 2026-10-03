@@ -2,6 +2,8 @@ import { createRoute, z } from '@hono/zod-openapi';
 
 import { errorSchema } from '../contracts/common.js';
 import {
+  adminTripDetailSchema,
+  adminTripListResponseSchema,
   completeDirectVisitImageUploadRequestSchema,
   completeDirectVisitImageUploadResponseSchema,
   createTripRequestSchema,
@@ -143,6 +145,27 @@ export const listTripsRoute = createRoute({
   }
 });
 
+export const listAdminTripsRoute = createRoute({
+  method: 'get',
+  path: '/api/admin/trips',
+  tags: ['Trips'],
+  security: [{ bearerAuth: [], sessionAuth: [] }],
+  responses: {
+    200: {
+      description: 'Admin trip list including drafts',
+      content: { 'application/json': { schema: adminTripListResponseSchema } }
+    },
+    401: {
+      description: 'Admin session required',
+      content: { 'application/json': { schema: errorSchema } }
+    },
+    503: {
+      description: 'OAuth not configured',
+      content: { 'application/json': { schema: errorSchema } }
+    }
+  }
+});
+
 export const listTripArchiveRoute = createRoute({
   method: 'get',
   path: '/api/trips/archive',
@@ -165,6 +188,14 @@ export const listTripArchiveRoute = createRoute({
     },
     400: {
       description: 'Invalid archive cursor or query',
+      content: {
+        'application/json': {
+          schema: errorSchema
+        }
+      }
+    },
+    503: {
+      description: 'OAuth not configured',
       content: {
         'application/json': {
           schema: errorSchema
@@ -220,7 +251,7 @@ export const getTripRoute = createRoute({
   method: 'get',
   path: '/api/trips/{id}',
   tags: ['Trips'],
-  security: [{ bearerAuth: [] }],
+  security: [{ bearerAuth: [], sessionAuth: [] }],
   request: {
     params: z.object({
       id: z.coerce.number().int()
@@ -242,6 +273,163 @@ export const getTripRoute = createRoute({
           schema: errorSchema
         }
       }
+    },
+    401: {
+      description: 'Admin session required',
+      content: {
+        'application/json': {
+          schema: errorSchema
+        }
+      }
+    },
+    503: {
+      description: 'OAuth not configured',
+      content: {
+        'application/json': {
+          schema: errorSchema
+        }
+      }
+    }
+  }
+});
+
+export const getAdminTripRoute = createRoute({
+  method: 'get',
+  path: '/api/admin/trips/{id}',
+  tags: ['Trips'],
+  security: [{ bearerAuth: [], sessionAuth: [] }],
+  request: { params: adminTripIdParamsSchema },
+  responses: {
+    200: {
+      description: 'Admin trip detail including drafts and route waypoints',
+      content: { 'application/json': { schema: adminTripDetailSchema } }
+    },
+    401: {
+      description: 'Admin session required',
+      content: { 'application/json': { schema: errorSchema } }
+    },
+    404: {
+      description: 'Trip was not found',
+      content: { 'application/json': { schema: errorSchema } }
+    },
+    503: {
+      description: 'OAuth or storage unavailable',
+      content: { 'application/json': { schema: errorSchema } }
+    }
+  }
+});
+
+export const getAdminTripPreviewRoute = createRoute({
+  method: 'get',
+  path: '/api/admin/trips/{id}/preview',
+  tags: ['Trips'],
+  security: [{ bearerAuth: [], sessionAuth: [] }],
+  request: { params: adminTripIdParamsSchema },
+  responses: {
+    200: {
+      description: 'Private public-shaped trip preview, including draft visits',
+      content: { 'application/json': { schema: publicTripDetailSchema } }
+    },
+    401: {
+      description: 'Admin session required',
+      content: { 'application/json': { schema: errorSchema } }
+    },
+    404: {
+      description: 'Trip was not found',
+      content: { 'application/json': { schema: errorSchema } }
+    },
+    503: {
+      description: 'OAuth or storage unavailable',
+      content: { 'application/json': { schema: errorSchema } }
+    }
+  }
+});
+
+const adminTripPreviewImagesQuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(24).default(12),
+  offset: z.coerce.number().int().min(0).default(0)
+});
+
+export const getAdminTripPreviewRouteRoute = createRoute({
+  method: 'get',
+  path: '/api/admin/trips/{id}/preview/route',
+  tags: ['Trips'],
+  security: [{ bearerAuth: [], sessionAuth: [] }],
+  request: { params: adminTripIdParamsSchema },
+  responses: {
+    200: {
+      description: 'Private preview route calculated without using the public route cache',
+      content: { 'application/json': { schema: publicTripRouteResponseSchema } }
+    },
+    401: {
+      description: 'Admin session required',
+      content: { 'application/json': { schema: errorSchema } }
+    },
+    404: {
+      description: 'Trip was not found',
+      content: { 'application/json': { schema: errorSchema } }
+    },
+    503: {
+      description: 'OAuth not configured',
+      content: { 'application/json': { schema: errorSchema } }
+    }
+  }
+});
+
+export const getAdminTripPreviewVisitImagesRoute = createRoute({
+  method: 'get',
+  path: '/api/admin/trips/{id}/preview/visits/{visitId}/images',
+  tags: ['Trips'],
+  security: [{ bearerAuth: [], sessionAuth: [] }],
+  request: {
+    params: adminTripIdParamsSchema.extend({ visitId: z.coerce.number().int().positive() }),
+    query: adminTripPreviewImagesQuerySchema
+  },
+  responses: {
+    200: {
+      description: 'Private paginated visit gallery for an attached visit',
+      content: { 'application/json': { schema: publicTripVisitImagesResponseSchema } }
+    },
+    401: {
+      description: 'Admin session required',
+      content: { 'application/json': { schema: errorSchema } }
+    },
+    404: {
+      description: 'Trip visit was not found',
+      content: { 'application/json': { schema: errorSchema } }
+    },
+    503: {
+      description: 'OAuth or storage unavailable',
+      content: { 'application/json': { schema: errorSchema } }
+    }
+  }
+});
+
+export const getAdminTripPreviewStopImagesRoute = createRoute({
+  method: 'get',
+  path: '/api/admin/trips/{id}/preview/stops/{stopId}/images',
+  tags: ['Trips'],
+  security: [{ bearerAuth: [], sessionAuth: [] }],
+  request: {
+    params: adminTripIdParamsSchema.extend({ stopId: z.coerce.number().int().positive() }),
+    query: adminTripPreviewImagesQuerySchema
+  },
+  responses: {
+    200: {
+      description: 'Private paginated stop gallery for an attached stop',
+      content: { 'application/json': { schema: publicTripVisitImagesResponseSchema } }
+    },
+    401: {
+      description: 'Admin session required',
+      content: { 'application/json': { schema: errorSchema } }
+    },
+    404: {
+      description: 'Trip stop was not found',
+      content: { 'application/json': { schema: errorSchema } }
+    },
+    503: {
+      description: 'OAuth or storage unavailable',
+      content: { 'application/json': { schema: errorSchema } }
     }
   }
 });

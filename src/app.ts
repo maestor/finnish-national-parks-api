@@ -45,6 +45,9 @@ import {
   findVisitImageById,
   findVisitImageByUploadKey,
   findVisitRecordById,
+  getAdminParkVisitsBySlug,
+  getAdminTripPreviewById,
+  getAdminVisitById,
   getCatalogListEtagSeed,
   getParkBySlug,
   getParkBySlugIncludingRemoved,
@@ -70,8 +73,10 @@ import {
   isAdminInvitationUsable,
   listAdminParkVisibility,
   listAdminUsers,
+  listAdminVisits,
   listParkSearchEntries,
   listPublicParks,
+  listPublicTrips,
   listPublishedDateRangeReviewShares,
   listTripArchive,
   listTripImageCandidates,
@@ -110,7 +115,7 @@ import {
   createPublicSummaryEtag,
   hasMatchingEtag,
   PRIVATE_CACHE_CONTROL,
-  PUBLIC_SUMMARY_CACHE_CONTROL
+  PUBLICATION_SUMMARY_CACHE_CONTROL
 } from './http/cache.js';
 import {
   buildGoogleAuthUrl,
@@ -168,12 +173,15 @@ import {
   createVisitRoute,
   deleteVisitImageRoute,
   deleteVisitRoute,
+  getAdminParkVisitsRoute,
+  getAdminVisitRoute,
   getParkRoute,
   getParkVisitsRoute,
   getPublicHomeSummaryRoute,
   getPublicMapSummaryRoute,
   getVisitRoute,
   listAdminParkVisibilityRoute,
+  listAdminVisitsRoute,
   listParkSearchRoute,
   listParksRoute,
   listVisitsRoute,
@@ -200,12 +208,18 @@ import {
   deleteTripStopImageRoute,
   deleteTripStopRoute,
   getAdminTripFeaturedImageRoute,
+  getAdminTripPreviewRoute,
+  getAdminTripPreviewRouteRoute,
+  getAdminTripPreviewStopImagesRoute,
+  getAdminTripPreviewVisitImagesRoute,
+  getAdminTripRoute,
   getPublicTripRouteRoute,
   getPublicTripStopImagesRoute,
   getPublicTripVisitImagesRoute,
   getTripBySlugRoute,
   getTripRoute,
   listAdminTripImagesRoute,
+  listAdminTripsRoute,
   listTripArchiveRoute,
   listTripsRoute,
   reorderTripStopImagesRoute,
@@ -740,8 +754,12 @@ const normalizeRouteFallbackQueries = (...queries: Array<string | null | undefin
   return normalizedQueries.length > 0 ? normalizedQueries : undefined;
 };
 
-const buildPublicTripRouteWaypoints = async (database: Database, trip: PublicTripDetail) => {
-  const routeInput = await getPublicTripRouteInputByTripId(database, trip.id);
+const buildPublicTripRouteWaypoints = async (
+  database: Database,
+  trip: PublicTripDetail,
+  includeDrafts = false
+) => {
+  const routeInput = await getPublicTripRouteInputByTripId(database, trip.id, includeDrafts);
 
   if (!routeInput?.available || !routeInput.startingPoint) {
     return null;
@@ -1829,6 +1847,21 @@ export const createApp = ({
       );
     });
 
+    app.openapi(getAdminParkVisitsRoute, async (context) => {
+      context.header('Cache-Control', PRIVATE_CACHE_CONTROL);
+      const authFailure = await requireAdminSession(context, auth);
+      if (authFailure) return authFailure;
+
+      const { slug } = context.req.valid('param');
+      const visits = await getAdminParkVisitsBySlug(database, slug, getImagePublicUrl);
+
+      if (!visits) {
+        return context.json(jsonNotFound('Park not found.'), 404);
+      }
+
+      return context.json({ visits }, 200);
+    });
+
     app.openapi(getPublicHomeSummaryRoute, async (context) => {
       const summary = await getPublicHomeSummary(database);
       const etag = createPublicSummaryEtag({
@@ -1836,7 +1869,7 @@ export const createApp = ({
         publicUpdatedAt: summary.updatedAt,
         publicVersion: summary.version
       });
-      context.header('Cache-Control', PUBLIC_SUMMARY_CACHE_CONTROL);
+      context.header('Cache-Control', PUBLICATION_SUMMARY_CACHE_CONTROL);
       context.header('ETag', etag);
 
       if (hasMatchingEtag(context.req.header('if-none-match'), etag)) {
@@ -1862,7 +1895,7 @@ export const createApp = ({
         publicUpdatedAt: summary.updatedAt,
         publicVersion: summary.version
       });
-      context.header('Cache-Control', PUBLIC_SUMMARY_CACHE_CONTROL);
+      context.header('Cache-Control', PUBLICATION_SUMMARY_CACHE_CONTROL);
       context.header('ETag', etag);
 
       if (hasMatchingEtag(context.req.header('if-none-match'), etag)) {
@@ -1889,7 +1922,7 @@ export const createApp = ({
         publicUpdatedAt: version.updatedAt,
         publicVersion: version.version
       });
-      context.header('Cache-Control', PUBLIC_SUMMARY_CACHE_CONTROL);
+      context.header('Cache-Control', PUBLICATION_SUMMARY_CACHE_CONTROL);
       context.header('ETag', etag);
 
       if (hasMatchingEtag(context.req.header('if-none-match'), etag)) {
@@ -1912,7 +1945,7 @@ export const createApp = ({
         publicUpdatedAt: seed.publicUpdatedAt,
         publicVersion: seed.publicVersion
       });
-      context.header('Cache-Control', PUBLIC_SUMMARY_CACHE_CONTROL);
+      context.header('Cache-Control', PUBLICATION_SUMMARY_CACHE_CONTROL);
       context.header('ETag', etag);
 
       if (hasMatchingEtag(context.req.header('if-none-match'), etag)) {
@@ -1922,9 +1955,16 @@ export const createApp = ({
         });
       }
 
-      const trips = await listTrips(database);
+      const trips = await listPublicTrips(database);
 
       return context.json({ trips }, 200);
+    });
+
+    app.openapi(listAdminTripsRoute, async (context) => {
+      context.header('Cache-Control', PRIVATE_CACHE_CONTROL);
+      const authFailure = await requireAdminSession(context, auth);
+      if (authFailure) return authFailure;
+      return context.json({ trips: await listTrips(database) }, 200);
     });
 
     app.openapi(listTripArchiveRoute, async (context) => {
@@ -2554,6 +2594,8 @@ export const createApp = ({
 
     app.openapi(getTripRoute, async (context) => {
       context.header('Cache-Control', PRIVATE_CACHE_CONTROL);
+      const authFailure = await requireAdminSession(context, auth);
+      if (authFailure) return authFailure;
 
       const { id } = context.req.valid('param');
       const trip = await getTripById(database, id, getImagePublicUrl);
@@ -2563,6 +2605,76 @@ export const createApp = ({
       }
 
       return context.json(trip, 200);
+    });
+
+    app.openapi(getAdminTripRoute, async (context) => {
+      context.header('Cache-Control', PRIVATE_CACHE_CONTROL);
+      const authFailure = await requireAdminSession(context, auth);
+      if (authFailure) return authFailure;
+      const { id } = context.req.valid('param');
+      const trip = await getTripById(database, id, getImagePublicUrl);
+      if (!trip) return context.json(jsonNotFound('Trip not found.'), 404);
+      return context.json(trip, 200);
+    });
+
+    app.openapi(getAdminTripPreviewRoute, async (context) => {
+      context.header('Cache-Control', PRIVATE_CACHE_CONTROL);
+      const authFailure = await requireAdminSession(context, auth);
+      if (authFailure) return authFailure;
+      const { id } = context.req.valid('param');
+      const trip = await getAdminTripPreviewById(database, id, getImagePublicUrl);
+      if (!trip) return context.json(jsonNotFound('Trip not found.'), 404);
+      return context.json(trip, 200);
+    });
+
+    app.openapi(getAdminTripPreviewRouteRoute, async (context) => {
+      context.header('Cache-Control', PRIVATE_CACHE_CONTROL);
+      const authFailure = await requireAdminSession(context, auth);
+      if (authFailure) return authFailure;
+      const { id } = context.req.valid('param');
+      const trip = await getAdminTripPreviewById(database, id, getImagePublicUrl);
+      if (!trip) return context.json(jsonNotFound('Trip not found.'), 404);
+      const routeWaypoints = await buildPublicTripRouteWaypoints(database, trip, true);
+      const route = await buildPublicTripRouteState(database, trip, tripPlanner, routeWaypoints);
+      return context.json(route, 200);
+    });
+
+    app.openapi(getAdminTripPreviewVisitImagesRoute, async (context) => {
+      context.header('Cache-Control', PRIVATE_CACHE_CONTROL);
+      const authFailure = await requireAdminSession(context, auth);
+      if (authFailure) return authFailure;
+      const { id, visitId } = context.req.valid('param');
+      const { limit, offset } = context.req.valid('query');
+      const images = await getPublicTripVisitImagesBySlug(
+        database,
+        '',
+        visitId,
+        limit,
+        offset,
+        getImagePublicUrl,
+        { tripId: id, includeDrafts: true }
+      );
+      if (!images) return context.json(jsonNotFound('Trip visit not found.'), 404);
+      return context.json(images, 200);
+    });
+
+    app.openapi(getAdminTripPreviewStopImagesRoute, async (context) => {
+      context.header('Cache-Control', PRIVATE_CACHE_CONTROL);
+      const authFailure = await requireAdminSession(context, auth);
+      if (authFailure) return authFailure;
+      const { id, stopId } = context.req.valid('param');
+      const { limit, offset } = context.req.valid('query');
+      const images = await getPublicTripStopImagesBySlug(
+        database,
+        '',
+        stopId,
+        limit,
+        offset,
+        getImagePublicUrl,
+        { tripId: id, includeDrafts: true }
+      );
+      if (!images) return context.json(jsonNotFound('Trip stop not found.'), 404);
+      return context.json(images, 200);
     });
 
     app.openapi(suggestTripPlannerRoute, async (context) => {
@@ -2702,6 +2814,26 @@ export const createApp = ({
         return context.json(jsonNotFound('Visit not found.'), 404);
       }
 
+      return context.json(visit, 200);
+    });
+
+    app.openapi(listAdminVisitsRoute, async (context) => {
+      context.header('Cache-Control', PRIVATE_CACHE_CONTROL);
+      const authFailure = await requireAdminSession(context, auth);
+      if (authFailure) return authFailure;
+
+      const visits = await listAdminVisits(database, getImagePublicUrl);
+      return context.json({ visits }, 200);
+    });
+
+    app.openapi(getAdminVisitRoute, async (context) => {
+      context.header('Cache-Control', PRIVATE_CACHE_CONTROL);
+      const authFailure = await requireAdminSession(context, auth);
+      if (authFailure) return authFailure;
+
+      const { id } = context.req.valid('param');
+      const visit = await getAdminVisitById(database, id, getImagePublicUrl);
+      if (!visit) return context.json(jsonNotFound('Visit not found.'), 404);
       return context.json(visit, 200);
     });
 

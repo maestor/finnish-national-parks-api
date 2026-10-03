@@ -148,6 +148,7 @@ describe('API routes', () => {
       } | null;
       note?: string;
       route?: string;
+      status?: 'draft' | 'published';
       tripId?: number | null;
       tripStopOrder?: number;
       visitedOn: string;
@@ -155,7 +156,7 @@ describe('API routes', () => {
   ) => {
     const response = await requestAsAdmin(app, `/api/parks/${slug}/visits`, {
       method: 'POST',
-      body: JSON.stringify(body),
+      body: JSON.stringify({ status: 'published', ...body }),
       headers: {
         'content-type': 'application/json'
       }
@@ -172,6 +173,7 @@ describe('API routes', () => {
     body: {
       description?: string | null;
       name: string;
+      status?: 'draft' | 'published';
       slug?: string;
       startingPoint?: {
         coordinate: {
@@ -184,7 +186,7 @@ describe('API routes', () => {
   ) => {
     const response = await requestAsAdmin(app, '/api/trips', {
       method: 'POST',
-      body: JSON.stringify(body),
+      body: JSON.stringify({ status: 'published', ...body }),
       headers: {
         'content-type': 'application/json'
       }
@@ -254,6 +256,414 @@ describe('API routes', () => {
       response
     };
   };
+
+  it('creates visits and trips privately by default and only publishes explicit public records', async () => {
+    const app = createAuthedApp();
+    const visitResponse = await requestAsAdmin(
+      app,
+      '/api/parks/akasmannyn-kansallispuisto/visits',
+      {
+        method: 'POST',
+        body: JSON.stringify({ visitedOn: '2026-08-01' }),
+        headers: { 'content-type': 'application/json' }
+      }
+    );
+    const visit = (await visitResponse.json()) as { id: number };
+    const visitRow = await testDatabase.client.execute({
+      sql: 'SELECT status FROM park_visits WHERE id = ?',
+      args: [visit.id]
+    });
+    const publicVisits = await app.request('/api/visits');
+    const publicVisitList = (await publicVisits.json()) as { visits: Array<{ id: number }> };
+    const publicVisitDetail = await app.request(`/api/visits/${visit.id}`);
+    const publicParkVisitResponse = await app.request(
+      '/api/parks/akasmannyn-kansallispuisto/visits'
+    );
+    const publicParkVisits = (await publicParkVisitResponse.json()) as {
+      visitedSummary: { visitCount: number };
+      visits: Array<{ id: number }>;
+    };
+    const tripResponse = await requestAsAdmin(app, '/api/trips', {
+      method: 'POST',
+      body: JSON.stringify({ name: 'Yksityinen retki' }),
+      headers: { 'content-type': 'application/json' }
+    });
+    const trip = (await tripResponse.json()) as { id: number; slug: string; status: string };
+    const tripRow = await testDatabase.client.execute({
+      sql: 'SELECT status FROM trips WHERE id = ?',
+      args: [trip.id]
+    });
+    const publicTrips = await app.request('/api/trips');
+    const publicTripList = (await publicTrips.json()) as { trips: Array<{ id: number }> };
+    const adminVisitResponse = await requestAsAdmin(app, `/api/admin/visits/${visit.id}`);
+    const adminVisit = (await adminVisitResponse.json()) as { status: string };
+    const adminTripResponse = await requestAsAdmin(app, `/api/admin/trips/${trip.id}`);
+    const adminTrip = (await adminTripResponse.json()) as { status: string };
+    const publicTripDetail = await app.request(`/api/trips/slug/${trip.slug}`);
+
+    expect(visitResponse.status).toBe(201);
+    expect(visitRow.rows[0]?.status).toBe('draft');
+    expect(publicVisitList.visits.some((entry) => entry.id === visit.id)).toBe(false);
+    expect(publicVisitDetail.status).toBe(404);
+    expect(publicParkVisits.visits.some((entry) => entry.id === visit.id)).toBe(false);
+    expect(publicParkVisits.visitedSummary.visitCount).toBe(0);
+    expect(tripResponse.status).toBe(201);
+    expect(tripRow.rows[0]?.status).toBe('draft');
+    expect(publicTripList.trips.some((entry) => entry.id === trip.id)).toBe(false);
+    expect(adminVisitResponse.status).toBe(200);
+    expect(adminVisitResponse.headers.get('cache-control')).toBe('private, no-store');
+    expect(adminVisit.status).toBe('draft');
+    expect(adminTripResponse.status).toBe(200);
+    expect(adminTripResponse.headers.get('cache-control')).toBe('private, no-store');
+    expect(adminTrip.status).toBe('draft');
+    expect(publicTripDetail.status).toBe(404);
+
+    const unchangedStatusResponse = await requestAsAdmin(app, `/api/visits/${visit.id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ note: 'Saved while private.' }),
+      headers: { 'content-type': 'application/json' }
+    });
+    const publishedVisitResponse = await requestAsAdmin(app, `/api/visits/${visit.id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status: 'published' }),
+      headers: { 'content-type': 'application/json' }
+    });
+    const visibleVisitsResponse = await app.request('/api/visits');
+    const visibleVisits = (await visibleVisitsResponse.json()) as { visits: Array<{ id: number }> };
+
+    expect(unchangedStatusResponse.status).toBe(200);
+    expect(publishedVisitResponse.status).toBe(200);
+    expect(visibleVisits.visits.some((entry) => entry.id === visit.id)).toBe(true);
+  });
+
+  it('keeps visit publication independent from the parent trip status', async () => {
+    const app = createAuthedApp();
+    const trip = await createTrip(app, { name: 'Valmisteilla oleva retki', status: 'draft' });
+    const visitResponse = await requestAsAdmin(
+      app,
+      '/api/parks/akasmannyn-kansallispuisto/visits',
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          status: 'published',
+          tripId: trip.body.id,
+          visitedOn: '2026-08-02'
+        }),
+        headers: { 'content-type': 'application/json' }
+      }
+    );
+    const visit = (await visitResponse.json()) as { id: number };
+    const draftVisitResponse = await requestAsAdmin(app, `/api/visits/${visit.id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status: 'draft' }),
+      headers: { 'content-type': 'application/json' }
+    });
+    expect(draftVisitResponse.status).toBe(200);
+    const publishedTripResponse = await requestAsAdmin(app, `/api/trips/${trip.body.id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status: 'published' }),
+      headers: { 'content-type': 'application/json' }
+    });
+    expect(publishedTripResponse.status).toBe(200);
+    const publicTripResponse = await app.request(`/api/trips/slug/${trip.body.slug}`);
+    const publicTripBody = (await publicTripResponse.json()) as {
+      itinerary: Array<{ kind: 'visit'; visit: { id: number } }>;
+    };
+    expect(publicTripResponse.status).toBe(200);
+    expect(
+      publicTripBody.itinerary.some(
+        (entry) => entry.kind === 'visit' && entry.visit.id === visit.id
+      )
+    ).toBe(false);
+    const withdrawnTripResponse = await requestAsAdmin(app, `/api/trips/${trip.body.id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status: 'draft' }),
+      headers: { 'content-type': 'application/json' }
+    });
+    expect(withdrawnTripResponse.status).toBe(200);
+
+    const readyVisitResponse = await requestAsAdmin(app, `/api/visits/${visit.id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status: 'published' }),
+      headers: { 'content-type': 'application/json' }
+    });
+    expect(readyVisitResponse.status).toBe(200);
+    const stillVisible = (await (await app.request('/api/visits')).json()) as {
+      visits: Array<{ id: number; trip: { id: number } | null; tripStopOrder: number | null }>;
+    };
+    const visibleVisit = stillVisible.visits.find((entry) => entry.id === visit.id);
+    const visibleVisitDetail = await app.request(`/api/visits/${visit.id}`);
+    const visibleVisitDetailBody = (await visibleVisitDetail.json()) as {
+      trip: { id: number } | null;
+      tripStopOrder: number | null;
+    };
+    const visibleParkHistory = await app.request('/api/parks/akasmannyn-kansallispuisto/visits');
+    const visibleParkHistoryBody = (await visibleParkHistory.json()) as {
+      visitedSummary: { visitCount: number };
+      visits: Array<{ id: number; trip: { id: number } | null; tripStopOrder: number | null }>;
+    };
+    const visibleTimeline = await app.request('/api/visits-timeline');
+    const visibleTimelineBody = (await visibleTimeline.json()) as {
+      visits: Array<{ id: number; trip: { id: number } | null; tripStopOrder: number | null }>;
+    };
+    expect(visibleVisit).toMatchObject({ id: visit.id, trip: null, tripStopOrder: null });
+    expect(visibleVisitDetail.status).toBe(200);
+    expect(visibleVisitDetailBody).toMatchObject({ trip: null, tripStopOrder: null });
+    expect(visibleParkHistoryBody.visits).toContainEqual(
+      expect.objectContaining({ id: visit.id, trip: null, tripStopOrder: null })
+    );
+    expect(visibleParkHistoryBody.visitedSummary.visitCount).toBeGreaterThan(0);
+    expect(visibleTimelineBody.visits).toContainEqual(
+      expect.objectContaining({ id: visit.id, trip: null, tripStopOrder: null })
+    );
+
+    const republishedTripResponse = await requestAsAdmin(app, `/api/trips/${trip.body.id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status: 'published' }),
+      headers: { 'content-type': 'application/json' }
+    });
+    expect(republishedTripResponse.status).toBe(200);
+
+    const released = (await (await app.request('/api/visits')).json()) as {
+      visits: Array<{ id: number; trip: { id: number } | null }>;
+    };
+    expect(released.visits.find((entry) => entry.id === visit.id)).toMatchObject({
+      id: visit.id,
+      trip: { id: trip.body.id }
+    });
+    const tripWithPublishedVisit = (await (
+      await app.request(`/api/trips/slug/${trip.body.slug}`)
+    ).json()) as {
+      itinerary: Array<{ kind: 'visit'; visit: { id: number } }>;
+    };
+    expect(tripWithPublishedVisit.itinerary).toContainEqual(
+      expect.objectContaining({ kind: 'visit', visit: expect.objectContaining({ id: visit.id }) })
+    );
+    await requestAsAdmin(app, `/api/trips/${trip.body.id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status: 'draft' }),
+      headers: { 'content-type': 'application/json' }
+    });
+    const deleteDraftTripResponse = await requestAsAdmin(app, `/api/trips/${trip.body.id}`, {
+      method: 'DELETE'
+    });
+    const visitAfterDraftTripDeleteResponse = await app.request(`/api/visits/${visit.id}`);
+    const visitAfterDraftTripDelete = (await visitAfterDraftTripDeleteResponse.json()) as {
+      status: string;
+      trip: { id: number } | null;
+    };
+    expect(deleteDraftTripResponse.status).toBe(204);
+    expect(visitAfterDraftTripDeleteResponse.status).toBe(200);
+    expect(visitAfterDraftTripDelete).toMatchObject({ status: 'published', trip: null });
+  });
+
+  it('exposes draft visits to admins on a park and prevents adding them to trips', async () => {
+    const app = createAuthedApp();
+    const trip = await createTrip(app, { name: 'Julkaistu retki' });
+    const { body: draftVisit } = await createVisit(app, 'akasmannyn-kansallispuisto', {
+      status: 'draft',
+      visitedOn: '2026-08-03'
+    });
+
+    const addDraftVisitResponse = await requestAsAdmin(app, `/api/visits/${draftVisit.id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ tripId: trip.body.id }),
+      headers: { 'content-type': 'application/json' }
+    });
+    const createDraftInTripResponse = await requestAsAdmin(
+      app,
+      '/api/parks/akasmannyn-kansallispuisto/visits',
+      {
+        method: 'POST',
+        body: JSON.stringify({ status: 'draft', tripId: trip.body.id, visitedOn: '2026-08-04' }),
+        headers: { 'content-type': 'application/json' }
+      }
+    );
+    const createOmittedStatusInTripResponse = await requestAsAdmin(
+      app,
+      '/api/parks/akasmannyn-kansallispuisto/visits',
+      {
+        method: 'POST',
+        body: JSON.stringify({ tripId: trip.body.id, visitedOn: '2026-08-06' }),
+        headers: { 'content-type': 'application/json' }
+      }
+    );
+    const publicVisitsResponse = await app.request('/api/parks/akasmannyn-kansallispuisto/visits');
+    const adminParkVisitsResponse = await requestAsAdmin(
+      app,
+      '/api/admin/parks/akasmannyn-kansallispuisto/visits'
+    );
+    const publicVisits = (await publicVisitsResponse.json()) as {
+      visits: Array<{ id: number }>;
+    };
+    const adminParkVisits = (await adminParkVisitsResponse.json()) as {
+      visits: Array<{ id: number; status: 'draft' | 'published' }>;
+    };
+
+    expect(addDraftVisitResponse.status).toBe(422);
+    expect(createDraftInTripResponse.status).toBe(422);
+    expect(createOmittedStatusInTripResponse.status).toBe(422);
+    expect(publicVisits.visits.some((visit) => visit.id === draftVisit.id)).toBe(false);
+    expect(adminParkVisitsResponse.status).toBe(200);
+    expect(adminParkVisits.visits).toContainEqual(
+      expect.objectContaining({ id: draftVisit.id, status: 'draft' })
+    );
+
+    const unauthenticatedAdminResponse = await app.request(
+      '/api/admin/parks/akasmannyn-kansallispuisto/visits'
+    );
+    expect(unauthenticatedAdminResponse.status).toBe(401);
+  });
+
+  it('serves private trip previews and admin visit listings with draft content', async () => {
+    const app = createAuthedApp();
+    const trip = await createTrip(app, { name: 'Esikatseltava retki', status: 'draft' });
+    const visit = await createVisit(app, 'akasmannyn-kansallispuisto', {
+      status: 'published',
+      tripId: trip.body.id,
+      visitedOn: '2026-08-05'
+    });
+    await requestAsAdmin(app, `/api/visits/${visit.body.id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status: 'draft' }),
+      headers: { 'content-type': 'application/json' }
+    });
+    const stop = await createTripStop(app, trip.body.id, {
+      location: {
+        coordinate: { lat: 61.5, lon: 23.7 },
+        label: 'Esikatselun pysähdys'
+      },
+      visitedOn: '2026-08-05'
+    });
+    const stopWithoutImages = await createTripStop(app, trip.body.id, {
+      location: {
+        coordinate: { lat: 61.6, lon: 23.8 },
+        label: 'Pysähdys ilman kuvia'
+      },
+      visitedOn: '2026-08-05'
+    });
+    await createTripStopImage(testDatabase.database, {
+      createdAt: '2026-08-05T10:00:00.000Z',
+      displayOrder: 0,
+      fullKey: `trip-stops/${stop.body.id}/preview/full.jpg`,
+      mimeType: 'image/jpeg',
+      originalName: 'preview.jpg',
+      thumbKey: `trip-stops/${stop.body.id}/preview/thumb.jpg`,
+      tripStopId: stop.body.id,
+      updatedAt: '2026-08-05T10:00:00.000Z'
+    });
+
+    const previewResponse = await requestAsAdmin(app, `/api/admin/trips/${trip.body.id}/preview`);
+    const preview = (await previewResponse.json()) as {
+      itinerary: Array<{
+        kind: string;
+        stop?: { id: number };
+        visit?: { id: number; status: string };
+      }>;
+      status: string;
+    };
+    const routePreviewResponse = await requestAsAdmin(
+      app,
+      `/api/admin/trips/${trip.body.id}/preview/route`
+    );
+    const visitImagesResponse = await requestAsAdmin(
+      app,
+      `/api/admin/trips/${trip.body.id}/preview/visits/${visit.body.id}/images?limit=12&offset=0`
+    );
+    const stopImagesResponse = await requestAsAdmin(
+      app,
+      `/api/admin/trips/${trip.body.id}/preview/stops/${stop.body.id}/images?limit=12&offset=0`
+    );
+    const adminTripResponse = await requestAsAdmin(app, `/api/admin/trips/${trip.body.id}`);
+    const adminVisitResponse = await requestAsAdmin(app, `/api/admin/visits/${visit.body.id}`);
+    const adminVisitsResponse = await requestAsAdmin(app, '/api/admin/visits');
+    const adminTripsResponse = await requestAsAdmin(app, '/api/admin/trips');
+    const missingAdminVisitResponse = await requestAsAdmin(app, '/api/admin/visits/99999');
+    const adminVisits = (await adminVisitsResponse.json()) as {
+      visits: Array<{ id: number; status: 'draft' | 'published' }>;
+    };
+    const missingParkResponse = await requestAsAdmin(app, '/api/admin/parks/missing/visits');
+    const missingTripResponse = await requestAsAdmin(app, '/api/admin/trips/99999/preview');
+    const missingVisitImagesResponse = await requestAsAdmin(
+      app,
+      `/api/admin/trips/${trip.body.id}/preview/visits/99999/images`
+    );
+    const missingStopImagesResponse = await requestAsAdmin(
+      app,
+      `/api/admin/trips/${trip.body.id}/preview/stops/99999/images`
+    );
+    const unauthenticatedAdminVisitsResponse = await app.request('/api/admin/visits');
+    const unauthenticatedAdminTripsResponse = await app.request('/api/admin/trips');
+    const unauthenticatedTripDetailResponse = await app.request(`/api/trips/${trip.body.id}`);
+    const unauthenticatedAdminTripResponse = await app.request(`/api/admin/trips/${trip.body.id}`);
+    const unauthenticatedTripPreviewResponse = await app.request(
+      `/api/admin/trips/${trip.body.id}/preview`
+    );
+    const unauthenticatedRoutePreviewResponse = await app.request(
+      `/api/admin/trips/${trip.body.id}/preview/route`
+    );
+    const unauthenticatedVisitImagesResponse = await app.request(
+      `/api/admin/trips/${trip.body.id}/preview/visits/${visit.body.id}/images`
+    );
+    const unauthenticatedStopImagesResponse = await app.request(
+      `/api/admin/trips/${trip.body.id}/preview/stops/${stop.body.id}/images`
+    );
+    const unauthenticatedAdminVisitResponse = await app.request(
+      `/api/admin/visits/${visit.body.id}`
+    );
+    const missingAdminTripResponse = await requestAsAdmin(app, '/api/admin/trips/99999');
+    const missingTripDetailResponse = await requestAsAdmin(app, '/api/trips/99999');
+    const missingRoutePreviewResponse = await requestAsAdmin(
+      app,
+      '/api/admin/trips/99999/preview/route'
+    );
+    const missingAdminVisitDetailResponse = await requestAsAdmin(app, '/api/admin/visits/99999');
+
+    expect(previewResponse.status).toBe(200);
+    expect(previewResponse.headers.get('cache-control')).toBe('private, no-store');
+    expect(preview.status).toBe('draft');
+    expect(preview.itinerary).toContainEqual(
+      expect.objectContaining({
+        kind: 'visit',
+        visit: expect.objectContaining({ id: visit.body.id })
+      })
+    );
+    expect(preview.itinerary).toContainEqual(expect.objectContaining({ kind: 'stop' }));
+    expect(preview.itinerary).toContainEqual(
+      expect.objectContaining({
+        kind: 'stop',
+        stop: expect.objectContaining({ id: stopWithoutImages.body.id })
+      })
+    );
+    expect(routePreviewResponse.status).toBe(200);
+    expect(visitImagesResponse.status).toBe(200);
+    expect(stopImagesResponse.status).toBe(200);
+    expect(adminTripResponse.status).toBe(200);
+    expect(adminVisitResponse.status).toBe(200);
+    expect(adminVisitsResponse.status).toBe(200);
+    expect(missingAdminVisitResponse.status).toBe(404);
+    expect(adminTripsResponse.status).toBe(200);
+    expect(adminVisits.visits).toContainEqual(
+      expect.objectContaining({ id: visit.body.id, status: 'draft' })
+    );
+    expect(missingParkResponse.status).toBe(404);
+    expect(missingTripResponse.status).toBe(404);
+    expect(missingVisitImagesResponse.status).toBe(404);
+    expect(missingStopImagesResponse.status).toBe(404);
+    expect(missingAdminTripResponse.status).toBe(404);
+    expect(missingTripDetailResponse.status).toBe(404);
+    expect(missingRoutePreviewResponse.status).toBe(404);
+    expect(missingAdminVisitDetailResponse.status).toBe(404);
+    expect(unauthenticatedAdminVisitsResponse.status).toBe(401);
+    expect(unauthenticatedAdminTripsResponse.status).toBe(401);
+    expect(unauthenticatedTripDetailResponse.status).toBe(401);
+    expect(unauthenticatedAdminTripResponse.status).toBe(401);
+    expect(unauthenticatedTripPreviewResponse.status).toBe(401);
+    expect(unauthenticatedRoutePreviewResponse.status).toBe(401);
+    expect(unauthenticatedVisitImagesResponse.status).toBe(401);
+    expect(unauthenticatedStopImagesResponse.status).toBe(401);
+    expect(unauthenticatedAdminVisitResponse.status).toBe(401);
+  });
 
   it('serves the public park list without boundary geometry and with cache validators', async () => {
     const app = createAuthedApp();
@@ -1364,7 +1774,7 @@ describe('API routes', () => {
     };
 
     expect(response.status).toBe(200);
-    expect(response.headers.get('cache-control')).toBe('public, max-age=0, s-maxage=600');
+    expect(response.headers.get('cache-control')).toBe('private, no-store');
     expect(response.headers.get('etag')).toBeTruthy();
     expect(body.totalVisits).toBe(3);
     expect(body.uniqueVisitedParks).toBe(2);
@@ -1687,7 +2097,7 @@ describe('API routes', () => {
     const akasmanty = body.parks.find((park) => park.slug === 'akasmannyn-kansallispuisto');
 
     expect(response.status).toBe(200);
-    expect(response.headers.get('cache-control')).toBe('public, max-age=0, s-maxage=600');
+    expect(response.headers.get('cache-control')).toBe('private, no-store');
     expect(response.headers.get('etag')).toBeTruthy();
     expect(body.parks).toHaveLength(4);
     expect(body.version).toBeGreaterThan(0);
@@ -1855,7 +2265,7 @@ describe('API routes', () => {
     };
 
     expect(response.status).toBe(200);
-    expect(response.headers.get('cache-control')).toBe('public, max-age=0, s-maxage=600');
+    expect(response.headers.get('cache-control')).toBe('private, no-store');
     expect(response.headers.get('etag')).toBeTruthy();
     expect(body.visits.map((visit) => visit.id)).toEqual([
       secondVisit.id,
@@ -2076,7 +2486,7 @@ describe('API routes', () => {
     };
 
     expect(tripsResponse.status).toBe(200);
-    expect(tripsResponse.headers.get('cache-control')).toBe('public, max-age=0, s-maxage=600');
+    expect(tripsResponse.headers.get('cache-control')).toBe('private, no-store');
     expect(tripsResponse.headers.get('etag')).toBeTruthy();
     const cachedTripsResponse = await app.request('/api/trips', {
       headers: {
@@ -2588,7 +2998,7 @@ describe('API routes', () => {
     expect(stop.tripStopOrder).toBe(2);
     expect(stop.visitedOn).toBe('2026-06-07');
 
-    const tripDetailResponse = await app.request(`/api/trips/${trip.id}`);
+    const tripDetailResponse = await requestAsAdmin(app, `/api/trips/${trip.id}`);
     const tripDetailBody = (await tripDetailResponse.json()) as {
       itinerary: Array<
         | {
@@ -2678,7 +3088,7 @@ describe('API routes', () => {
     const deleteStopResponse = await requestAsAdmin(app, `/api/trip-stops/${stop.id}`, {
       method: 'DELETE'
     });
-    const clearedTripDetailResponse = await app.request(`/api/trips/${trip.id}`);
+    const clearedTripDetailResponse = await requestAsAdmin(app, `/api/trips/${trip.id}`);
     const clearedTripDetailBody = (await clearedTripDetailResponse.json()) as {
       itinerary: Array<{
         kind: 'visit' | 'stop';
@@ -2776,7 +3186,7 @@ describe('API routes', () => {
       tripStopOrder: 2
     });
 
-    const adminDetailResponse = await app.request(`/api/trips/${trip.id}`);
+    const adminDetailResponse = await requestAsAdmin(app, `/api/trips/${trip.id}`);
     const adminDetailBody = (await adminDetailResponse.json()) as {
       itinerary: Array<{
         kind: 'route-waypoint' | 'visit';
@@ -2821,6 +3231,65 @@ describe('API routes', () => {
       expect.objectContaining({ coordinate: { lat: 60.1699, lon: 24.9384 } })
     ]);
     expect(JSON.stringify(publicRouteBody)).not.toContain('Tampereen reittivalinta');
+
+    const previewRouteResponse = await requestAsAdmin(
+      app,
+      `/api/admin/trips/${trip.id}/preview/route`
+    );
+    const previewRouteBody = (await previewRouteResponse.json()) as {
+      data: TripPlannerRoundTripRoute | null;
+      success: boolean;
+    };
+
+    expect(previewRouteResponse.status).toBe(200);
+    expect(previewRouteBody).toMatchObject({ success: true });
+    expect(previewRouteBody.data?.geometry.coordinates.length).toBeGreaterThan(0);
+    expect(buildRoundTripRoute).toHaveBeenCalledTimes(1);
+
+    const { body: draftVisit } = await createVisit(app, 'akasmannyn-kansallispuisto', {
+      location: { lat: 61.25, lon: 24.15 },
+      tripId: trip.id,
+      tripStopOrder: 4,
+      visitedOn: '2026-06-09'
+    });
+    const draftVisitStatusResponse = await requestAsAdmin(app, `/api/visits/${draftVisit.id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status: 'draft' }),
+      headers: { 'content-type': 'application/json' }
+    });
+    const publicRouteAfterDraftVisitResponse = await app.request(
+      '/api/trips/slug/reittivalinta-reissu/route'
+    );
+    const publicRouteAfterDraftVisitBody = (await publicRouteAfterDraftVisitResponse.json()) as {
+      data: TripPlannerRoundTripRoute | null;
+    };
+
+    expect(draftVisitStatusResponse.status).toBe(200);
+    expect(publicRouteAfterDraftVisitBody.data?.geometry.coordinates).toHaveLength(5);
+    expect(buildRoundTripRoute).toHaveBeenCalledTimes(2);
+
+    const draftPreviewRouteResponse = await requestAsAdmin(
+      app,
+      `/api/admin/trips/${trip.id}/preview/route`
+    );
+    const draftPreviewRouteBody = (await draftPreviewRouteResponse.json()) as {
+      data: TripPlannerRoundTripRoute | null;
+    };
+
+    expect(draftPreviewRouteResponse.status).toBe(200);
+    expect(draftPreviewRouteBody.data?.geometry.coordinates).toHaveLength(6);
+    expect(buildRoundTripRoute).toHaveBeenCalledTimes(3);
+
+    const publicRouteAfterDraftPreviewResponse = await app.request(
+      '/api/trips/slug/reittivalinta-reissu/route'
+    );
+    const publicRouteAfterDraftPreviewBody =
+      (await publicRouteAfterDraftPreviewResponse.json()) as {
+        data: TripPlannerRoundTripRoute | null;
+      };
+
+    expect(publicRouteAfterDraftPreviewBody.data?.geometry.coordinates).toHaveLength(5);
+    expect(buildRoundTripRoute).toHaveBeenCalledTimes(3);
 
     const unchangedWaypointResponse = await requestAsAdmin(
       app,
@@ -2885,15 +3354,20 @@ describe('API routes', () => {
       `/api/trip-route-waypoints/${createdWaypoint.id}`,
       { method: 'DELETE' }
     );
-    const afterDeleteAdminDetailResponse = await app.request(`/api/trips/${trip.id}`);
+    const afterDeleteAdminDetailResponse = await requestAsAdmin(app, `/api/trips/${trip.id}`);
     const afterDeleteAdminDetailBody = (await afterDeleteAdminDetailResponse.json()) as {
-      itinerary: Array<{ kind: 'visit'; tripStopOrder: number }>;
+      itinerary: Array<{ kind: 'visit'; tripStopOrder: number; visit: { id: number } }>;
     };
 
     expect(deleteWaypointResponse.status).toBe(204);
     expect(afterDeleteAdminDetailBody.itinerary).toEqual([
       expect.objectContaining({ kind: 'visit', tripStopOrder: 1 }),
-      expect.objectContaining({ kind: 'visit', tripStopOrder: 2 })
+      expect.objectContaining({ kind: 'visit', tripStopOrder: 2 }),
+      expect.objectContaining({
+        kind: 'visit',
+        tripStopOrder: 3,
+        visit: expect.objectContaining({ id: draftVisit.id })
+      })
     ]);
   });
 
@@ -4449,7 +4923,7 @@ describe('API routes', () => {
 
   it('handles trip stop not-found and unexpected failure paths', async () => {
     const app = createAuthedApp();
-    const missingTripDetailResponse = await app.request('/api/trips/99999');
+    const missingTripDetailResponse = await requestAsAdmin(app, '/api/trips/99999');
     const missingTripDetailBody = (await missingTripDetailResponse.json()) as { error: string };
     const missingTripStopCreateResponse = await requestAsAdmin(app, '/api/trips/99999/stops', {
       method: 'POST',
@@ -4931,6 +5405,7 @@ describe('API routes', () => {
           author: 'Hiker One',
           note: 'Windy but sunny.',
           route: 'North trail',
+          status: 'published',
           visitedOn: '2026-04-20'
         }),
         headers: {

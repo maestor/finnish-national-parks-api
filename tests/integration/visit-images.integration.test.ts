@@ -93,7 +93,7 @@ describe('Visit image routes', () => {
   const createVisit = async () => {
     const app = createAuthedApp({ storage });
     const response = await requestAsAdmin(app, '/api/parks/akasmannyn-kansallispuisto/visits', {
-      body: JSON.stringify({ visitedOn: '2026-04-20' }),
+      body: JSON.stringify({ status: 'published', visitedOn: '2026-04-20' }),
       headers: { 'content-type': 'application/json' },
       method: 'POST'
     });

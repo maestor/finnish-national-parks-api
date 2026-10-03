@@ -87,6 +87,7 @@ If an upload limit exists, at least one test should cover the real stored-object
 - `GET /api/trips` returns named trips with derived `dateRange`, `visitCount`, persisted `slug`, and optional `startingPoint`.
 - `GET /api/trips/archive` covers default/max page limits, keyset continuation and ordering, invalid cursors, private cache headers, normalized bounded excerpts, and nullable covers for hidden or detached selected sources.
 - `GET /api/trips/slug/:slug` returns one page-ready trip detail payload by public slug, including derived `imageCount` / `stopCount`, itinerary visit park `markerPoint` / `typeLabel` / per-visit `imageCount`, trip-stop image counts, and `route.available`. It omits private route-waypoint records and never invokes the planner. `GET /api/trips/slug/:slug/route` calculates or reads the separately cached route; visit itinerary entries include optional visit `location`, private route waypoints are passed to the planner in shared order, and hidden-waypoint failures redact failed-leg details. Missing route prerequisites return a successful empty route state, while actual routing failures stay inside the route error state.
+- Admin trip preview route reads reuse a matching public coordinate fingerprint, keep draft-inclusive route fingerprints in separate cache rows, and do not replace the cached public geometry.
 - `GET /api/trips/:id` returns one trip with a merged visit/stop/route-waypoint itinerary in shared `tripStopOrder`; route-waypoint CRUD is covered for creation, location/order edits, deletion, order-gap closure, public omission, and admin authorization.
 - `GET /api/visits-timeline` returns the lightweight `/kaynnit` timeline dataset with `imageCount`, `trip: { id, name, slug } | null`, `tripStopOrder: number | null`, and pre-resolved park `typeLabel` values.
 - Date-range-review preview, publish, and unpublish stay admin-session protected, while published-share reads require the API key for non-localhost callers and remain suitable for server-rendered frontend share pages.
@@ -97,15 +98,16 @@ If an upload limit exists, at least one test should cover the real stored-object
 - `POST /api/trip-planner/search` resolves exact known park and trail names from the local catalog before provider geocoding, filters parks against the real routed path, excludes parks outside the corridor, preserves the documented unvisited-first ordering, suppresses overly broad matches from the first 30 km of long trips, and returns map-ready route geometry plus route and park bounding boxes.
 - `GET /api/parks/:slug/visits` returns park-scoped visit history and visited summary.
 - `GET /api/visits` and `GET /api/visits/:id` expose visit resources with parent park references, `trip: { id, name, slug } | null`, and optional `location: { lat, lon } | null`.
-- Catalog, home summary, map summary, trip list, and visits timeline `GET` endpoints emit ETags and return `304 Not Modified` for matching `If-None-Match`.
+- Catalog, home summary, map summary, trip list, and visits timeline `GET` endpoints emit ETags and return `304 Not Modified` for matching `If-None-Match`; publication-dependent summaries use `private, no-store` while catalog reads retain their cache policy.
 - Catalog `GET` endpoints are safe for public caching.
-- Home summary, map summary, trip list, and visits timeline endpoints use shared-cache headers and bump their version signal when trip, trip-stop, trip-stop image, visit, or visit-image data changes.
+- Home summary, map summary, trip list, and visits timeline endpoints bump their version signal when trip, trip-stop, trip-stop image, visit, or visit-image data changes.
 - Visit and management endpoints are private or no-store.
 - Trip planner provider failures surface as stable app errors instead of raw Geoapify responses.
 - All write routes and admin-only visibility reads require an admin session and fail closed when OAuth session auth is unavailable.
 - Admin invitation tests cover provisioned-admin creation, normalized email handling, existing email-only enrollment, new-admin insertion, exact recipient-email matching, token reuse rejection, and already-enrolled conflicts.
 - Park removal toggle can hide and restore a park through the authenticated park-management API.
 - Trip create/edit/delete supports named-trip CRUD, persisted trip slugs, optional starting points, and clears visit assignments on delete.
+- Draft lifecycle integration coverage verifies omitted-status draft defaults, omitted-status PATCH preservation, private draft visits, independent visit/trip status changes, hidden draft visits inside public trips, public published visits detached in projections from draft trips, admin-only per-park draft visit reads, prevention of adding draft visits to trips, and migration backfill of existing rows.
 - Trip-stop create/edit/delete supports non-park itinerary stops with labeled coordinates, optional custom `displayName`, required `visitedOn` dates, optional notes, and shared ordering between stops and park visits.
 - Trip-stop image routes support multipart uploads, direct uploads, delete, reorder, and a maximum of 6 images per stop.
 - Trip featured-image persistence and admin routes cover composite source identity, ownership, replacement/clear, reassignment and cascade cleanup, pagination, private caching, and nullable public resolution. Review builders cover explicit-cover priority and legacy fallback behavior.
@@ -113,6 +115,7 @@ If an upload limit exists, at least one test should cover the real stored-object
 - Trip-stop validation covers both required trip membership context and date-range constraints: a stop cannot be created for a trip with zero visits, and each stop date may be at most one day outside the trip's visit-derived range so departure-day and return-day stops can extend the trip window.
 - Visit create/edit/delete supports optional route, author, `tripId`, `tripStopOrder`, and nullable visit `location` fields, including same-day ordering inside a named trip.
 - Visit create/edit/delete works against a real temporary database.
+- Public visit timelines and generated review inputs exclude visits by their own draft status, while published visits assigned to draft trips remain visible without exposing the trip relationship; existing published review snapshots remain frozen by policy.
 - Park logo upload logic verifies the park slug, prefers `data/logos/<slug>.png`, falls back to `data/logos/display-types/<normalized-display-type>.png` when a park shares a display type, uploads the resolved file once to the matching R2 key, and persists the logo reference in the database.
 - Auth routes bypass bearer-token middleware.
 - Google OAuth callback validates state/PKCE, verifies the ID token, checks the admin allowlist, and sets a session cookie.

@@ -6,8 +6,9 @@ This document describes the current security and operational baseline for the AP
 
 - Anonymous backend reads: `GET /health`, `GET /openapi.json`, `GET /assets/logos/*`, `GET /assets/media/*`, and `/auth/*` login-control routes.
 - API-key boundary: frontend-facing `/api/*` reads outside localhost.
-- Admin session: all writes and admin-only reads.
-- Trip route-waypoint CRUD and the full trip-editing itinerary are admin-session-only. Public trip responses omit waypoint labels and coordinates; route construction may use the private coordinates, and failures involving a hidden waypoint do not return its leg details.
+- Admin session: all writes and admin-only reads, including `GET /api/admin/visits`, `/api/admin/parks/:slug/visits`, `/api/admin/trips`, their detail routes, and the trip preview, route, and gallery endpoints under `/api/admin/trips/:id/preview/*`. These responses are `private, no-store`; API-key-only access does not grant admin identity.
+- Public visit/trip reads enforce each record's own publication status. A published visit at a visible park stays public even when assigned to a draft trip; public visit projections omit the draft trip relationship and order. Draft visits remain private, and draft trips, their trip-stop galleries, and trip-stop media stay private.
+- Trip route-waypoint CRUD and the full trip-editing itinerary are admin-session-only. Public trip responses omit waypoint labels and coordinates; route construction may use the private coordinates, and failures involving a hidden waypoint do not return its leg details. Admin preview route construction uses authenticated requests and coordinate-fingerprint cache entries; draft-inclusive routes cannot replace public route geometry.
 - Super-admin session: `GET /api/admin/admins`, admin role changes/removal, and `POST /api/admin/invitations`.
 - Local-only operations: imports, migrations, backups, and repair commands.
 
@@ -40,6 +41,8 @@ Restrict log access and retention to operational roles. Treat any confirmed hist
 ## Storage and uploads
 
 - Keep R2 private. Public visit, trip-stop, trip, review, and park-map payloads use stable `/assets/media/*` application URLs; the route checks the current public database relationship before redirecting to a fresh presigned R2 target. Admin and private media responses continue to use presigned URLs.
+- Publication status is checked again when resolving stable public media URLs: visit images depend on the visit status and park visibility, while trip-stop images depend on the trip status. Withdrawing content prevents new public media redirects for that record type but cannot recall a previously downloaded file or an already-issued signed URL.
+- Frozen year/date-range review snapshots are not rewritten when a source visit or trip is withdrawn. Refresh or unpublish the share separately; its old text remains stored, while source media redirects still follow current visibility.
 - Validate limits against stored-object metadata, not only client-declared metadata. Direct-upload completion requires a positive integer stored size no greater than 15 MiB; missing or invalid metadata returns `422`, while an oversized stored object returns `413` and creates no image row.
 - Completion GETs use a bounded, deadline-limited object stream and stop reading when the 15 MiB source limit is exceeded; they do not buffer an unbounded `transformToByteArray()` result. The derivative backfill uses the same explicit source bound and keeps retained sources when a read fails.
 - Direct browser PUTs target parent-scoped temporary keys. Completion reads the stored object, limits decoding to 40 megapixels, applies orientation, strips EXIF/GPS metadata, and creates separate server-owned JPEG full (maximum 2,560 px) and thumbnail (maximum 480 px; 150 KiB quality budget) keys. The temporary key is separately persisted as the parent-scoped completion identity, so a retry returns the original image with `200` and fresh read URLs even after staging cleanup; a first successful completion returns `201`. The database enforces that identity and atomically admits no more than six trip-stop images.

@@ -1,12 +1,12 @@
 import { eq } from 'drizzle-orm';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   countTripStopImages,
-  createTrip,
+  createTrip as createRepositoryTrip,
+  createVisit as createRepositoryVisit,
   createTripStop,
   createTripStopImage,
-  createVisit,
   createVisitImage,
   deleteTrip,
   deleteTripStop,
@@ -14,6 +14,7 @@ import {
   deleteVisit,
   deleteVisitImage,
   findTripStopImageById,
+  getAdminTripPreviewById,
   getCatalogListEtagSeed,
   getParkBySlug,
   getParkBySlugIncludingRemoved,
@@ -45,6 +46,15 @@ import { createTestDatabase } from '../helpers/test-db.js';
 describe('repositories', () => {
   let testDatabase: Awaited<ReturnType<typeof createTestDatabase>>;
   const getImagePublicUrl = async () => '';
+  const createTrip = (
+    database: Parameters<typeof createRepositoryTrip>[0],
+    input: Parameters<typeof createRepositoryTrip>[1]
+  ) => createRepositoryTrip(database, { status: 'published', ...input });
+  const createVisit = (
+    database: Parameters<typeof createRepositoryVisit>[0],
+    slug: string,
+    input: Parameters<typeof createRepositoryVisit>[2]
+  ) => createRepositoryVisit(database, slug, { status: 'published', ...input });
 
   beforeEach(async () => {
     testDatabase = await createTestDatabase();
@@ -694,6 +704,49 @@ describe('repositories', () => {
       getVisitById(testDatabase.database, looseVisit.id, async () => '')
     ).resolves.toMatchObject({
       trip: null
+    });
+  });
+
+  it('returns null when a trip is deleted before its transactional update', async () => {
+    const trip = await createTrip(testDatabase.database, { name: 'Poistuva retki' });
+    const originalTransaction = testDatabase.database.transaction.bind(testDatabase.database);
+    const transactionSpy = vi.spyOn(testDatabase.database, 'transaction');
+    transactionSpy.mockImplementation(async (callback, ...options) => {
+      transactionSpy.mockRestore();
+      await deleteTrip(testDatabase.database, trip.id);
+      return originalTransaction(callback, ...options);
+    });
+
+    await expect(
+      updateTrip(testDatabase.database, trip.id, { status: 'draft' })
+    ).resolves.toBeNull();
+  });
+
+  it('returns an unavailable route when the trip is removed during preview loading', async () => {
+    const trip = await createTrip(testDatabase.database, {
+      name: 'Retki poistuu latauksen aikana'
+    });
+    const preview = await getAdminTripPreviewById(
+      testDatabase.database,
+      trip.id,
+      getImagePublicUrl,
+      async () => null
+    );
+
+    expect(preview?.route).toEqual({ available: false, data: null, error: null, success: true });
+  });
+
+  it('does not report a trip deletion when the database leaves its row in place', async () => {
+    const trip = await createTrip(testDatabase.database, { name: 'Retki jota ei poisteta' });
+    await testDatabase.client.execute({
+      sql: 'CREATE TRIGGER preserve_test_trip BEFORE DELETE ON trips BEGIN SELECT RAISE(IGNORE); END'
+    });
+
+    await expect(deleteTrip(testDatabase.database, trip.id)).resolves.toBe(false);
+    await expect(
+      getTripById(testDatabase.database, trip.id, getImagePublicUrl)
+    ).resolves.toMatchObject({
+      id: trip.id
     });
   });
 

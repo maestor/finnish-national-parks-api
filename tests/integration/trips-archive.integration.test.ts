@@ -75,7 +75,7 @@ describe('trip archive API', () => {
     input: { description?: string | null; name: string }
   ) => {
     const response = await requestAsAdmin(app, '/api/trips', {
-      body: JSON.stringify(input),
+      body: JSON.stringify({ status: 'published', ...input }),
       headers: { 'content-type': 'application/json' },
       method: 'POST'
     });
@@ -88,7 +88,7 @@ describe('trip archive API', () => {
     visitedOn: string
   ) => {
     const response = await requestAsAdmin(app, '/api/parks/akasmannyn-kansallispuisto/visits', {
-      body: JSON.stringify({ tripId, visitedOn }),
+      body: JSON.stringify({ status: 'published', tripId, visitedOn }),
       headers: { 'content-type': 'application/json' },
       method: 'POST'
     });

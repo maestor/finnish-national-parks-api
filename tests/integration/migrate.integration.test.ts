@@ -45,6 +45,7 @@ describe('migrateDatabase', () => {
     const publicDataVersionColumns = await client.execute(
       'PRAGMA table_info(public_data_versions)'
     );
+    const tripRouteColumns = await client.execute('PRAGMA table_info(trip_routes)');
 
     expect(migrations.rows.map((row) => String(row.name))).toEqual([
       '0000_init.sql',
@@ -86,7 +87,9 @@ describe('migrateDatabase', () => {
       '0036_media_lifecycle.sql',
       '0037_media_upload_processing_claim.sql',
       '0038_trip_routes.sql',
-      '0039_trip_route_waypoints.sql'
+      '0039_trip_route_waypoints.sql',
+      '0040_trip_visit_publication_status.sql',
+      '0041_trip_route_cache_fingerprints.sql'
     ]);
     expect(parkTypes.rows.map((row) => String(row.slug))).toEqual([
       'outdoor-recreation-area',
@@ -102,6 +105,12 @@ describe('migrateDatabase', () => {
     expect(parkColumns.rows.some((row) => String(row.name) === 'removed')).toBe(true);
     expect(parkColumns.rows.some((row) => String(row.name) === 'postal_code')).toBe(true);
     expect(parkColumns.rows.some((row) => String(row.name) === 'display_type_name')).toBe(true);
+    expect(
+      tripRouteColumns.rows
+        .filter((row) => Number(row.pk) > 0)
+        .sort((left, right) => Number(left.pk) - Number(right.pk))
+        .map((row) => String(row.name))
+    ).toEqual(['trip_id', 'fingerprint']);
     expect(parkColumns.rows.some((row) => String(row.name) === 'managed_by_lipas_import')).toBe(
       true
     );
@@ -149,6 +158,35 @@ describe('migrateDatabase', () => {
     expect(adminInvitationTable.rows).toHaveLength(1);
     expect(tripPlannerBudgetTable.rows).toHaveLength(1);
     expect(publicDataVersionColumns.rows.some((row) => String(row.name) === 'version')).toBe(true);
+  });
+
+  it('preserves existing trip and visit records as published and defaults new rows to drafts', async () => {
+    await client.executeMultiple(`
+      CREATE TABLE trips (id INTEGER PRIMARY KEY, name TEXT NOT NULL);
+      CREATE TABLE park_visits (id INTEGER PRIMARY KEY, visited_on TEXT NOT NULL);
+      INSERT INTO trips (id, name) VALUES (17, 'Vanha retki');
+      INSERT INTO park_visits (id, visited_on) VALUES (29, '2025-06-01');
+    `);
+    const migrationSql = await readFile(
+      new URL('../../src/db/migrations/0040_trip_visit_publication_status.sql', import.meta.url),
+      'utf8'
+    );
+    await client.executeMultiple(migrationSql);
+    await client.executeMultiple(`
+      INSERT INTO trips (id, name) VALUES (18, 'Uusi retki');
+      INSERT INTO park_visits (id, visited_on) VALUES (30, '2026-06-01');
+    `);
+    const tripStatuses = await client.execute('SELECT id, status FROM trips ORDER BY id');
+    const visitStatuses = await client.execute('SELECT id, status FROM park_visits ORDER BY id');
+
+    expect(tripStatuses.rows.map((row) => [Number(row.id), String(row.status)])).toEqual([
+      [17, 'published'],
+      [18, 'draft']
+    ]);
+    expect(visitStatuses.rows.map((row) => [Number(row.id), String(row.status)])).toEqual([
+      [29, 'published'],
+      [30, 'draft']
+    ]);
   });
 
   it('reports pending migrations without mutating a fresh database', async () => {
@@ -203,7 +241,9 @@ describe('migrateDatabase', () => {
       '0036_media_lifecycle.sql',
       '0037_media_upload_processing_claim.sql',
       '0038_trip_routes.sql',
-      '0039_trip_route_waypoints.sql'
+      '0039_trip_route_waypoints.sql',
+      '0040_trip_visit_publication_status.sql',
+      '0041_trip_route_cache_fingerprints.sql'
     ]);
     expect(schemaMigrationTableBeforeApply.rows).toEqual([]);
     expect(pendingAfterApply).toEqual([]);

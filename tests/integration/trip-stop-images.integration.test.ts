@@ -95,6 +95,7 @@ describe('Trip stop image routes', () => {
     const tripResponse = await requestAsAdmin(app, '/api/trips', {
       body: JSON.stringify({
         name: 'Kesäreissu 2026',
+        status: 'published',
         startingPoint: {
           coordinate: {
             lat: 60.1699,
@@ -110,6 +111,7 @@ describe('Trip stop image routes', () => {
 
     await requestAsAdmin(app, '/api/parks/akasmannyn-kansallispuisto/visits', {
       body: JSON.stringify({
+        status: 'published',
         tripId: trip.id,
         tripStopOrder: 1,
         visitedOn: '2026-06-07'
@@ -205,7 +207,7 @@ describe('Trip stop image routes', () => {
 
     expect(reorderResponse.status).toBe(204);
 
-    const tripDetailResponse = await app.request(`/api/trips/${tripId}`);
+    const tripDetailResponse = await requestAsAdmin(app, `/api/trips/${tripId}`);
     const tripDetailBody = (await tripDetailResponse.json()) as {
       itinerary: Array<
         | { kind: 'visit' }
