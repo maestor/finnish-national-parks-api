@@ -408,10 +408,30 @@ export const publicVisitVersionSchema = z.object({
   version: z.number().int().nonnegative()
 });
 
+export const tripArchiveFeaturedImageSchema = z.object({
+  height: z.number().int().positive().nullable(),
+  url: z.string().url(),
+  width: z.number().int().positive().nullable()
+});
+
+export const tripPreviewSchema = z.object({
+  dateRange: tripDateRangeSchema.nullable(),
+  descriptionExcerpt: z.string().nullable(),
+  featuredImage: tripArchiveFeaturedImageSchema.nullable(),
+  id: z.number().int(),
+  name: z.string(),
+  slug: z.string(),
+  stopCount: z.number().int().nonnegative(),
+  visitCount: z.number().int().nonnegative()
+});
+
+export const tripArchiveItemSchema = tripPreviewSchema.extend({
+  createdAt: z.string().datetime()
+});
+
 export const publicTypeProgressSchema = z.object({
   totalParks: z.number().int(),
-  totalVisits: z.number().int(),
-  type: parkTypeSchema,
+  type: z.object({ name: z.string(), slug: parkTypeSchema.shape.slug }),
   visible: z.boolean(),
   visitedParks: z.number().int()
 });
@@ -419,36 +439,16 @@ export const publicTypeProgressSchema = z.object({
 export const publicCategoryProgressSchema = z.object({
   category: parkCategorySchema,
   totalParks: z.number().int(),
-  totalVisits: z.number().int(),
   visitedParks: z.number().int()
 });
 
-export const publicMostVisitedParkSchema = z.object({
-  lastVisitedOn: z
-    .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/)
-    .nullable(),
-  park: visitParkSchema,
-  visitCount: z.number().int()
-});
-
-export const publicRecentParkVisitSchema = z.object({
-  park: visitParkSchema,
-  visitedSummary: visitedSummarySchema
-});
-
-export const publicVisitEntrySchema = z.object({
-  createdAt: z.string().datetime(),
+export const standaloneVisitPreviewSchema = z.object({
   id: z.number().int(),
   park: visitParkSchema,
-  updatedAt: z.string().datetime(),
-  visitedOn: visitDateSchema
-});
-
-export const publicHomeSummaryTripSchema = z.object({
-  name: z.string(),
-  slug: z.string(),
-  startDate: visitDateSchema.nullable()
+  visitedOn: visitDateSchema,
+  imageCount: z.number().int().nonnegative(),
+  descriptionExcerpt: z.string().nullable(),
+  featuredImage: tripArchiveFeaturedImageSchema.nullable()
 });
 
 export const seasonalVisitCountsSchema = z.object({
@@ -459,12 +459,14 @@ export const seasonalVisitCountsSchema = z.object({
 });
 
 export const publicHomeSummaryResponseSchema = publicVisitVersionSchema.extend({
-  latestTrips: z.array(publicHomeSummaryTripSchema),
+  latestTrip: tripPreviewSchema.nullable(),
+  latestStandaloneVisit: standaloneVisitPreviewSchema.nullable(),
+  magnetProgress: z.object({
+    visitedParks: z.number().int().nonnegative(),
+    totalParks: z.number().int().nonnegative()
+  }),
   progressByCategory: z.array(publicCategoryProgressSchema),
-  latestVisitEntries: z.array(publicVisitEntrySchema),
-  mostVisitedParks: z.array(publicMostVisitedParkSchema),
   progressByType: z.array(publicTypeProgressSchema),
-  recentVisits: z.array(publicRecentParkVisitSchema),
   seasonalVisitCounts: seasonalVisitCountsSchema,
   totalVisits: z.number().int(),
   uniqueVisitedParks: z.number().int()
@@ -503,24 +505,6 @@ export const tripListResponseSchema = z.object({
 
 export const adminTripListResponseSchema = z.object({
   trips: z.array(adminTripSchema)
-});
-
-export const tripArchiveFeaturedImageSchema = z.object({
-  height: z.number().int().positive().nullable(),
-  url: z.string().url(),
-  width: z.number().int().positive().nullable()
-});
-
-export const tripArchiveItemSchema = z.object({
-  createdAt: z.string().datetime(),
-  dateRange: tripDateRangeSchema.nullable(),
-  descriptionExcerpt: z.string().nullable(),
-  featuredImage: tripArchiveFeaturedImageSchema.nullable(),
-  id: z.number().int(),
-  name: z.string(),
-  slug: z.string(),
-  stopCount: z.number().int().nonnegative(),
-  visitCount: z.number().int().nonnegative()
 });
 
 export const tripArchiveResponseSchema = z.object({

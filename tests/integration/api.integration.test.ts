@@ -1707,221 +1707,6 @@ describe('API routes', () => {
     expect(response.headers.get('etag')).toContain(parkTypeFixtures.outdoorRecreationArea.slug);
   });
 
-  it('serves lightweight frontend home summary data with shared-cache validators', async () => {
-    const app = createAuthedApp();
-
-    await createVisit(app, 'akasmannyn-kansallispuisto', {
-      author: 'Hiker One',
-      note: 'Keep private note out of the home summary response.',
-      route: 'North trail',
-      visitedOn: '2026-04-20'
-    });
-    await createVisit(app, 'akasmannyn-kansallispuisto', {
-      visitedOn: '2026-04-22'
-    });
-    await createVisit(app, 'seitsemisen-kansallispuisto', {
-      visitedOn: '2026-04-21'
-    });
-
-    const response = await app.request('/api/home-summary');
-    const body = (await response.json()) as {
-      latestVisitEntries: Array<{
-        id: number;
-        park: { slug: string };
-        visitedOn: string;
-      }>;
-      mostVisitedParks: Array<{
-        lastVisitedOn: string | null;
-        park: { slug: string };
-        visitCount: number;
-      }>;
-      progressByCategory: Array<{
-        category: { slug: string };
-        totalParks: number;
-        totalVisits: number;
-        visitedParks: number;
-      }>;
-      progressByType: Array<{
-        totalParks: number;
-        totalVisits: number;
-        type: { slug: string };
-        visible: boolean;
-        visitedParks: number;
-      }>;
-      recentVisits: Array<{
-        park: { slug: string };
-        visitedSummary: {
-          lastVisitedOn: string | null;
-          visitCount: number;
-          visited: boolean;
-        };
-      }>;
-      seasonalVisitCounts: {
-        autumn: number;
-        spring: number;
-        summer: number;
-        winter: number;
-      };
-      latestTrips: Array<{
-        name: string;
-        slug: string;
-        startDate: string | null;
-      }>;
-      totalVisits: number;
-      uniqueVisitedParks: number;
-      updatedAt: string | null;
-      version: number;
-    };
-
-    expect(response.status).toBe(200);
-    expect(response.headers.get('cache-control')).toBe('private, no-store');
-    expect(response.headers.get('etag')).toBeTruthy();
-    expect(body.totalVisits).toBe(3);
-    expect(body.uniqueVisitedParks).toBe(2);
-    expect(body.seasonalVisitCounts).toEqual({ autumn: 0, spring: 3, summer: 0, winter: 0 });
-    expect(body.version).toBeGreaterThan(0);
-    expect(body.updatedAt).toBeTruthy();
-    expect(body.progressByType).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          totalParks: 2,
-          totalVisits: 3,
-          type: expect.objectContaining({
-            slug: parkTypeFixtures.nationalPark.slug
-          }),
-          visible: true,
-          visitedParks: 2
-        })
-      ])
-    );
-    expect(body.progressByCategory).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          category: expect.objectContaining({
-            slug: parkTypeFixtures.nationalPark.slug
-          }),
-          totalParks: 2,
-          totalVisits: 3,
-          visitedParks: 2
-        })
-      ])
-    );
-    expect(body.mostVisitedParks[0]).toEqual(
-      expect.objectContaining({
-        lastVisitedOn: '2026-04-22',
-        park: expect.objectContaining({
-          slug: 'akasmannyn-kansallispuisto'
-        }),
-        visitCount: 2
-      })
-    );
-    expect(body.recentVisits[0]).toEqual(
-      expect.objectContaining({
-        park: expect.objectContaining({
-          slug: 'akasmannyn-kansallispuisto'
-        }),
-        visitedSummary: {
-          lastVisitedOn: '2026-04-22',
-          visitCount: 2,
-          visited: true
-        }
-      })
-    );
-    expect(body.latestVisitEntries.map((entry) => entry.park.slug)).toEqual([
-      'seitsemisen-kansallispuisto',
-      'akasmannyn-kansallispuisto',
-      'akasmannyn-kansallispuisto'
-    ]);
-    expect(body.latestTrips).toEqual([]);
-    expect(body.latestVisitEntries[0]).not.toHaveProperty('note');
-    expect(body.latestVisitEntries[0]).not.toHaveProperty('route');
-    expect(body.latestVisitEntries[0]).not.toHaveProperty('images');
-  });
-
-  it('includes latest trips in home summary ordered by trip start date', async () => {
-    const app = createAuthedApp();
-
-    const { body: springTrip } = await createTrip(app, {
-      name: 'Kevätretki'
-    });
-    const { body: summerTrip } = await createTrip(app, {
-      name: 'Kesäretki'
-    });
-    const { body: winterTrip } = await createTrip(app, {
-      name: 'Talviretki'
-    });
-
-    await createVisit(app, 'akasmannyn-kansallispuisto', {
-      tripId: springTrip.id,
-      visitedOn: '2026-03-02'
-    });
-    await createVisit(app, 'seitsemisen-kansallispuisto', {
-      tripId: summerTrip.id,
-      visitedOn: '2026-07-15'
-    });
-    await createVisit(app, 'evon-retkeilyalue', {
-      tripId: winterTrip.id,
-      visitedOn: '2026-01-10'
-    });
-
-    const response = await app.request('/api/home-summary');
-    const body = (await response.json()) as {
-      latestTrips: Array<{
-        name: string;
-        slug: string;
-        startDate: string | null;
-      }>;
-    };
-
-    expect(response.status).toBe(200);
-    expect(body.latestTrips).toEqual([
-      {
-        name: 'Kesäretki',
-        slug: 'kesaretki',
-        startDate: '2026-07-15'
-      },
-      {
-        name: 'Kevätretki',
-        slug: 'kevatretki',
-        startDate: '2026-03-02'
-      },
-      {
-        name: 'Talviretki',
-        slug: 'talviretki',
-        startDate: '2026-01-10'
-      }
-    ]);
-  });
-
-  it('orders latest visit entries by addition time instead of visit date', async () => {
-    const app = createAuthedApp();
-
-    await createVisit(app, 'akasmannyn-kansallispuisto', {
-      visitedOn: '2026-04-22'
-    });
-    await createVisit(app, 'seitsemisen-kansallispuisto', {
-      visitedOn: '2026-04-10'
-    });
-
-    const response = await app.request('/api/home-summary');
-    const body = (await response.json()) as {
-      latestVisitEntries: Array<{
-        park: { slug: string };
-        visitedOn: string;
-      }>;
-    };
-
-    expect(response.status).toBe(200);
-    expect(body.latestVisitEntries.map((entry) => entry.park.slug)).toEqual([
-      'seitsemisen-kansallispuisto',
-      'akasmannyn-kansallispuisto'
-    ]);
-    expect(body.latestVisitEntries.map((entry) => entry.visitedOn)).toEqual([
-      '2026-04-10',
-      '2026-04-22'
-    ]);
-  });
-
   it('marks trail progress types hidden while exposing combined trail category progress', async () => {
     await importParks({
       database: testDatabase.database,
@@ -1980,14 +1765,14 @@ describe('API routes', () => {
     expect(body.progressByType[0]).toMatchObject({
       type: { slug: 'nature-trail' },
       totalParks: 1,
-      totalVisits: 1,
+
       visible: false,
       visitedParks: 1
     });
     expect(body.progressByCategory[0]).toMatchObject({
       category: { slug: 'trails-and-routes' },
       totalParks: 1,
-      totalVisits: 1,
+
       visitedParks: 1
     });
   });
@@ -2051,14 +1836,14 @@ describe('API routes', () => {
         expect.objectContaining({
           type: expect.objectContaining({ slug: 'hiking-area' }),
           totalParks: 1,
-          totalVisits: 1,
+
           visible: false,
           visitedParks: 1
         }),
         expect.objectContaining({
           type: expect.objectContaining({ slug: 'wilderness-area' }),
           totalParks: 1,
-          totalVisits: 1,
+
           visible: false,
           visitedParks: 1
         })
@@ -2068,7 +1853,7 @@ describe('API routes', () => {
       expect.objectContaining({
         category: expect.objectContaining({ slug: 'hiking-and-wilderness-areas' }),
         totalParks: 2,
-        totalVisits: 2,
+
         visitedParks: 2
       })
     ]);

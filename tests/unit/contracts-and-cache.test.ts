@@ -196,12 +196,18 @@ describe('contracts and cache helpers', () => {
       publicUpdatedAt: '2026-05-02T00:00:00.000Z',
       publicVersion: 7
     });
+    const emptySummaryEtag = createPublicSummaryEtag({
+      kind: 'trips',
+      publicUpdatedAt: null,
+      publicVersion: 0
+    });
 
     expect(emptyListEtag).toContain('none');
     expect(emptyListEtag).toContain('all');
     expect(detailEtag).toContain('summary');
     expect(publicSummaryEtag).toContain('timeline');
     expect(publicSummaryEtag).toContain(':7:');
+    expect(emptySummaryEtag).toBe('"public-summary:v2:trips:0:none:none:none:none"');
     expect(hasMatchingEtag(undefined, emptyListEtag)).toBe(false);
     expect(hasMatchingEtag(`W/ignored, ${detailEtag}`, detailEtag)).toBe(true);
   });

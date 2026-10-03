@@ -1,5 +1,5 @@
 const CATALOG_RESPONSE_VERSION = 'v1';
-const PUBLIC_SUMMARY_RESPONSE_VERSION = 'v1';
+const PUBLIC_SUMMARY_RESPONSE_VERSION = 'v2';
 
 export const CATALOG_CACHE_CONTROL =
   'public, max-age=0, s-maxage=3600, stale-while-revalidate=86400';

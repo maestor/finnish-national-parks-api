@@ -1863,12 +1863,8 @@ export const createApp = ({
     });
 
     app.openapi(getPublicHomeSummaryRoute, async (context) => {
-      const summary = await getPublicHomeSummary(database);
-      const etag = createPublicSummaryEtag({
-        kind: 'home',
-        publicUpdatedAt: summary.updatedAt,
-        publicVersion: summary.version
-      });
+      const seed = await getPublicVisitSummaryEtagSeed(database);
+      const etag = createPublicSummaryEtag({ ...seed, kind: 'home' });
       context.header('Cache-Control', PUBLICATION_SUMMARY_CACHE_CONTROL);
       context.header('ETag', etag);
 
@@ -1879,6 +1875,7 @@ export const createApp = ({
         });
       }
 
+      const summary = await getPublicHomeSummary(database, publicMediaUrl);
       return context.json(summary, 200);
     });
 
