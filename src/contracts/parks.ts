@@ -446,9 +446,18 @@ export const standaloneVisitPreviewSchema = z.object({
   id: z.number().int(),
   park: visitParkSchema,
   visitedOn: visitDateSchema,
+  route: z.string().nullable(),
   imageCount: z.number().int().nonnegative(),
   descriptionExcerpt: z.string().nullable(),
   featuredImage: tripArchiveFeaturedImageSchema.nullable()
+});
+
+export const homeFeaturedVisitSelectionSchema = z.object({
+  visitId: z.number().int().positive().nullable()
+});
+
+export const adminHomeFeaturedVisitResponseSchema = homeFeaturedVisitSelectionSchema.extend({
+  candidates: z.array(standaloneVisitPreviewSchema.pick({ id: true, park: true, visitedOn: true }))
 });
 
 export const seasonalVisitCountsSchema = z.object({
@@ -461,6 +470,7 @@ export const seasonalVisitCountsSchema = z.object({
 export const publicHomeSummaryResponseSchema = publicVisitVersionSchema.extend({
   latestTrip: tripPreviewSchema.nullable(),
   latestStandaloneVisit: standaloneVisitPreviewSchema.nullable(),
+  featuredVisit: standaloneVisitPreviewSchema.nullable(),
   magnetProgress: z.object({
     visitedParks: z.number().int().nonnegative(),
     totalParks: z.number().int().nonnegative()

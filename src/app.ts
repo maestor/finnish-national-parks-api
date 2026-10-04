@@ -49,6 +49,7 @@ import {
   getAdminTripPreviewById,
   getAdminVisitById,
   getCatalogListEtagSeed,
+  getHomeFeaturedVisitId,
   getParkBySlug,
   getParkBySlugIncludingRemoved,
   getParkVisitsBySlug,
@@ -74,6 +75,7 @@ import {
   listAdminParkVisibility,
   listAdminUsers,
   listAdminVisits,
+  listHomeFeaturedVisitCandidates,
   listParkSearchEntries,
   listPublicParks,
   listPublicTrips,
@@ -98,6 +100,7 @@ import {
   unpublishDateRangeReviewShareByShareId,
   unpublishYearReviewShare,
   updateAdminUser,
+  updateHomeFeaturedVisit,
   updateParkDetails,
   updateParkRemoved,
   updatePublishedDateRangeReviewShareByShareId,
@@ -173,6 +176,7 @@ import {
   createVisitRoute,
   deleteVisitImageRoute,
   deleteVisitRoute,
+  getAdminHomeFeaturedVisitRoute,
   getAdminParkVisitsRoute,
   getAdminVisitRoute,
   getParkRoute,
@@ -187,6 +191,7 @@ import {
   listVisitsRoute,
   listVisitsTimelineRoute,
   reorderVisitImagesRoute,
+  updateAdminHomeFeaturedVisitRoute,
   updateParkRemovedRoute,
   updateParkRoute,
   updateVisitRoute,
@@ -1862,9 +1867,30 @@ export const createApp = ({
       return context.json({ visits }, 200);
     });
 
+    app.openapi(getAdminHomeFeaturedVisitRoute, async (context) => {
+      context.header('Cache-Control', PRIVATE_CACHE_CONTROL);
+      const authFailure = await requireAdminSession(context, auth);
+      if (authFailure) return authFailure;
+      const [visitId, candidates] = await Promise.all([
+        getHomeFeaturedVisitId(database),
+        listHomeFeaturedVisitCandidates(database)
+      ]);
+      return context.json({ visitId, candidates }, 200);
+    });
+
+    app.openapi(updateAdminHomeFeaturedVisitRoute, async (context) => {
+      context.header('Cache-Control', PRIVATE_CACHE_CONTROL);
+      const authFailure = await requireAdminSession(context, auth);
+      if (authFailure) return authFailure;
+      const { visitId } = context.req.valid('json');
+      const saved = await updateHomeFeaturedVisit(database, visitId);
+      if (!saved) return context.json({ error: 'Visit is not public.' }, 422);
+      return context.json({ visitId }, 200);
+    });
+
     app.openapi(getPublicHomeSummaryRoute, async (context) => {
       const seed = await getPublicVisitSummaryEtagSeed(database);
-      const etag = createPublicSummaryEtag({ ...seed, kind: 'home' });
+      const etag = createPublicSummaryEtag({ ...seed, kind: 'home', responseVersion: 'v3' });
       context.header('Cache-Control', PUBLICATION_SUMMARY_CACHE_CONTROL);
       context.header('ETag', etag);
 

@@ -1,7 +1,10 @@
 import { eq } from 'drizzle-orm';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createApp } from '../../src/app.js';
-import { publicHomeSummaryResponseSchema } from '../../src/contracts/parks.js';
+import {
+  adminHomeFeaturedVisitResponseSchema,
+  publicHomeSummaryResponseSchema
+} from '../../src/contracts/parks.js';
 import { createTripStopImage, createVisitImage } from '../../src/db/repositories.js';
 import { parkVisits, trips } from '../../src/db/schema.js';
 import { createSessionToken } from '../../src/http/session.js';
@@ -62,6 +65,140 @@ describe('home memories API', () => {
   const visit = (body: object) =>
     write('/api/parks/akasmannyn-kansallispuisto/visits', { status: 'published', ...body });
 
+  it('lets admins select, replace and clear a public visit with fresh home validators', async () => {
+    const path = '/api/admin/home-featured-visit';
+    const initial = await summary();
+    expect(initial.body).toHaveProperty('featuredVisit', null);
+    const empty = await app.request(path, { headers: { cookie } });
+    expect(await empty.json()).toEqual({ visitId: null, candidates: [] });
+    expect(empty.headers.get('cache-control')).toBe('private, no-store');
+    const trip = await write('/api/trips', { name: 'Salainen retki', status: 'draft' });
+    const record = await visit({
+      visitedOn: '2026-06-01',
+      tripId: trip.id,
+      note: 'Muisto',
+      route: 'Rantapolku, 4 km'
+    });
+    const other = await visit({ visitedOn: '2026-07-01' });
+    await visit({ visitedOn: '2026-08-01', status: 'draft' });
+    await image(record.id, 'cover');
+    const before = await summary();
+    const candidates = adminHomeFeaturedVisitResponseSchema.parse(
+      await (await app.request(path, { headers: { cookie } })).json()
+    );
+    expect(candidates).toMatchObject({
+      visitId: null,
+      candidates: [{ id: other.id }, { id: record.id }]
+    });
+    expect(candidates.candidates).toHaveLength(2);
+    await write(path, { visitId: record.id }, 'PATCH');
+    const selected = await summary();
+    expect(selected.etag).not.toBe(before.etag);
+    expect(selected.body.featuredVisit).toMatchObject({
+      id: record.id,
+      route: 'Rantapolku, 4 km',
+      descriptionExcerpt: 'Muisto',
+      imageCount: 1,
+      featuredImage: { width: 1200, height: 800 }
+    });
+    expect(JSON.stringify(selected.body.featuredVisit)).not.toContain('Salainen');
+    expect(await (await app.request(path, { headers: { cookie } })).json()).toHaveProperty(
+      'visitId',
+      record.id
+    );
+    await write(`/api/visits/${record.id}`, { status: 'draft' }, 'PATCH');
+    expect((await summary()).body.featuredVisit).toBeNull();
+    await write(`/api/visits/${record.id}`, { status: 'published' }, 'PATCH');
+    await write('/api/parks/akasmannyn-kansallispuisto/removed', { removed: true }, 'PATCH');
+    expect((await summary()).body.featuredVisit).toBeNull();
+    await write('/api/parks/akasmannyn-kansallispuisto/removed', { removed: false }, 'PATCH');
+    await write(path, { visitId: other.id }, 'PATCH');
+    expect((await summary()).body.featuredVisit).toMatchObject({
+      id: other.id,
+      route: null,
+      featuredImage: null
+    });
+    await write(path, { visitId: null }, 'PATCH');
+    const cleared = await summary();
+    expect(cleared.body.featuredVisit).toBeNull();
+    expect(cleared.etag).not.toBe(selected.etag);
+    await write(path, { visitId: other.id }, 'PATCH');
+    expect(
+      (await app.request(`/api/visits/${other.id}`, { method: 'DELETE', headers: { cookie } }))
+        .status
+    ).toBe(204);
+    expect((await summary()).body.featuredVisit).toBeNull();
+    expect(await (await app.request(path, { headers: { cookie } })).json()).toHaveProperty(
+      'visitId',
+      null
+    );
+  });
+
+  it('omits complete Markdown headings from visit previews while preserving the full note', async () => {
+    const note =
+      '# Käynnin otsikko\n\nRauhallinen päivä luonnossa.\n\n## Muistiinpanoja ##\n\nPolku jatkui järven rantaan. #muisto ja C# säilyvät.';
+    const record = await visit({ visitedOn: '2026-09-12', note });
+    await write('/api/admin/home-featured-visit', { visitId: record.id }, 'PATCH');
+    const result = await summary();
+    const excerpt =
+      'Rauhallinen päivä luonnossa. Polku jatkui järven rantaan. #muisto ja C# säilyvät.';
+    expect(result.body.featuredVisit?.descriptionExcerpt).toBe(excerpt);
+    expect(result.body.latestStandaloneVisit?.descriptionExcerpt).toBe(excerpt);
+    const detail = await (await app.request(`/api/visits/${record.id}`)).json();
+    expect(detail).toHaveProperty('note', note);
+  });
+
+  it('rejects unauthorized, invalid and unavailable featured-visit selections', async () => {
+    const path = '/api/admin/home-featured-visit';
+    const draft = await visit({ visitedOn: '2026-06-01', status: 'draft' });
+    for (const method of ['GET', 'PATCH']) {
+      const options =
+        method === 'PATCH'
+          ? {
+              body: JSON.stringify({ visitId: null }),
+              headers: { 'content-type': 'application/json' }
+            }
+          : {};
+      expect((await app.request(path, { ...options, method })).status).toBe(401);
+      const unconfigured = createApp({ database: db.database });
+      expect((await unconfigured.request(path, { ...options, method })).status).toBe(503);
+    }
+    for (const visitId of [draft.id, 99999]) {
+      expect(
+        (
+          await app.request(path, {
+            method: 'PATCH',
+            headers: { cookie, 'content-type': 'application/json' },
+            body: JSON.stringify({ visitId })
+          })
+        ).status
+      ).toBe(422);
+    }
+    for (const body of [{}, { visitId: 0 }, { visitId: '1' }]) {
+      expect(
+        (
+          await app.request(path, {
+            method: 'PATCH',
+            headers: { cookie, 'content-type': 'application/json' },
+            body: JSON.stringify(body)
+          })
+        ).status
+      ).toBe(400);
+    }
+    const record = await visit({ visitedOn: '2026-06-02' });
+    await write('/api/parks/akasmannyn-kansallispuisto/removed', { removed: true }, 'PATCH');
+    expect(
+      (
+        await app.request(path, {
+          method: 'PATCH',
+          headers: { cookie, 'content-type': 'application/json' },
+          body: JSON.stringify({ visitId: record.id })
+        })
+      ).status
+    ).toBe(422);
+    expect((await summary()).body.featuredVisit).toBeNull();
+  });
+
   it('selects by visit date and public trip association without returning legacy lists', async () => {
     const trip = await write('/api/trips', {
       name: 'Kesäretki',
@@ -73,6 +210,7 @@ describe('home memories API', () => {
     const standalone = await visit({
       visitedOn: '2026-08-01',
       tripId: draft.id,
+      route: 'Järvikierros, 6 km',
       note: '  Oma\n muisto '
     });
     await visit({ visitedOn: '2026-01-01' });
@@ -99,6 +237,7 @@ describe('home memories API', () => {
         id: standalone.id,
         park: { slug: 'akasmannyn-kansallispuisto' },
         visitedOn: '2026-08-01',
+        route: 'Järvikierros, 6 km',
         descriptionExcerpt: 'Oma muisto',
         featuredImage: null,
         imageCount: 0
@@ -110,6 +249,7 @@ describe('home memories API', () => {
     });
     expect(Object.keys(body).sort()).toEqual(
       [
+        'featuredVisit',
         'latestTrip',
         'latestStandaloneVisit',
         'magnetProgress',
@@ -392,7 +532,7 @@ describe('home memories API', () => {
     expect(cached.status).toBe(304);
     expect(await cached.text()).toBe('');
     const oldShape = await app.request('/api/home-summary', {
-      headers: { 'if-none-match': changed.etag.replace('public-summary:v2:', 'public-summary:v1:') }
+      headers: { 'if-none-match': changed.etag.replace('public-summary:v3:', 'public-summary:v2:') }
     });
     expect(oldShape.status).toBe(200);
   });

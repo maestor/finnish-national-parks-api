@@ -35,6 +35,7 @@ import {
   adminInvitations,
   admins,
   dateRangeReviewShares,
+  homeFeaturedVisit,
   importRuns,
   mediaUploads,
   parks,
@@ -870,7 +871,12 @@ const TRIP_ARCHIVE_CURSOR_VERSION = 1;
 export class TripArchiveCursorError extends Error {}
 
 export const createTripDescriptionExcerpt = (description: string | null) => {
-  const normalized = description?.replace(/\s+/gu, ' ').trim() ?? '';
+  const normalized =
+    description
+      ?.replace(/^ {0,3}#{1,6}(?:[ \t]+[^\r\n]*)?\r?$/gmu, '')
+      .replace(/^(?: {0,3}(?![ \t\r]*$)\S[^\r\n]*\r?\n)+ {0,3}(?:=+|-+)[ \t]*\r?$/gmu, '')
+      .replace(/\s+/gu, ' ')
+      .trim() ?? '';
 
   if (!normalized) {
     return null;
@@ -3969,14 +3975,75 @@ export const getPublicVisitDataVersion = async (
   return toPublicVisitVersion(await getPublicVisitDataVersionRecord(database));
 };
 
-const getLatestStandaloneVisitPreview = async (
+export const getHomeFeaturedVisitId = async (database: Database) => {
+  const [selection] = await database
+    .select()
+    .from(homeFeaturedVisit)
+    .where(eq(homeFeaturedVisit.id, 1));
+  return selection?.visitId ?? null;
+};
+
+export const listHomeFeaturedVisitCandidates = async (database: Database) => {
+  const rows = await database
+    .select({
+      id: parkVisits.id,
+      parkName: parks.name,
+      parkSlug: parks.slug,
+      visitedOn: parkVisits.visitedOn
+    })
+    .from(parkVisits)
+    .innerJoin(parks, eq(parks.id, parkVisits.parkId))
+    .where(and(eq(parks.removed, false), eq(parkVisits.status, 'published')))
+    .orderBy(desc(parkVisits.visitedOn), desc(parkVisits.createdAt), desc(parkVisits.id));
+  return rows.map(({ id, parkName, parkSlug, visitedOn }) => ({
+    id,
+    park: { name: parkName, slug: parkSlug },
+    visitedOn
+  }));
+};
+
+export const updateHomeFeaturedVisit = async (database: Database, visitId: number | null) =>
+  database.transaction(async (tx) => {
+    if (visitId !== null) {
+      const [eligible] = await tx
+        .select({ id: parkVisits.id })
+        .from(parkVisits)
+        .innerJoin(parks, eq(parks.id, parkVisits.parkId))
+        .where(
+          and(
+            eq(parkVisits.id, visitId),
+            eq(parkVisits.status, 'published'),
+            eq(parks.removed, false)
+          )
+        );
+      if (!eligible) return false;
+    }
+    await tx
+      .insert(homeFeaturedVisit)
+      .values({ id: 1, visitId })
+      .onConflictDoUpdate({ target: homeFeaturedVisit.id, set: { visitId } });
+    await bumpPublicVisitDataVersion(tx, new Date().toISOString());
+    return true;
+  });
+
+const getSelectedHomeVisitPreview = async (
   database: Database,
   getImagePublicUrl: (key: string) => Promise<string>
+) => {
+  const visitId = await getHomeFeaturedVisitId(database);
+  return visitId === null ? null : getHomeVisitPreview(database, getImagePublicUrl, visitId);
+};
+
+const getHomeVisitPreview = async (
+  database: Database,
+  getImagePublicUrl: (key: string) => Promise<string>,
+  selectedVisitId: number | null
 ) => {
   const [visit] = await database
     .select({
       id: parkVisits.id,
       note: parkVisits.note,
+      route: parkVisits.route,
       parkName: parks.name,
       parkSlug: parks.slug,
       visitedOn: parkVisits.visitedOn
@@ -3988,7 +4055,9 @@ const getLatestStandaloneVisitPreview = async (
       and(
         eq(parks.removed, false),
         eq(parkVisits.status, 'published'),
-        or(isNull(trips.id), eq(trips.status, 'draft'))
+        selectedVisitId === null
+          ? or(isNull(trips.id), eq(trips.status, 'draft'))
+          : eq(parkVisits.id, selectedVisitId)
       )
     )
     .orderBy(desc(parkVisits.visitedOn), desc(parkVisits.createdAt), desc(parkVisits.id))
@@ -4012,6 +4081,7 @@ const getLatestStandaloneVisitPreview = async (
     id: visit.id,
     park: { name: visit.parkName, slug: visit.parkSlug },
     visitedOn: visit.visitedOn,
+    route: visit.route,
     imageCount: Number(counts[0]!.count),
     descriptionExcerpt: createTripDescriptionExcerpt(visit.note),
     featuredImage:
@@ -4029,13 +4099,15 @@ export const getPublicHomeSummary = async (
   database: Database,
   getImagePublicUrl: (key: string) => Promise<string>
 ) => {
-  const [parkRows, tripRows, visitRows, version, latestStandaloneVisit] = await Promise.all([
-    listPublicParkRows(database),
-    listTripArchiveRows(database, 1, null),
-    listPublicVisitRows(database),
-    getPublicVisitDataVersion(database),
-    getLatestStandaloneVisitPreview(database, getImagePublicUrl)
-  ]);
+  const [parkRows, tripRows, visitRows, version, latestStandaloneVisit, featuredVisit] =
+    await Promise.all([
+      listPublicParkRows(database),
+      listTripArchiveRows(database, 1, null),
+      listPublicVisitRows(database),
+      getPublicVisitDataVersion(database),
+      getHomeVisitPreview(database, getImagePublicUrl, null),
+      getSelectedHomeVisitPreview(database, getImagePublicUrl)
+    ]);
   const publicParks = await Promise.all(parkRows.map((row) => toPublicPark(row)));
   const visitsByParkId = new Map<number, PublicVisitRow[]>();
 
@@ -4125,6 +4197,7 @@ export const getPublicHomeSummary = async (
   return {
     latestTrip: trip ? toTripPreview(trip, featuredImages.get(trip.id)) : null,
     latestStandaloneVisit,
+    featuredVisit,
     magnetProgress: {
       totalParks: magnetParkIds.size,
       visitedParks: [...visitsByParkId.keys()].filter((id) => magnetParkIds.has(id)).length
