@@ -27,12 +27,13 @@ export const createCatalogDetailEtag = (input: {
 export const createPublicSummaryEtag = (input: {
   activeCount?: number;
   kind: 'home' | 'map' | 'timeline' | 'trips';
+  responseVersion?: string;
   latestCatalogImportRunId?: number | null;
   latestCatalogUpdatedAt?: string | null;
   publicUpdatedAt: string | null;
   publicVersion: number;
 }) => {
-  return `"public-summary:${PUBLIC_SUMMARY_RESPONSE_VERSION}:${input.kind}:${input.publicVersion}:${input.publicUpdatedAt ?? 'none'}:${input.activeCount ?? 'none'}:${input.latestCatalogImportRunId ?? 'none'}:${input.latestCatalogUpdatedAt ?? 'none'}"`;
+  return `"public-summary:${input.responseVersion ?? PUBLIC_SUMMARY_RESPONSE_VERSION}:${input.kind}:${input.publicVersion}:${input.publicUpdatedAt ?? 'none'}:${input.activeCount ?? 'none'}:${input.latestCatalogImportRunId ?? 'none'}:${input.latestCatalogUpdatedAt ?? 'none'}"`;
 };
 
 export const hasMatchingEtag = (ifNoneMatch: string | undefined, etag: string) => {

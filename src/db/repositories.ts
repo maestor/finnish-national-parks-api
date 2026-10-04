@@ -4170,10 +4170,38 @@ export const getPublicMapSummary = async (
   };
 };
 
-export const listVisitsTimeline = async (database: Database) => {
-  const visitRows = sortTripAwareVisitRows(await listVisitTimelineRows(database));
+export const listVisitsTimeline = async (
+  database: Database,
+  getImagePublicUrl: (key: string) => Promise<string>
+) => {
+  const [rows, images] = await Promise.all([
+    listVisitTimelineRows(database),
+    database
+      .select({ visitId: parkVisits.id, thumbKey: visitImages.thumbKey })
+      .from(parkVisits)
+      .innerJoin(parks, eq(parks.id, parkVisits.parkId))
+      .innerJoin(
+        visitImages,
+        sql`${visitImages.id} = (
+        SELECT candidate.id FROM visit_images candidate
+        WHERE candidate.visit_id = ${parkVisits.id}
+        ORDER BY candidate.display_order, candidate.id LIMIT 1
+      )`
+      )
+      .where(and(visibleCatalogWhere(), eq(parkVisits.status, 'published')))
+  ]);
+  const featuredImages = new Map(
+    await Promise.all(
+      images.map(async (image) => {
+        const url = await getImagePublicUrl(image.thumbKey);
+        return [image.visitId, url ? { url } : null] as const;
+      })
+    )
+  );
+  const visitRows = sortTripAwareVisitRows(rows);
 
   return visitRows.map((visit) => ({
+    featuredImage: featuredImages.get(visit.id) ?? null,
     createdAt: visit.createdAt,
     id: visit.id,
     imageCount: visit.imageCount,
