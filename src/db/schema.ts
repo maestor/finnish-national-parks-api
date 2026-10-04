@@ -444,3 +444,8 @@ export const adminInvitations = sqliteTable(
     )
   })
 );
+
+export const homeFeaturedVisit = sqliteTable('home_featured_visit', {
+  id: integer('id').primaryKey(),
+  visitId: integer('visit_id').references(() => parkVisits.id, { onDelete: 'set null' })
+});

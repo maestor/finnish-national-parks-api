@@ -339,6 +339,24 @@ describe('trip archive API', () => {
     expect(() => decodeTripArchiveCursor(invalidFieldsCursor)).toThrow('Invalid archive cursor.');
   });
 
+  it('removes whole Markdown headings before shortening memory excerpts', () => {
+    expect(
+      createTripDescriptionExcerpt('# Otsikko\n\nKuvaus.\n## Toinen otsikko ##\nLisää kuvausta.')
+    ).toBe('Kuvaus. Lisää kuvausta.');
+    expect(createTripDescriptionExcerpt('  ### Sisennetty otsikko\r\nKuvaus.')).toBe('Kuvaus.');
+    expect(
+      createTripDescriptionExcerpt('Otsikko\n=======\n\nKuvaus.\n\nToinen otsikko\n---\n\nLoput.')
+    ).toBe('Kuvaus. Loput.');
+    expect(createTripDescriptionExcerpt('Monirivinen\notsikko\n---\n\nKuvaus.')).toBe('Kuvaus.');
+    expect(createTripDescriptionExcerpt('#\n## Otsikko')).toBeNull();
+    expect(createTripDescriptionExcerpt(`# Otsikko\n\n${'😀'.repeat(300)}`)).toBe(
+      `${'😀'.repeat(239)}…`
+    );
+    expect(createTripDescriptionExcerpt('#muisto C# ja seitsemän ####### merkkiä')).toBe(
+      '#muisto C# ja seitsemän ####### merkkiä'
+    );
+  });
+
   it('normalizes and truncates descriptions by Unicode code point', () => {
     expect(createTripDescriptionExcerpt('  retki\n  luonnossa  ')).toBe('retki luonnossa');
     expect(createTripDescriptionExcerpt('   ')).toBeNull();

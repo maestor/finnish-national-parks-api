@@ -2,6 +2,7 @@ import { createRoute, z } from '@hono/zod-openapi';
 
 import { errorSchema } from '../contracts/common.js';
 import {
+  adminHomeFeaturedVisitResponseSchema,
   adminParkVisibilityResponseSchema,
   adminParkVisitsResponseSchema,
   adminVisitListResponseSchema,
@@ -11,6 +12,7 @@ import {
   createVisitRequestSchema,
   directVisitImageUploadPlanSchema,
   directVisitImageUploadRequestSchema,
+  homeFeaturedVisitSelectionSchema,
   parkDetailSchema,
   parkListResponseSchema,
   parkSearchResponseSchema,
@@ -272,6 +274,55 @@ export const getAdminParkVisitsRoute = createRoute({
     },
     503: {
       description: 'OAuth or storage unavailable',
+      content: { 'application/json': { schema: errorSchema } }
+    }
+  }
+});
+
+export const getAdminHomeFeaturedVisitRoute = createRoute({
+  method: 'get',
+  path: '/api/admin/home-featured-visit',
+  tags: ['Frontend'],
+  security: [{ bearerAuth: [], sessionAuth: [] }],
+  responses: {
+    200: {
+      description: 'Saved selection and eligible published visits',
+      content: { 'application/json': { schema: adminHomeFeaturedVisitResponseSchema } }
+    },
+    401: {
+      description: 'Admin session required',
+      content: { 'application/json': { schema: errorSchema } }
+    },
+    503: {
+      description: 'Authentication unavailable',
+      content: { 'application/json': { schema: errorSchema } }
+    }
+  }
+});
+
+export const updateAdminHomeFeaturedVisitRoute = createRoute({
+  method: 'patch',
+  path: '/api/admin/home-featured-visit',
+  tags: ['Frontend'],
+  security: [{ bearerAuth: [], sessionAuth: [] }],
+  request: {
+    body: { content: { 'application/json': { schema: homeFeaturedVisitSelectionSchema } } }
+  },
+  responses: {
+    200: {
+      description: 'Saved selection',
+      content: { 'application/json': { schema: homeFeaturedVisitSelectionSchema } }
+    },
+    401: {
+      description: 'Admin session required',
+      content: { 'application/json': { schema: errorSchema } }
+    },
+    422: {
+      description: 'Visit is not public',
+      content: { 'application/json': { schema: errorSchema } }
+    },
+    503: {
+      description: 'Authentication unavailable',
       content: { 'application/json': { schema: errorSchema } }
     }
   }

@@ -193,6 +193,12 @@ describe('resource baseline API', () => {
 
       expect(response.status).toBe(201);
     }
+    const selection = await app.request('/api/admin/home-featured-visit', {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json', cookie: `__session=${adminSession}` },
+      body: JSON.stringify({ visitId: imageVisitId })
+    });
+    expect(selection.status).toBe(200);
     const executeSpy = vi.spyOn(testDatabase.client, 'execute');
 
     const measure = async (path: string) => {
