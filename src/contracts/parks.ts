@@ -485,6 +485,7 @@ export const visitTimelineParkSchema = visitParkSchema.extend({
 });
 
 export const visitTimelineEntrySchema = z.object({
+  featuredImage: z.object({ url: z.string().url() }).nullable(),
   createdAt: z.string().datetime(),
   id: z.number().int(),
   imageCount: z.number().int(),

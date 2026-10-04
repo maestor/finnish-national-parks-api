@@ -1909,11 +1909,12 @@ export const createApp = ({
       const [catalogSeed, version, visits] = await Promise.all([
         getCatalogListEtagSeed(database),
         getPublicVisitDataVersion(database),
-        listVisitsTimeline(database)
+        listVisitsTimeline(database, publicMediaUrl)
       ]);
       const etag = createPublicSummaryEtag({
         activeCount: catalogSeed.activeCount,
         kind: 'timeline',
+        responseVersion: 'v3',
         latestCatalogImportRunId: catalogSeed.latestImportRunId,
         latestCatalogUpdatedAt: catalogSeed.latestUpdatedAt,
         publicUpdatedAt: version.updatedAt,

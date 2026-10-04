@@ -1990,7 +1990,9 @@ describe('API routes', () => {
   });
 
   it('serves a lightweight visits timeline with resolved type labels and image counts', async () => {
-    const app = createAuthedApp();
+    const app = createAuthedApp({
+      getPublicMediaUrl: (key) => `https://api.example.test/assets/media/${key}`
+    });
     const { body: firstVisit } = await createVisit(app, 'akasmannyn-kansallispuisto', {
       note: 'Keep note out of the timeline response.',
       route: 'North trail',
@@ -2061,6 +2063,7 @@ describe('API routes', () => {
       expect.objectContaining({
         id: secondVisit.id,
         imageCount: 2,
+        featuredImage: { url: 'https://api.example.test/assets/media/visits/second/thumb-1.jpg' },
         park: {
           name: 'Seitsemisen kansallispuisto',
           slug: 'seitsemisen-kansallispuisto',
@@ -2075,6 +2078,7 @@ describe('API routes', () => {
       expect.objectContaining({
         id: thirdVisit.id,
         imageCount: 0,
+        featuredImage: null,
         park: expect.objectContaining({
           slug: 'kaupunkilaakson-ulkoilualue',
           typeLabel: parkTypeFixtures.outdoorRecreationArea.name
@@ -2086,6 +2090,105 @@ describe('API routes', () => {
     expect(body.visits[0]).not.toHaveProperty('images');
     expect(body.visits[0]).not.toHaveProperty('note');
     expect(body.visits[0]).not.toHaveProperty('updatedAt');
+    const unavailableMedia = await createAuthedApp().request('/api/visits-timeline');
+    const unavailableBody = (await unavailableMedia.json()) as {
+      visits: Array<{ featuredImage: { url: string } | null }>;
+    };
+    expect(unavailableBody.visits.every((visit) => visit.featuredImage === null)).toBe(true);
+  });
+
+  it('derives visit thumbnails from image order and keeps publication and cache boundaries', async () => {
+    const storage = createMemoryStorage();
+    const presign = vi.spyOn(storage, 'getPresignedUrl');
+    const publicUrl = vi.fn((key: string) => `https://api.example.test/assets/media/${key}`);
+    const app = createAuthedApp({ storage, getPublicMediaUrl: publicUrl });
+    const { body: trip } = await createTrip(app, { name: 'Private trip', status: 'draft' });
+    const { body: visit } = await createVisit(app, 'akasmannyn-kansallispuisto', {
+      visitedOn: '2026-06-07',
+      tripId: trip.id
+    });
+    const images = [];
+    for (const [index, displayOrder] of [9, 0, 0].entries()) {
+      images.push(
+        await createVisitImage(testDatabase.database, {
+          createdAt: '2026-06-08T09:00:00.000Z',
+          updatedAt: '2026-06-08T09:00:00.000Z',
+          displayOrder,
+          fullKey: `visits/${visit.id}/full-${index}.jpg`,
+          thumbKey: `visits/${visit.id}/thumb-${index}.jpg`,
+          mimeType: 'image/jpeg',
+          originalName: `${index}.jpg`,
+          visitId: visit.id
+        })
+      );
+    }
+    const readTimeline = async () => {
+      const response = await app.request('/api/visits-timeline');
+      expect(response.status).toBe(200);
+      const body = (await response.json()) as {
+        visits: Array<{
+          id: number;
+          featuredImage: { url: string } | null;
+          trip: { id: number } | null;
+        }>;
+      };
+      return { response, body };
+    };
+    presign.mockClear();
+    const initial = await readTimeline();
+    expect(initial.body.visits[0]).toMatchObject({
+      id: visit.id,
+      trip: null,
+      featuredImage: { url: publicUrl(images[1]!.thumbKey) }
+    });
+    expect(presign).not.toHaveBeenCalled();
+    const reorder = await requestAsAdmin(app, `/api/visits/${visit.id}/images/reorder`, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ imageIds: [images[2]!.id, images[0]!.id, images[1]!.id] })
+    });
+    expect(reorder.status).toBe(204);
+    const reordered = await readTimeline();
+    expect(reordered.body.visits[0]?.featuredImage?.url).toBe(publicUrl(images[2]!.thumbKey));
+    expect(reordered.response.headers.get('etag')).not.toBe(initial.response.headers.get('etag'));
+    const removed = await requestAsAdmin(app, `/api/visits/${visit.id}/images/${images[2]!.id}`, {
+      method: 'DELETE'
+    });
+    expect(removed.status).toBe(204);
+    const afterDelete = await readTimeline();
+    expect(afterDelete.body.visits[0]?.featuredImage?.url).toBe(publicUrl(images[0]!.thumbKey));
+    expect(afterDelete.response.headers.get('etag')).not.toBe(
+      reordered.response.headers.get('etag')
+    );
+    await requestAsAdmin(app, `/api/trips/${trip.id}`, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ status: 'published' })
+    });
+    expect((await readTimeline()).body.visits[0]).toMatchObject({
+      trip: { id: trip.id },
+      featuredImage: { url: publicUrl(images[0]!.thumbKey) }
+    });
+    await requestAsAdmin(app, `/api/visits/${visit.id}`, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ status: 'draft' })
+    });
+    publicUrl.mockClear();
+    expect((await readTimeline()).body.visits).toEqual([]);
+    expect(publicUrl).not.toHaveBeenCalled();
+    await requestAsAdmin(app, `/api/visits/${visit.id}`, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ status: 'published' })
+    });
+    await testDatabase.database
+      .update(parks)
+      .set({ removed: true })
+      .where(eq(parks.slug, 'akasmannyn-kansallispuisto'));
+    publicUrl.mockClear();
+    expect((await readTimeline()).body.visits).toEqual([]);
+    expect(publicUrl).not.toHaveBeenCalled();
   });
 
   it('returns 304 for matching visits timeline ETags and changes them when park labels change', async () => {
@@ -2103,6 +2206,11 @@ describe('API routes', () => {
       }
     });
 
+    expect(firstEtag).toContain('public-summary:v3:timeline:');
+    const legacyResponse = await app.request('/api/visits-timeline', {
+      headers: { 'if-none-match': firstEtag?.replace(':v3:', ':v2:') ?? '' }
+    });
+    expect(legacyResponse.status).toBe(200);
     expect(firstEtag).toBeTruthy();
     expect(cachedResponse.status).toBe(304);
 
