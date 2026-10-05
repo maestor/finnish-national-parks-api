@@ -3919,6 +3919,39 @@ export const updateParkFeaturedImage = async (
     await bumpPublicVisitDataVersion(tx, new Date().toISOString());
   });
 
+export const backfillParkFeaturedImages = async (database: Database, dryRun: boolean) =>
+  database.transaction(async (tx) => {
+    // Match the admin picker's order without resolving URLs or loading galleries.
+    const candidates = sql`
+      SELECT parkId, name, slug, imageId FROM (
+        SELECT p.id AS parkId, p.name, p.slug, i.id AS imageId,
+          ROW_NUMBER() OVER (
+            PARTITION BY p.id
+            ORDER BY v.visited_on DESC, v.id DESC, i.display_order ASC, i.id ASC
+          ) AS position
+        FROM parks p
+        JOIN park_visits v ON v.park_id = p.id
+        JOIN visit_images i ON i.visit_id = v.id
+        LEFT JOIN park_featured_images f ON f.park_id = p.id
+        WHERE v.status = 'published' AND f.park_id IS NULL
+      ) WHERE position = 1 ORDER BY parkId
+    `;
+    const selected = await tx.all<{
+      parkId: number;
+      name: string;
+      slug: string;
+      imageId: number;
+    }>(candidates);
+    if (!dryRun && selected.length > 0) {
+      await tx.run(sql`
+        INSERT INTO park_featured_images (park_id, visit_image_id)
+        SELECT parkId, imageId FROM (${candidates})
+      `);
+      await bumpPublicVisitDataVersion(tx, new Date().toISOString());
+    }
+    return { dryRun, parks: selected };
+  });
+
 export const listTripImageCandidates = async (
   database: DbClient,
   tripId: number,

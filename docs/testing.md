@@ -20,6 +20,7 @@ Use API integration tests for:
 - response contracts
 - ETag and cache-control behavior
 - persistence behavior
+- park featured-image backfill previews, published-only deterministic selection, preserved selections, repeat runs, transactional rollback, and real CLI migration/argument boundaries against temporary databases
 - visit workflows
 - importer plus database behavior when realistic enough
 - deployment-entry contracts that cannot be reproduced reliably through localhost alone, such as Vercel's Hono auto-detection behavior

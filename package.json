@@ -20,6 +20,7 @@
     "media:convert-existing-images": "tsx src/cli/backfill-image-derivatives.ts",
     "media:remove-converted-originals": "tsx src/cli/retire-converted-image-originals.ts",
     "park:move-visits": "tsx src/cli/move-park-visits.ts",
+    "park:backfill-featured-images": "tsx src/cli/backfill-park-featured-images.ts",
     "park:logo": "tsx src/cli/upload-park-logo.ts",
     "park:logos": "tsx src/cli/upload-all-park-logos.ts",
     "park:map": "tsx src/cli/upload-park-map.ts",
