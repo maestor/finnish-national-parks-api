@@ -346,6 +346,19 @@ export const tripFeaturedImages = sqliteTable(
   })
 );
 
+export const parkFeaturedImages = sqliteTable(
+  'park_featured_images',
+  {
+    parkId: integer('park_id')
+      .primaryKey()
+      .references(() => parks.id, { onDelete: 'cascade' }),
+    visitImageId: integer('visit_image_id')
+      .notNull()
+      .references(() => visitImages.id, { onDelete: 'cascade' })
+  },
+  (table) => ({ visitImageIndex: index('park_featured_visit_image_idx').on(table.visitImageId) })
+);
+
 export const publicDataVersions = sqliteTable('public_data_versions', {
   key: text('key').primaryKey(),
   version: integer('version').notNull(),

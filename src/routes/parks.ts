@@ -14,12 +14,16 @@ import {
   directVisitImageUploadRequestSchema,
   homeFeaturedVisitSelectionSchema,
   parkDetailSchema,
+  parkFeaturedImageResponseSchema,
+  parkFeaturedImageSettingsSchema,
+  parkImageCandidatesResponseSchema,
   parkListResponseSchema,
   parkSearchResponseSchema,
   parkVisitsResponseSchema,
   publicHomeSummaryResponseSchema,
   publicMapSummaryResponseSchema,
   reorderVisitImagesRequestSchema,
+  updateParkFeaturedImageRequestSchema,
   updateParkRemovedRequestSchema,
   updateParkRequestSchema,
   updateVisitRequestSchema,
@@ -1028,6 +1032,97 @@ export const reorderVisitImagesRoute = createRoute({
           schema: errorSchema
         }
       }
+    }
+  }
+});
+
+export const listAdminParkImagesRoute = createRoute({
+  method: 'get',
+  path: '/api/admin/parks/{slug}/images',
+  tags: ['Parks'],
+  security: [{ bearerAuth: [], sessionAuth: [] }],
+  request: {
+    params: z.object({ slug: z.string() }),
+    query: z.object({
+      limit: z.coerce.number().int().min(1).max(100).default(48),
+      offset: z.coerce.number().int().min(0).default(0)
+    })
+  },
+  responses: {
+    200: {
+      description: 'Park image candidates',
+      content: { 'application/json': { schema: parkImageCandidatesResponseSchema } }
+    },
+    401: {
+      description: 'Admin session required',
+      content: { 'application/json': { schema: errorSchema } }
+    },
+    404: {
+      description: 'Park not found',
+      content: { 'application/json': { schema: errorSchema } }
+    },
+    503: {
+      description: 'OAuth or storage unavailable',
+      content: { 'application/json': { schema: errorSchema } }
+    }
+  }
+});
+
+export const getAdminParkFeaturedImageRoute = createRoute({
+  method: 'get',
+  path: '/api/admin/parks/{slug}/featured-image',
+  tags: ['Parks'],
+  security: [{ bearerAuth: [], sessionAuth: [] }],
+  request: { params: z.object({ slug: z.string() }) },
+  responses: {
+    200: {
+      description: 'Saved park featured image',
+      content: { 'application/json': { schema: parkFeaturedImageSettingsSchema } }
+    },
+    401: {
+      description: 'Admin session required',
+      content: { 'application/json': { schema: errorSchema } }
+    },
+    404: {
+      description: 'Park not found',
+      content: { 'application/json': { schema: errorSchema } }
+    },
+    503: {
+      description: 'OAuth or storage unavailable',
+      content: { 'application/json': { schema: errorSchema } }
+    }
+  }
+});
+
+export const updateAdminParkFeaturedImageRoute = createRoute({
+  method: 'patch',
+  path: '/api/admin/parks/{slug}/featured-image',
+  tags: ['Parks'],
+  security: [{ bearerAuth: [], sessionAuth: [] }],
+  request: {
+    params: z.object({ slug: z.string() }),
+    body: { content: { 'application/json': { schema: updateParkFeaturedImageRequestSchema } } }
+  },
+  responses: {
+    200: {
+      description: 'Updated park featured image',
+      content: { 'application/json': { schema: parkFeaturedImageResponseSchema } }
+    },
+    401: {
+      description: 'Admin session required',
+      content: { 'application/json': { schema: errorSchema } }
+    },
+    404: {
+      description: 'Park not found',
+      content: { 'application/json': { schema: errorSchema } }
+    },
+    422: {
+      description: 'Unavailable image',
+      content: { 'application/json': { schema: errorSchema } }
+    },
+    503: {
+      description: 'OAuth or storage unavailable',
+      content: { 'application/json': { schema: errorSchema } }
     }
   }
 });
