@@ -27,6 +27,21 @@ The deployment guardrail test for this lives in `tests/integration/vercel-entry.
 
 - Node.js 24 or newer.
 
+## Backfill Park Featured Images
+
+Run against the database configured by `DATABASE_URL` and, for Turso, `DATABASE_AUTH_TOKEN`. All migrations must already be applied; the command reports pending migrations without applying them, including in preview mode.
+
+```sh
+npm run park:backfill-featured-images -- --dry-run
+npm run park:backfill-featured-images
+```
+
+The preview lists the parks and image IDs that would be selected without changing data. The normal command fills only parks with no stored featured-image selection and at least one photo from a published visit. It chooses the first photo in the admin picker's order: visit date descending, visit ID descending, image display order ascending, then image ID ascending. Newer visits without photos do not prevent an older photo from being selected. Hidden parks are eligible as in admin editing; their public visibility stays unchanged. Existing selections are preserved even when their source visit has since been withdrawn.
+
+The backfill reads image metadata only, requires no storage credentials, and saves all selections with one public visit-data version bump in a transaction. A failure rolls back the entire write. Reruns skip filled parks and leave the cache version unchanged when no parks need a cover.
+
+The output lists affected slugs. After applying, expire those frontend `public-park:{slug}` caches using the UI's authenticated public-cache revalidation flow with `parkSlug` and `expireImmediately: true` to show the photos immediately. The command updates API ETags but does not call the UI or clear its caches itself.
+
 ## Security And Sustainability Baseline
 
 - Route naming is not the auth policy. Catalog and visit `GET` data is public from an end-user perspective when accessed through the Reissuvihko UI, but the backend remains a separate API boundary: frontend-facing `/api/*` routes generally require the server-side API key outside localhost when `API_KEY` is configured, including `GET /api/year-review/shares/:shareId` for server-rendered share pages.
