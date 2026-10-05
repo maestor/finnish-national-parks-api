@@ -91,7 +91,8 @@ describe('migrateDatabase', () => {
       '0040_trip_visit_publication_status.sql',
       '0041_trip_route_cache_fingerprints.sql',
       '0042_home_featured_visit.sql',
-      '0043_park_featured_image.sql'
+      '0043_park_featured_image.sql',
+      '0044_park_description.sql'
     ]);
     expect(parkTypes.rows.map((row) => String(row.slug))).toEqual([
       'outdoor-recreation-area',
@@ -124,6 +125,9 @@ describe('migrateDatabase', () => {
     expect(parkColumns.rows.some((row) => String(row.name) === 'imported_slug')).toBe(true);
     expect(parkColumns.rows.some((row) => String(row.name) === 'imported_marker_lat')).toBe(true);
     expect(parkColumns.rows.some((row) => String(row.name) === 'imported_marker_lon')).toBe(true);
+    expect(
+      parkColumns.rows.some((row) => String(row.name) === 'description' && row.notnull === 0)
+    ).toBe(true);
     expect(parkColumns.rows.some((row) => String(row.name) === 'has_magnet')).toBe(true);
     expect(parkColumns.rows.some((row) => String(row.name) === 'imported_has_magnet')).toBe(true);
     expect(parkColumns.rows.some((row) => String(row.name) === 'imported_location_label')).toBe(
@@ -247,7 +251,8 @@ describe('migrateDatabase', () => {
       '0040_trip_visit_publication_status.sql',
       '0041_trip_route_cache_fingerprints.sql',
       '0042_home_featured_visit.sql',
-      '0043_park_featured_image.sql'
+      '0043_park_featured_image.sql',
+      '0044_park_description.sql'
     ]);
     expect(schemaMigrationTableBeforeApply.rows).toEqual([]);
     expect(pendingAfterApply).toEqual([]);

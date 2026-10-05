@@ -136,6 +136,64 @@ describe('API routes', () => {
     });
   };
 
+  it('lets an admin save, preserve and clear a public Markdown park description', async () => {
+    const app = createAuthedApp();
+    const path = '/api/parks/akasmannyn-kansallispuisto';
+    const initial = await app.request(path);
+    expect(await initial.json()).toMatchObject({ description: null });
+    const initialEtag = initial.headers.get('etag');
+    expect(initialEtag).toContain(':description-v1:');
+    const legacyRead = await app.request(path, {
+      headers: { 'if-none-match': initialEtag!.replace(':description-v1', '') }
+    });
+    expect(legacyRead.status).toBe(200);
+    expect(await legacyRead.json()).toMatchObject({ description: null });
+    const patch = (body: Record<string, unknown>) =>
+      requestAsAdmin(app, path, {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+    const description = '**Metsäpolkuja**\n\n- [Kartta](https://example.com/kartta)';
+    const saved = await patch({ description: `  ${description}\n ` });
+    expect(saved.status).toBe(200);
+    expect(saved.headers.get('cache-control')).toBe('private, no-store');
+    expect(await saved.json()).toMatchObject({ description });
+    const publicRead = await app.request(path, {
+      headers: { 'if-none-match': initialEtag! }
+    });
+    expect(publicRead.status).toBe(200);
+    expect(publicRead.headers.get('etag')).not.toBe(initialEtag);
+    expect(await publicRead.json()).toMatchObject({ description });
+    expect(await (await patch({ hasMagnet: true })).json()).toMatchObject({ description });
+    const list = (await (await app.request('/api/parks')).json()) as { parks: unknown[] };
+    expect(list.parks[0]).not.toHaveProperty('description');
+    for (const cleared of [null, '   \n ']) {
+      const response = await patch({ description: cleared });
+      expect(response.status).toBe(200);
+      expect(await response.json()).toMatchObject({ description: null });
+    }
+    expect((await patch({ description: 'a'.repeat(5000) })).status).toBe(200);
+    expect((await patch({ description: 'a'.repeat(5001) })).status).toBe(400);
+    expect(
+      (
+        await app.request(path, {
+          method: 'PATCH',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ description: 'Unauthorized' })
+        })
+      ).status
+    ).toBe(401);
+    await testDatabase.database
+      .update(parks)
+      .set({ removed: true })
+      .where(eq(parks.slug, 'akasmannyn-kansallispuisto'));
+    const hiddenRead = await requestAsAdmin(app, path);
+    expect(hiddenRead.headers.get('cache-control')).toBe('private, no-store');
+    expect(await hiddenRead.json()).toMatchObject({ description: 'a'.repeat(5000) });
+    expect((await app.request(path)).status).toBe(404);
+  });
+
   const createVisit = async (
     app: ReturnType<typeof createApp>,
     slug: string,
