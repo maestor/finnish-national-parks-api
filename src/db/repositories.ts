@@ -38,6 +38,7 @@ import {
   homeFeaturedVisit,
   importRuns,
   mediaUploads,
+  parkFeaturedImages,
   parks,
   parkTypes,
   parkVisits,
@@ -3295,7 +3296,9 @@ export const getParkBySlug = async (
   getMapPublicUrl?: GetMapPublicUrl
 ) => {
   const row = await getTypedParkBySlug(database, slug);
-  return row ? await toPark(row, getLogoPublicUrl, getMapPublicUrl) : null;
+  return row
+    ? { ...(await toPark(row, getLogoPublicUrl, getMapPublicUrl)), featuredImage: null }
+    : null;
 };
 
 export const getParkBySlugIncludingRemoved = async (
@@ -3305,7 +3308,9 @@ export const getParkBySlugIncludingRemoved = async (
   getMapPublicUrl?: GetMapPublicUrl
 ) => {
   const row = await getTypedParkBySlugIncludingRemoved(database, slug);
-  return row ? await toPark(row, getLogoPublicUrl, getMapPublicUrl) : null;
+  return row
+    ? { ...(await toPark(row, getLogoPublicUrl, getMapPublicUrl)), featuredImage: null }
+    : null;
 };
 
 export const listVisits = async (
@@ -3817,6 +3822,102 @@ export const listTripArchive = async (
     )
   };
 };
+
+const publishedParkImageWhere = (parkId: number) =>
+  and(eq(parkVisits.parkId, parkId), eq(parkVisits.status, 'published'));
+
+export const hasParkImageCandidates = async (database: DbClient, parkId: number) => {
+  const rows = await database
+    .select({ id: visitImages.id })
+    .from(visitImages)
+    .innerJoin(parkVisits, eq(parkVisits.id, visitImages.visitId))
+    .where(publishedParkImageWhere(parkId))
+    .limit(1);
+  return rows.length > 0;
+};
+
+const parkImageRows = (database: DbClient, parkId: number) =>
+  database
+    .select({
+      image: visitImages,
+      park: { name: parks.name, removed: parks.removed },
+      visit: { id: parkVisits.id, visitedOn: parkVisits.visitedOn }
+    })
+    .from(visitImages)
+    .innerJoin(parkVisits, eq(parkVisits.id, visitImages.visitId))
+    .innerJoin(parks, eq(parks.id, parkVisits.parkId))
+    .where(publishedParkImageWhere(parkId))
+    .$dynamic();
+
+const toParkImageCandidate = async (
+  row: Awaited<ReturnType<typeof parkImageRows>>[number],
+  getImageUrl: (key: string) => Promise<string>
+) => ({
+  image: await toVisitImage(row.image, getImageUrl),
+  isPubliclyVisible: !row.park.removed,
+  reference: { imageId: row.image.id, source: 'visit-image' as const },
+  sourceId: row.visit.id,
+  sourceLabel: row.park.name,
+  visitedOn: row.visit.visitedOn
+});
+
+export const listParkImageCandidates = async (
+  database: DbClient,
+  parkId: number,
+  offset: number,
+  limit: number,
+  getImageUrl: (key: string) => Promise<string>
+) => {
+  const rows = await parkImageRows(database, parkId)
+    .orderBy(
+      desc(parkVisits.visitedOn),
+      desc(parkVisits.id),
+      asc(visitImages.displayOrder),
+      asc(visitImages.id)
+    )
+    .limit(limit + 1)
+    .offset(offset);
+  return {
+    images: await Promise.all(
+      rows.slice(0, limit).map((row) => toParkImageCandidate(row, getImageUrl))
+    ),
+    nextOffset: rows.length > limit ? offset + limit : null
+  };
+};
+
+export const getParkFeaturedImage = async (
+  database: DbClient,
+  parkId: number,
+  getImageUrl: (key: string) => Promise<string>
+) => {
+  const [row] = await parkImageRows(database, parkId).innerJoin(
+    parkFeaturedImages,
+    and(eq(parkFeaturedImages.parkId, parkId), eq(parkFeaturedImages.visitImageId, visitImages.id))
+  );
+  if (!row) return null;
+  return toParkImageCandidate(row, getImageUrl);
+};
+
+export const updateParkFeaturedImage = async (
+  database: Database,
+  parkId: number,
+  imageId: number | null
+) =>
+  database.transaction(async (tx) => {
+    if (imageId !== null) {
+      const [row] = await parkImageRows(tx, parkId).where(
+        and(publishedParkImageWhere(parkId), eq(visitImages.id, imageId))
+      );
+      if (!row) throw new RepositoryValidationError('Park featured image is unavailable.');
+      await tx
+        .insert(parkFeaturedImages)
+        .values({ parkId, visitImageId: imageId })
+        .onConflictDoUpdate({ target: parkFeaturedImages.parkId, set: { visitImageId: imageId } });
+    } else {
+      await tx.delete(parkFeaturedImages).where(eq(parkFeaturedImages.parkId, parkId));
+    }
+    await bumpPublicVisitDataVersion(tx, new Date().toISOString());
+  });
 
 export const listTripImageCandidates = async (
   database: DbClient,

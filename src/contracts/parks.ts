@@ -109,15 +109,6 @@ export const adminParkVisibilityItemSchema = parkSearchItemSchema.extend({
   markerPoint: pointSchema
 });
 
-export const parkDetailSchema = parkListItemSchema.extend({
-  boundaryGeoJson: geoJsonFeatureCollectionSchema.optional(),
-  catalogStatus: z.enum(['active', 'inactive']),
-  lipasId: z.number().int(),
-  municipalityCode: z.number().int().nullable(),
-  sourceEventDate: z.string().datetime().nullable(),
-  updatedAt: z.string()
-});
-
 export const visitImageSchema = z.object({
   id: z.number().int(),
   fullUrl: z.string().url(),
@@ -157,6 +148,36 @@ export const tripImageCandidatesResponseSchema = z.object({
 
 export const updateTripFeaturedImageRequestSchema = z.object({
   featuredImage: tripImageReferenceSchema.nullable()
+});
+
+export const parkDetailSchema = parkListItemSchema.extend({
+  featuredImage: visitImageSchema.nullable(),
+  boundaryGeoJson: geoJsonFeatureCollectionSchema.optional(),
+  catalogStatus: z.enum(['active', 'inactive']),
+  lipasId: z.number().int(),
+  municipalityCode: z.number().int().nullable(),
+  sourceEventDate: z.string().datetime().nullable(),
+  updatedAt: z.string()
+});
+
+export const parkImageReferenceSchema = tripImageReferenceSchema.extend({
+  source: z.literal('visit-image')
+});
+export const parkImageCandidateSchema = tripImageCandidateSchema.extend({
+  reference: parkImageReferenceSchema
+});
+export const parkFeaturedImageResponseSchema = z.object({
+  featuredImage: parkImageCandidateSchema.nullable()
+});
+export const parkFeaturedImageSettingsSchema = parkFeaturedImageResponseSchema.extend({
+  hasImages: z.boolean()
+});
+export const parkImageCandidatesResponseSchema = z.object({
+  images: z.array(parkImageCandidateSchema),
+  nextOffset: z.number().int().nonnegative().nullable()
+});
+export const updateParkFeaturedImageRequestSchema = z.object({
+  featuredImage: parkImageReferenceSchema.nullable()
 });
 
 export const visitTripSchema = z.object({

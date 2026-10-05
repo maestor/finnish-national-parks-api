@@ -52,6 +52,7 @@ import {
   getHomeFeaturedVisitId,
   getParkBySlug,
   getParkBySlugIncludingRemoved,
+  getParkFeaturedImage,
   getParkVisitsBySlug,
   getPublicHomeSummary,
   getPublicMapSummary,
@@ -71,11 +72,13 @@ import {
   getVisitById,
   getYearReviewImageAssetsByVisitId,
   getYearReviewTripFeaturedImageAssetsByTripId,
+  hasParkImageCandidates,
   isAdminInvitationUsable,
   listAdminParkVisibility,
   listAdminUsers,
   listAdminVisits,
   listHomeFeaturedVisitCandidates,
+  listParkImageCandidates,
   listParkSearchEntries,
   listPublicParks,
   listPublicTrips,
@@ -102,6 +105,7 @@ import {
   updateAdminUser,
   updateHomeFeaturedVisit,
   updateParkDetails,
+  updateParkFeaturedImage,
   updateParkRemoved,
   updatePublishedDateRangeReviewShareByShareId,
   updateTrip,
@@ -177,6 +181,7 @@ import {
   deleteVisitImageRoute,
   deleteVisitRoute,
   getAdminHomeFeaturedVisitRoute,
+  getAdminParkFeaturedImageRoute,
   getAdminParkVisitsRoute,
   getAdminVisitRoute,
   getParkRoute,
@@ -184,6 +189,7 @@ import {
   getPublicHomeSummaryRoute,
   getPublicMapSummaryRoute,
   getVisitRoute,
+  listAdminParkImagesRoute,
   listAdminParkVisibilityRoute,
   listAdminVisitsRoute,
   listParkSearchRoute,
@@ -192,6 +198,7 @@ import {
   listVisitsTimelineRoute,
   reorderVisitImagesRoute,
   updateAdminHomeFeaturedVisitRoute,
+  updateAdminParkFeaturedImageRoute,
   updateParkRemovedRoute,
   updateParkRoute,
   updateVisitRoute,
@@ -1750,6 +1757,63 @@ export const createApp = ({
       return context.json(visibility, 200);
     });
 
+    app.openapi(listAdminParkImagesRoute, async (context) => {
+      context.header('Cache-Control', PRIVATE_CACHE_CONTROL);
+      const authFailure = await requireAdminSession(context, auth);
+      if (authFailure) return authFailure;
+      const { slug } = context.req.valid('param');
+      const park = await findParkRecordBySlugIncludingRemoved(database, slug);
+      if (!park) return context.json(jsonNotFound('Park not found.'), 404);
+      const { offset, limit } = context.req.valid('query');
+      const result = await listParkImageCandidates(
+        database,
+        park.id,
+        offset,
+        limit,
+        getImagePublicUrl
+      );
+      if (!storage && result.images.length > 0)
+        return context.json({ error: 'Image storage is not configured.' }, 503);
+      return context.json(result, 200);
+    });
+
+    app.openapi(getAdminParkFeaturedImageRoute, async (context) => {
+      context.header('Cache-Control', PRIVATE_CACHE_CONTROL);
+      const authFailure = await requireAdminSession(context, auth);
+      if (authFailure) return authFailure;
+      const { slug } = context.req.valid('param');
+      const park = await findParkRecordBySlugIncludingRemoved(database, slug);
+      if (!park) return context.json(jsonNotFound('Park not found.'), 404);
+      const hasImages = await hasParkImageCandidates(database, park.id);
+      if (!storage && hasImages)
+        return context.json({ error: 'Image storage is not configured.' }, 503);
+      const featuredImage = await getParkFeaturedImage(database, park.id, getImagePublicUrl);
+      return context.json({ featuredImage, hasImages }, 200);
+    });
+
+    app.openapi(updateAdminParkFeaturedImageRoute, async (context) => {
+      context.header('Cache-Control', PRIVATE_CACHE_CONTROL);
+      const authFailure = await requireAdminSession(context, auth);
+      if (authFailure) return authFailure;
+      const { slug } = context.req.valid('param');
+      const park = await findParkRecordBySlugIncludingRemoved(database, slug);
+      if (!park) return context.json(jsonNotFound('Park not found.'), 404);
+      const { featuredImage } = context.req.valid('json');
+      if (featuredImage && !storage)
+        return context.json({ error: 'Image storage is not configured.' }, 503);
+      try {
+        await updateParkFeaturedImage(database, park.id, featuredImage?.imageId ?? null);
+      } catch (error) {
+        if (error instanceof RepositoryValidationError)
+          return context.json({ error: error.message }, 422);
+        throw error;
+      }
+      return context.json(
+        { featuredImage: await getParkFeaturedImage(database, park.id, getImagePublicUrl) },
+        200
+      );
+    });
+
     app.openapi(getParkRoute, async (context) => {
       const { slug } = context.req.valid('param');
       const query = context.req.valid('query');
@@ -1768,12 +1832,23 @@ export const createApp = ({
         return context.json(jsonNotFound('Park not found.'), 404);
       }
 
+      const record = await findParkRecordBySlugIncludingRemoved(database, slug);
+      const featuredImage =
+        storage || getPublicMediaUrl
+          ? await getParkFeaturedImage(
+              database,
+              record!.id,
+              canViewRemovedPark ? getImagePublicUrl : publicMediaUrl
+            )
+          : null;
+      const parkWithImage = { ...park, featuredImage: featuredImage?.image ?? null };
+
       if (canViewRemovedPark) {
         context.header('Cache-Control', PRIVATE_CACHE_CONTROL);
 
         return context.json(
           {
-            ...park,
+            ...parkWithImage,
             ...(omitBoundary ? { boundaryGeoJson: undefined } : {})
           },
           200
@@ -1783,7 +1858,7 @@ export const createApp = ({
       const etag = createCatalogDetailEtag({
         includeBoundary,
         lipasId: park.lipasId,
-        updatedAt: park.updatedAt
+        updatedAt: `${park.updatedAt}:cover-v1:${(await getPublicVisitDataVersion(database)).version}`
       });
       context.header('Cache-Control', CATALOG_CACHE_CONTROL);
       context.header('ETag', etag);
@@ -1797,7 +1872,7 @@ export const createApp = ({
 
       return context.json(
         {
-          ...park,
+          ...parkWithImage,
           ...(omitBoundary ? { boundaryGeoJson: undefined } : {})
         },
         200
@@ -1822,7 +1897,11 @@ export const createApp = ({
           return context.json(jsonNotFound('Park not found.'), 404);
         }
 
-        return context.json(park, 200);
+        const record = await findParkRecordBySlugIncludingRemoved(database, park.slug);
+        const featuredImage = storage
+          ? await getParkFeaturedImage(database, record!.id, getImagePublicUrl)
+          : null;
+        return context.json({ ...park, featuredImage: featuredImage?.image ?? null }, 200);
       } catch (error) {
         const message = (error as Error).message;
 
