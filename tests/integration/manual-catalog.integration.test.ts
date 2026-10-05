@@ -1676,6 +1676,7 @@ describe('manual catalog imports', () => {
       .set({
         importedLocationLabel: 'Viikintie',
         importedName: 'Vanhentunut Viikki-kohde',
+        description: '**Viikin polut**',
         importedParkUrl: 'https://example.invalid/vanhentunut-viikki-kohde',
         importedSlug: 'vanhentunut-viikki-kohde',
         locationLabel: 'Viikintie',
@@ -1705,6 +1706,7 @@ describe('manual catalog imports', () => {
 
     const viikki = await getParkBySlug(testDatabase.database, 'viikin-luontoalue');
     expect(viikki).toMatchObject({
+      description: '**Viikin polut**',
       lipasId: 9002046,
       locationLabel: 'Hakalantie 1',
       name: 'Viikin luontoalue',

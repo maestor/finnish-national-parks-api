@@ -151,6 +151,7 @@ export const updateTripFeaturedImageRequestSchema = z.object({
 });
 
 export const parkDetailSchema = parkListItemSchema.extend({
+  description: z.string().nullable(),
   featuredImage: visitImageSchema.nullable(),
   boundaryGeoJson: geoJsonFeatureCollectionSchema.optional(),
   catalogStatus: z.enum(['active', 'inactive']),
@@ -611,6 +612,7 @@ export const updateParkRemovedRequestSchema = z.object({
 
 export const updateParkRequestSchema = z
   .object({
+    description: z.string().max(5000).nullable().optional(),
     areaKm2: z.number().nonnegative().nullable().optional(),
     displayTypeName: z.string().max(120).nullable().optional(),
     establishmentYear: z.number().int().nullable().optional(),
@@ -625,6 +627,7 @@ export const updateParkRequestSchema = z
   })
   .refine(
     (input) =>
+      input.description !== undefined ||
       input.areaKm2 !== undefined ||
       input.displayTypeName !== undefined ||
       input.establishmentYear !== undefined ||

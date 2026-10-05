@@ -46,6 +46,7 @@ export const parks = sqliteTable(
     name: text('name').notNull(),
     importedName: text('imported_name'),
     displayTypeName: text('display_type_name'),
+    description: text('description'),
     importedDisplayTypeName: text('imported_display_type_name'),
     areaKm2: real('area_km2'),
     importedAreaKm2: real('imported_area_km2'),

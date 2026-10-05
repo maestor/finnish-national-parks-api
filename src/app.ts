@@ -1858,7 +1858,7 @@ export const createApp = ({
       const etag = createCatalogDetailEtag({
         includeBoundary,
         lipasId: park.lipasId,
-        updatedAt: `${park.updatedAt}:cover-v1:${(await getPublicVisitDataVersion(database)).version}`
+        updatedAt: `${park.updatedAt}:description-v1:cover-v1:${(await getPublicVisitDataVersion(database)).version}`
       });
       context.header('Cache-Control', CATALOG_CACHE_CONTROL);
       context.header('ETag', etag);

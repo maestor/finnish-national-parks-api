@@ -374,6 +374,7 @@ export type PublishedDateRangeReviewShare = {
 };
 
 type UpdateParkDetailsInput = {
+  description?: string | null | undefined;
   areaKm2?: number | null | undefined;
   displayTypeName?: string | null | undefined;
   establishmentYear?: number | null | undefined;
@@ -3297,7 +3298,11 @@ export const getParkBySlug = async (
 ) => {
   const row = await getTypedParkBySlug(database, slug);
   return row
-    ? { ...(await toPark(row, getLogoPublicUrl, getMapPublicUrl)), featuredImage: null }
+    ? {
+        ...(await toPark(row, getLogoPublicUrl, getMapPublicUrl)),
+        description: row.park.description,
+        featuredImage: null
+      }
     : null;
 };
 
@@ -3309,7 +3314,11 @@ export const getParkBySlugIncludingRemoved = async (
 ) => {
   const row = await getTypedParkBySlugIncludingRemoved(database, slug);
   return row
-    ? { ...(await toPark(row, getLogoPublicUrl, getMapPublicUrl)), featuredImage: null }
+    ? {
+        ...(await toPark(row, getLogoPublicUrl, getMapPublicUrl)),
+        description: row.park.description,
+        featuredImage: null
+      }
     : null;
 };
 
@@ -4882,6 +4891,10 @@ export const updateParkDetails = async (
     .update(parks)
     .set({
       areaKm2: input.areaKm2 === undefined ? park.areaKm2 : input.areaKm2,
+      description:
+        input.description === undefined
+          ? park.description
+          : normalizeOptionalText(input.description),
       displayTypeName:
         input.displayTypeName === undefined
           ? park.displayTypeName
