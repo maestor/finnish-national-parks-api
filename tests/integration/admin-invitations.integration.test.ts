@@ -166,7 +166,7 @@ describe('admin invitations', () => {
     );
 
     expect(callbackResponse.status).toBe(302);
-    expect(callbackResponse.headers.get('location')).toBe('http://localhost:4300/control-panel');
+    expect(callbackResponse.headers.get('location')).toBe('http://localhost:4300/hallinta');
     expect(extractCookies(callbackResponse).__session).toBeDefined();
 
     const provisionedAdmin = await testDatabase.database
@@ -224,7 +224,7 @@ describe('admin invitations', () => {
     };
     const callbackResponse = await app.request(callbackPath, { headers: callbackHeaders });
 
-    expect(callbackResponse.headers.get('location')).toBe('http://localhost:4300/control-panel');
+    expect(callbackResponse.headers.get('location')).toBe('http://localhost:4300/hallinta');
 
     const secondStartResponse = await app.request(`/auth/google?invite=${token}`);
     expect(secondStartResponse.headers.get('location')).toBe(

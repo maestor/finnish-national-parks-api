@@ -121,6 +121,7 @@ If an upload limit exists, at least one test should cover the real stored-object
 - Park logo upload logic verifies the park slug, prefers `data/logos/<slug>.png`, falls back to `data/logos/display-types/<normalized-display-type>.png` when a park shares a display type, uploads the resolved file once to the matching R2 key, and persists the logo reference in the database.
 - Auth routes bypass bearer-token middleware.
 - Google OAuth callback validates state/PKCE, verifies the ID token, checks the admin allowlist, and sets a session cookie.
+- OAuth return tests use real temporary databases and signed Google-token fixtures to prove direct public-page return (with query/fragment) for both direct API and frontend-proxied callbacks, canonical `/hallinta` fallback, unsafe/tampered-cookie rejection, destination reset/clearing, production cookie flags, unchanged failure redirects, and the optional `returnTo` OpenAPI contract.
 - `GET /auth/me` returns the current user from a valid session or `401` otherwise.
 - `POST /auth/logout` clears the session cookie.
 - Runtime API handlers are implemented against the same Zod/OpenAPI contract definitions.

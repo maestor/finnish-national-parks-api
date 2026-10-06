@@ -122,6 +122,7 @@ describe('google oauth', () => {
   afterEach(async () => {
     await testDatabase.dispose();
     vi.restoreAllMocks();
+    vi.unstubAllEnvs();
   });
 
   it('redirects to google auth url with state and pkce cookies', async () => {
@@ -137,6 +138,177 @@ describe('google oauth', () => {
     const cookies = extractCookies(response);
     expect(cookies.__oauth_state).toBeDefined();
     expect(cookies.__oauth_pkce).toBeDefined();
+  });
+
+  it.each([undefined, 'http://localhost:4300/auth/google/callback'])(
+    'returns directly to the public destination with callback URI %s',
+    async (googleRedirectUri) => {
+      global.fetch = mockFetch([
+        {
+          url: googleClaimsFixtureUrl,
+          body: {
+            aud: authConfig.googleClientId,
+            email: 'admin@example.com',
+            exp: Math.floor(Date.now() / 1000) + 3600,
+            iss: 'https://accounts.google.com',
+            sub: 'google-user-id'
+          }
+        }
+      ]);
+      await testDatabase.database.insert(admins).values({
+        createdAt: '2026-05-01T10:00:00.000Z',
+        email: 'admin@example.com',
+        googleSub: 'google-user-id',
+        updatedAt: '2026-05-01T10:00:00.000Z'
+      });
+      const app = createApp({
+        auth: googleRedirectUri === undefined ? authConfig : { ...authConfig, googleRedirectUri },
+        database: testDatabase.database
+      });
+      const returnTo = '/reissusuunnittelu?paikka=pallas#reitti';
+      const startUrl = new URL('http://localhost:3004/auth/google');
+      startUrl.searchParams.set('returnTo', returnTo);
+      const start = await app.request(startUrl.toString());
+      const cookies = extractCookies(start);
+
+      expect(new URL(start.headers.get('location') ?? '').searchParams.get('redirect_uri')).toBe(
+        googleRedirectUri ?? 'http://localhost:3004/auth/google/callback'
+      );
+      expect(decodeURIComponent(cookies.__oauth_return ?? '')).toBe(returnTo);
+      const returnCookie = start.headers
+        .getSetCookie()
+        .find((cookie) => cookie.startsWith('__oauth_return='));
+      expect(returnCookie).toContain('HttpOnly');
+      expect(returnCookie).toContain('SameSite=Lax');
+      expect(returnCookie).toContain('Max-Age=600');
+      expect(returnCookie).toContain('Path=/');
+
+      const callback = await app.request(
+        `http://localhost:3004/auth/google/callback?code=auth-code&state=${cookies.__oauth_state}`,
+        {
+          headers: {
+            cookie: `__oauth_state=${cookies.__oauth_state}; __oauth_pkce=${cookies.__oauth_pkce}; __oauth_return=${cookies.__oauth_return}`
+          }
+        }
+      );
+
+      expect(callback.status).toBe(302);
+      expect(callback.headers.get('location')).toBe(`${authConfig.frontendUrl}${returnTo}`);
+      expect(extractCookies(callback).__session).toBeDefined();
+      expect(
+        callback.headers.getSetCookie().find((cookie) => cookie.startsWith('__oauth_return='))
+      ).toContain('Max-Age=0');
+      expect(callback.headers.get('cache-control')).toBe('private, no-store');
+    }
+  );
+
+  it('clears a previous destination when starting login without a return path', async () => {
+    const app = createApp({ auth: authConfig, database: testDatabase.database });
+    const start = await app.request('/auth/google', {
+      headers: { cookie: '__oauth_return=%2Fretket' }
+    });
+
+    expect(
+      start.headers.getSetCookie().find((cookie) => cookie.startsWith('__oauth_return='))
+    ).toContain('Max-Age=0');
+  });
+
+  it.each([
+    'https://evil.example/phish',
+    '//evil.example/phish',
+    '/retket/..//evil.example/phish',
+    '/\\evil.example/phish',
+    '/auth/logout',
+    '/hallinta',
+    '/kirjaudu?error=auth_failed'
+  ])('ignores unsafe destination %j even when its cookie is tampered with', async (returnTo) => {
+    global.fetch = mockFetch([
+      {
+        url: googleClaimsFixtureUrl,
+        body: {
+          aud: authConfig.googleClientId,
+          email: 'admin@example.com',
+          exp: Math.floor(Date.now() / 1000) + 3600,
+          iss: 'https://accounts.google.com',
+          sub: 'google-user-id'
+        }
+      }
+    ]);
+    await testDatabase.database.insert(admins).values({
+      createdAt: '2026-05-01T10:00:00.000Z',
+      email: 'admin@example.com',
+      googleSub: 'google-user-id',
+      updatedAt: '2026-05-01T10:00:00.000Z'
+    });
+    const app = createApp({ auth: authConfig, database: testDatabase.database });
+    const start = await app.request(`/auth/google?${new URLSearchParams({ returnTo })}`);
+    expect(
+      start.headers.getSetCookie().find((cookie) => cookie.startsWith('__oauth_return='))
+    ).toContain('Max-Age=0');
+    const cookies = extractCookies(start);
+    const callback = await app.request(
+      `/auth/google/callback?code=auth-code&state=${cookies.__oauth_state}`,
+      {
+        headers: {
+          cookie: `__oauth_state=${cookies.__oauth_state}; __oauth_pkce=${cookies.__oauth_pkce}; __oauth_return=${encodeURIComponent(returnTo)}`
+        }
+      }
+    );
+
+    expect(callback.headers.get('location')).toBe(`${authConfig.frontendUrl}/hallinta`);
+    expect(extractCookies(callback).__session).toBeDefined();
+  });
+
+  it('keeps return cookies secure in production and clears them on failure', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    const app = createApp({ auth: authConfig, database: testDatabase.database });
+    const start = await app.request('https://api.example.com/auth/google?returnTo=%2Fretket');
+    expect(
+      start.headers.getSetCookie().find((cookie) => cookie.startsWith('__oauth_return='))
+    ).toContain('Secure');
+
+    const callback = await app.request(
+      'https://api.example.com/auth/google/callback?error=access_denied'
+    );
+    const clearedCookie = callback.headers
+      .getSetCookie()
+      .find((cookie) => cookie.startsWith('__oauth_return='));
+    expect(clearedCookie).toContain('Secure');
+    expect(clearedCookie).toContain('Max-Age=0');
+  });
+
+  it('documents the optional return destination and rejects oversized query values', async () => {
+    const app = createApp({ auth: authConfig, database: testDatabase.database });
+    const schema = (await (await app.request('/openapi.json')).json()) as {
+      paths: { '/auth/google': { get: { parameters: unknown[] } } };
+    };
+    expect(schema.paths['/auth/google'].get.parameters).toContainEqual(
+      expect.objectContaining({
+        in: 'query',
+        name: 'returnTo',
+        required: false,
+        schema: expect.objectContaining({ type: 'string', maxLength: 2048 })
+      })
+    );
+    const response = await app.request(
+      `/auth/google?${new URLSearchParams({ returnTo: '/'.repeat(2049) })}`
+    );
+    expect(response.status).toBe(400);
+  });
+
+  it('clears the destination on failed OAuth callbacks without returning to the public page', async () => {
+    const app = createApp({ auth: authConfig, database: testDatabase.database });
+    const callback = await app.request('/auth/google/callback?error=access_denied', {
+      headers: { cookie: '__oauth_return=%2Fretket' }
+    });
+
+    expect(callback.headers.get('location')).toBe(
+      `${authConfig.frontendUrl}/login?error=auth_failed`
+    );
+    expect(
+      callback.headers.getSetCookie().find((cookie) => cookie.startsWith('__oauth_return='))
+    ).toContain('Max-Age=0');
+    expect(extractCookies(callback).__session).toBeUndefined();
   });
 
   it('uses configured public redirect uri for proxied oauth deployments', async () => {
@@ -203,7 +375,7 @@ describe('google oauth', () => {
     );
 
     expect(callbackResponse.status).toBe(302);
-    expect(callbackResponse.headers.get('location')).toBe('http://localhost:4300/control-panel');
+    expect(callbackResponse.headers.get('location')).toBe('http://localhost:4300/hallinta');
   });
 
   it('completes callback and sets session cookie for allowed admin', async () => {
@@ -248,7 +420,7 @@ describe('google oauth', () => {
     );
 
     expect(callbackResponse.status).toBe(302);
-    expect(callbackResponse.headers.get('location')).toBe('http://localhost:4300/control-panel');
+    expect(callbackResponse.headers.get('location')).toBe('http://localhost:4300/hallinta');
 
     const sessionCookies = extractCookies(callbackResponse);
     expect(sessionCookies.__session).toBeDefined();
