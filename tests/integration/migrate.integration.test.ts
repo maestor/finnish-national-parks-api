@@ -92,7 +92,8 @@ describe('migrateDatabase', () => {
       '0041_trip_route_cache_fingerprints.sql',
       '0042_home_featured_visit.sql',
       '0043_park_featured_image.sql',
-      '0044_park_description.sql'
+      '0044_park_description.sql',
+      '0045_home_featured_park.sql'
     ]);
     expect(parkTypes.rows.map((row) => String(row.slug))).toEqual([
       'outdoor-recreation-area',
@@ -252,7 +253,8 @@ describe('migrateDatabase', () => {
       '0041_trip_route_cache_fingerprints.sql',
       '0042_home_featured_visit.sql',
       '0043_park_featured_image.sql',
-      '0044_park_description.sql'
+      '0044_park_description.sql',
+      '0045_home_featured_park.sql'
     ]);
     expect(schemaMigrationTableBeforeApply.rows).toEqual([]);
     expect(pendingAfterApply).toEqual([]);

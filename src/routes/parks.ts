@@ -2,6 +2,7 @@ import { createRoute, z } from '@hono/zod-openapi';
 
 import { errorSchema } from '../contracts/common.js';
 import {
+  adminHomeFeaturedParkResponseSchema,
   adminHomeFeaturedVisitResponseSchema,
   adminParkVisibilityResponseSchema,
   adminParkVisitsResponseSchema,
@@ -12,6 +13,7 @@ import {
   createVisitRequestSchema,
   directVisitImageUploadPlanSchema,
   directVisitImageUploadRequestSchema,
+  homeFeaturedParkSelectionSchema,
   homeFeaturedVisitSelectionSchema,
   parkDetailSchema,
   parkFeaturedImageResponseSchema,
@@ -323,6 +325,55 @@ export const updateAdminHomeFeaturedVisitRoute = createRoute({
     },
     422: {
       description: 'Visit is not public',
+      content: { 'application/json': { schema: errorSchema } }
+    },
+    503: {
+      description: 'Authentication unavailable',
+      content: { 'application/json': { schema: errorSchema } }
+    }
+  }
+});
+
+export const getAdminHomeFeaturedParkRoute = createRoute({
+  method: 'get',
+  path: '/api/admin/home-featured-park',
+  tags: ['Frontend'],
+  security: [{ bearerAuth: [], sessionAuth: [] }],
+  responses: {
+    200: {
+      description: 'Saved selection and eligible repeatedly visited parks',
+      content: { 'application/json': { schema: adminHomeFeaturedParkResponseSchema } }
+    },
+    401: {
+      description: 'Admin session required',
+      content: { 'application/json': { schema: errorSchema } }
+    },
+    503: {
+      description: 'Authentication unavailable',
+      content: { 'application/json': { schema: errorSchema } }
+    }
+  }
+});
+
+export const updateAdminHomeFeaturedParkRoute = createRoute({
+  method: 'patch',
+  path: '/api/admin/home-featured-park',
+  tags: ['Frontend'],
+  security: [{ bearerAuth: [], sessionAuth: [] }],
+  request: {
+    body: { content: { 'application/json': { schema: homeFeaturedParkSelectionSchema } } }
+  },
+  responses: {
+    200: {
+      description: 'Saved selection',
+      content: { 'application/json': { schema: homeFeaturedParkSelectionSchema } }
+    },
+    401: {
+      description: 'Admin session required',
+      content: { 'application/json': { schema: errorSchema } }
+    },
+    422: {
+      description: 'Park is not eligible',
       content: { 'application/json': { schema: errorSchema } }
     },
     503: {

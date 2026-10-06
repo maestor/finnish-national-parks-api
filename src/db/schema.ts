@@ -463,3 +463,8 @@ export const homeFeaturedVisit = sqliteTable('home_featured_visit', {
   id: integer('id').primaryKey(),
   visitId: integer('visit_id').references(() => parkVisits.id, { onDelete: 'set null' })
 });
+
+export const homeFeaturedPark = sqliteTable('home_featured_park', {
+  id: integer('id').primaryKey(),
+  parkId: integer('park_id').references(() => parks.id, { onDelete: 'set null' })
+});
