@@ -35,6 +35,7 @@ import {
   adminInvitations,
   admins,
   dateRangeReviewShares,
+  homeFeaturedPark,
   homeFeaturedVisit,
   importRuns,
   mediaUploads,
@@ -4118,6 +4119,95 @@ export const getPublicVisitDataVersion = async (
   return toPublicVisitVersion(await getPublicVisitDataVersionRecord(database));
 };
 
+const eligibleHomeParks = (database: DbClient) =>
+  database
+    .select({
+      id: parks.id,
+      name: parks.name,
+      slug: parks.slug,
+      visitCount: sql<number>`count(${parkVisits.id})`.mapWith(Number)
+    })
+    .from(parks)
+    .innerJoin(parkVisits, eq(parkVisits.parkId, parks.id))
+    .where(and(eq(parks.removed, false), eq(parkVisits.status, 'published')))
+    .groupBy(parks.id)
+    .having(sql`count(${parkVisits.id}) >= 2`)
+    .orderBy(asc(parks.name));
+
+export const listHomeFeaturedParkCandidates = async (database: Database) =>
+  (await eligibleHomeParks(database)).map(({ name, slug, visitCount }) => ({
+    name,
+    slug,
+    visitCount
+  }));
+
+export const getHomeFeaturedParkSlug = async (database: Database) => {
+  const [selection] = await database
+    .select({ slug: parks.slug })
+    .from(homeFeaturedPark)
+    .leftJoin(parks, eq(parks.id, homeFeaturedPark.parkId))
+    .where(eq(homeFeaturedPark.id, 1));
+  return selection?.slug ?? null;
+};
+
+export const updateHomeFeaturedPark = async (database: Database, parkSlug: string | null) =>
+  database.transaction(async (tx) => {
+    let parkId: number | null = null;
+    if (parkSlug !== null) {
+      const eligible = (await eligibleHomeParks(tx)).find((park) => park.slug === parkSlug);
+      if (!eligible) return false;
+      parkId = eligible.id;
+    }
+    await tx
+      .insert(homeFeaturedPark)
+      .values({ id: 1, parkId })
+      .onConflictDoUpdate({ target: homeFeaturedPark.id, set: { parkId } });
+    await bumpPublicVisitDataVersion(tx, new Date().toISOString());
+    return true;
+  });
+
+const getSelectedHomeParkPreview = async (
+  database: Database,
+  getImagePublicUrl: (key: string) => Promise<string>
+) => {
+  const [row] = await database
+    .select({
+      id: parks.id,
+      name: parks.name,
+      slug: parks.slug,
+      description: parks.description,
+      areaKm2: parks.areaKm2,
+      establishmentYear: parks.establishmentYear,
+      visitCount: sql<number>`count(${parkVisits.id})`.mapWith(Number),
+      displayTypeName: parks.displayTypeName,
+      type: parkTypes
+    })
+    .from(homeFeaturedPark)
+    .innerJoin(parks, eq(parks.id, homeFeaturedPark.parkId))
+    .innerJoin(parkTypes, eq(parkTypes.id, parks.typeId))
+    .innerJoin(parkVisits, eq(parkVisits.parkId, parks.id))
+    .where(
+      and(eq(homeFeaturedPark.id, 1), eq(parks.removed, false), eq(parkVisits.status, 'published'))
+    )
+    .groupBy(parks.id)
+    .having(sql`count(${parkVisits.id}) >= 2`);
+  if (!row) return null;
+  const cover = await getParkFeaturedImage(database, row.id, getImagePublicUrl);
+  return {
+    name: row.name,
+    slug: row.slug,
+    areaKm2: row.areaKm2,
+    establishmentYear: row.establishmentYear,
+    visitCount: row.visitCount,
+    displayTypeName: row.displayTypeName,
+    type: toParkType(row.type),
+    descriptionExcerpt: createTripDescriptionExcerpt(row.description),
+    featuredImage: cover?.image.fullUrl
+      ? { url: cover.image.fullUrl, width: cover.image.fullWidth, height: cover.image.fullHeight }
+      : null
+  };
+};
+
 export const getHomeFeaturedVisitId = async (database: Database) => {
   const [selection] = await database
     .select()
@@ -4242,15 +4332,23 @@ export const getPublicHomeSummary = async (
   database: Database,
   getImagePublicUrl: (key: string) => Promise<string>
 ) => {
-  const [parkRows, tripRows, visitRows, version, latestStandaloneVisit, featuredVisit] =
-    await Promise.all([
-      listPublicParkRows(database),
-      listTripArchiveRows(database, 1, null),
-      listPublicVisitRows(database),
-      getPublicVisitDataVersion(database),
-      getHomeVisitPreview(database, getImagePublicUrl, null),
-      getSelectedHomeVisitPreview(database, getImagePublicUrl)
-    ]);
+  const [
+    parkRows,
+    tripRows,
+    visitRows,
+    version,
+    latestStandaloneVisit,
+    featuredVisit,
+    featuredPark
+  ] = await Promise.all([
+    listPublicParkRows(database),
+    listTripArchiveRows(database, 1, null),
+    listPublicVisitRows(database),
+    getPublicVisitDataVersion(database),
+    getHomeVisitPreview(database, getImagePublicUrl, null),
+    getSelectedHomeVisitPreview(database, getImagePublicUrl),
+    getSelectedHomeParkPreview(database, getImagePublicUrl)
+  ]);
   const publicParks = await Promise.all(parkRows.map((row) => toPublicPark(row)));
   const visitsByParkId = new Map<number, PublicVisitRow[]>();
 
@@ -4341,6 +4439,7 @@ export const getPublicHomeSummary = async (
     latestTrip: trip ? toTripPreview(trip, featuredImages.get(trip.id)) : null,
     latestStandaloneVisit,
     featuredVisit,
+    featuredPark,
     magnetProgress: {
       totalParks: magnetParkIds.size,
       visitedParks: [...visitsByParkId.keys()].filter((id) => magnetParkIds.has(id)).length

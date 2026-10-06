@@ -65,6 +65,113 @@ describe('home memories API', () => {
   const visit = (body: object) =>
     write('/api/parks/akasmannyn-kansallispuisto/visits', { status: 'published', ...body });
 
+  it('features only visible parks with at least two published visits and keeps unavailable selections clearable', async () => {
+    const path = '/api/admin/home-featured-park';
+    const slug = 'akasmannyn-kansallispuisto';
+    expect(await (await app.request(path, { headers: { cookie } })).json()).toEqual({
+      parkSlug: null,
+      candidates: []
+    });
+    const first = await visit({ visitedOn: '2026-06-01' });
+    const second = await visit({ visitedOn: '2026-07-01', status: 'draft' });
+    const select = (parkSlug: string | null) => write(path, { parkSlug }, 'PATCH');
+    const candidates = async () => await (await app.request(path, { headers: { cookie } })).json();
+    expect(await candidates()).toHaveProperty('candidates', []);
+    await write(`/api/visits/${second.id}`, { status: 'published' }, 'PATCH');
+    expect(await candidates()).toMatchObject({ candidates: [{ slug, visitCount: 2 }] });
+    await write(
+      `/api/parks/${slug}`,
+      { description: '# Otsikko\n\nTuttu metsä.', establishmentYear: 1990, areaKm2: 12 },
+      'PATCH'
+    );
+    const cover = await image(first.id, 'park-cover');
+    await write(
+      `/api/admin/parks/${slug}/featured-image`,
+      { featuredImage: { imageId: cover.id, source: 'visit-image' } },
+      'PATCH'
+    );
+    const before = await summary();
+    await select(slug);
+    const selected = await summary();
+    expect(selected.etag).not.toBe(before.etag);
+    expect(selected.body).toHaveProperty(
+      'featuredPark',
+      expect.objectContaining({
+        slug,
+        descriptionExcerpt: 'Tuttu metsä.',
+        visitCount: 2,
+        establishmentYear: 1990,
+        areaKm2: 12,
+        featuredImage: expect.objectContaining({ width: 1200, height: 800 })
+      })
+    );
+    const extra = await visit({ visitedOn: '2026-09-01' });
+    expect((await summary()).body).toHaveProperty('featuredPark.visitCount', 3);
+    await write(`/api/visits/${extra.id}`, { status: 'draft' }, 'PATCH');
+    expect((await summary()).body).toHaveProperty('featuredPark.visitCount', 2);
+    const unavailableMedia = createApp({
+      auth,
+      database: db.database,
+      getPublicMediaUrl: async () => ''
+    });
+    expect(await (await unavailableMedia.request('/api/home-summary')).json()).toHaveProperty(
+      'featuredPark.featuredImage',
+      null
+    );
+    await write(`/api/visits/${second.id}`, { status: 'draft' }, 'PATCH');
+    expect((await summary()).body).toHaveProperty('featuredPark', null);
+    expect(await candidates()).toEqual({ parkSlug: slug, candidates: [] });
+    await write(`/api/visits/${second.id}`, { status: 'published' }, 'PATCH');
+    await write(`/api/parks/${slug}/removed`, { removed: true }, 'PATCH');
+    expect((await summary()).body).toHaveProperty('featuredPark', null);
+    await write(`/api/parks/${slug}/removed`, { removed: false }, 'PATCH');
+    await write(`/api/visits/${first.id}`, { status: 'draft' }, 'PATCH');
+    await visit({ visitedOn: '2026-08-01' });
+    expect((await summary()).body).toHaveProperty(
+      'featuredPark',
+      expect.objectContaining({ featuredImage: null })
+    );
+    await select(null);
+    expect((await summary()).body).toHaveProperty('featuredPark', null);
+    await select(slug);
+    await write(`/api/parks/${slug}`, { description: null }, 'PATCH');
+    expect((await summary()).body).toHaveProperty(
+      'featuredPark',
+      expect.objectContaining({ descriptionExcerpt: null })
+    );
+    await db.client.execute('DELETE FROM park_visits');
+    await db.client.execute("DELETE FROM parks WHERE slug = 'akasmannyn-kansallispuisto'");
+    expect(await candidates()).toEqual({ parkSlug: null, candidates: [] });
+    expect((await summary()).body).toHaveProperty('featuredPark', null);
+  });
+
+  it('protects featured parks and rejects malformed, missing, single-visit and hidden parks', async () => {
+    const path = '/api/admin/home-featured-park';
+    const patch = (body: object, headers: Record<string, string> = { cookie }) =>
+      app.request(path, {
+        method: 'PATCH',
+        headers: { ...headers, 'content-type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+    for (const method of ['GET', 'PATCH']) {
+      const options = {
+        method,
+        headers: { 'content-type': 'application/json' },
+        ...(method === 'PATCH' ? { body: JSON.stringify({ parkSlug: null }) } : {})
+      };
+      expect((await app.request(path, options)).status).toBe(401);
+      expect((await createApp({ database: db.database }).request(path, options)).status).toBe(503);
+    }
+    for (const body of [{}, { parkSlug: 1 }, { parkSlug: '' }])
+      expect((await patch(body)).status).toBe(400);
+    expect((await patch({ parkSlug: 'missing' })).status).toBe(422);
+    await visit({ visitedOn: '2026-06-01' });
+    expect((await patch({ parkSlug: 'akasmannyn-kansallispuisto' })).status).toBe(422);
+    await visit({ visitedOn: '2026-07-01' });
+    await write('/api/parks/akasmannyn-kansallispuisto/removed', { removed: true }, 'PATCH');
+    expect((await patch({ parkSlug: 'akasmannyn-kansallispuisto' })).status).toBe(422);
+  });
+
   it('lets admins select, replace and clear a public visit with fresh home validators', async () => {
     const path = '/api/admin/home-featured-visit';
     const initial = await summary();
@@ -250,6 +357,7 @@ describe('home memories API', () => {
     expect(Object.keys(body).sort()).toEqual(
       [
         'featuredVisit',
+        'featuredPark',
         'latestTrip',
         'latestStandaloneVisit',
         'magnetProgress',
@@ -532,7 +640,7 @@ describe('home memories API', () => {
     expect(cached.status).toBe(304);
     expect(await cached.text()).toBe('');
     const oldShape = await app.request('/api/home-summary', {
-      headers: { 'if-none-match': changed.etag.replace('public-summary:v3:', 'public-summary:v2:') }
+      headers: { 'if-none-match': changed.etag.replace('public-summary:v4:', 'public-summary:v3:') }
     });
     expect(oldShape.status).toBe(200);
   });

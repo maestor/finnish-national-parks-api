@@ -482,6 +482,31 @@ export const adminHomeFeaturedVisitResponseSchema = homeFeaturedVisitSelectionSc
   candidates: z.array(standaloneVisitPreviewSchema.pick({ id: true, park: true, visitedOn: true }))
 });
 
+export const homeFeaturedParkSelectionSchema = z.object({
+  parkSlug: z.string().min(1).nullable()
+});
+
+export const adminHomeFeaturedParkResponseSchema = homeFeaturedParkSelectionSchema.extend({
+  candidates: z.array(
+    z.object({ name: z.string(), slug: z.string(), visitCount: z.number().int().min(2) })
+  )
+});
+
+export const homeParkPreviewSchema = parkListItemSchema
+  .pick({
+    areaKm2: true,
+    establishmentYear: true,
+    displayTypeName: true,
+    name: true,
+    slug: true,
+    type: true
+  })
+  .extend({
+    visitCount: z.number().int().min(2),
+    descriptionExcerpt: z.string().nullable(),
+    featuredImage: tripArchiveFeaturedImageSchema.nullable()
+  });
+
 export const seasonalVisitCountsSchema = z.object({
   autumn: z.number().int(),
   spring: z.number().int(),
@@ -493,6 +518,7 @@ export const publicHomeSummaryResponseSchema = publicVisitVersionSchema.extend({
   latestTrip: tripPreviewSchema.nullable(),
   latestStandaloneVisit: standaloneVisitPreviewSchema.nullable(),
   featuredVisit: standaloneVisitPreviewSchema.nullable(),
+  featuredPark: homeParkPreviewSchema.nullable(),
   magnetProgress: z.object({
     visitedParks: z.number().int().nonnegative(),
     totalParks: z.number().int().nonnegative()
