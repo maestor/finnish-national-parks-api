@@ -71,11 +71,12 @@ authorized production-mode runtime and are tracked separately from this CI gate.
 
 ## Branch And PR Workflow
 
-- Create a dedicated branch for every change: `feature/<name>`, `bugfix/<name>`, `chore/<name>`, `docs/<name>`, etc.
-- If you are currently on `main`, create or switch to the correct work branch before editing files, running write-capable fixers, or staging changes.
+- Plans and prototypes confined to the shared, untracked Reissuvihko Plans vault do not enter the Git workflow: leave the current branch unchanged, even on `main`, and review the artifacts directly.
+- Create a dedicated branch for repository changes, including tracked documentation or agent instructions: `feature/<name>`, `bugfix/<name>`, `chore/<name>`, `docs/<name>`, etc.
+- If you are currently on `main`, create or switch to the correct work branch before editing repository files, running write-capable fixers against the repository, or staging changes.
 - Before the review pause on implementation work, finish the focused verification needed for the touched behavior, including closing obvious branch-coverage gaps in new routes, upload flows, and other conditional workflows. Save the full `npm run verify` gate for after user acceptance, but do not treat that final run as the first time uncovered branches are discovered.
 - After the review pause, treat a brief approval such as `done`, `looks good`, or `approved` as permission to continue the remaining PR-ready workflow steps unless the user explicitly asks to stop before verify, commit, or push.
-- Push the branch and open a pull request against `main`.
+- Push the branch and provide a compare link and PR notes for a pull request against `main`. The user creates the PR; agents never open or submit it.
 - Ensure focused verification is complete before requesting review, then run and pass `npm run verify` after user acceptance and before the PR-ready handoff.
 - User review and explicit acceptance are required before merging.
 - Do not push directly to `main`.
