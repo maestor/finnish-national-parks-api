@@ -3,12 +3,14 @@
 ## Always-on workflow
 
 - Read this file first. It contains the repository invariants that apply to every task.
-- Before a file or Git change, inspect `git branch --show-current`, `git status --short`, and the relevant diff. Do not work directly on `main`; create or switch to a branch named `feature/`, `bugfix/`, `chore/`, `docs/`, `refactor/`, or `test/`.
+- Before changing files in this repository or making Git changes, inspect `git branch --show-current`, `git status --short`, and the relevant diff. Do not edit repository files directly on `main`; create or switch to a branch named `feature/`, `bugfix/`, `chore/`, `docs/`, `refactor/`, or `test/`.
+- For planning or prototypes confined to the shared, untracked Reissuvihko Plans vault, preserve the current Git state, even on `main`: do not create or switch branches, commit, push, or prepare a PR handoff. This project exception takes precedence over general skill branch and delivery instructions. If the task expands to repository edits, apply the branch workflow immediately before the first repository change.
 - Preserve unrelated user changes in the worktree; do not reset, revert, or overwrite them.
 - Identify the owning area and current workflow phase before loading more context. Use targeted search (`rg`) and targeted file reads; do not preload entire README or development/testing documents.
 - Detailed documentation remains authoritative. “Do not preload the whole document” means “do not guess”: locate the relevant heading, read that section and enough surrounding context to understand it, and expand only when uncertainty or a cross-cutting concern requires it.
 - When documentation and implementation demonstrably drift, inspect the runtime code/config as the source of current behavior, then correct the documentation in the same task where appropriate.
 - Load project skills when their workflow or concern is reached, not all at startup. In particular: API/OpenAPI/generated consumers or contracts → `api-contract-sync`; tests/TDD → `intelligence-testing`; local verification → `local-first-verification`; documentation/planning → `project-documentation`; branch, commit, push, PR handoff, or cleanup → `git-pr-workflow`. Read the relevant local `SKILL.md` completely before acting on that concern.
+- Keep Reissuvihko-specific skill overrides in this file and repository documentation. Do not modify installed general skills or their supporting references to encode project-specific rules.
 
 ## Documentation routing
 
@@ -56,5 +58,5 @@ Use Codex’s built-in read-only `explorer` when the parent would otherwise insp
 
 ## Delivery
 
-- Use focused checks while implementing and pause for user review before the final verification gate. For documentation/repository-configuration-only changes, the full application gate may be skipped when the touched files are outside what it validates; state that exception clearly.
+- For repository changes, use focused checks while implementing and pause for user review before the final verification gate. For documentation/repository-configuration-only changes, the full application gate may be skipped when the touched files are outside what it validates; state that exception clearly. Vault-only planning ends with the plan/prototype review and does not enter the Git delivery workflow.
 - After acceptance, consult the Git workflow skill, run the required verification, commit coherent changes, push, and provide a compare link plus PR notes. The user remains responsible for creating the PR.
