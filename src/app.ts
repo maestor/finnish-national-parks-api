@@ -143,6 +143,12 @@ import {
 } from './http/google-oauth.js';
 import { logger } from './http/logger.js';
 import {
+  clearOAuthReturnCookie,
+  readOAuthReturnPath,
+  setOAuthReturnCookie,
+  validateOAuthReturnPath
+} from './http/oauth-return.js';
+import {
   clearSessionCookie,
   createSessionToken,
   getSessionCookie,
@@ -1422,7 +1428,7 @@ export const createApp = ({
         return c.json({ error: 'OAuth not configured.' }, 503);
       }
 
-      const { invite } = c.req.valid('query');
+      const { invite, returnTo } = c.req.valid('query');
 
       if (invite && !(await isAdminInvitationUsable(database, invite))) {
         return c.redirect(`${auth.frontendUrl}/login?error=invitation_invalid`, 302);
@@ -1434,6 +1440,7 @@ export const createApp = ({
 
       setOAuthStateCookie(c, state);
       setPkceCookie(c, codeVerifier);
+      setOAuthReturnCookie(c, validateOAuthReturnPath(returnTo, auth.frontendUrl));
       if (invite) {
         setAdminInvitationCookie(c, invite);
       } else {
@@ -1460,8 +1467,10 @@ export const createApp = ({
       const query = c.req.valid('query');
       const frontendUrl = auth.frontendUrl;
       const invitationToken = getAdminInvitationCookie(c);
+      const returnPath = readOAuthReturnPath(c, frontendUrl);
 
       clearAdminInvitationCookie(c);
+      clearOAuthReturnCookie(c);
 
       try {
         if (query.error) {
@@ -1526,7 +1535,7 @@ export const createApp = ({
 
         setSessionCookie(c, sessionToken, auth.cookieName);
 
-        return c.redirect(`${frontendUrl}/control-panel`, 302);
+        return c.redirect(new URL(returnPath ?? '/hallinta', frontendUrl).toString(), 302);
       } catch {
         return c.redirect(
           `${frontendUrl}/login?error=${invitationToken ? 'invitation_failed' : 'auth_failed'}`,

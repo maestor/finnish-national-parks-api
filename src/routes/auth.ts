@@ -33,7 +33,11 @@ export const googleAuthRoute = createRoute({
   path: '/auth/google',
   request: {
     query: z.object({
-      invite: z.string().max(256).optional()
+      invite: z.string().max(256).optional(),
+      returnTo: z.string().max(2048).optional().openapi({
+        description:
+          'Optional public frontend path to return to after successful login, including query and fragment'
+      })
     })
   },
   security: [],
