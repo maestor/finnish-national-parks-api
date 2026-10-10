@@ -211,6 +211,19 @@ Examples include:
 - simple RKY additions like `Loviisan alakaupunki`, `Louhisaaren kartano`, `Sipoonlinna`, and `Iniön kirkonkylä`
 - factory-village rows such as `Fiskarsin ruukki`, `Kauttuan ruukki`, and `Högforsin ruukki`, where feature narrowing or exclusions may be needed
 
+`vihdin-kirkonkyla` uses RKY item 4034, **Vihdin kirkonkylä ja Vanhalan viljelymaisema**.
+The published WFS feature (`rky_alue.845`) is one continuous polygon with no named
+sub-areas, so the import retains Vanhalan viljelymaisema in the boundary while
+using **Vihdin kirkonkylä** as the catalog name. Excluding the fields would require
+a separately reviewed manual boundary. The integration fixture preserves the
+published geometry fetched on 2026-10-10.
+
+For the two Vihti additions:
+
+```sh
+npm run import:special-parks -- vihdin-kirkonkyla nummelanharju
+```
+
 ### 6. World heritage WFS with feature ID filtering
 
 Use this when the source is the Museovirasto world-heritage layer and the importer needs one exact feature from a broader dataset.
@@ -252,6 +265,17 @@ Use this when the final stored geometry should live in the repo instead of being
 - `special://<slug>` maps to `src/importer/special-parks/data/<slug>.json`
 - the importer loads these files directly from the repo
 - `tests/fixtures/special-parks.ts` does not need an entry for local `special://` sources
+
+`special://nummelanharju` preserves the official LIPAS polygon for
+**Nummelanharjun MOBO-rata** (sports site `604132`), fetched on 2026-10-10.
+It represents the orienteering area in the northern part of the ridge, **not the
+full Nummelanharju recreation area**. The catalog entry is an outdoor recreation
+area with the Visit Vihti destination URL. Source identity, attribution, and the
+limited extent are recorded in the GeoJSON properties; LIPAS contact details and
+comments are not copied. Imports use this local snapshot without contacting LIPAS.
+Vihti's WFS advertises zoning recreation polygons, but fetching them requires
+credentials; its published route PDF does not supply a machine-readable area
+boundary. No new environment variables are needed for either Vihti addition.
 
 This workflow is already used for several different reasons:
 
