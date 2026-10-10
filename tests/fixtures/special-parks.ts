@@ -1081,6 +1081,16 @@ export const createSpecialParksSource = () => {
       };
     }
 
+    if (
+      sourceUrl.includes(
+        encodeURIComponent("kohdenimi='Vihdin kirkonkylä ja Vanhalan viljelymaisema'")
+      )
+    ) {
+      return JSON.parse(
+        await readFile(new URL('./museovirasto-vihdin-kirkonkyla.json', import.meta.url), 'utf-8')
+      );
+    }
+
     if (sourceUrl.includes('typeNames=rajapinta_suojellut:rky_alue')) {
       return {
         type: 'FeatureCollection',

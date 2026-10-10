@@ -56,7 +56,7 @@ describe('manual catalog imports', () => {
       now: () => '2026-05-27T08:00:00.000Z'
     });
 
-    expect(result.results).toHaveLength(158);
+    expect(result.results).toHaveLength(160);
 
     const merenkurkku = await getParkBySlug(
       testDatabase.database,
@@ -1413,7 +1413,7 @@ describe('manual catalog imports', () => {
     );
     const kevo = await getParkBySlug(testDatabase.database, 'kevon-luonnonpuisto');
 
-    expect(allParks).toHaveLength(158);
+    expect(allParks).toHaveLength(160);
     expect(merenkurkku).toMatchObject({ catalogStatus: 'active' });
     expect(kevo).toMatchObject({ catalogStatus: 'active' });
   });
@@ -1490,7 +1490,7 @@ describe('manual catalog imports', () => {
       database: testDatabase.database
     });
 
-    expect(result.results).toHaveLength(158);
+    expect(result.results).toHaveLength(160);
 
     const merenkurkku = await getParkBySlug(
       testDatabase.database,
@@ -1629,6 +1629,53 @@ describe('manual catalog imports', () => {
     expect(tammionSaaristokyla?.boundaryGeoJson?.features).toHaveLength(1);
     expect(tammionSaaristokyla?.boundingBox.maxLat).toBeLessThan(60.43);
     expect(tammionSaaristokyla?.boundingBox.maxLon).toBeLessThan(27.43);
+  });
+
+  it('imports Nummelanharju using the local LIPAS MOBO area snapshot', async () => {
+    const result = await importSpecialParks({
+      database: testDatabase.database,
+      includeSlugs: ['nummelanharju'],
+      now: () => '2026-10-10T12:00:00.000Z'
+    });
+
+    expect(result.results).toMatchObject([
+      { name: 'Nummelanharju', slug: 'nummelanharju', featureCount: 1 }
+    ]);
+    const park = await getParkBySlug(testDatabase.database, 'nummelanharju');
+    expect(park).toMatchObject({
+      lipasId: 9002054,
+      name: 'Nummelanharju',
+      parkUrl: 'https://www.visitvihti.fi/seikkailu/nummelanharju/',
+      postalOffice: 'Nummela',
+      type: { slug: 'outdoor-recreation-area' }
+    });
+    expect(park?.boundaryGeoJson?.features).toHaveLength(1);
+    expect(park?.boundaryGeoJson?.features[0]?.geometry.type).toBe('Polygon');
+    expect(park?.boundingBox.minLat).toBeCloseTo(60.335189, 5);
+    expect(park?.boundingBox.maxLat).toBeCloseTo(60.348698, 5);
+  });
+
+  it('imports Vihdin kirkonkylä with the published combined RKY boundary', async () => {
+    const result = await importSpecialParks({
+      database: testDatabase.database,
+      fetchSource: createSpecialParksSource(),
+      includeSlugs: ['vihdin-kirkonkyla'],
+      now: () => '2026-10-10T12:00:00.000Z'
+    });
+
+    expect(result.results).toMatchObject([
+      { name: 'Vihdin kirkonkylä', slug: 'vihdin-kirkonkyla', featureCount: 1 }
+    ]);
+    const park = await getParkBySlug(testDatabase.database, 'vihdin-kirkonkyla');
+    expect(park).toMatchObject({
+      lipasId: 9001092,
+      name: 'Vihdin kirkonkylä',
+      parkUrl: 'https://www.rky.fi/read/asp/r_kohde_det.aspx?KOHDE_ID=4034',
+      type: { slug: 'cultural-history-area' }
+    });
+    expect(park?.boundaryGeoJson?.features).toHaveLength(1);
+    expect(park?.boundingBox.minLon).toBeCloseTo(24.27246, 4);
+    expect(park?.boundingBox.maxLon).toBeCloseTo(24.32579, 4);
   });
 
   it('can import Isohaaran voimalaitos from the RKY source set', async () => {
@@ -1786,7 +1833,7 @@ describe('manual catalog imports', () => {
       now: () => '2026-05-27T08:00:00.000Z'
     });
 
-    expect(result.results).toHaveLength(158);
+    expect(result.results).toHaveLength(160);
   });
 
   it('fails clearly when a selected special-park slug is unknown', async () => {
