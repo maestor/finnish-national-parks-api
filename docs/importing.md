@@ -5,7 +5,7 @@ This repo has two import paths:
 - `npm run import:parks` for the main LIPAS-backed catalog import
 - `npm run import:special-parks` for curated non-LIPAS additions that still belong in the shared park catalog
 
-The main LIPAS import no longer blocks on raw upstream count drift.
+The main LIPAS import does not block on raw upstream count drift.
 When `npm run import:parks` finds brand-new parks, it imports them as removed so they stay hidden until you explicitly enable them from the admin UI, and it prints the newly added names in the CLI output.
 Use `npm run import:parks -- --dry-run` when you want that same preview without writing any database changes.
 
@@ -20,14 +20,6 @@ The normal special-import edit path is:
 - [tests/integration/manual-catalog.integration.test.ts](../tests/integration/manual-catalog.integration.test.ts)
 - [tests/fixtures/special-parks.ts](../tests/fixtures/special-parks.ts) when the source stays remote in tests
 - `src/importer/special-parks/data/<slug>.json` when the source should be stored locally as `special://...`
-
-When a batch adds new curated special parks for the user, finish the implementation pass by offering a copy-pasteable one-liner import command that lists the new slugs explicitly, for example:
-
-```bash
-npm run import:special-parks -- slug-one slug-two slug-three
-```
-
-That lets the user run the import, review the resulting catalog rows locally, and only then give final acceptance for the verify/commit/push phase.
 
 ## Source Selection
 
@@ -45,8 +37,6 @@ For geometry:
 - Prefer local `special://...` GeoJSON for municipality-specific manual imports once the official geometry choice is clear. That keeps the import stable and the tests deterministic.
 
 ## Helsinki Workflow
-
-Helsinki is important enough that it is worth following a consistent path.
 
 Start with the official open WFS:
 
@@ -85,12 +75,9 @@ Practical Helsinki rule of thumb:
 - use `YLRE_Viheralue_alue` when it already expresses the park as one or more official area polygons
 - use `YLRE_Katu_ja_viherosat_eiliikenne_alue` only when the detailed sub-areas are genuinely the best published representation of the park
 
-Example: `Tullisaaren kartanopuisto`
-
-- the official published geometry was easier to justify from `YLRE_Viheralue_alue`
-- the matching official park name in the source was `Henrik Borgströmin puisto`
-- the stored user-facing import still remained `Tullisaaren kartanopuisto`
-- the final stored geometry was copied into a repo-local `special://tullisaaren-kartanopuisto`
+Source names can differ from catalog names: `Tullisaaren kartanopuisto` uses
+`Henrik Borgströmin puisto` from `YLRE_Viheralue_alue`. Preserve the catalog name
+when storing the source geometry under `special://tullisaaren-kartanopuisto`.
 
 ## Vantaa municipal-plan workflow
 
@@ -148,7 +135,7 @@ This is a good fit when:
 - the destination polygon already matches the intended imported place
 - you want both official geometry and a Luontoon `parkUrl`
 
-Examples in the importer include `Paistjärvi` and the later batch of Luontoon destination areas.
+See `Paistjärvi` in the importer for an example config.
 
 ### 3. Luontoon route lines
 
@@ -211,6 +198,11 @@ Examples include:
 - simple RKY additions like `Loviisan alakaupunki`, `Louhisaaren kartano`, `Sipoonlinna`, and `Iniön kirkonkylä`
 - factory-village rows such as `Fiskarsin ruukki`, `Kauttuan ruukki`, and `Högforsin ruukki`, where feature narrowing or exclusions may be needed
 
+Feature filters select whole published features; they cannot trim part of a
+polygon. For example, `Vihdin kirkonkylä` includes Vanhalan viljelymaisema in its
+combined RKY boundary. A narrower boundary requires a separately reviewed local
+geometry.
+
 ### 6. World heritage WFS with feature ID filtering
 
 Use this when the source is the Museovirasto world-heritage layer and the importer needs one exact feature from a broader dataset.
@@ -247,11 +239,17 @@ Use the envelope filter when:
 
 ### 8. Repo-local `special://` geometry
 
-Use this when the final stored geometry should live in the repo instead of being fetched live every test run.
+Use this when imports should load a stored geometry snapshot instead of fetching
+the source live.
 
 - `special://<slug>` maps to `src/importer/special-parks/data/<slug>.json`
 - the importer loads these files directly from the repo
 - `tests/fixtures/special-parks.ts` does not need an entry for local `special://` sources
+
+Record the source URL or identifier, retrieval date, attribution, license, and
+geometry scope in the GeoJSON properties. Make limited coverage explicit: for
+example, `special://nummelanharju` covers the northern MOBO area, not the entire
+recreation area. Do not copy LIPAS contact details or comments into snapshots.
 
 This workflow is already used for several different reasons:
 

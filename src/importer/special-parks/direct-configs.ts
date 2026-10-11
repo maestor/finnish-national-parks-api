@@ -12,6 +12,20 @@ import type { SpecialParkConfig } from './types.js';
 
 export const baseSpecialParkConfigs: SpecialParkConfig[] = [
   {
+    displayTypeName: null,
+    locationLabel: 'Hiidenvedentie 3',
+    parkUrl: 'https://www.visitvihti.fi/seikkailu/nummelanharju/',
+    name: 'Nummelanharju',
+    parkTypeSlug: 'outdoor-recreation-area',
+    postalCode: '03100',
+    postalOffice: 'Nummela',
+    responseShapeVersion: 'manual-lipas-mobo-area-v1',
+    slug: 'nummelanharju',
+    // MOBO polygon covers the northern recreation area, not the full ridge.
+    sourceUrl: 'special://nummelanharju',
+    syntheticLipasId: 9_002_054
+  },
+  {
     displayTypeName: 'Maailmanperintökohde',
     locationLabel: 'Raippaluodontie 2',
     parkUrl: 'https://www.luontoon.fi/fi/kohteet/merenkurkun-maailmanperintoalue',

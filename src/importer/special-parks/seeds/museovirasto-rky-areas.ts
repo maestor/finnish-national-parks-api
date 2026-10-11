@@ -3,6 +3,16 @@ import type { MuseovirastoRkyAreaSeed } from '../types.js';
 export const sourceReadyHistoryRkyAreaSeeds: MuseovirastoRkyAreaSeed[] = [
   {
     displayTypeName: null,
+    parkUrl: 'https://www.rky.fi/read/asp/r_kohde_det.aspx?KOHDE_ID=4034',
+    name: 'Vihdin kirkonkylä',
+    parkTypeSlug: 'cultural-history-area',
+    slug: 'vihdin-kirkonkyla',
+    // RKY publishes the village and Vanhalan fields as one continuous polygon.
+    sourceName: 'Vihdin kirkonkylä ja Vanhalan viljelymaisema',
+    syntheticLipasId: 9_001_092
+  },
+  {
+    displayTypeName: null,
     parkUrl: null,
     name: 'Bengtskärin majakka',
     parkTypeSlug: 'cultural-history-area',
