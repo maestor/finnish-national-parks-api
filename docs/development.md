@@ -423,7 +423,7 @@ This is intentionally a narrow contract: `src/index.ts` is the one place that sh
 
 ### Production Data Operations
 
-Vercel only serves the HTTP API. Production schema migrations now belong in the GitHub Actions `Production Migration` workflow that runs on pushes to `main`, while catalog imports remain operator-run commands.
+Vercel only serves the HTTP API. Production schema migrations belong in the GitHub Actions `Production Migration` workflow that runs on pushes to `main`. The `Weekly LIPAS Import` workflow refreshes the catalog on Mondays at 09:43 Finland time and opens a review issue mentioning `@maestor` only when new parks are found. Manual catalog imports remain available. See [weekly LIPAS automation](./importing.md#weekly-lipas-automation) for notification retries, permissions and setup requirements.
 
 The workflow first checks whether production has any unapplied SQL migration files. It only takes a fresh Turso backup artifact and runs `npm run db:migrate` when pending migrations exist. Keep the manual commands below as the fallback path for recovery, first-time setup, or exceptional maintenance:
 

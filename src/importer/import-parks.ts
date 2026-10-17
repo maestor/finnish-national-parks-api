@@ -9,6 +9,7 @@ import {
   syncParkTypes,
   upsertImportedPark
 } from '../db/repositories.js';
+import { parkImportNotifications } from '../db/schema.js';
 import {
   getSupportedParkTypeByCode,
   hikingAreaDisplayTypeName,
@@ -42,6 +43,7 @@ type ImportParksOptions = {
   fetchSource?: (sourceUrl: string) => Promise<unknown>;
   fetchLuontoonSitemap?: ((sourceUrl: string) => Promise<string>) | undefined;
   markNewParksRemoved?: boolean;
+  queueNewParkNotification?: boolean;
   now?: () => string;
   sourceUrl: string;
 };
@@ -166,6 +168,7 @@ export const importParks = async ({
   fetchSource = defaultFetchSource,
   fetchLuontoonSitemap,
   markNewParksRemoved = false,
+  queueNewParkNotification = false,
   now = () => new Date().toISOString(),
   sourceUrl
 }: ImportParksOptions) => {
@@ -277,6 +280,19 @@ export const importParks = async ({
       }
 
       await markMissingParksInactive(tx, importedLipasIds, importRunId!, importedAt);
+
+      if (queueNewParkNotification && newParks.length > 0) {
+        await tx.insert(parkImportNotifications).values({
+          importRunId: importRunId!,
+          parksJson: JSON.stringify(
+            newParks.map(({ lipasId, name, typeName }) => ({
+              lipasId,
+              name,
+              typeName
+            }))
+          )
+        });
+      }
 
       if (dryRun) {
         throw new ImportDryRunRollbackError();

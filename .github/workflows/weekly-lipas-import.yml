@@ -1,0 +1,55 @@
+name: Weekly LIPAS Import
+
+on:
+  schedule:
+    - cron: '43 9 * * 1'
+      timezone: Europe/Helsinki
+
+concurrency:
+  group: production-database
+  cancel-in-progress: false
+
+jobs:
+  import-parks:
+    name: Import LIPAS parks and notify maestor
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: production
+    permissions:
+      contents: read
+      issues: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Backup production database
+        env:
+          DATABASE_AUTH_TOKEN: ${{ secrets.DATABASE_AUTH_TOKEN }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: npm run db:backup -- before-weekly-lipas-import
+
+      - name: Upload backup artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: weekly-lipas-db-backup-${{ github.run_id }}
+          path: data/backups/*.db
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Import parks and send review notifications
+        env:
+          DATABASE_AUTH_TOKEN: ${{ secrets.DATABASE_AUTH_TOKEN }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npm run import:parks:scheduled

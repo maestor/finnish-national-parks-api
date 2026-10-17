@@ -16,6 +16,13 @@ export const importRuns = sqliteTable('import_runs', {
   responseShapeVersion: text('response_shape_version').notNull()
 });
 
+export const parkImportNotifications = sqliteTable('park_import_notifications', {
+  importRunId: integer('import_run_id')
+    .primaryKey()
+    .references(() => importRuns.id),
+  parksJson: text('parks_json').notNull()
+});
+
 export const parkTypes = sqliteTable(
   'park_types',
   {

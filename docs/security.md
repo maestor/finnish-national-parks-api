@@ -134,6 +134,14 @@ Run a preview after bulk imports or large deletions and at least monthly. Produc
 
 ## External services
 
+Weekly LIPAS imports send only newly imported catalog names, type names and LIPAS
+IDs to review issues on the configured GitHub repository, mentioning `@maestor`.
+The Actions token is scoped to `contents: read` and `issues: write`; GitHub
+requests use the fixed `https://api.github.com` origin and a 30-second timeout.
+Failed reports remain in the owned database for retry. No contacts, notes,
+visits or credentials are included in review issues. See
+[weekly LIPAS automation](./importing.md#weekly-lipas-automation).
+
 Normal reads use the owned database rather than live upstream catalog requests. Geoapify is limited to the trip-planner operations, remains server-side, uses short timeouts, reuses identical requests in process, and returns `503` when unavailable. Shared libSQL/Turso controls separate per-client request admission from provider-credit reservations. Suggestions, route searches, and nearby searches retain their per-client minute limits; each actual uncached or new in-flight provider attempt reserves a conservative work-unit cost before network work, while cache hits and in-flight followers reserve zero. Public trip reads do not consume the per-client request bucket; cold route construction remains subject to the provider-wide daily ceiling. The paired UI proxy counts and caps planner request bodies at 16 KiB before buffering; the API counts actual request bytes before JSON validation. Confirm the daily limit, provider work-unit policy, and edge rules against the provider subscription before production exposure.
 
 ## Deployment requirements

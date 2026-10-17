@@ -282,6 +282,10 @@ Importer expectations:
 - Allow manually imported catalog rows, such as Merenkurkun maailmanperintöalue, to stay active outside the normal LIPAS cleanup path.
 - Read from the local/libSQL database during normal API requests instead of calling LIPAS live.
 
+The [weekly LIPAS workflow](./docs/importing.md#weekly-lipas-automation) imports
+parks every Monday at 09:43 Finland time and opens a review issue mentioning
+`@maestor` when new hidden parks are added. Manual imports remain unchanged.
+
 The supported manual catalog import currently covers:
 
 ```sh
