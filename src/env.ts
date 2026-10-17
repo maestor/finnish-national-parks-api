@@ -12,6 +12,11 @@ const envSchema = z.object({
   FRONTEND_URL: z.string().url().default('http://localhost:4300'),
   GEOAPIFY_API_KEY: z.string().min(1).optional(),
   GEOAPIFY_DAILY_REQUEST_LIMIT: z.coerce.number().int().min(5).default(3000),
+  GITHUB_REPOSITORY: z
+    .string()
+    .regex(/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/)
+    .optional(),
+  GITHUB_TOKEN: z.string().min(1).optional(),
   GOOGLE_CLIENT_ID: z.string().optional(),
   GOOGLE_CLIENT_SECRET: z.string().optional(),
   GOOGLE_REDIRECT_URI: z.string().url().optional(),

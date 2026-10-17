@@ -7,9 +7,49 @@ This repo has two import paths:
 
 The main LIPAS import does not block on raw upstream count drift.
 When `npm run import:parks` finds brand-new parks, it imports them as removed so they stay hidden until you explicitly enable them from the admin UI, and it prints the newly added names in the CLI output.
-Use `npm run import:parks -- --dry-run` when you want that same preview without writing any database changes.
+Use `npm run import:parks -- --dry-run` for the same preview without persisting
+imported parks or import runs. The manual CLI applies pending schema migrations
+before either mode; the scheduled command below never applies migrations.
 
 Use this guide when you need to reproduce or extend the curated special import workflow.
+
+## Weekly LIPAS automation
+
+The API repository's `Weekly LIPAS Import` workflow runs every Monday at 09:43
+in `Europe/Helsinki`, including daylight saving time. It has no manual trigger;
+continue using `npm run import:parks` for imports from your computer.
+
+Each run backs up production to a GitHub Actions artifact retained for 14 days,
+then runs `npm run import:parks:scheduled` using the `production` environment's
+existing `DATABASE_URL` and `DATABASE_AUTH_TOKEN` secrets. It shares the
+`production-database` concurrency group with production migrations and never
+applies migrations itself. Migration `0046_park_import_notifications.sql` must
+be applied by the normal production migration workflow before the first import.
+
+New parks stay hidden until enabled in the admin UI. A run with new parks opens
+one Finnish review issue with their names, types and LIPAS IDs, mentioning only
+`@maestor`. With no additions, it creates no issue. Existing parks are refreshed
+using the same import and preservation rules as the manual command; missing
+LIPAS-managed parks become inactive. Normal API reads remain local-first, and
+existing catalog ETag/cache and offline behavior is unchanged.
+
+Notification reports are queued in the same database transaction as the import.
+Failed notifications remain queued for the next scheduled run, which retries
+them before fetching LIPAS. A hidden import-run marker in each issue prevents
+duplicates if GitHub accepted an issue but database acknowledgement failed;
+closed issues are included in that check. Keep that marker when editing issues.
+Manual imports and dry runs do not queue GitHub notifications.
+
+GitHub supplies the short-lived `GITHUB_TOKEN` with `issues: write` and
+`GITHUB_REPOSITORY` to this workflow; no personal token or mail service is needed.
+Issues must be enabled on the repository. For email delivery, `maestor` must
+enable email for participating conversations in
+[GitHub notification settings](https://github.com/settings/notifications).
+Environment protection rules must allow unattended scheduled runs if fully
+automatic operation is desired. GitHub schedules can be delayed, and public
+repositories' schedules are disabled after 60 days without repository activity.
+After merging, verify the first scheduled run in Actions and the notification
+settings; local tests do not send real issues or emails.
 
 ## Entry Points
 

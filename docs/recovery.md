@@ -6,7 +6,7 @@ This runbook separates what the repository can prove locally from the backup, re
 
 - The production migration workflow creates a Turso SQLite backup only when a schema migration is pending. GitHub retains that workflow artifact for 14 days.
 - `npm run db:backup` can create a fresh local SQLite copy of the remote Turso database before a high-risk import, migration, or bulk administrative change.
-- The repository does not prove a recurring database-backup schedule, Turso PITR retention, R2 object versioning, an independent media copy, or a completed production restore drill. Those remain operator checks, not controls this code claims are configured.
+- The weekly LIPAS workflow also schedules a pre-import database backup, retained as a GitHub artifact for 14 days. Configuration alone does not prove successful recurring runs, Turso PITR retention, R2 object versioning, an independent media copy, or a completed production restore drill. Those remain operator checks; see [weekly LIPAS automation](./importing.md#weekly-lipas-automation).
 
 ## Safe database drill
 
