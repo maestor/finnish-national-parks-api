@@ -303,6 +303,31 @@ Examples include:
 - island and boundary snapshots such as `Seurasaari`, `Mustikkamaa`, `Seili`, and `Vallisaari`
 - pragmatic local proxies such as `Kuhakoski`
 
+#### Ruotsinkylän tutkimusmetsä
+
+Import the Tuusula outdoor recreation area with:
+
+```sh
+npm run import:special-parks -- ruotsinkylan-tutkimusmetsa
+```
+
+The local snapshot uses the blue `Tutkimusmetsä (465 ha)` outlines in
+[Luke's visitor map](https://www.luke.fi/fi/documents/ruotsinkylan-tutkimusmetsan-kartta),
+retrieved on 2026-10-17. It contains five simplified polygons and the central
+built-area exclusion. The raster PDF has no embedded georeferencing: its outlines
+were manually digitized and registered in ETRS-TM35FIN using OpenStreetMap road
+junctions. Source links, attribution, license notes, map dimensions and control
+points are recorded in the snapshot's collection-level `properties`.
+
+This is approximate map-display geometry, not a surveyed boundary. It covers
+the Tuusula visitor-map area, not the roughly 1,000 hectares of research land
+across five municipalities described on
+[Luke's destination page](https://www.luke.fi/fi/tietoa-lukesta/vierailukohteet/ruotsinkylan-tutkimusmetsa).
+The catalog area is the map's published 465 hectares, counted once; the digitized
+polygons total approximately 470 hectares. The marker is at Professorin pytinki
+near the Maisalantie entrance. Address metadata is `Maisalantie, 04360 Tuusula`.
+No new environment variables or remote runtime requests are needed.
+
 ### 9. Geological SYKE GeoJSON workflow
 
 Use this when the geometry comes from a non-protected-sites SYKE layer rather than the standard protected-sites WFS.

@@ -13,6 +13,22 @@ import type { SpecialParkConfig } from './types.js';
 export const baseSpecialParkConfigs: SpecialParkConfig[] = [
   {
     displayTypeName: null,
+    extractMetadata: extractGeoJsonAreaM2Metadata,
+    locationLabel: 'Maisalantie',
+    markerPoint: { lat: 60.361854, lon: 24.988811 },
+    parkUrl: 'https://www.luke.fi/fi/tietoa-lukesta/vierailukohteet/ruotsinkylan-tutkimusmetsa',
+    name: 'Ruotsinkylän tutkimusmetsä',
+    parkTypeSlug: 'outdoor-recreation-area',
+    postalCode: '04360',
+    postalOffice: 'Tuusula',
+    responseShapeVersion: 'luke-visitor-map-boundary-v1',
+    slug: 'ruotsinkylan-tutkimusmetsa',
+    // Approximate Tuusula visitor-map boundary; marker at Professorin pytinki.
+    sourceUrl: 'special://ruotsinkylan-tutkimusmetsa',
+    syntheticLipasId: 9_002_055
+  },
+  {
+    displayTypeName: null,
     locationLabel: 'Hiidenvedentie 3',
     parkUrl: 'https://www.visitvihti.fi/seikkailu/nummelanharju/',
     name: 'Nummelanharju',
