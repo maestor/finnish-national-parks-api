@@ -2,7 +2,7 @@ import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
   test: {
-    // Full-catalog importer integration tests insert 148 fixture records per
+    // Full-catalog importer integration tests insert 161 fixture records per
     // test; constrained CI runners need more headroom than the 5s default.
     testTimeout: 20000,
     coverage: {

@@ -1,0 +1,213 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Ruotsinkylän tutkimusmetsä",
+        "part": 1,
+        "area_m2": 4650000
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [24.995165, 60.373703],
+            [24.993248, 60.374956],
+            [24.991338, 60.373828],
+            [24.989204, 60.371761],
+            [24.995875, 60.36912],
+            [24.991346, 60.364643],
+            [24.988021, 60.365794],
+            [24.986058, 60.365515],
+            [24.98497, 60.364821],
+            [24.986055, 60.363304],
+            [24.984365, 60.363198],
+            [24.985634, 60.361003],
+            [24.987156, 60.361531],
+            [24.988476, 60.360782],
+            [24.992354, 60.359808],
+            [24.994794, 60.359242],
+            [24.996494, 60.359177],
+            [24.998457, 60.359456],
+            [24.999644, 60.360831],
+            [25.000937, 60.360506],
+            [25.001601, 60.361194],
+            [25.008434, 60.367314],
+            [25.008214, 60.368587],
+            [24.997222, 60.374749],
+            [24.995165, 60.373703]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Ruotsinkylän tutkimusmetsä",
+        "part": 2
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [24.993324, 60.357864],
+            [24.995166, 60.359228],
+            [24.994794, 60.359242],
+            [24.992354, 60.359808],
+            [24.988476, 60.360782],
+            [24.988341, 60.360859],
+            [24.987916, 60.36069],
+            [24.986601, 60.361338],
+            [24.985634, 60.361003],
+            [24.985379, 60.361444],
+            [24.983055, 60.359271],
+            [24.996738, 60.346169],
+            [25.000305, 60.347912],
+            [25.000132, 60.34842],
+            [24.997694, 60.348986],
+            [24.996908, 60.350253],
+            [24.997253, 60.351532],
+            [24.998795, 60.354017],
+            [24.999914, 60.354201],
+            [25.000286, 60.355055],
+            [24.999698, 60.357685],
+            [24.999075, 60.358613],
+            [24.997641, 60.358936],
+            [24.996846, 60.358076],
+            [24.998448, 60.35733],
+            [24.997386, 60.356211],
+            [24.995456, 60.355423],
+            [24.99263, 60.355389],
+            [24.989924, 60.355697],
+            [24.991969, 60.356912],
+            [24.989477, 60.358328],
+            [24.990696, 60.359193],
+            [24.993324, 60.357864]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Ruotsinkylän tutkimusmetsä",
+        "part": 3
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [25.006488, 60.364484],
+            [25.004285, 60.363598],
+            [25.001601, 60.361194],
+            [25.001594, 60.361186],
+            [25.001514, 60.358047],
+            [25.001713, 60.357114],
+            [25.001358, 60.356004],
+            [25.00117, 60.354471],
+            [25.000931, 60.351491],
+            [25.00111, 60.348602],
+            [25.001283, 60.348094],
+            [25.003737, 60.347273],
+            [25.005976, 60.34764],
+            [25.008663, 60.354475],
+            [25.011216, 60.358928],
+            [25.011278, 60.360204],
+            [25.009891, 60.362058],
+            [25.008754, 60.364426],
+            [25.007791, 60.363989],
+            [25.006488, 60.364484]
+          ],
+          [
+            [25.00486, 60.351964],
+            [25.005351, 60.35316],
+            [25.007502, 60.352675],
+            [25.006723, 60.351561],
+            [25.00486, 60.351964]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Ruotsinkylän tutkimusmetsä",
+        "part": 4
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [25.01871, 60.361227],
+            [25.012, 60.359957],
+            [25.010285, 60.355685],
+            [25.011395, 60.353742],
+            [25.014445, 60.352418],
+            [25.019343, 60.350945],
+            [25.026736, 60.352563],
+            [25.033909, 60.353157],
+            [25.034455, 60.3558],
+            [25.028481, 60.361002],
+            [25.019531, 60.359366],
+            [25.01871, 60.361227]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Ruotsinkylän tutkimusmetsä",
+        "part": 5
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [25.010008, 60.355597],
+            [25.006167, 60.348125],
+            [25.005976, 60.34764],
+            [25.005912, 60.347629],
+            [25.005213, 60.34627],
+            [25.032912, 60.346342],
+            [25.033915, 60.353072],
+            [25.026746, 60.352393],
+            [25.019353, 60.350775],
+            [25.014466, 60.352078],
+            [25.011259, 60.353655],
+            [25.010008, 60.355597]
+          ]
+        ]
+      }
+    }
+  ],
+  "properties": {
+    "name": "Ruotsinkylän tutkimusmetsä",
+    "source_url": "https://www.luke.fi/fi/documents/ruotsinkylan-tutkimusmetsan-kartta",
+    "retrievedAt": "2026-10-17",
+    "attribution": "Luonnonvarakeskus (Luke); map credits Maanmittauslaitos Maastotietokanta 2014–2016",
+    "license": "No explicit reuse license stated on the Luke map; simplified boundary facts only, no basemap reproduced",
+    "geometryScope": "Approximate digitization of the blue Tutkimusmetsä (465 ha) outlines in the Tuusula visitor map; excludes research parcels in other municipalities",
+    "geometryMethod": "Manually simplified raster-map outlines, affine registration in ETRS-TM35FIN (EPSG:3067) using the Vanha Tuusulantie junctions with Tuusulanväylä, Korsontie and Maisalantie; not a surveyed boundary",
+    "controlPointSource": "https://api.openstreetmap.org/api/0.6/map?bbox=24.965,60.344,25.04,60.386",
+    "controlPointAttribution": "OpenStreetMap contributors, ODbL 1.0",
+    "controlPoints": [
+      {
+        "mapPoint": [225, 200],
+        "lonLat": [25.0075554, 60.3655173]
+      },
+      {
+        "mapPoint": [242, 304],
+        "lonLat": [25.0105044, 60.356708]
+      },
+      {
+        "mapPoint": [191, 413],
+        "lonLat": [25.0038732, 60.3473595]
+      }
+    ],
+    "mapCoordinateUnits": "PDF points, origin top left, page 708.96 × 483.36; source raster has no embedded georeferencing",
+    "publishedAreaHa": 465,
+    "geometryAccuracy": "Approximate map digitization, suitable for catalog display; not cadastral or navigation data"
+  }
+}

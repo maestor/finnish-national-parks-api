@@ -56,7 +56,7 @@ describe('manual catalog imports', () => {
       now: () => '2026-05-27T08:00:00.000Z'
     });
 
-    expect(result.results).toHaveLength(160);
+    expect(result.results).toHaveLength(161);
 
     const merenkurkku = await getParkBySlug(
       testDatabase.database,
@@ -1413,7 +1413,7 @@ describe('manual catalog imports', () => {
     );
     const kevo = await getParkBySlug(testDatabase.database, 'kevon-luonnonpuisto');
 
-    expect(allParks).toHaveLength(160);
+    expect(allParks).toHaveLength(161);
     expect(merenkurkku).toMatchObject({ catalogStatus: 'active' });
     expect(kevo).toMatchObject({ catalogStatus: 'active' });
   });
@@ -1490,7 +1490,7 @@ describe('manual catalog imports', () => {
       database: testDatabase.database
     });
 
-    expect(result.results).toHaveLength(160);
+    expect(result.results).toHaveLength(161);
 
     const merenkurkku = await getParkBySlug(
       testDatabase.database,
@@ -1629,6 +1629,54 @@ describe('manual catalog imports', () => {
     expect(tammionSaaristokyla?.boundaryGeoJson?.features).toHaveLength(1);
     expect(tammionSaaristokyla?.boundingBox.maxLat).toBeLessThan(60.43);
     expect(tammionSaaristokyla?.boundingBox.maxLon).toBeLessThan(27.43);
+  });
+
+  it('imports Ruotsinkylän tutkimusmetsä from the local Luke map boundary', async () => {
+    const result = await importSpecialParks({
+      database: testDatabase.database,
+      includeSlugs: ['ruotsinkylan-tutkimusmetsa'],
+      now: () => '2026-10-17T12:00:00.000Z'
+    });
+
+    expect(result.results).toMatchObject([
+      { name: 'Ruotsinkylän tutkimusmetsä', slug: 'ruotsinkylan-tutkimusmetsa', featureCount: 5 }
+    ]);
+    const park = await getParkBySlug(testDatabase.database, 'ruotsinkylan-tutkimusmetsa');
+    expect(park).toMatchObject({
+      address: 'Maisalantie, 04360 Tuusula',
+      areaKm2: 4.65,
+      lipasId: 9002055,
+      name: 'Ruotsinkylän tutkimusmetsä',
+      parkUrl: 'https://www.luke.fi/fi/tietoa-lukesta/vierailukohteet/ruotsinkylan-tutkimusmetsa',
+      postalCode: '04360',
+      postalOffice: 'Tuusula',
+      type: { slug: 'outdoor-recreation-area' }
+    });
+    expect(park?.boundaryGeoJson?.features).toHaveLength(5);
+    expect(park?.boundingBox.minLat).toBeGreaterThan(60.34);
+    expect(park?.boundingBox.maxLat).toBeLessThan(60.38);
+    expect(park?.boundingBox.minLon).toBeGreaterThan(24.97);
+    expect(park?.boundingBox.maxLon).toBeLessThan(25.04);
+    expect(
+      isFullyInsideArea(
+        {
+          type: 'FeatureCollection',
+          features: [
+            {
+              type: 'Feature',
+              geometry: {
+                type: 'LineString',
+                coordinates: [
+                  [24.998, 60.368],
+                  [24.999, 60.367]
+                ]
+              }
+            }
+          ]
+        },
+        park?.boundaryGeoJson ?? { type: 'FeatureCollection', features: [] }
+      )
+    ).toBe(true);
   });
 
   it('imports Nummelanharju using the local LIPAS MOBO area snapshot', async () => {
@@ -1833,7 +1881,7 @@ describe('manual catalog imports', () => {
       now: () => '2026-05-27T08:00:00.000Z'
     });
 
-    expect(result.results).toHaveLength(160);
+    expect(result.results).toHaveLength(161);
   });
 
   it('fails clearly when a selected special-park slug is unknown', async () => {
