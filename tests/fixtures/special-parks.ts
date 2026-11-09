@@ -1091,6 +1091,15 @@ export const createSpecialParksSource = () => {
       );
     }
 
+    if (
+      sourceUrl.includes(
+        encodeURIComponent("kohdenimi='Lappeenrannan linnoitus- ja varuskuntakaupunki'")
+      ) &&
+      !sourceUrl.includes(encodeURIComponent("nimi='Linnoitus ja Rakuunanmäki'"))
+    ) {
+      throw new Error('Lappeenrannan linnoitus must select the fortress feature.');
+    }
+
     if (sourceUrl.includes('typeNames=rajapinta_suojellut:rky_alue')) {
       return {
         type: 'FeatureCollection',
