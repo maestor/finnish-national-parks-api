@@ -56,7 +56,7 @@ describe('manual catalog imports', () => {
       now: () => '2026-05-27T08:00:00.000Z'
     });
 
-    expect(result.results).toHaveLength(161);
+    expect(result.results).toHaveLength(163);
 
     const merenkurkku = await getParkBySlug(
       testDatabase.database,
@@ -1222,6 +1222,27 @@ describe('manual catalog imports', () => {
       type: { slug: 'cultural-history-area' }
     });
 
+    for (const expected of [
+      {
+        slug: 'lappeenrannan-linnoitus',
+        address: 'Kristiinankatu 3-5, 53900 Lappeenranta',
+        name: 'Lappeenrannan linnoitus',
+        lipasId: 9001093,
+        parkUrl: 'https://www.rky.fi/read/asp/r_kohde_det.aspx?KOHDE_ID=1170'
+      },
+      {
+        slug: 'taavetin-linnoitus',
+        address: 'Linnalantie 29, 54500 Taavetti',
+        name: 'Taavetin linnoitus',
+        lipasId: 9001094,
+        parkUrl: 'https://www.rky.fi/read/asp/r_kohde_det.aspx?KOHDE_ID=1178'
+      }
+    ]) {
+      const park = await getParkBySlug(testDatabase.database, expected.slug);
+      expect(park).toMatchObject({ ...expected, type: { slug: 'cultural-history-area' } });
+      expect(park?.boundaryGeoJson?.features.length).toBeGreaterThan(0);
+    }
+
     const haminanLinnoitus = await getParkBySlug(testDatabase.database, 'haminan-linnoitus');
     expect(haminanLinnoitus).toMatchObject({
       lipasId: 9001088,
@@ -1413,7 +1434,7 @@ describe('manual catalog imports', () => {
     );
     const kevo = await getParkBySlug(testDatabase.database, 'kevon-luonnonpuisto');
 
-    expect(allParks).toHaveLength(161);
+    expect(allParks).toHaveLength(163);
     expect(merenkurkku).toMatchObject({ catalogStatus: 'active' });
     expect(kevo).toMatchObject({ catalogStatus: 'active' });
   });
@@ -1490,7 +1511,7 @@ describe('manual catalog imports', () => {
       database: testDatabase.database
     });
 
-    expect(result.results).toHaveLength(161);
+    expect(result.results).toHaveLength(163);
 
     const merenkurkku = await getParkBySlug(
       testDatabase.database,
@@ -1881,7 +1902,7 @@ describe('manual catalog imports', () => {
       now: () => '2026-05-27T08:00:00.000Z'
     });
 
-    expect(result.results).toHaveLength(161);
+    expect(result.results).toHaveLength(163);
   });
 
   it('fails clearly when a selected special-park slug is unknown', async () => {

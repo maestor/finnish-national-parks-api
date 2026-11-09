@@ -3,6 +3,31 @@ import type { MuseovirastoRkyAreaSeed } from '../types.js';
 export const sourceReadyHistoryRkyAreaSeeds: MuseovirastoRkyAreaSeed[] = [
   {
     displayTypeName: null,
+    locationLabel: 'Kristiinankatu 3-5',
+    parkUrl: 'https://www.rky.fi/read/asp/r_kohde_det.aspx?KOHDE_ID=1170',
+    name: 'Lappeenrannan linnoitus',
+    parkTypeSlug: 'cultural-history-area',
+    postalCode: '53900',
+    postalOffice: 'Lappeenranta',
+    slug: 'lappeenrannan-linnoitus',
+    sourceFeatureName: 'Linnoitus ja Rakuunanmäki',
+    sourceName: 'Lappeenrannan linnoitus- ja varuskuntakaupunki',
+    syntheticLipasId: 9_001_093
+  },
+  {
+    displayTypeName: null,
+    locationLabel: 'Linnalantie 29',
+    parkUrl: 'https://www.rky.fi/read/asp/r_kohde_det.aspx?KOHDE_ID=1178',
+    name: 'Taavetin linnoitus',
+    parkTypeSlug: 'cultural-history-area',
+    postalCode: '54500',
+    postalOffice: 'Taavetti',
+    slug: 'taavetin-linnoitus',
+    sourceName: 'Taavetin linnoitus',
+    syntheticLipasId: 9_001_094
+  },
+  {
+    displayTypeName: null,
     parkUrl: 'https://www.rky.fi/read/asp/r_kohde_det.aspx?KOHDE_ID=4034',
     name: 'Vihdin kirkonkylä',
     parkTypeSlug: 'cultural-history-area',
