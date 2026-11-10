@@ -117,6 +117,13 @@ import {
   updateTripStop,
   updateVisit
 } from './db/repositories.js';
+import {
+  findEligibleArea,
+  listAreaTrailCandidates,
+  listAreaTrails,
+  setAreaTrailOverride,
+  TrailAreaValidationError
+} from './db/trail-areas.js';
 import { createAuthMiddleware } from './http/auth.js';
 import {
   CATALOG_CACHE_CONTROL,
@@ -215,6 +222,12 @@ import {
   updateVisitRoute,
   uploadVisitImagesRoute
 } from './routes/parks.js';
+import {
+  addAreaTrailRoute,
+  listAreaTrailCandidatesRoute,
+  listAreaTrailsRoute,
+  removeAreaTrailRoute
+} from './routes/trail-areas.js';
 import {
   searchNearbyTripPlannerRoute,
   searchTripPlannerRoute,
@@ -1369,6 +1382,18 @@ export const createApp = ({
   });
 
   if (database) {
+    for (const path of [
+      '/api/admin/parks/:slug/trails',
+      '/api/admin/parks/:slug/trails/:trailId',
+      '/api/admin/parks/:slug/trail-candidates'
+    ]) {
+      app.use(path, async (context, next) => {
+        context.header('Cache-Control', PRIVATE_CACHE_CONTROL);
+        const failure = await requireAdminSession(context, auth);
+        if (failure) return failure;
+        await next();
+      });
+    }
     app.get('/assets/media/*', async (context) => {
       const mediaPath = context.req.path.slice('/assets/media/'.length);
       const segments = mediaPath.split('/').filter(Boolean);
@@ -1771,6 +1796,54 @@ export const createApp = ({
       return context.json(visibility, 200);
     });
 
+    app.openapi(listAreaTrailsRoute, async (context) => {
+      try {
+        const area = await findEligibleArea(database, context.req.valid('param').slug);
+        if (!area) return context.json(jsonNotFound('Area not found.'), 404);
+        return context.json({ trails: await listAreaTrails(database, area.id) }, 200);
+      } catch (error) {
+        if (error instanceof TrailAreaValidationError)
+          return context.json({ error: error.message }, 422);
+        throw error;
+      }
+    });
+    app.openapi(listAreaTrailCandidatesRoute, async (context) => {
+      try {
+        const area = await findEligibleArea(database, context.req.valid('param').slug);
+        if (!area) return context.json(jsonNotFound('Area not found.'), 404);
+        const { q, limit, offset } = context.req.valid('query');
+        return context.json(await listAreaTrailCandidates(database, q ?? '', limit, offset), 200);
+      } catch (error) {
+        if (error instanceof TrailAreaValidationError)
+          return context.json({ error: error.message }, 422);
+        throw error;
+      }
+    });
+    app.openapi(addAreaTrailRoute, async (context) => {
+      try {
+        const { slug, trailId } = context.req.valid('param');
+        const link = await setAreaTrailOverride(database, slug, trailId, 'include');
+        if (!link) return context.json(jsonNotFound('Area or trail not found.'), 404);
+        return context.json(link, 200);
+      } catch (error) {
+        if (error instanceof TrailAreaValidationError)
+          return context.json({ error: error.message }, 422);
+        throw error;
+      }
+    });
+    app.openapi(removeAreaTrailRoute, async (context) => {
+      try {
+        const { slug, trailId } = context.req.valid('param');
+        const link = await setAreaTrailOverride(database, slug, trailId, 'exclude');
+        if (!link) return context.json(jsonNotFound('Area or trail not found.'), 404);
+        return context.json(link, 200);
+      } catch (error) {
+        if (error instanceof TrailAreaValidationError)
+          return context.json({ error: error.message }, 422);
+        throw error;
+      }
+    });
+
     app.openapi(listAdminParkImagesRoute, async (context) => {
       context.header('Cache-Control', PRIVATE_CACHE_CONTROL);
       const authFailure = await requireAdminSession(context, auth);
@@ -1837,7 +1910,11 @@ export const createApp = ({
       const removedPark = adminSession
         ? await findParkRecordBySlugIncludingRemoved(database, slug)
         : null;
-      const canViewRemovedPark = Boolean(adminSession && removedPark?.removed);
+      const canViewRemovedPark = Boolean(
+        adminSession &&
+          removedPark &&
+          (removedPark.removed || removedPark.trailPublicationRole !== 'independent')
+      );
       const park = canViewRemovedPark
         ? await getParkBySlugIncludingRemoved(database, slug, logoPublicUrl, mapPrivateUrl)
         : await getParkBySlug(database, slug, logoPublicUrl, mapPublicUrl);
@@ -3080,7 +3157,14 @@ export const createApp = ({
 
       const { slug } = context.req.valid('param');
       const { removed } = context.req.valid('json');
-      const updated = await updateParkRemoved(database, slug, removed);
+      let updated: boolean;
+      try {
+        updated = await updateParkRemoved(database, slug, removed);
+      } catch (error) {
+        if (error instanceof RepositoryValidationError)
+          return context.json({ error: error.message }, 422);
+        throw error;
+      }
 
       if (!updated) {
         return context.json(jsonNotFound('Park not found.'), 404);

@@ -60,7 +60,7 @@ If an upload limit exists, at least one test should cover the real stored-object
 
 - Import keeps only active supported LIPAS catalog records.
 - Import persists normalized catalog type metadata and park-to-type references.
-- Import accepts route-based `4403` walking trails, `4404` nature trails, and `4405` hiking trails; it skips walking trails when any route point overlaps an imported area and skips other trail imports when they are fully contained inside an imported area or match an imported area's `locationLabel + postalCode + postalOffice`.
+- Import retains supported source-active trails disabled when new, calculates per-area length coverage, and preserves source IDs, local edits, visits and manual link overrides. Geometry tests cover segment crossings, holes, repeated segments, invalid inputs and the 10% threshold; admin and public tests cover access, durable overrides, visibility and cache validators.
 - Import excludes contact email, phone number, and comment text.
 - Import stores the expected catalog fields.
 - Import derives stable slugs, marker points, and bounding boxes.

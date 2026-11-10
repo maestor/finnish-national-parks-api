@@ -6,11 +6,11 @@ import { createApp } from '../../src/app.js';
 import { createTrip, createVisit } from '../../src/db/repositories.js';
 import { visitImages } from '../../src/db/schema.js';
 import { createSessionToken } from '../../src/http/session.js';
-import { importParks } from '../../src/importer/import-parks.js';
 import { createSlug } from '../../src/parks/park-normalization.js';
 import { createMemoryStorage } from '../../src/storage/memory-storage.js';
 import { createGeoapifyClient } from '../../src/trip-planner/geoapify.js';
 import { createLipasPark } from '../fixtures/lipas.js';
+import { importPublishedParkFixtures } from '../helpers/import-published-park-fixtures.js';
 import { createTestDatabase } from '../helpers/test-db.js';
 
 const BASELINE_TIMESTAMP = '2026-09-15T09:00:00.000Z';
@@ -118,7 +118,7 @@ describe('resource baseline API', () => {
   beforeEach(async () => {
     testDatabase = await createTestDatabase();
 
-    await importParks({
+    await importPublishedParkFixtures({
       database: testDatabase.database,
       expectedActiveCount: 20,
       now: () => BASELINE_TIMESTAMP,

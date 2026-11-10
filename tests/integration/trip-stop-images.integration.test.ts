@@ -6,10 +6,10 @@ import { createApp } from '../../src/app.js';
 import * as repositories from '../../src/db/repositories.js';
 import { mediaUploads, tripStopImages } from '../../src/db/schema.js';
 import { createSessionToken } from '../../src/http/session.js';
-import { importParks } from '../../src/importer/import-parks.js';
 import { createMemoryStorage } from '../../src/storage/memory-storage.js';
 import type { StorageClient } from '../../src/storage/types.js';
 import { createLipasPark } from '../fixtures/lipas.js';
+import { importPublishedParkFixtures } from '../helpers/import-published-park-fixtures.js';
 import { createTestDatabase } from '../helpers/test-db.js';
 
 const authConfig = {
@@ -39,7 +39,7 @@ describe('Trip stop image routes', () => {
       new TextEncoder().encode(authConfig.jwtSecret)
     ).then((token) => `${authConfig.cookieName}=${token}`);
 
-    await importParks({
+    await importPublishedParkFixtures({
       database: testDatabase.database,
       expectedActiveCount: 1,
       now: () => '2026-05-01T09:00:00.000Z',

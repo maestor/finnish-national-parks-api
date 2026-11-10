@@ -32,7 +32,6 @@ await migrateDatabase(client);
 const result = await importParks({
   database: createDatabase(client),
   dryRun: args.dryRun,
-  markNewParksRemoved: true,
   sourceUrl: defaultLipasCatalogSourceUrl
 });
 
@@ -40,11 +39,11 @@ await client.close();
 
 if (result.dryRun) {
   console.log(
-    `Dry run: would import ${result.activeCount} catalog places from ${result.sourceActiveCount} active LIPAS records. Would skip ${result.skippedTrailCount} overlapping or nested trail records.`
+    `Dry run: would import ${result.activeCount} catalog places from ${result.sourceActiveCount} active LIPAS records.`
   );
 } else {
   console.log(
-    `Imported ${result.activeCount} catalog places from ${result.sourceActiveCount} active LIPAS records in run ${result.importRunId}. Skipped ${result.skippedTrailCount} overlapping or nested trail records.`
+    `Imported ${result.activeCount} catalog places from ${result.sourceActiveCount} active LIPAS records in run ${result.importRunId}.`
   );
 }
 
@@ -65,3 +64,20 @@ if (result.newParks.length === 0) {
     console.log(`- ${park.typeName}: ${park.name} [${park.lipasId}]`);
   }
 }
+
+if (result.trailAreaResult) {
+  const { automaticLinks, manualExclusions, newlyHidden, newlyHiddenPublicSlugs, unresolved } =
+    result.trailAreaResult;
+  console.log(
+    `Trail–area matches: ${automaticLinks}; newly classified trails: ${newlyHidden}; manual exclusions: ${manualExclusions}; unresolved geometry cases: ${unresolved.length}.`
+  );
+  if (newlyHiddenPublicSlugs.length)
+    console.log(`Expire these public park URLs immediately: ${newlyHiddenPublicSlugs.join(', ')}`);
+  for (const issue of unresolved)
+    console.log(
+      `Unresolved geometry: trail ${issue.trailId}, area ${issue.areaId ?? 'none'}, ${issue.status}`
+    );
+}
+
+console.log(`Source deactivations: ${result.deactivatedParks.length}.`);
+for (const park of result.deactivatedParks) console.log(`- ${park.slug} [${park.lipasId}]`);

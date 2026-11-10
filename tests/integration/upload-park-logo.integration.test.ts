@@ -8,9 +8,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as repositories from '../../src/db/repositories.js';
 import { getParkBySlug } from '../../src/db/repositories.js';
 import { parks } from '../../src/db/schema.js';
-import { importParks } from '../../src/importer/import-parks.js';
 import { uploadParkLogo } from '../../src/parks/upload-park-logo.js';
 import { createLipasPark, parkTypeFixtures } from '../fixtures/lipas.js';
+import { importPublishedParkFixtures } from '../helpers/import-published-park-fixtures.js';
 import { createTestDatabase } from '../helpers/test-db.js';
 
 describe('uploadParkLogo', () => {
@@ -23,7 +23,7 @@ describe('uploadParkLogo', () => {
 
     testDatabase = await createTestDatabase();
 
-    await importParks({
+    await importPublishedParkFixtures({
       database: testDatabase.database,
       expectedActiveCount: 1,
       now: () => '2026-05-01T10:00:00.000Z',
@@ -91,7 +91,7 @@ describe('uploadParkLogo', () => {
     await mkdir(sharedLogoDirectory, { recursive: true });
     await writeFile(sharedLogoPath, Buffer.from('shared-png-data'));
 
-    await importParks({
+    await importPublishedParkFixtures({
       database: testDatabase.database,
       expectedActiveCount: 2,
       now: () => '2026-05-01T11:00:00.000Z',

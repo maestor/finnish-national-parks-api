@@ -94,7 +94,8 @@ describe('migrateDatabase', () => {
       '0043_park_featured_image.sql',
       '0044_park_description.sql',
       '0045_home_featured_park.sql',
-      '0046_park_import_notifications.sql'
+      '0046_park_import_notifications.sql',
+      '0047_trail_area_links.sql'
     ]);
     expect(parkTypes.rows.map((row) => String(row.slug))).toEqual([
       'outdoor-recreation-area',
@@ -108,6 +109,21 @@ describe('migrateDatabase', () => {
       'cultural-history-area'
     ]);
     expect(parkColumns.rows.some((row) => String(row.name) === 'removed')).toBe(true);
+    expect(parkColumns.rows.some((row) => String(row.name) === 'trail_publication_role')).toBe(
+      true
+    );
+    const linkColumns = await client.execute('PRAGMA table_info(trail_area_links)');
+    expect(linkColumns.rows.map((row) => String(row.name))).toEqual(
+      expect.arrayContaining([
+        'trail_id',
+        'area_id',
+        'override',
+        'overlap_metres',
+        'route_metres',
+        'overlap_ratio',
+        'geometry_fingerprint'
+      ])
+    );
     expect(parkColumns.rows.some((row) => String(row.name) === 'postal_code')).toBe(true);
     expect(parkColumns.rows.some((row) => String(row.name) === 'display_type_name')).toBe(true);
     expect(
@@ -197,6 +213,46 @@ describe('migrateDatabase', () => {
     ]);
   });
 
+  it('stores independent automatic and manual decisions with bounded measurements', async () => {
+    await migrateDatabase(client);
+    await client.execute(`INSERT INTO import_runs (id, source_url, active_count, imported_at, response_shape_version)
+      VALUES (1, 'test', 4, '2026-11-10', 'test')`);
+    for (const id of [1, 2, 3, 4]) {
+      await client.execute({
+        sql: `INSERT INTO parks (id, lipas_id, type_id, slug, name, location_label, boundary_geojson,
+          bbox_min_lon, bbox_min_lat, bbox_max_lon, bbox_max_lat, marker_lon, marker_lat,
+          catalog_status, last_import_run_id, created_at, updated_at)
+          VALUES (?, ?, 111, ?, 'Test', '', '{}', 0, 0, 1, 1, 0, 0, 'active', 1, '2026-11-10', '2026-11-10')`,
+        args: [id, id, `park-${id}`]
+      });
+    }
+    const insert = (
+      trailId: number,
+      areaId: number,
+      override: string | null,
+      ratio: number | null
+    ) =>
+      client.execute({
+        sql: `INSERT INTO trail_area_links
+          (trail_id, area_id, automatic_match, override, overlap_ratio, created_at, updated_at)
+          VALUES (?, ?, 1, ?, ?, '2026-11-10', '2026-11-10')`,
+        args: [trailId, areaId, override, ratio]
+      });
+    await insert(1, 2, 'exclude', 0.5);
+    await insert(1, 3, 'include', null);
+    await expect(insert(1, 2, null, 0.5)).rejects.toThrow();
+    await expect(insert(1, 1, null, 0.5)).rejects.toThrow();
+    await expect(insert(1, 4, null, 1.1)).rejects.toThrow();
+    await expect(insert(1, 4, 'invalid', 0.5)).rejects.toThrow();
+    const links = await client.execute(
+      'SELECT area_id, override FROM trail_area_links ORDER BY area_id'
+    );
+    expect(links.rows.map((row) => [row.area_id, row.override])).toEqual([
+      [2, 'exclude'],
+      [3, 'include']
+    ]);
+  });
+
   it('reports pending migrations without mutating a fresh database', async () => {
     const pendingBeforeApply = await getPendingMigrationNames(client);
     const schemaMigrationTableBeforeApply = await client.execute(`
@@ -256,7 +312,8 @@ describe('migrateDatabase', () => {
       '0043_park_featured_image.sql',
       '0044_park_description.sql',
       '0045_home_featured_park.sql',
-      '0046_park_import_notifications.sql'
+      '0046_park_import_notifications.sql',
+      '0047_trail_area_links.sql'
     ]);
     expect(schemaMigrationTableBeforeApply.rows).toEqual([]);
     expect(pendingAfterApply).toEqual([]);

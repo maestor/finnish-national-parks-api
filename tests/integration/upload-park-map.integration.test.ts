@@ -6,9 +6,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import * as repositories from '../../src/db/repositories.js';
 import { getParkBySlug } from '../../src/db/repositories.js';
-import { importParks } from '../../src/importer/import-parks.js';
 import { uploadParkMap } from '../../src/parks/upload-park-map.js';
 import { createLipasPark } from '../fixtures/lipas.js';
+import { importPublishedParkFixtures } from '../helpers/import-published-park-fixtures.js';
 import { createTestDatabase } from '../helpers/test-db.js';
 
 describe('uploadParkMap', () => {
@@ -21,7 +21,7 @@ describe('uploadParkMap', () => {
 
     testDatabase = await createTestDatabase();
 
-    await importParks({
+    await importPublishedParkFixtures({
       database: testDatabase.database,
       expectedActiveCount: 1,
       now: () => '2026-05-01T10:00:00.000Z',

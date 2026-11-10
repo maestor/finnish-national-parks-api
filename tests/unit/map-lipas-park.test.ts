@@ -40,6 +40,79 @@ describe('mapLipasPark', () => {
     expect(mapped).not.toHaveProperty('comment');
   });
 
+  it('normalizes multipart LIPAS line and polygon geometry into stored features', () => {
+    const source = createLipasTrail();
+    const mapped = mapLipasPark({
+      ...source,
+      location: {
+        ...source.location,
+        geometries: {
+          type: 'FeatureCollection',
+          features: [
+            {
+              type: 'Feature',
+              geometry: {
+                type: 'MultiLineString',
+                coordinates: [
+                  [
+                    [24, 60],
+                    [24.1, 60.1]
+                  ],
+                  [
+                    [25, 61],
+                    [25.1, 61.1]
+                  ]
+                ]
+              }
+            },
+            {
+              type: 'Feature',
+              geometry: {
+                type: 'MultiPolygon',
+                coordinates: [
+                  [
+                    [
+                      [24, 60],
+                      [24.2, 60],
+                      [24.2, 60.2],
+                      [24, 60]
+                    ]
+                  ],
+                  [
+                    [
+                      [25, 61],
+                      [25.2, 61],
+                      [25.2, 61.2],
+                      [25, 61]
+                    ]
+                  ]
+                ]
+              }
+            },
+            {
+              type: 'Feature',
+              geometry: {
+                type: 'LineString',
+                coordinates: [
+                  [24.5, 60.5],
+                  [24.6, 60.6]
+                ]
+              }
+            }
+          ]
+        }
+      }
+    });
+    expect(mapped.boundaryGeoJson.features.map((feature) => feature.geometry.type)).toEqual([
+      'LineString',
+      'LineString',
+      'Polygon',
+      'Polygon',
+      'LineString'
+    ]);
+    expect(mapped.boundingBox).toMatchObject({ minLon: 24, maxLon: 25.2 });
+  });
+
   it('falls back cleanly when url, address, and slug inputs are sparse', () => {
     const source = createLipasPark({
       name: '!!!'

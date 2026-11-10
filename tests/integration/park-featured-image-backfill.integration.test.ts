@@ -10,8 +10,8 @@ import {
   getPublicVisitDataVersion
 } from '../../src/db/repositories.js';
 import { parkFeaturedImages, parks, parkVisits } from '../../src/db/schema.js';
-import { importParks } from '../../src/importer/import-parks.js';
 import { createLipasPark } from '../fixtures/lipas.js';
+import { importPublishedParkFixtures } from '../helpers/import-published-park-fixtures.js';
 import { createTestDatabase } from '../helpers/test-db.js';
 
 const execFileAsync = promisify(execFile);
@@ -39,7 +39,7 @@ describe('park featured-image backfill', () => {
   beforeEach(async () => {
     imageNumber = 0;
     db = await createTestDatabase();
-    await importParks({
+    await importPublishedParkFixtures({
       database: db.database,
       expectedActiveCount: 6,
       sourceUrl: 'https://example.test/lipas',

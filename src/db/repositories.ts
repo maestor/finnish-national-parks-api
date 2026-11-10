@@ -44,6 +44,7 @@ import {
   parkTypes,
   parkVisits,
   publicDataVersions,
+  trailAreaLinks,
   tripFeaturedImages,
   tripRoutes,
   tripRouteWaypoints,
@@ -53,6 +54,15 @@ import {
   visitImages,
   yearReviewShares
 } from './schema.js';
+
+const standalonePublicParkWhere = () =>
+  and(eq(parks.removed, false), eq(parks.trailPublicationRole, 'independent'));
+const administrativeHistoryParkWhere = () =>
+  or(eq(parks.removed, false), eq(parks.trailPublicationRole, 'area_member'));
+const isStandaloneParkHidden = () =>
+  sql<boolean>`(${parks.removed} = 1 OR ${parks.trailPublicationRole} != 'independent')`.mapWith(
+    Boolean
+  );
 
 export const MEDIA_CLEANUP_GRACE_PERIOD_MS = 8 * 24 * 60 * 60 * 1000;
 export const MEDIA_UPLOAD_PROCESSING_LEASE_MS = 2 * 60 * 1000;
@@ -787,11 +797,11 @@ const getTripStopVisitDateRange = async (database: DbClient, tripId: number) => 
       .select({
         endVisitedOn: sql<
           string | null
-        >`MAX(CASE WHEN ${parks.removed} = 0 THEN ${parkVisits.visitedOn} END)`,
+        >`MAX(CASE WHEN ${administrativeHistoryParkWhere()} THEN ${parkVisits.visitedOn} END)`,
         startVisitedOn: sql<
           string | null
-        >`MIN(CASE WHEN ${parks.removed} = 0 THEN ${parkVisits.visitedOn} END)`,
-        visitCount: sql<number>`COUNT(CASE WHEN ${parks.removed} = 0 THEN ${parkVisits.id} END)`
+        >`MIN(CASE WHEN ${administrativeHistoryParkWhere()} THEN ${parkVisits.visitedOn} END)`,
+        visitCount: sql<number>`COUNT(CASE WHEN ${administrativeHistoryParkWhere()} THEN ${parkVisits.id} END)`
       })
       .from(parkVisits)
       .innerJoin(parks, eq(parkVisits.parkId, parks.id))
@@ -1015,7 +1025,7 @@ const toMap = async (
 };
 
 const visibleParkBySlugWhere = (slug: string) =>
-  and(eq(parks.slug, slug), eq(parks.removed, false));
+  and(eq(parks.slug, slug), standalonePublicParkWhere());
 
 const categoryWhere = (categorySlug: SupportedParkCategorySlug) => {
   const typeSlugs = getSupportedParkTypeSlugsByCategorySlug(categorySlug);
@@ -1030,7 +1040,7 @@ const categoryWhere = (categorySlug: SupportedParkCategorySlug) => {
 const visibleCatalogWhere = (
   options: { categorySlug?: SupportedParkCategorySlug; typeSlug?: SupportedParkTypeSlug } = {}
 ) => {
-  const conditions = [eq(parks.catalogStatus, 'active'), eq(parks.removed, false)];
+  const conditions = [eq(parks.catalogStatus, 'active'), standalonePublicParkWhere()];
 
   if (options.typeSlug) {
     conditions.push(eq(parkTypes.slug, options.typeSlug));
@@ -1587,7 +1597,7 @@ const resolveTripId = async (database: Database, tripId?: number | null) => {
   return trip.id;
 };
 
-export const findParkRecordBySlugIncludingRemoved = async (database: Database, slug: string) => {
+export const findParkRecordBySlugIncludingRemoved = async (database: DbClient, slug: string) => {
   return database.query.parks.findFirst({
     where: eq(parks.slug, slug)
   });
@@ -1869,7 +1879,11 @@ export const getYearReviewTripFeaturedImageAssetsByTripId = async (
     /* c8 ignore next 20 -- visit-image review assets are covered through the review integration. */
     if (selection.visitImageId !== null) {
       const rows = await database
-        .select({ image: visitImages, parkRemoved: parks.removed, tripId: parkVisits.tripId })
+        .select({
+          image: visitImages,
+          parkRemoved: isStandaloneParkHidden(),
+          tripId: parkVisits.tripId
+        })
         .from(visitImages)
         .innerJoin(parkVisits, eq(parkVisits.id, visitImages.visitId))
         .innerJoin(parks, eq(parks.id, parkVisits.parkId))
@@ -2040,7 +2054,7 @@ const countVisitsBySeason = (visits: Array<{ visitedOn: string }>) => {
 };
 
 const listVisitRowsWithPark = async (database: Database, publicOnly: boolean) => {
-  const visibilityWhere = and(eq(parks.removed, false), eq(parkVisits.status, 'published'));
+  const visibilityWhere = and(standalonePublicParkWhere(), eq(parkVisits.status, 'published'));
   const visitRows = await database
     .select({
       park: parks,
@@ -2071,7 +2085,7 @@ const listPublicVisitRows = async (database: Database) => {
     })
     .from(parkVisits)
     .innerJoin(parks, eq(parkVisits.parkId, parks.id))
-    .where(and(eq(parks.removed, false), eq(parkVisits.status, 'published')))
+    .where(and(standalonePublicParkWhere(), eq(parkVisits.status, 'published')))
     .orderBy(desc(parkVisits.createdAt), desc(parkVisits.id));
 };
 
@@ -2091,8 +2105,8 @@ const listTripRows = async (database: Database, publicOnly = false): Promise<Tri
     .innerJoin(parks, eq(parkVisits.parkId, parks.id))
     .where(
       publicOnly
-        ? and(eq(parks.removed, false), eq(parkVisits.status, 'published'))
-        : eq(parks.removed, false)
+        ? and(standalonePublicParkWhere(), eq(parkVisits.status, 'published'))
+        : administrativeHistoryParkWhere()
     )
     .groupBy(parkVisits.tripId)
     .as('active_trip_visit_stats');
@@ -2166,7 +2180,7 @@ const listTripArchiveRows = async (
     })
     .from(parkVisits)
     .innerJoin(parks, eq(parkVisits.parkId, parks.id))
-    .where(and(eq(parks.removed, false), eq(parkVisits.status, 'published')))
+    .where(and(standalonePublicParkWhere(), eq(parkVisits.status, 'published')))
     .groupBy(parkVisits.tripId)
     .as('archive_active_trip_visit_stats');
 
@@ -2276,7 +2290,7 @@ const listTripDetailVisitRowsByTripId = async (
     })
     .from(parkVisits)
     .innerJoin(parks, eq(parkVisits.parkId, parks.id))
-    .where(and(eq(parkVisits.tripId, tripId), eq(parks.removed, false)))
+    .where(and(eq(parkVisits.tripId, tripId), administrativeHistoryParkWhere()))
     .orderBy(asc(parkVisits.tripStopOrder), asc(parkVisits.id)) as Promise<TripDetailVisitRow[]>;
 };
 
@@ -2314,7 +2328,7 @@ const listPublicTripDetailVisitRowsByTripId = async (
       and(
         eq(parkVisits.tripId, tripId),
         ...(includeDrafts ? [] : [eq(parkVisits.status, 'published')]),
-        eq(parks.removed, false)
+        includeDrafts ? administrativeHistoryParkWhere() : standalonePublicParkWhere()
       )
     )
     .groupBy(
@@ -2944,7 +2958,11 @@ export const unpublishDateRangeReviewShareByShareId = async (
   return Number(result.rowsAffected ?? 0) > 0;
 };
 
-const getVisitRowWithParkById = async (database: Database, visitId: number) => {
+const getVisitRowWithParkById = async (
+  database: Database,
+  visitId: number,
+  includeHidden = false
+) => {
   return (
     (
       await database
@@ -2954,7 +2972,9 @@ const getVisitRowWithParkById = async (database: Database, visitId: number) => {
         })
         .from(parkVisits)
         .innerJoin(parks, eq(parkVisits.parkId, parks.id))
-        .where(and(eq(parkVisits.id, visitId), eq(parks.removed, false)))
+        .where(
+          and(eq(parkVisits.id, visitId), includeHidden ? undefined : standalonePublicParkWhere())
+        )
     )[0] ?? null
   );
 };
@@ -3017,7 +3037,7 @@ export const getAdminParkVisitsBySlug = async (
   slug: string,
   getImagePublicUrl: (key: string) => Promise<string>
 ) => {
-  const park = await getParkRecordBySlug(database, slug);
+  const park = await findParkRecordBySlugIncludingRemoved(database, slug);
 
   if (!park) {
     return null;
@@ -3027,7 +3047,7 @@ export const getAdminParkVisitsBySlug = async (
     .select({ park: parks, visit: parkVisits })
     .from(parkVisits)
     .innerJoin(parks, eq(parkVisits.parkId, parks.id))
-    .where(and(eq(parks.id, park.id), eq(parks.removed, false)))
+    .where(eq(parks.id, park.id))
     .orderBy(desc(parkVisits.visitedOn), desc(parkVisits.id));
 
   return Promise.all(rows.map((row) => buildAdminVisitWithPark(database, row, getImagePublicUrl)));
@@ -3053,7 +3073,9 @@ export const getPublicTripVisitImagesBySlug = async (
         ...(options.includeDrafts === true ? [] : [eq(trips.status, 'published')]),
         eq(parkVisits.id, visitId),
         ...(options.includeDrafts === true ? [] : [eq(parkVisits.status, 'published')]),
-        eq(parks.removed, false)
+        options.includeDrafts === true
+          ? administrativeHistoryParkWhere()
+          : standalonePublicParkWhere()
       )
     )
     .limit(1);
@@ -3130,7 +3152,7 @@ export const findPublicMediaKey = async (database: Database, key: string) => {
     .innerJoin(parks, eq(parks.id, parkVisits.parkId))
     .where(
       and(
-        eq(parks.removed, false),
+        standalonePublicParkWhere(),
         eq(parkVisits.status, 'published'),
         or(eq(visitImages.fullKey, key), eq(visitImages.thumbKey, key))
       )
@@ -3161,7 +3183,7 @@ export const findPublicMediaKey = async (database: Database, key: string) => {
   const publicParkMap = await database
     .select({ mapKey: parks.mapKey })
     .from(parks)
-    .where(and(eq(parks.mapKey, key), eq(parks.removed, false)))
+    .where(and(eq(parks.mapKey, key), standalonePublicParkWhere()))
     .limit(1);
 
   return publicParkMap[0]?.mapKey ?? null;
@@ -3563,7 +3585,7 @@ const getTripImageCandidate = async (
       .select({
         image: visitImages,
         parkName: parks.name,
-        parkRemoved: parks.removed,
+        parkRemoved: isStandaloneParkHidden(),
         tripStatus: trips.status,
         visitStatus: parkVisits.status,
         tripId: parkVisits.tripId,
@@ -3703,7 +3725,7 @@ const getTripArchiveFeaturedImages = async (
       : database
           .select({
             image: visitImages,
-            parkRemoved: parks.removed,
+            parkRemoved: isStandaloneParkHidden(),
             visitStatus: parkVisits.status,
             tripId: parkVisits.tripId
           })
@@ -3850,7 +3872,10 @@ const parkImageRows = (database: DbClient, parkId: number) =>
   database
     .select({
       image: visitImages,
-      park: { name: parks.name, removed: parks.removed },
+      park: {
+        name: parks.name,
+        removed: isStandaloneParkHidden()
+      },
       visit: { id: parkVisits.id, visitedOn: parkVisits.visitedOn }
     })
     .from(visitImages)
@@ -3973,7 +3998,7 @@ export const listTripImageCandidates = async (
     .select({
       image: visitImages,
       parkName: parks.name,
-      parkRemoved: parks.removed,
+      parkRemoved: isStandaloneParkHidden(),
       sourceId: parkVisits.id,
       tripStopOrder: parkVisits.tripStopOrder,
       tripId: parkVisits.tripId,
@@ -4109,7 +4134,7 @@ export const getAdminVisitById = async (
   visitId: number,
   getImagePublicUrl: (key: string) => Promise<string>
 ) => {
-  const row = await getVisitRowWithParkById(database, visitId);
+  const row = await getVisitRowWithParkById(database, visitId, true);
   return row ? buildAdminVisitWithPark(database, row, getImagePublicUrl) : null;
 };
 
@@ -4129,7 +4154,7 @@ const eligibleHomeParks = (database: DbClient) =>
     })
     .from(parks)
     .innerJoin(parkVisits, eq(parkVisits.parkId, parks.id))
-    .where(and(eq(parks.removed, false), eq(parkVisits.status, 'published')))
+    .where(and(standalonePublicParkWhere(), eq(parkVisits.status, 'published')))
     .groupBy(parks.id)
     .having(sql`count(${parkVisits.id}) >= 2`)
     .orderBy(asc(parks.name));
@@ -4187,7 +4212,11 @@ const getSelectedHomeParkPreview = async (
     .innerJoin(parkTypes, eq(parkTypes.id, parks.typeId))
     .innerJoin(parkVisits, eq(parkVisits.parkId, parks.id))
     .where(
-      and(eq(homeFeaturedPark.id, 1), eq(parks.removed, false), eq(parkVisits.status, 'published'))
+      and(
+        eq(homeFeaturedPark.id, 1),
+        standalonePublicParkWhere(),
+        eq(parkVisits.status, 'published')
+      )
     )
     .groupBy(parks.id)
     .having(sql`count(${parkVisits.id}) >= 2`);
@@ -4226,7 +4255,7 @@ export const listHomeFeaturedVisitCandidates = async (database: Database) => {
     })
     .from(parkVisits)
     .innerJoin(parks, eq(parks.id, parkVisits.parkId))
-    .where(and(eq(parks.removed, false), eq(parkVisits.status, 'published')))
+    .where(and(standalonePublicParkWhere(), eq(parkVisits.status, 'published')))
     .orderBy(desc(parkVisits.visitedOn), desc(parkVisits.createdAt), desc(parkVisits.id));
   return rows.map(({ id, parkName, parkSlug, visitedOn }) => ({
     id,
@@ -4246,7 +4275,7 @@ export const updateHomeFeaturedVisit = async (database: Database, visitId: numbe
           and(
             eq(parkVisits.id, visitId),
             eq(parkVisits.status, 'published'),
-            eq(parks.removed, false)
+            standalonePublicParkWhere()
           )
         );
       if (!eligible) return false;
@@ -4286,7 +4315,7 @@ const getHomeVisitPreview = async (
     .leftJoin(trips, eq(trips.id, parkVisits.tripId))
     .where(
       and(
-        eq(parks.removed, false),
+        standalonePublicParkWhere(),
         eq(parkVisits.status, 'published'),
         selectedVisitId === null
           ? or(isNull(trips.id), eq(trips.status, 'draft'))
@@ -4911,23 +4940,55 @@ export const findVisitRecordById = async (database: DbClient, visitId: number) =
   return rows[0] ?? null;
 };
 
-export const updateParkRemoved = async (database: Database, slug: string, removed: boolean) => {
-  const park = await findParkRecordBySlugIncludingRemoved(database, slug);
+export const updateParkRemoved = async (database: Database, slug: string, removed: boolean) =>
+  database.transaction(async (tx) => {
+    const park = await findParkRecordBySlugIncludingRemoved(tx, slug);
+    if (!park) return false;
 
-  if (!park) {
-    return false;
-  }
+    if (
+      !removed &&
+      park.bboxMinLon === 0 &&
+      park.bboxMaxLon === 0 &&
+      park.bboxMinLat === 0 &&
+      park.bboxMaxLat === 0 &&
+      park.markerLon === 0 &&
+      park.markerLat === 0
+    ) {
+      throw new RepositoryValidationError('A place without coordinates cannot be enabled.');
+    }
 
-  await database
-    .update(parks)
-    .set({
-      removed,
-      updatedAt: new Date().toISOString()
-    })
-    .where(eq(parks.id, park.id));
+    if (!removed && park.trailPublicationRole !== 'independent') {
+      const activeLinks = await tx
+        .select({ trailId: trailAreaLinks.trailId })
+        .from(trailAreaLinks)
+        .innerJoin(parks, eq(parks.id, trailAreaLinks.areaId))
+        .where(
+          and(
+            eq(trailAreaLinks.trailId, park.id),
+            eq(parks.catalogStatus, 'active'),
+            or(
+              eq(trailAreaLinks.override, 'include'),
+              and(eq(trailAreaLinks.automaticMatch, true), isNull(trailAreaLinks.override))
+            )
+          )
+        )
+        .limit(1);
+      if (activeLinks.length)
+        throw new RepositoryValidationError(
+          'An area member cannot be enabled as a standalone destination.'
+        );
+    }
 
-  return true;
-};
+    await tx
+      .update(parks)
+      .set({
+        removed,
+        ...(!removed ? { trailPublicationRole: 'independent' as const } : {}),
+        updatedAt: new Date().toISOString()
+      })
+      .where(eq(parks.id, park.id));
+    return true;
+  });
 
 export const updateParkDetails = async (
   database: Database,

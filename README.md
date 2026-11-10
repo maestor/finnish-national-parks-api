@@ -117,6 +117,7 @@ The paired UI presents catalog and visit `GET` data publicly to end users withou
 - `GET /api/trips/slug/:slug/visits/:visitId/images` — one visible trip visit's image page; private/no-store, ordered, default 12 and maximum 24 images
 - `GET /api/trips/slug/:slug/stops/:stopId/images` — one visible trip stop's image page; private/no-store, ordered, default 12 and maximum 24 images
 - `GET /api/admin/parks/visibility`
+- `GET /api/admin/parks/:slug/trails` and `/trail-candidates`; `PUT`/`DELETE /api/admin/parks/:slug/trails/:trailId` — private admin trail relationships
 - `GET /api/admin/admins`
 - `PATCH /api/admin/admins/:id`
 - `DELETE /api/admin/admins/:id`
@@ -269,11 +270,9 @@ Importer expectations:
   - `4405` Retkeilyreitti
 - Store normalized type metadata in a dedicated type table and reference it from catalog rows.
 - Store catalog fields needed for a map app.
-- Persist both `postalCode` and `postalOffice` from LIPAS so location matching can use the more stable numeric postal identifier.
-- Skip `4404` nature trails and `4405` hiking trails when their full route geometry is contained inside one imported area record, because visits should attach to the parent area instead of the nested route.
-- Skip `4403` walking trails when any route point overlaps an imported area record, because those routes are treated as nested visit targets even when only part of the route crosses the area.
-- Skip trail imports whose normalized `locationLabel`, `postalCode`, and `postalOffice` exactly match one imported area record, because those are also treated as nested visit targets.
-- Import `4403` walking trails and `4405` hiking trails as removed-by-default catalog rows so the UI can opt into showing them separately from the main public catalog.
+- Persist postal fields; address matches do not establish trail membership.
+- Retain every supported source-active LIPAS trail. Each active area intersecting at least 10% of the measured trail length becomes a parent; special-import trails remain independent.
+- Keep new records disabled. Linked trails are unavailable as standalone public destinations even if an old visibility flag is enabled; admin reads remain private. Manual link inclusions and exclusions survive imports.
 - Exclude LIPAS contact email, phone number, and comment text.
 - Refresh imported `parkUrl` values from Luontoon's official Finnish sitemap when a matching destination exists, instead of trusting LIPAS `www` blindly.
 - Preserve personal notes and visit history across imports.

@@ -8,9 +8,9 @@ import {
 import { createTripStopImage, createVisitImage } from '../../src/db/repositories.js';
 import { parkVisits, trips } from '../../src/db/schema.js';
 import { createSessionToken } from '../../src/http/session.js';
-import { importParks } from '../../src/importer/import-parks.js';
 import { createMemoryStorage } from '../../src/storage/memory-storage.js';
 import { createLipasPark, parkTypeFixtures } from '../fixtures/lipas.js';
+import { importPublishedParkFixtures } from '../helpers/import-published-park-fixtures.js';
 import { createTestDatabase } from '../helpers/test-db.js';
 
 const auth = {
@@ -35,7 +35,7 @@ describe('home memories API', () => {
     publicMediaUrl.mockClear();
     db = await createTestDatabase();
     cookie = `__session=${await createSessionToken({ email: 'admin@example.com', name: 'Admin', picture: '', role: 'admin', sub: 'admin' }, new TextEncoder().encode(auth.jwtSecret))}`;
-    await importParks({
+    await importPublishedParkFixtures({
       database: db.database,
       expectedActiveCount: 1,
       now: () => '2026-05-01T09:00:00.000Z',
@@ -594,7 +594,7 @@ describe('home memories API', () => {
       latestStandaloneVisit: null,
       magnetProgress: { totalParks: 1, visitedParks: 0 }
     });
-    await importParks({
+    await importPublishedParkFixtures({
       database: db.database,
       expectedActiveCount: 3,
       now: () => '2026-05-02T09:00:00.000Z',

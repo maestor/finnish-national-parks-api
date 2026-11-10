@@ -39,8 +39,8 @@ import {
   updateVisit
 } from '../../src/db/repositories.js';
 import { mediaCleanupTasks, parks, parkVisits, tripRoutes } from '../../src/db/schema.js';
-import { importParks } from '../../src/importer/import-parks.js';
 import { createLipasPark, parkTypeFixtures } from '../fixtures/lipas.js';
+import { importPublishedParkFixtures } from '../helpers/import-published-park-fixtures.js';
 import { createTestDatabase } from '../helpers/test-db.js';
 
 describe('repositories', () => {
@@ -59,7 +59,7 @@ describe('repositories', () => {
   beforeEach(async () => {
     testDatabase = await createTestDatabase();
 
-    await importParks({
+    await importPublishedParkFixtures({
       database: testDatabase.database,
       expectedActiveCount: 1,
       now: () => '2026-05-01T10:00:00.000Z',
@@ -157,7 +157,7 @@ describe('repositories', () => {
   });
 
   it('defaults hasMagnet on national parks and allows admin updates', async () => {
-    await importParks({
+    await importPublishedParkFixtures({
       database: testDatabase.database,
       expectedActiveCount: 2,
       now: () => '2026-05-02T10:00:00.000Z',
@@ -205,7 +205,7 @@ describe('repositories', () => {
   });
 
   it('rejects invalid luontoon urls and conflicting park slugs', async () => {
-    await importParks({
+    await importPublishedParkFixtures({
       database: testDatabase.database,
       expectedActiveCount: 2,
       now: () => '2026-05-02T10:00:00.000Z',
@@ -1370,7 +1370,7 @@ describe('repositories', () => {
   });
 
   it('returns an empty catalog etag seed when no active parks remain', async () => {
-    await importParks({
+    await importPublishedParkFixtures({
       database: testDatabase.database,
       expectedActiveCount: 0,
       now: () => '2026-05-02T10:00:00.000Z',
@@ -1406,7 +1406,7 @@ describe('repositories', () => {
   });
 
   it('builds a catalog etag seed for the combined hiking and wilderness category filter', async () => {
-    await importParks({
+    await importPublishedParkFixtures({
       database: testDatabase.database,
       expectedActiveCount: 2,
       now: () => '2026-05-02T10:15:00.000Z',
@@ -1488,7 +1488,7 @@ describe('repositories', () => {
   });
 
   it('returns empty visit list when no active parks remain', async () => {
-    await importParks({
+    await importPublishedParkFixtures({
       database: testDatabase.database,
       expectedActiveCount: 0,
       now: () => '2026-05-02T10:00:00.000Z',
@@ -1506,7 +1506,7 @@ describe('repositories', () => {
   });
 
   it('lists flat visits and park-scoped visit history across multiple parks', async () => {
-    await importParks({
+    await importPublishedParkFixtures({
       database: testDatabase.database,
       expectedActiveCount: 2,
       now: () => '2026-05-01T10:00:00.000Z',
@@ -1860,7 +1860,7 @@ describe('repositories', () => {
   });
 
   it('reassigns visits and keeps visit images attached under the target park', async () => {
-    await importParks({
+    await importPublishedParkFixtures({
       database: testDatabase.database,
       expectedActiveCount: 3,
       now: () => '2026-05-01T10:00:00.000Z',
@@ -1988,7 +1988,7 @@ describe('repositories', () => {
   });
 
   it('supports dry-run previews for visit reassignment without changing stored visits', async () => {
-    await importParks({
+    await importPublishedParkFixtures({
       database: testDatabase.database,
       expectedActiveCount: 3,
       now: () => '2026-05-01T10:00:00.000Z',
@@ -2044,7 +2044,7 @@ describe('repositories', () => {
   });
 
   it('can move one selected visit by id without reassigning other visits from the same park', async () => {
-    await importParks({
+    await importPublishedParkFixtures({
       database: testDatabase.database,
       expectedActiveCount: 3,
       now: () => '2026-05-01T10:00:00.000Z',
@@ -2134,7 +2134,7 @@ describe('repositories', () => {
   });
 
   it('returns a zero-move result when the source park has no visits', async () => {
-    await importParks({
+    await importPublishedParkFixtures({
       database: testDatabase.database,
       expectedActiveCount: 2,
       now: () => '2026-05-01T10:00:00.000Z',
@@ -2166,7 +2166,7 @@ describe('repositories', () => {
   });
 
   it('rejects visit-id reassignment when the source park row is missing', async () => {
-    await importParks({
+    await importPublishedParkFixtures({
       database: testDatabase.database,
       expectedActiveCount: 2,
       now: () => '2026-05-01T10:00:00.000Z',
@@ -2204,7 +2204,7 @@ describe('repositories', () => {
   });
 
   it('rejects invalid visit reassignment requests', async () => {
-    await importParks({
+    await importPublishedParkFixtures({
       database: testDatabase.database,
       expectedActiveCount: 2,
       now: () => '2026-05-01T10:00:00.000Z',

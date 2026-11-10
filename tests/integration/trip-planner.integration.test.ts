@@ -2,11 +2,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { createApp } from '../../src/app.js';
 import { createVisit } from '../../src/db/repositories.js';
-import { importParks } from '../../src/importer/import-parks.js';
 import { createTripPlannerBudget, TripPlannerBudgetError } from '../../src/trip-planner/budget.js';
 import { createGeoapifyClient } from '../../src/trip-planner/geoapify.js';
 import { createTripPlannerService, TripPlannerError } from '../../src/trip-planner/search.js';
 import { createLipasPark, createLipasTrail, parkTypeFixtures } from '../fixtures/lipas.js';
+import { importPublishedParkFixtures } from '../helpers/import-published-park-fixtures.js';
 import { createTestDatabase } from '../helpers/test-db.js';
 
 const createPolygon = (minLon: number, minLat: number, maxLon: number, maxLat: number) => ({
@@ -156,7 +156,7 @@ describe('trip planner route', () => {
   beforeEach(async () => {
     testDatabase = await createTestDatabase();
 
-    await importParks({
+    await importPublishedParkFixtures({
       database: testDatabase.database,
       expectedActiveCount: 4,
       now: () => '2026-07-15T18:00:00.000Z',
