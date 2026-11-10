@@ -49,6 +49,32 @@ describe('manual catalog imports', () => {
     await testDatabase.dispose();
   });
 
+  it('imports the two Haltiala nature reserves with their own boundaries', async () => {
+    await importSpecialParks({
+      database: testDatabase.database,
+      includeSlugs: ['haltialanmetsan-luonnonsuojelualue', 'haltialan-aarnialue']
+    });
+
+    const forest = await getParkBySlug(testDatabase.database, 'haltialanmetsan-luonnonsuojelualue');
+    const oldGrowth = await getParkBySlug(testDatabase.database, 'haltialan-aarnialue');
+    expect(forest).toMatchObject({
+      name: 'Haltialanmetsän luonnonsuojelualue',
+      type: { slug: 'nature-reserve-area' },
+      address: 'Pakilantie 124, 00670 Helsinki',
+      postalOffice: 'Helsinki',
+      areaKm2: 1.36
+    });
+    expect(oldGrowth).toMatchObject({
+      name: 'Haltialan aarnialue',
+      type: { slug: 'nature-reserve-area' },
+      address: 'Haltialan aarnialue, 00690 Helsinki',
+      areaKm2: 0.23
+    });
+    expect(forest?.boundaryGeoJson?.features.length).toBeGreaterThan(0);
+    expect(oldGrowth?.boundaryGeoJson?.features.length).toBeGreaterThan(0);
+    expect(forest?.boundaryGeoJson).not.toEqual(oldGrowth?.boundaryGeoJson);
+  });
+
   it('imports all special parks with correct metadata', async () => {
     const result = await importSpecialParks({
       database: testDatabase.database,
@@ -56,7 +82,7 @@ describe('manual catalog imports', () => {
       now: () => '2026-05-27T08:00:00.000Z'
     });
 
-    expect(result.results).toHaveLength(163);
+    expect(result.results).toHaveLength(165);
 
     const merenkurkku = await getParkBySlug(
       testDatabase.database,
@@ -1434,7 +1460,7 @@ describe('manual catalog imports', () => {
     );
     const kevo = await getParkBySlug(testDatabase.database, 'kevon-luonnonpuisto');
 
-    expect(allParks).toHaveLength(163);
+    expect(allParks).toHaveLength(165);
     expect(merenkurkku).toMatchObject({ catalogStatus: 'active' });
     expect(kevo).toMatchObject({ catalogStatus: 'active' });
   });
@@ -1511,7 +1537,7 @@ describe('manual catalog imports', () => {
       database: testDatabase.database
     });
 
-    expect(result.results).toHaveLength(163);
+    expect(result.results).toHaveLength(165);
 
     const merenkurkku = await getParkBySlug(
       testDatabase.database,
@@ -1902,7 +1928,7 @@ describe('manual catalog imports', () => {
       now: () => '2026-05-27T08:00:00.000Z'
     });
 
-    expect(result.results).toHaveLength(163);
+    expect(result.results).toHaveLength(165);
   });
 
   it('fails clearly when a selected special-park slug is unknown', async () => {

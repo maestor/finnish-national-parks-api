@@ -580,6 +580,36 @@ export const baseSpecialParkConfigs: SpecialParkConfig[] = [
   },
   {
     displayTypeName: null,
+    extractMetadata: extractGeoJsonAreaM2Metadata,
+    locationLabel: 'Pakilantie 124',
+    parkUrl:
+      'https://www.hel.fi/fi/kulttuuri-ja-vapaa-aika/ulkoilu-puistot-ja-luontokohteet/ulkoilualueet/haltialan-luontoalue',
+    name: 'Haltialanmetsän luonnonsuojelualue',
+    parkTypeSlug: 'nature-reserve-area',
+    postalCode: '00670',
+    postalOffice: 'Helsinki',
+    responseShapeVersion: 'manual-syke-protected-site-v1',
+    slug: 'haltialanmetsan-luonnonsuojelualue',
+    sourceUrl: 'special://haltialanmetsan-luonnonsuojelualue',
+    syntheticLipasId: 9_002_056
+  },
+  {
+    displayTypeName: null,
+    extractMetadata: extractGeoJsonAreaM2Metadata,
+    locationLabel: 'Haltialan aarnialue',
+    parkUrl:
+      'https://www.hel.fi/fi/kulttuuri-ja-vapaa-aika/ulkoilu-puistot-ja-luontokohteet/ulkoilualueet/haltialan-luontoalue/haltialan-aarnialueen-polut',
+    name: 'Haltialan aarnialue',
+    parkTypeSlug: 'nature-reserve-area',
+    postalCode: '00690',
+    postalOffice: 'Helsinki',
+    responseShapeVersion: 'manual-syke-protected-site-v1',
+    slug: 'haltialan-aarnialue',
+    sourceUrl: 'special://haltialan-aarnialue',
+    syntheticLipasId: 9_002_057
+  },
+  {
+    displayTypeName: null,
     locationLabel: 'Seili',
     parkUrl: 'https://www.luontoon.fi/fi/kohteet/seili',
     name: 'Seili',
