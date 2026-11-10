@@ -47,7 +47,7 @@ The output lists affected slugs. After applying, expire those frontend `public-p
 - Route naming is not the auth policy. Catalog and visit `GET` data is public from an end-user perspective when accessed through the Reissuvihko UI, but the backend remains a separate API boundary: frontend-facing `/api/*` routes generally require the server-side API key outside localhost when `API_KEY` is configured, including `GET /api/year-review/shares/:shareId` for server-rendered share pages.
 - `GET /health`, `GET /openapi.json`, `GET /assets/logos/*`, and `GET /assets/media/*` are the anonymous backend reads today. `/auth/*` is anonymous login control flow, not anonymous data access. The public UI can expose catalog and visit data without login because it calls the backend through its server-side API-key boundary. Do not describe other backend routes as anonymously public unless middleware and tests prove that policy.
 - Do not expose the shared `API_KEY` in browser-delivered code.
-- All write routes and `GET /api/admin/parks/visibility` should stay admin-session protected.
+- All write routes and `/api/admin/parks/*` management reads require an admin session and private/no-store responses.
 - When adding or changing an env var, update `src/env.ts`, `.env.example`, `README.md`, and the relevant docs in the same change.
 - Treat direct uploads as a storage-cost surface: enforce size and content-type limits against the actual stored object, not only the client request.
 - Planner request limits count the actual request stream before OpenAPI JSON validation. Storage reads use explicit byte ceilings and finite deadlines; callers must pass an appropriate bound instead of reading unbounded object bodies.
@@ -168,11 +168,9 @@ The importer should:
 - Print the newly added catalog rows after each import run so changes stay visible without halting the sync.
 - Upsert catalog rows by `lipasId`.
 - Upsert normalized catalog types in a dedicated `park_types` table.
-- Persist both `postal_code` and `postal_office` from LIPAS for stronger location matching.
-- Skip `4404` nature trails and `4405` hiking trails whose full route geometry is contained inside one imported area record.
-- Skip `4403` walking trails when any route point overlaps one imported area record.
-- Skip trail imports whose normalized `location_label`, `postal_code`, and `postal_office` exactly match one imported area record.
-- Import `4403` walking trails and `4405` hiking trails as removed-by-default catalog rows.
+- Retain source-active supported trails and link each area covering at least 10% of measured route length; never infer membership from address. Special-import trails remain independent.
+- Keep effective or formerly linked trails out of standalone public destinations. Manual inclusion/exclusion overrides survive recomputation, and existing visit history requires an explicit preservation decision before a new conversion.
+- Recompute links after LIPAS and special-area imports; use the preview, geometry report, and cache-expiry procedure in [Importing Guide](./importing.md#trailarea-reconciliation).
 - Preserve personal visit history during catalog re-imports.
 - Preserve manually authored `parks.description` across both LIPAS and special-park imports; this nullable Markdown text has no imported baseline and starts empty for new records.
 - Preserve any manually set `parks.removed` flags during catalog re-imports.

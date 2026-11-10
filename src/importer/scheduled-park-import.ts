@@ -18,8 +18,8 @@ export const runScheduledParkImport = async (client: Client, github: GithubRevie
   await sendPendingParkReviews(database, github);
   const result = await importParks({
     database,
-    markNewParksRemoved: true,
     queueNewParkNotification: true,
+    requireNoPublicTrailConversions: true,
     sourceUrl: defaultLipasCatalogSourceUrl
   });
   await sendPendingParkReviews(database, github);

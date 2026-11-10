@@ -3,10 +3,10 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { createTrip, createTripStop, createVisit } from '../../src/db/repositories.js';
 import { tripStopImages, visitImages } from '../../src/db/schema.js';
-import { importParks } from '../../src/importer/import-parks.js';
 import { runConvertedImageOriginalRetirement } from '../../src/media/retire-converted-image-originals.js';
 import { createMemoryStorage } from '../../src/storage/memory-storage.js';
 import { createLipasPark } from '../fixtures/lipas.js';
+import { importPublishedParkFixtures } from '../helpers/import-published-park-fixtures.js';
 import { createTestDatabase } from '../helpers/test-db.js';
 
 describe('converted image original retirement', () => {
@@ -17,7 +17,7 @@ describe('converted image original retirement', () => {
     testDatabase = await createTestDatabase();
     storage = createMemoryStorage();
 
-    await importParks({
+    await importPublishedParkFixtures({
       database: testDatabase.database,
       expectedActiveCount: 1,
       fetchSource: async () => ({ items: [createLipasPark()] }),

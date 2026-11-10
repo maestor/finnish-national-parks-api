@@ -5,9 +5,14 @@ import { z } from 'zod';
 
 import type { Database } from '../db/database.js';
 import { createImportRun, syncParkTypes, upsertCatalogPark } from '../db/repositories.js';
-import { getSupportedParkTypeBySlug, hasMagnetByDefaultForTypeSlug } from '../parks/park-types.js';
+import {
+  getSupportedParkTypeBySlug,
+  hasMagnetByDefaultForTypeSlug,
+  isTrailTypeCode
+} from '../parks/park-types.js';
 import type { GeoJsonFeatureCollection, LineStringGeometry, PolygonGeometry } from './geometry.js';
 import { deriveBoundingBox } from './geometry.js';
+import { reconcileTrailAreas } from './reconcile-trail-areas.js';
 import { extractHikingAreaMetadata } from './special-parks/builders.js';
 import { specialParkConfigs } from './special-parks/index.js';
 
@@ -191,6 +196,7 @@ type ImportSpecialParksOptions = {
   database: Database;
   fetchSource?: (sourceUrl: string) => Promise<unknown>;
   includeSlugs?: string[];
+  allowPublicTrailConversions?: boolean;
   now?: () => string;
 };
 
@@ -198,10 +204,10 @@ export const importSpecialParks = async ({
   database,
   fetchSource = defaultFetchSource,
   includeSlugs,
+  allowPublicTrailConversions = false,
   now = () => new Date().toISOString()
 }: ImportSpecialParksOptions) => {
   const importedAt = now();
-  await syncParkTypes(database);
   const selectedConfigs =
     includeSlugs && includeSlugs.length > 0
       ? (() => {
@@ -221,6 +227,14 @@ export const importSpecialParks = async ({
         })()
       : specialParkConfigs;
 
+  if (allowPublicTrailConversions && selectedConfigs.length !== 1) {
+    throw new Error('Public trail conversion requires exactly one selected special area.');
+  }
+  const publicTrailSlugs: string[] = [];
+  const trailAreaReports: Array<{
+    areaSlug: string;
+    report: Awaited<ReturnType<typeof reconcileTrailAreas>>;
+  }> = [];
   const results: Array<{
     featureCount: number;
     importRunId: number;
@@ -228,6 +242,14 @@ export const importSpecialParks = async ({
     slug: string;
   }> = [];
 
+  const prepared: Array<{
+    config: (typeof selectedConfigs)[number];
+    featureCount: number;
+    metadata: { areaKm2: number | null; establishmentYear: number | null };
+    boundaryGeoJson: GeoJsonFeatureCollection;
+    boundingBox: ReturnType<typeof deriveBoundingBox>;
+    parkType: ReturnType<typeof getSupportedParkTypeBySlug>;
+  }> = [];
   for (const config of selectedConfigs) {
     const payload = await fetchSource(config.sourceUrl);
 
@@ -284,10 +306,27 @@ export const importSpecialParks = async ({
     const boundingBox = deriveBoundingBox(boundaryGeoJson);
     const parkType = getSupportedParkTypeBySlug(config.parkTypeSlug);
 
-    let importRunId: number;
+    prepared.push({
+      config,
+      featureCount: sourceFeatures.length,
+      metadata,
+      boundaryGeoJson,
+      boundingBox,
+      parkType
+    });
+  }
 
-    await database.transaction(async (tx) => {
-      importRunId = await createImportRun(tx, {
+  await database.transaction(async (tx) => {
+    await syncParkTypes(tx);
+    for (const {
+      config,
+      featureCount,
+      metadata,
+      boundaryGeoJson,
+      boundingBox,
+      parkType
+    } of prepared) {
+      const importRunId = await createImportRun(tx, {
         activeCount: 1,
         importedAt,
         responseShapeVersion: config.responseShapeVersion,
@@ -311,6 +350,7 @@ export const importSpecialParks = async ({
         locationLabel: config.locationLabel,
         parkUrl: config.parkUrl,
         managedByLipasImport: false,
+        removed: true,
         markerLat: config.markerPoint?.lat ?? (boundingBox.minLat + boundingBox.maxLat) / 2,
         markerLon: config.markerPoint?.lon ?? (boundingBox.minLon + boundingBox.maxLon) / 2,
         municipalityCode: null,
@@ -322,17 +362,25 @@ export const importSpecialParks = async ({
         typeId: parkType.id,
         updatedAt: importedAt
       });
-    });
+      results.push({ featureCount, importRunId, name: config.name, slug: config.slug });
+    }
+    const areas = prepared.filter(({ parkType }) => !isTrailTypeCode(parkType.code));
+    if (areas.length) {
+      const report = await reconcileTrailAreas(tx, importedAt);
+      if (!allowPublicTrailConversions && report.newlyHiddenPublicSlugs.length) {
+        throw new Error(
+          `Public trail conversion requires immediate frontend cache expiry: ${report.newlyHiddenPublicSlugs.join(', ')}`
+        );
+      }
+      publicTrailSlugs.push(...report.newlyHiddenPublicSlugs);
+      trailAreaReports.push({
+        areaSlug: areas.map(({ config }) => config.slug).join(', '),
+        report
+      });
+    }
+  });
 
-    results.push({
-      featureCount: sourceFeatures.length,
-      importRunId: importRunId!,
-      name: config.name,
-      slug: config.slug
-    });
-  }
-
-  return { importedAt, results };
+  return { importedAt, results, publicTrailSlugs, trailAreaReports };
 };
 
 export { extractHikingAreaMetadata };

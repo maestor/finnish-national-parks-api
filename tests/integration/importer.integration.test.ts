@@ -4,9 +4,10 @@ import {
   createVisit,
   getParkBySlug,
   getParkVisitsBySlug,
-  listParks
+  listParks,
+  updateParkRemoved
 } from '../../src/db/repositories.js';
-import { importRuns, parks } from '../../src/db/schema.js';
+import { importRuns, parks, trailAreaLinks } from '../../src/db/schema.js';
 import { importParks } from '../../src/importer/import-parks.js';
 import {
   createLipasHikingTrail,
@@ -15,6 +16,7 @@ import {
   createLipasWalkingTrail,
   parkTypeFixtures
 } from '../fixtures/lipas.js';
+import { importPublishedParkFixtures } from '../helpers/import-published-park-fixtures.js';
 import { createTestDatabase } from '../helpers/test-db.js';
 
 const emptyLuontoonSitemap = async () =>
@@ -68,7 +70,7 @@ describe('importParks', () => {
       {
         lipasId: 12345,
         name: 'Äkäsmännyn kansallispuisto',
-        removed: false,
+        removed: true,
         slug: 'akasmannyn-kansallispuisto',
         typeCode: parkTypeFixtures.nationalPark.typeCode,
         typeName: parkTypeFixtures.nationalPark.name
@@ -76,17 +78,17 @@ describe('importParks', () => {
       {
         lipasId: 99999,
         name: 'Uusi luontopolku',
-        removed: false,
+        removed: true,
         slug: 'uusi-luontopolku',
         typeCode: parkTypeFixtures.natureTrail.typeCode,
         typeName: parkTypeFixtures.natureTrail.name
       }
     ]);
-    expect(parks).toHaveLength(2);
+    expect(parks).toHaveLength(0);
   });
 
   it('can import newly discovered parks as removed until an admin explicitly enables them', async () => {
-    await importParks({
+    await importPublishedParkFixtures({
       database: testDatabase.database,
       now: () => '2026-05-01T08:00:00.000Z',
       sourceUrl: 'https://example.test/lipas',
@@ -97,7 +99,6 @@ describe('importParks', () => {
 
     const result = await importParks({
       database: testDatabase.database,
-      markNewParksRemoved: true,
       now: () => '2026-05-02T08:00:00.000Z',
       sourceUrl: 'https://example.test/lipas',
       fetchSource: async () => ({
@@ -147,7 +148,6 @@ describe('importParks', () => {
     const result = await importParks({
       database: testDatabase.database,
       dryRun: true,
-      markNewParksRemoved: true,
       now: () => '2026-05-02T08:00:00.000Z',
       sourceUrl: 'https://example.test/lipas',
       fetchSource: async () => ({
@@ -198,7 +198,7 @@ describe('importParks', () => {
   });
 
   it('updates catalog rows without deleting personal visit data', async () => {
-    await importParks({
+    await importPublishedParkFixtures({
       database: testDatabase.database,
       expectedActiveCount: 1,
       now: () => '2026-05-01T08:00:00.000Z',
@@ -216,7 +216,7 @@ describe('importParks', () => {
       visitedOn: '2026-04-10'
     });
 
-    await importParks({
+    await importPublishedParkFixtures({
       database: testDatabase.database,
       expectedActiveCount: 1,
       now: () => '2026-05-02T08:00:00.000Z',
@@ -269,7 +269,7 @@ describe('importParks', () => {
   });
 
   it('preserves manually edited park details across re-imports', async () => {
-    await importParks({
+    await importPublishedParkFixtures({
       database: testDatabase.database,
       expectedActiveCount: 1,
       now: () => '2026-05-01T08:00:00.000Z',
@@ -295,7 +295,7 @@ describe('importParks', () => {
       })
       .where(eq(parks.slug, 'akasmannyn-kansallispuisto'));
 
-    await importParks({
+    await importPublishedParkFixtures({
       database: testDatabase.database,
       expectedActiveCount: 1,
       now: () => '2026-05-02T08:00:00.000Z',
@@ -335,7 +335,7 @@ describe('importParks', () => {
   });
 
   it('preserves a manually overridden park marker point across re-imports', async () => {
-    await importParks({
+    await importPublishedParkFixtures({
       database: testDatabase.database,
       expectedActiveCount: 1,
       now: () => '2026-05-01T08:00:00.000Z',
@@ -353,7 +353,7 @@ describe('importParks', () => {
       })
       .where(eq(parks.slug, 'akasmannyn-kansallispuisto'));
 
-    await importParks({
+    await importPublishedParkFixtures({
       database: testDatabase.database,
       expectedActiveCount: 1,
       now: () => '2026-05-02T08:00:00.000Z',
@@ -382,7 +382,7 @@ describe('importParks', () => {
   });
 
   it('falls back to the current slug when importedSlug is missing on an existing row', async () => {
-    await importParks({
+    await importPublishedParkFixtures({
       database: testDatabase.database,
       expectedActiveCount: 1,
       now: () => '2026-05-01T08:00:00.000Z',
@@ -400,7 +400,7 @@ describe('importParks', () => {
       })
       .where(eq(parks.lipasId, 12345));
 
-    await importParks({
+    await importPublishedParkFixtures({
       database: testDatabase.database,
       expectedActiveCount: 1,
       now: () => '2026-05-02T08:00:00.000Z',
@@ -586,8 +586,85 @@ describe('importParks', () => {
     await expect(getParkBySlug(testDatabase.database, 'testin-ulkoilureitti')).resolves.toBeNull();
   });
 
-  it('skips hiking trails that are fully inside an imported area', async () => {
-    await importParks({
+  it('retains a source-active nested trail disabled and records its area relationship', async () => {
+    const source = [
+      createLipasPark(),
+      createLipasHikingTrail({
+        location: {
+          geometries: {
+            type: 'FeatureCollection',
+            features: [
+              {
+                type: 'Feature',
+                geometry: {
+                  type: 'LineString',
+                  coordinates: [
+                    [24.5, 60.5],
+                    [25, 61]
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      })
+    ];
+    const options = {
+      database: testDatabase.database,
+      sourceUrl: 'https://example.test/lipas',
+      fetchSource: async () => ({ items: source })
+    };
+    await importParks(options);
+    const firstTrail = await testDatabase.database.query.parks.findFirst({
+      where: eq(parks.lipasId, createLipasHikingTrail()['lipas-id'])
+    });
+    expect(firstTrail).toMatchObject({
+      removed: true,
+      catalogStatus: 'active',
+      trailPublicationRole: 'area_member'
+    });
+    await testDatabase.database
+      .update(parks)
+      .set({ removed: false })
+      .where(eq(parks.id, firstTrail!.id));
+    await expect(getParkBySlug(testDatabase.database, firstTrail!.slug)).resolves.toBeNull();
+    const links = await testDatabase.database.select().from(trailAreaLinks);
+    expect(links).toHaveLength(1);
+    expect(links[0]).toMatchObject({ trailId: firstTrail?.id, automaticMatch: true });
+    await importParks(options);
+    expect(await testDatabase.database.select().from(trailAreaLinks)).toHaveLength(1);
+    expect(
+      (await testDatabase.database.query.parks.findFirst({ where: eq(parks.id, firstTrail!.id) }))
+        ?.id
+    ).toBe(firstTrail?.id);
+    const inactiveSource = [source[0]!, { ...source[1]!, status: 'inactive' }];
+    await importParks({ ...options, fetchSource: async () => ({ items: inactiveSource }) });
+    const inactive = await testDatabase.database.query.parks.findFirst({
+      where: eq(parks.id, firstTrail!.id)
+    });
+    expect(inactive).toMatchObject({
+      catalogStatus: 'inactive',
+      removed: false,
+      trailPublicationRole: 'area_member'
+    });
+    expect(await testDatabase.database.select().from(trailAreaLinks)).toHaveLength(0);
+    await expect(getParkBySlug(testDatabase.database, firstTrail!.slug)).resolves.toBeNull();
+    await importParks(options);
+    const restored = await testDatabase.database.query.parks.findFirst({
+      where: eq(parks.id, firstTrail!.id)
+    });
+    expect(restored).toMatchObject({
+      catalogStatus: 'active',
+      removed: false,
+      trailPublicationRole: 'area_member'
+    });
+    expect((await testDatabase.database.select().from(trailAreaLinks))[0]?.automaticMatch).toBe(
+      true
+    );
+  });
+
+  it('keeps a geographically separate hiking trail independent', async () => {
+    await importPublishedParkFixtures({
       database: testDatabase.database,
       expectedActiveCount: 2,
       now: () => '2026-05-01T08:00:00.000Z',
@@ -597,12 +674,15 @@ describe('importParks', () => {
       })
     });
 
-    await expect(getParkBySlug(testDatabase.database, 'testin-retkeilyreitti')).resolves.toBeNull();
-    await expect(listParks(testDatabase.database)).resolves.toHaveLength(1);
+    await expect(
+      getParkBySlug(testDatabase.database, 'testin-retkeilyreitti')
+    ).resolves.toMatchObject({ slug: 'testin-retkeilyreitti' });
+    expect(await testDatabase.database.select().from(trailAreaLinks)).toHaveLength(0);
+    await expect(listParks(testDatabase.database)).resolves.toHaveLength(2);
   });
 
-  it('skips walking trails when any route point overlaps an imported area', async () => {
-    await importParks({
+  it('links walking trails when measured overlap qualifies', async () => {
+    await importPublishedParkFixtures({
       database: testDatabase.database,
       expectedActiveCount: 2,
       now: () => '2026-05-01T08:00:00.000Z',
@@ -638,8 +718,8 @@ describe('importParks', () => {
     await expect(listParks(testDatabase.database)).resolves.toHaveLength(1);
   });
 
-  it('skips hiking trails whose location label and postal fields match an imported area', async () => {
-    await importParks({
+  it('does not link a hiking trail by matching address alone', async () => {
+    await importPublishedParkFixtures({
       database: testDatabase.database,
       expectedActiveCount: 2,
       now: () => '2026-05-01T08:00:00.000Z',
@@ -674,12 +754,15 @@ describe('importParks', () => {
       })
     });
 
-    await expect(getParkBySlug(testDatabase.database, 'testin-retkeilyreitti')).resolves.toBeNull();
-    await expect(listParks(testDatabase.database)).resolves.toHaveLength(1);
+    await expect(
+      getParkBySlug(testDatabase.database, 'testin-retkeilyreitti')
+    ).resolves.toMatchObject({ slug: 'testin-retkeilyreitti' });
+    expect(await testDatabase.database.select().from(trailAreaLinks)).toHaveLength(0);
+    await expect(listParks(testDatabase.database)).resolves.toHaveLength(2);
   });
 
   it('preserves manually removed parks across imports', async () => {
-    await importParks({
+    await importPublishedParkFixtures({
       database: testDatabase.database,
       expectedActiveCount: 1,
       now: () => '2026-05-01T08:00:00.000Z',
@@ -694,7 +777,7 @@ describe('importParks', () => {
       .set({ removed: true })
       .where(eq(parks.slug, 'akasmannyn-kansallispuisto'));
 
-    await importParks({
+    await importPublishedParkFixtures({
       database: testDatabase.database,
       expectedActiveCount: 1,
       now: () => '2026-05-02T08:00:00.000Z',
@@ -726,7 +809,7 @@ describe('importParks', () => {
   });
 
   it('reuses existing slugs, deduplicates new slugs, and can mark all parks inactive', async () => {
-    await importParks({
+    await importPublishedParkFixtures({
       database: testDatabase.database,
       expectedActiveCount: 2,
       now: () => '2026-05-01T08:00:00.000Z',
@@ -747,7 +830,7 @@ describe('importParks', () => {
     );
     expect(duplicateSlugPark?.lipasId).toBe(12346);
 
-    await importParks({
+    await importPublishedParkFixtures({
       database: testDatabase.database,
       expectedActiveCount: 0,
       now: () => '2026-05-02T08:00:00.000Z',
@@ -767,7 +850,7 @@ describe('importParks', () => {
   });
 
   it('imports supported protected-area types and persists normalized type metadata', async () => {
-    await importParks({
+    await importPublishedParkFixtures({
       database: testDatabase.database,
       expectedActiveCount: 4,
       now: () => '2026-05-01T08:00:00.000Z',
@@ -848,7 +931,7 @@ describe('importParks', () => {
   });
 
   it('imports standalone nature trails as catalog places', async () => {
-    await importParks({
+    await importPublishedParkFixtures({
       database: testDatabase.database,
       expectedActiveCount: 2,
       now: () => '2026-05-01T08:00:00.000Z',
@@ -895,8 +978,8 @@ describe('importParks', () => {
     });
   });
 
-  it('skips nature trails that are fully inside an imported area', async () => {
-    await importParks({
+  it('retains and links nature trails fully inside an area', async () => {
+    await importPublishedParkFixtures({
       database: testDatabase.database,
       expectedActiveCount: 2,
       now: () => '2026-05-01T08:00:00.000Z',
@@ -910,8 +993,8 @@ describe('importParks', () => {
     await expect(listParks(testDatabase.database)).resolves.toHaveLength(1);
   });
 
-  it('skips nature trails whose location label and postal fields match an imported area', async () => {
-    await importParks({
+  it('does not link a nature trail by matching address alone', async () => {
+    await importPublishedParkFixtures({
       database: testDatabase.database,
       expectedActiveCount: 2,
       now: () => '2026-05-01T08:00:00.000Z',
@@ -946,8 +1029,11 @@ describe('importParks', () => {
       })
     });
 
-    await expect(getParkBySlug(testDatabase.database, 'testin-luontopolku')).resolves.toBeNull();
-    await expect(listParks(testDatabase.database)).resolves.toHaveLength(1);
+    await expect(getParkBySlug(testDatabase.database, 'testin-luontopolku')).resolves.toMatchObject(
+      { slug: 'testin-luontopolku' }
+    );
+    expect(await testDatabase.database.select().from(trailAreaLinks)).toHaveLength(0);
+    await expect(listParks(testDatabase.database)).resolves.toHaveLength(2);
   });
 
   it('does not apply metadata-match skipping when one location field is missing', async () => {
@@ -976,7 +1062,7 @@ describe('importParks', () => {
     });
     delete trail.location['postal-code'];
 
-    await importParks({
+    await importPublishedParkFixtures({
       database: testDatabase.database,
       expectedActiveCount: 2,
       now: () => '2026-05-01T08:00:00.000Z',
@@ -995,7 +1081,7 @@ describe('importParks', () => {
   });
 
   it('prefers official luontoon sitemap urls over stale lipas www values', async () => {
-    await importParks({
+    await importPublishedParkFixtures({
       database: testDatabase.database,
       expectedActiveCount: 2,
       now: () => '2026-05-01T08:00:00.000Z',
@@ -1046,7 +1132,7 @@ describe('importParks', () => {
   });
 
   it('falls back to normalized lipas www when the luontoon sitemap has no match', async () => {
-    await importParks({
+    await importPublishedParkFixtures({
       database: testDatabase.database,
       expectedActiveCount: 1,
       now: () => '2026-05-01T08:00:00.000Z',
@@ -1081,7 +1167,7 @@ describe('importParks', () => {
   });
 
   it('uses canonical Luontoon destination slugs for wilderness areas even when the local slug still ends with -alue', async () => {
-    await importParks({
+    await importPublishedParkFixtures({
       database: testDatabase.database,
       expectedActiveCount: 1,
       now: () => '2026-05-01T08:00:00.000Z',
@@ -1116,7 +1202,7 @@ describe('importParks', () => {
   });
 
   it('prefers official luontoon route urls over stale lipas www values for nature trails', async () => {
-    await importParks({
+    await importPublishedParkFixtures({
       database: testDatabase.database,
       expectedActiveCount: 2,
       now: () => '2026-05-01T08:00:00.000Z',
@@ -1193,7 +1279,7 @@ describe('importParks', () => {
   });
 
   it('uses the generic hiking-area type with a Valtion retkeilyalue display label for type 109 imports', async () => {
-    await importParks({
+    await importPublishedParkFixtures({
       database: testDatabase.database,
       expectedActiveCount: 1,
       now: () => '2026-05-01T08:00:00.000Z',
@@ -1222,7 +1308,7 @@ describe('importParks', () => {
   });
 
   it('promotes non-109 retkeilyalue names into hiking-area without the Valtion retkeilyalue display label', async () => {
-    await importParks({
+    await importPublishedParkFixtures({
       database: testDatabase.database,
       expectedActiveCount: 2,
       now: () => '2026-05-01T08:00:00.000Z',
@@ -1304,14 +1390,14 @@ describe('importParks', () => {
       ) as typeof fetch;
 
     try {
-      await importParks({
+      await importPublishedParkFixtures({
         database: testDatabase.database,
         expectedActiveCount: 1,
         sourceUrl: 'https://example.test/lipas'
       });
 
       await expect(
-        importParks({
+        importPublishedParkFixtures({
           database: testDatabase.database,
           expectedActiveCount: 1,
           sourceUrl: 'https://example.test/lipas'
@@ -1345,7 +1431,7 @@ describe('importParks', () => {
 
     try {
       await expect(
-        importParks({
+        importPublishedParkFixtures({
           database: testDatabase.database,
           expectedActiveCount: 1,
           sourceUrl: 'https://example.test/lipas'
@@ -1355,6 +1441,66 @@ describe('importParks', () => {
       globalThis.fetch = originalFetch;
     }
   });
+
+  it.each([
+    [
+      {
+        items: [createLipasPark()],
+        pagination: { 'current-page': 2, 'page-size': 100, 'total-items': 1, 'total-pages': 1 }
+      },
+      null,
+      'first catalog page'
+    ],
+    [
+      {
+        items: [createLipasPark()],
+        pagination: { 'current-page': 1, 'page-size': 100, 'total-items': 2, 'total-pages': 1 }
+      },
+      null,
+      'incomplete catalog'
+    ],
+    [
+      {
+        items: [createLipasPark()],
+        pagination: { 'current-page': 1, 'page-size': 100, 'total-items': 2, 'total-pages': 2 }
+      },
+      {
+        items: [],
+        pagination: { 'current-page': 2, 'page-size': 100, 'total-items': 3, 'total-pages': 2 }
+      },
+      'inconsistent pagination'
+    ],
+    [
+      {
+        items: [createLipasPark()],
+        pagination: { 'current-page': 1, 'page-size': 100, 'total-items': 2, 'total-pages': 2 }
+      },
+      { items: [] },
+      'incomplete catalog'
+    ]
+  ])(
+    'rejects an incomplete or inconsistent source before cleanup',
+    async (first, second, error) => {
+      await importParks({
+        database: testDatabase.database,
+        sourceUrl: 'https://example.test',
+        fetchSource: async () => ({ items: [createLipasPark()] })
+      });
+      const before = await testDatabase.database.select().from(parks);
+      const originalFetch = globalThis.fetch;
+      const stub = vi.fn().mockResolvedValueOnce(Response.json(first));
+      if (second) stub.mockResolvedValueOnce(Response.json(second));
+      globalThis.fetch = stub as typeof fetch;
+      try {
+        await expect(
+          importParks({ database: testDatabase.database, sourceUrl: 'https://example.test' })
+        ).rejects.toThrow(error);
+        expect(await testDatabase.database.select().from(parks)).toEqual(before);
+      } finally {
+        globalThis.fetch = originalFetch;
+      }
+    }
+  );
 
   it('collects all pages from the default fetcher when the source spans multiple pages', async () => {
     const originalFetch = globalThis.fetch;
@@ -1404,7 +1550,7 @@ describe('importParks', () => {
       ) as typeof fetch;
 
     try {
-      await importParks({
+      await importPublishedParkFixtures({
         database: testDatabase.database,
         expectedActiveCount: 2,
         fetchLuontoonSitemap: emptyLuontoonSitemap,
@@ -1446,7 +1592,7 @@ describe('importParks', () => {
 
     try {
       await expect(
-        importParks({
+        importPublishedParkFixtures({
           database: testDatabase.database,
           expectedActiveCount: 2,
           fetchLuontoonSitemap: emptyLuontoonSitemap,
@@ -1496,7 +1642,7 @@ describe('importParks', () => {
       ) as typeof fetch;
 
     try {
-      const result = await importParks({
+      const result = await importPublishedParkFixtures({
         database: testDatabase.database,
         expectedActiveCount: 2,
         fetchLuontoonSitemap: emptyLuontoonSitemap,
@@ -1508,6 +1654,407 @@ describe('importParks', () => {
     } finally {
       globalThis.fetch = originalFetch;
     }
+  });
+
+  it('imports and links multipart source lines and polygons as one trail–area pair', async () => {
+    const park = createLipasPark();
+    const area = {
+      ...park,
+      location: {
+        ...park.location,
+        geometries: {
+          type: 'FeatureCollection',
+          features: [
+            {
+              type: 'Feature',
+              geometry: {
+                type: 'MultiPolygon',
+                coordinates: [
+                  [
+                    [
+                      [24, 60],
+                      [24.01, 60],
+                      [24.01, 60.01],
+                      [24, 60.01],
+                      [24, 60]
+                    ]
+                  ],
+                  [
+                    [
+                      [24.02, 60],
+                      [24.03, 60],
+                      [24.03, 60.01],
+                      [24.02, 60.01],
+                      [24.02, 60]
+                    ]
+                  ]
+                ]
+              }
+            }
+          ]
+        }
+      }
+    };
+    const source = createLipasTrail();
+    const trail = {
+      ...source,
+      location: {
+        ...source.location,
+        geometries: {
+          type: 'FeatureCollection',
+          features: [
+            {
+              type: 'Feature',
+              geometry: {
+                type: 'MultiLineString',
+                coordinates: [
+                  [
+                    [24.001, 60.005],
+                    [24.009, 60.005]
+                  ],
+                  [
+                    [24.021, 60.005],
+                    [24.029, 60.005]
+                  ]
+                ]
+              }
+            }
+          ]
+        }
+      }
+    };
+    await importParks({
+      database: testDatabase.database,
+      sourceUrl: 'https://example.test',
+      fetchSource: async () => ({ items: [area, trail] })
+    });
+    const links = await testDatabase.database.select().from(trailAreaLinks);
+    expect(links).toHaveLength(1);
+    expect(links[0]?.overlapRatio).toBeCloseTo(1, 5);
+    expect(
+      (await testDatabase.database.select().from(parks).where(eq(parks.lipasId, 440401)))[0]
+    ).toMatchObject({ removed: true, trailPublicationRole: 'area_member' });
+  });
+
+  it('keeps a former member unpublished when an updated route falls below the threshold', async () => {
+    const route = (coordinates: [number, number][]) =>
+      createLipasTrail({
+        location: {
+          geometries: {
+            type: 'FeatureCollection',
+            features: [{ type: 'Feature', geometry: { type: 'LineString', coordinates } }]
+          }
+        }
+      });
+    const options = {
+      database: testDatabase.database,
+      sourceUrl: 'https://example.test',
+      fetchSource: async () => ({
+        items: [
+          createLipasPark(),
+          route([
+            [24.5, 61],
+            [25, 61]
+          ])
+        ]
+      })
+    };
+    await importParks(options);
+    const trail = (
+      await testDatabase.database.select().from(parks).where(eq(parks.lipasId, 440401))
+    )[0]!;
+    await testDatabase.database.update(parks).set({ removed: false }).where(eq(parks.id, trail.id));
+    await importParks({
+      ...options,
+      fetchSource: async () => ({
+        items: [
+          createLipasPark(),
+          route([
+            [25.9, 61],
+            [27, 61]
+          ])
+        ]
+      })
+    });
+    expect(await testDatabase.database.select().from(trailAreaLinks)).toHaveLength(0);
+    expect(
+      (await testDatabase.database.select().from(parks).where(eq(parks.id, trail.id)))[0]
+    ).toMatchObject({ removed: false, trailPublicationRole: 'area_member' });
+    await expect(getParkBySlug(testDatabase.database, trail.slug)).resolves.toBeNull();
+  });
+
+  it('rolls back an import that would newly suppress a visited trail', async () => {
+    const outside = createLipasTrail({
+      location: {
+        geometries: {
+          type: 'FeatureCollection',
+          features: [
+            {
+              type: 'Feature',
+              geometry: {
+                type: 'LineString',
+                coordinates: [
+                  [35, 66],
+                  [35.1, 66.1]
+                ]
+              }
+            }
+          ]
+        }
+      }
+    });
+    await importPublishedParkFixtures({
+      database: testDatabase.database,
+      sourceUrl: 'https://example.test',
+      fetchSource: async () => ({ items: [createLipasPark(), outside] })
+    });
+    await createVisit(testDatabase.database, 'testin-luontopolku', {
+      author: 'Admin',
+      note: 'Walk',
+      route: 'Loop',
+      status: 'published',
+      visitedOn: '2026-11-10'
+    });
+    const before = await testDatabase.database.select().from(parks);
+    await expect(
+      importParks({
+        database: testDatabase.database,
+        sourceUrl: 'https://example.test',
+        fetchSource: async () => ({ items: [createLipasPark(), createLipasTrail()] })
+      })
+    ).rejects.toThrow('preservation decision');
+    expect(await testDatabase.database.select().from(parks)).toEqual(before);
+    expect(await testDatabase.database.select().from(trailAreaLinks)).toHaveLength(0);
+    expect(
+      await getParkVisitsBySlug(testDatabase.database, 'testin-luontopolku', async () => '')
+    ).toMatchObject({ visits: [expect.objectContaining({ route: 'Loop' })] });
+  });
+
+  it('rolls back the source batch if an area has no coordinates', async () => {
+    const area = createLipasPark({
+      location: { geometries: { type: 'FeatureCollection', features: [] } }
+    });
+    await expect(
+      importParks({
+        database: testDatabase.database,
+        sourceUrl: 'https://example.test',
+        fetchSource: async () => ({ items: [createLipasTrail(), area] })
+      })
+    ).rejects.toThrow('Area 12345 has no usable coordinates');
+    expect(await testDatabase.database.select().from(parks)).toHaveLength(0);
+  });
+
+  it('retains a source-active trail with no geometry disabled and reports it for review', async () => {
+    const source = createLipasTrail({
+      location: { geometries: { type: 'FeatureCollection', features: [] } }
+    });
+    const result = await importParks({
+      database: testDatabase.database,
+      sourceUrl: 'https://example.test',
+      fetchSource: async () => ({ items: [source] })
+    });
+    const trail = await testDatabase.database.query.parks.findFirst({
+      where: eq(parks.lipasId, source['lipas-id'])
+    });
+    expect(trail).toMatchObject({ removed: true, catalogStatus: 'active' });
+    await expect(updateParkRemoved(testDatabase.database, trail!.slug, false)).rejects.toThrow(
+      'without coordinates'
+    );
+    expect(result.trailAreaResult?.unresolved).toContainEqual({
+      trailId: trail!.id,
+      areaId: null,
+      status: 'missing-line'
+    });
+    await importParks({
+      database: testDatabase.database,
+      sourceUrl: 'https://example.test',
+      fetchSource: async () => ({ items: [createLipasTrail()] })
+    });
+    expect(await updateParkRemoved(testDatabase.database, trail!.slug, false)).toBe(true);
+    expect((await getParkBySlug(testDatabase.database, trail!.slug))?.markerPoint).toMatchObject({
+      lon: expect.any(Number),
+      lat: expect.any(Number)
+    });
+  });
+
+  it('retains an out-of-range trail privately and reports invalid coordinates', async () => {
+    const source = createLipasTrail({
+      location: {
+        geometries: {
+          type: 'FeatureCollection',
+          features: [
+            {
+              type: 'Feature',
+              geometry: {
+                type: 'LineString',
+                coordinates: [
+                  [24, 60],
+                  [24, 999]
+                ]
+              }
+            }
+          ]
+        }
+      }
+    });
+    const result = await importParks({
+      database: testDatabase.database,
+      sourceUrl: 'https://example.test',
+      fetchSource: async () => ({ items: [source] })
+    });
+    const trail = (
+      await testDatabase.database.select().from(parks).where(eq(parks.lipasId, 440401))
+    )[0]!;
+    expect(trail).toMatchObject({ removed: true, markerLon: 0, markerLat: 0 });
+    expect(result.trailAreaResult?.unresolved).toContainEqual({
+      trailId: trail.id,
+      areaId: null,
+      status: 'invalid-line'
+    });
+    await expect(updateParkRemoved(testDatabase.database, trail.slug, false)).rejects.toThrow(
+      'without coordinates'
+    );
+  });
+
+  it('preserves the last known location and visibility when an existing trail loses all geometry', async () => {
+    const options = {
+      database: testDatabase.database,
+      sourceUrl: 'https://example.test',
+      fetchSource: async () => ({ items: [createLipasTrail()] })
+    };
+    await importPublishedParkFixtures(options);
+    const before = (
+      await testDatabase.database.select().from(parks).where(eq(parks.lipasId, 440401))
+    )[0]!;
+    await testDatabase.database
+      .update(parks)
+      .set({ markerLat: 61, markerLon: 25 })
+      .where(eq(parks.id, before.id));
+    const empty = createLipasTrail({
+      location: { geometries: { type: 'FeatureCollection', features: [] } }
+    });
+    const result = await importParks({ ...options, fetchSource: async () => ({ items: [empty] }) });
+    const after = (
+      await testDatabase.database.select().from(parks).where(eq(parks.id, before.id))
+    )[0]!;
+    expect(after).toMatchObject({
+      id: before.id,
+      removed: false,
+      markerLat: 61,
+      markerLon: 25,
+      bboxMinLon: before.bboxMinLon,
+      bboxMaxLon: before.bboxMaxLon
+    });
+    expect(result.trailAreaResult?.unresolved).toContainEqual({
+      trailId: before.id,
+      areaId: null,
+      status: 'missing-line'
+    });
+  });
+
+  it('links usable line parts while reporting a degenerate part for review', async () => {
+    const source = createLipasTrail({
+      location: {
+        geometries: {
+          type: 'FeatureCollection',
+          features: [
+            {
+              type: 'Feature',
+              geometry: {
+                type: 'LineString',
+                coordinates: [
+                  [24.5, 61],
+                  [25, 61]
+                ]
+              }
+            },
+            {
+              type: 'Feature',
+              geometry: {
+                type: 'LineString',
+                coordinates: [
+                  [24.5, 61],
+                  [24.5, 61]
+                ]
+              }
+            }
+          ]
+        }
+      }
+    });
+    const result = await importParks({
+      database: testDatabase.database,
+      sourceUrl: 'https://example.test',
+      fetchSource: async () => ({ items: [createLipasPark(), source] })
+    });
+    const trail = (
+      await testDatabase.database.select().from(parks).where(eq(parks.lipasId, 440401))
+    )[0]!;
+    expect(result.trailAreaResult?.unresolved).toContainEqual({
+      trailId: trail.id,
+      areaId: null,
+      status: 'degenerate-line-part'
+    });
+    expect(await testDatabase.database.select().from(trailAreaLinks)).toMatchObject([
+      { trailId: trail.id, geometryQuality: 'degenerate-line-parts', automaticMatch: true }
+    ]);
+  });
+
+  it('retains and reports a degenerate trail even when no area overlaps its bounding box', async () => {
+    const source = createLipasTrail({
+      location: {
+        geometries: {
+          type: 'FeatureCollection',
+          features: [
+            {
+              type: 'Feature',
+              geometry: {
+                type: 'LineString',
+                coordinates: [
+                  [35, 66],
+                  [35, 66]
+                ]
+              }
+            }
+          ]
+        }
+      }
+    });
+    const result = await importParks({
+      database: testDatabase.database,
+      sourceUrl: 'https://example.test',
+      fetchSource: async () => ({ items: [source] })
+    });
+    const trail = await testDatabase.database.query.parks.findFirst({
+      where: eq(parks.lipasId, source['lipas-id'])
+    });
+    expect(trail).toMatchObject({
+      removed: true,
+      catalogStatus: 'active',
+      trailPublicationRole: 'independent'
+    });
+    expect(result.trailAreaResult?.unresolved).toEqual([
+      { trailId: trail!.id, areaId: null, status: 'invalid-line' }
+    ]);
+  });
+
+  it('rejects duplicate source IDs before changing stored records', async () => {
+    await importParks({
+      database: testDatabase.database,
+      sourceUrl: 'https://example.test',
+      fetchSource: async () => ({ items: [createLipasPark()] })
+    });
+    const before = await testDatabase.database.select().from(parks);
+    await expect(
+      importParks({
+        database: testDatabase.database,
+        sourceUrl: 'https://example.test',
+        fetchSource: async () => ({
+          items: [createLipasPark(), { ...createLipasPark(), status: 'inactive' }]
+        })
+      })
+    ).rejects.toThrow('duplicate source IDs');
+    expect(await testDatabase.database.select().from(parks)).toEqual(before);
   });
 
   it('rolls back all catalog changes on mid-import failure', async () => {

@@ -635,6 +635,10 @@ export const updateParkRemovedRoute = createRoute({
         }
       }
     },
+    422: {
+      description: 'A linked trail cannot be enabled as a standalone destination',
+      content: { 'application/json': { schema: errorSchema } }
+    },
     503: {
       description: 'OAuth not configured',
       content: {

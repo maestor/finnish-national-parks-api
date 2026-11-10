@@ -8,9 +8,9 @@ import {
   runImageDerivativeBackfill,
   runImageDerivativeBackfillToCompletion
 } from '../../src/images/backfill-image-derivatives.js';
-import { importParks } from '../../src/importer/import-parks.js';
 import { createMemoryStorage } from '../../src/storage/memory-storage.js';
 import { createLipasPark } from '../fixtures/lipas.js';
+import { importPublishedParkFixtures } from '../helpers/import-published-park-fixtures.js';
 import { createTestDatabase } from '../helpers/test-db.js';
 
 describe('image derivative backfill', () => {
@@ -21,7 +21,7 @@ describe('image derivative backfill', () => {
     testDatabase = await createTestDatabase();
     storage = createMemoryStorage();
 
-    await importParks({
+    await importPublishedParkFixtures({
       database: testDatabase.database,
       expectedActiveCount: 1,
       fetchSource: async () => ({ items: [createLipasPark()] }),

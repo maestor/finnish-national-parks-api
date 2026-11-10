@@ -13,6 +13,16 @@ before either mode; the scheduled command below never applies migrations.
 
 Use this guide when you need to reproduce or extend the curated special import workflow.
 
+## Trail–area reconciliation
+
+Both import paths insert new records disabled and preserve existing visibility and editable fields. The LIPAS import retains supported source-active trails, then clips route lines against active stored area polygons in WGS84 and measures the resulting lengths in EPSG:3067. Each area covering at least 10% of measured route length qualifies independently, without a distance floor or buffer; comparison uses a 1e-7 ratio tolerance for projection and floating-point precision. Invalid polygons and wholly degenerate trails are reported without automatic matches. When a trail contains both usable and zero-length line parts, the usable parts are measured and the degenerate parts are flagged in the report and link metadata; no geometry is repaired. A trail without usable coordinates retains its last known bounds and marker; a new trail without usable coordinates uses a private zero-coordinate placeholder and cannot be enabled until coordinates exist. An area without usable coordinates fails the import. Both import paths fetch and validate their source batch before committing catalog or relationship changes. Special-import trails remain independent; special areas can be parents. An effective link hides a trail as a standalone destination, and removing the last match does not automatically republish it; an explicit enable restores independence only when no effective link remains. No visit records are moved or rewritten.
+
+Back up the target database before applying. Run `npm run import:parks -- --dry-run` first; it rolls back catalog changes and reports new rows, automatic links, exclusions, unresolved geometry, deactivations and affected public slugs. A trail with visits that would newly become a member aborts the transaction for a separate preservation decision. After review, run `npm run import:parks` and immediately expire every reported slug through the UI's authenticated `POST /api/revalidate-public-cache` with `{ "parkSlugs": ["slug"] }` (maximum 500 per request). That endpoint also expires summary, map, planner and sitemap paths. API ETags do not invalidate the UI cache by themselves. Repeat the dry run to check stability before rollout.
+
+A scheduled import rolls back when it would newly hide an enabled trail, because it cannot perform the UI's authenticated expiry. Review the reported slugs, run the manual import and expire those URLs immediately. Special-area imports have the same guard; after review a single area can be imported with `npm run import:special-parks -- --allow-public-trail-conversions <slug>`, followed immediately by expiry of every printed slug. The default special-import command refuses that conversion.
+
+Admin-session endpoints `GET /api/admin/parks/{slug}/trails` and `/trail-candidates` expose private link and candidate data; `PUT`/`DELETE /api/admin/parks/{slug}/trails/{trailId}` record durable inclusion/exclusion overrides. The candidate read accepts `q`, `limit` (1–100) and `offset`. An API key alone is insufficient. Callers making a manual change must immediately expire the returned trail slug through the same UI endpoint. No relation editor is included.
+
 ## Weekly LIPAS automation
 
 The API repository's `Weekly LIPAS Import` workflow runs every Monday at 09:43
@@ -23,7 +33,7 @@ Each run backs up production to a GitHub Actions artifact retained for 14 days,
 then runs `npm run import:parks:scheduled` using the `production` environment's
 existing `DATABASE_URL` and `DATABASE_AUTH_TOKEN` secrets. It shares the
 `production-database` concurrency group with production migrations and never
-applies migrations itself. Migration `0046_park_import_notifications.sql` must
+applies migrations itself. Migrations `0046_park_import_notifications.sql` and `0047_trail_area_links.sql` must
 be applied by the normal production migration workflow before the first import.
 
 New parks stay hidden until enabled in the admin UI. A run with new parks opens
@@ -31,7 +41,7 @@ one Finnish review issue with their names, types and LIPAS IDs, mentioning only
 `@maestor`. With no additions, it creates no issue. Existing parks are refreshed
 using the same import and preservation rules as the manual command; missing
 LIPAS-managed parks become inactive. Normal API reads remain local-first, and
-existing catalog ETag/cache and offline behavior is unchanged.
+the frontend cache must be immediately expired for any retired public trail pages as described below.
 
 Notification reports are queued in the same database transaction as the import.
 Failed notifications remain queued for the next scheduled run, which retries

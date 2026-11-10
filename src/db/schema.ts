@@ -85,6 +85,9 @@ export const parks = sqliteTable(
     importedMarkerLon: real('imported_marker_lon'),
     importedMarkerLat: real('imported_marker_lat'),
     catalogStatus: text('catalog_status').notNull(),
+    trailPublicationRole: text('trail_publication_role', { enum: ['independent', 'area_member'] })
+      .notNull()
+      .default('independent'),
     removed: integer('removed', { mode: 'boolean' }).notNull().default(false),
     lastImportRunId: integer('last_import_run_id')
       .notNull()
@@ -101,6 +104,32 @@ export const parks = sqliteTable(
     typeIndex: index('parks_type_id_idx').on(table.typeId),
     statusIndex: index('parks_catalog_status_idx').on(table.catalogStatus),
     removedIndex: index('parks_removed_idx').on(table.removed)
+  })
+);
+
+export const trailAreaLinks = sqliteTable(
+  'trail_area_links',
+  {
+    trailId: integer('trail_id')
+      .notNull()
+      .references(() => parks.id),
+    areaId: integer('area_id')
+      .notNull()
+      .references(() => parks.id),
+    automaticMatch: integer('automatic_match', { mode: 'boolean' }).notNull().default(false),
+    override: text('override', { enum: ['include', 'exclude'] }),
+    overlapMetres: real('overlap_metres'),
+    routeMetres: real('route_metres'),
+    overlapRatio: real('overlap_ratio'),
+    calculationMethod: text('calculation_method'),
+    geometryFingerprint: text('geometry_fingerprint'),
+    geometryQuality: text('geometry_quality'),
+    createdAt: text('created_at').notNull(),
+    updatedAt: text('updated_at').notNull()
+  },
+  (table) => ({
+    primaryKey: primaryKey({ columns: [table.trailId, table.areaId] }),
+    areaIndex: index('trail_area_links_area_idx').on(table.areaId, table.trailId)
   })
 );
 

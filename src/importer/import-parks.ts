@@ -1,3 +1,4 @@
+import { and, eq } from 'drizzle-orm';
 import { z } from 'zod';
 
 import type { Database } from '../db/database.js';
@@ -9,28 +10,25 @@ import {
   syncParkTypes,
   upsertImportedPark
 } from '../db/repositories.js';
-import { parkImportNotifications } from '../db/schema.js';
+import { parkImportNotifications, parks } from '../db/schema.js';
 import {
   getSupportedParkTypeByCode,
   hikingAreaDisplayTypeName,
   hikingAreaTypeCode,
-  isHikingTrailTypeCode,
-  isTrailTypeCode,
-  isWalkingTrailTypeCode
+  isTrailTypeCode
 } from '../parks/park-types.js';
-import { hasAnyPointInsideArea, isFullyInsideArea } from './geometry.js';
 import { createLuontoonUrlResolver } from './luontoon-sitemap.js';
-import type { MappedPark } from './map-lipas-park.js';
 import { mapLipasPark } from './map-lipas-park.js';
+import { reconcileTrailAreas } from './reconcile-trail-areas.js';
 
 const lipasResponseSchema = z.object({
   items: z.array(z.unknown()),
   pagination: z
     .object({
-      'current-page': z.number().int(),
-      'page-size': z.number().int(),
-      'total-items': z.number().int(),
-      'total-pages': z.number().int()
+      'current-page': z.number().int().positive(),
+      'page-size': z.number().int().positive(),
+      'total-items': z.number().int().nonnegative(),
+      'total-pages': z.number().int().positive()
     })
     .optional()
 });
@@ -42,8 +40,8 @@ type ImportParksOptions = {
   dryRun?: boolean;
   fetchSource?: (sourceUrl: string) => Promise<unknown>;
   fetchLuontoonSitemap?: ((sourceUrl: string) => Promise<string>) | undefined;
-  markNewParksRemoved?: boolean;
   queueNewParkNotification?: boolean;
+  requireNoPublicTrailConversions?: boolean;
   now?: () => string;
   sourceUrl: string;
 };
@@ -68,9 +66,18 @@ const defaultFetchSource = async (sourceUrl: string) => {
   }
 
   const firstPayload = lipasResponseSchema.parse(await firstResponse.json());
+  if (firstPayload.pagination && firstPayload.pagination['current-page'] !== 1) {
+    throw new Error('LIPAS import did not return the first catalog page.');
+  }
   const totalPages = firstPayload.pagination?.['total-pages'] ?? 1;
 
   if (totalPages === 1) {
+    if (
+      firstPayload.pagination &&
+      firstPayload.items.length !== firstPayload.pagination['total-items']
+    ) {
+      throw new Error('LIPAS import returned an incomplete catalog.');
+    }
     return firstPayload;
   }
 
@@ -88,7 +95,19 @@ const defaultFetchSource = async (sourceUrl: string) => {
     }
 
     const payload = lipasResponseSchema.parse(await response.json());
+    if (
+      payload.pagination &&
+      (payload.pagination['current-page'] !== page ||
+        payload.pagination['total-pages'] !== totalPages ||
+        payload.pagination['total-items'] !== firstPagination['total-items'])
+    ) {
+      throw new Error(`LIPAS import returned inconsistent pagination on page ${page}.`);
+    }
     combinedItems.push(...payload.items);
+  }
+
+  if (combinedItems.length !== firstPagination['total-items']) {
+    throw new Error('LIPAS import returned an incomplete catalog.');
   }
 
   return {
@@ -127,39 +146,6 @@ const ensureUniqueSlug = (baseSlug: string, lipasId: number, takenSlugs: Set<str
   return candidate;
 };
 
-const normalizeLocationPart = (value: string | null) => value?.trim().toLowerCase() ?? '';
-
-const hasMatchingAreaLocationMetadata = (park: MappedPark, areas: MappedPark[]) => {
-  const parkLocationLabel = normalizeLocationPart(park.locationLabel);
-  const parkPostalCode = normalizeLocationPart(park.postalCode);
-  const parkPostalOffice = normalizeLocationPart(park.postalOffice);
-
-  if (!parkLocationLabel || !parkPostalCode || !parkPostalOffice) {
-    return false;
-  }
-
-  return areas.some(
-    (area) =>
-      normalizeLocationPart(area.locationLabel) === parkLocationLabel &&
-      normalizeLocationPart(area.postalCode) === parkPostalCode &&
-      normalizeLocationPart(area.postalOffice) === parkPostalOffice
-  );
-};
-
-const shouldSkipTrailImport = (park: MappedPark, areas: MappedPark[]) => {
-  if (!isTrailTypeCode(park.type.code)) {
-    return false;
-  }
-
-  const overlapsArea = areas.some((area) =>
-    isWalkingTrailTypeCode(park.type.code)
-      ? hasAnyPointInsideArea(park.boundaryGeoJson, area.boundaryGeoJson)
-      : isFullyInsideArea(park.boundaryGeoJson, area.boundaryGeoJson)
-  );
-
-  return overlapsArea || hasMatchingAreaLocationMetadata(park, areas);
-};
-
 export const importParks = async ({
   database,
   expectedActiveCount: _expectedActiveCount,
@@ -167,8 +153,8 @@ export const importParks = async ({
   dryRun = false,
   fetchSource = defaultFetchSource,
   fetchLuontoonSitemap,
-  markNewParksRemoved = false,
   queueNewParkNotification = false,
+  requireNoPublicTrailConversions = false,
   now = () => new Date().toISOString(),
   sourceUrl
 }: ImportParksOptions) => {
@@ -179,18 +165,22 @@ export const importParks = async ({
   const resolveParkUrl = createLuontoonUrlResolver(
     await effectiveFetchLuontoonSitemap(LUONTOON_SITEMAP_URL)
   );
+  const sourceIds = payload.items.map(
+    (item) => z.object({ 'lipas-id': z.number().int() }).parse(item)['lipas-id']
+  );
+  if (new Set(sourceIds).size !== sourceIds.length) {
+    throw new Error('LIPAS import returned duplicate source IDs.');
+  }
   const activeItems = payload.items.filter((item) => {
     const candidate = item as { status?: string };
     return candidate.status === 'active';
   });
   const mappedActiveParks = activeItems.map((item) => mapLipasPark(item));
-  const importedAreas = mappedActiveParks.filter((park) => !isTrailTypeCode(park.type.code));
-  const importedParks = mappedActiveParks.filter(
-    (park) => !shouldSkipTrailImport(park, importedAreas)
-  );
+  const importedParks = mappedActiveParks;
   const importedLipasIds = importedParks.map((park) => park.lipasId);
   const existingParks = await listExistingParksByLipasIds(database, importedLipasIds);
   const existingLipasIds = new Set(existingParks.map((park) => park.lipasId));
+  const existingByLipasId = new Map(existingParks.map((park) => [park.lipasId, park]));
   const existingImportedSlugByLipasId = new Map(
     existingParks.map((park) => [park.lipasId, park.importedSlug ?? park.slug])
   );
@@ -199,10 +189,7 @@ export const importParks = async ({
     .map((park) => ({
       lipasId: park.lipasId,
       name: park.name,
-      removed:
-        markNewParksRemoved ||
-        isHikingTrailTypeCode(park.type.code) ||
-        isWalkingTrailTypeCode(park.type.code),
+      removed: true,
       slug: park.slug,
       typeCode: park.type.code,
       typeName: getSupportedParkTypeByCode(park.type.code).name
@@ -217,6 +204,10 @@ export const importParks = async ({
   );
 
   let importRunId: number | null = null;
+  const trailAreaResult: { value: Awaited<ReturnType<typeof reconcileTrailAreas>> | null } = {
+    value: null
+  };
+  const deactivatedParks: { lipasId: number; slug: string }[] = [];
 
   try {
     await database.transaction(async (tx) => {
@@ -242,17 +233,36 @@ export const importParks = async ({
         const slug =
           existingImportedSlugByLipasId.get(lipasId) ??
           ensureUniqueSlug(mapped.slug, lipasId, takenSlugs);
-        const insertAsRemoved =
-          (!existingLipasIds.has(mapped.lipasId) && markNewParksRemoved) ||
-          isHikingTrailTypeCode(mapped.type.code) ||
-          isWalkingTrailTypeCode(mapped.type.code);
-
+        const hasBounds =
+          Object.values(mapped.boundingBox).every(Number.isFinite) &&
+          mapped.boundingBox.minLon >= -180 &&
+          mapped.boundingBox.maxLon <= 180 &&
+          mapped.boundingBox.minLat >= -90 &&
+          mapped.boundingBox.maxLat <= 90;
+        if (!hasBounds && !isTrailTypeCode(mapped.type.code)) {
+          throw new Error(`Area ${mapped.lipasId} has no usable coordinates.`);
+        }
+        const previous = existingByLipasId.get(mapped.lipasId);
+        const bounds = hasBounds
+          ? mapped.boundingBox
+          : {
+              minLon: previous?.bboxMinLon ?? 0,
+              minLat: previous?.bboxMinLat ?? 0,
+              maxLon: previous?.bboxMaxLon ?? 0,
+              maxLat: previous?.bboxMaxLat ?? 0
+            };
+        const marker = hasBounds
+          ? mapped.markerPoint
+          : {
+              lon: previous?.importedMarkerLon ?? previous?.markerLon ?? 0,
+              lat: previous?.importedMarkerLat ?? previous?.markerLat ?? 0
+            };
         await upsertImportedPark(tx, {
           areaKm2: mapped.areaKm2,
-          bboxMaxLat: mapped.boundingBox.maxLat,
-          bboxMaxLon: mapped.boundingBox.maxLon,
-          bboxMinLat: mapped.boundingBox.minLat,
-          bboxMinLon: mapped.boundingBox.minLon,
+          bboxMaxLat: bounds.maxLat,
+          bboxMaxLon: bounds.maxLon,
+          bboxMinLat: bounds.minLat,
+          bboxMinLon: bounds.minLon,
           boundaryGeojson: JSON.stringify(mapped.boundaryGeoJson),
           catalogStatus: 'active',
           createdAt: importedAt,
@@ -265,9 +275,9 @@ export const importParks = async ({
           locationLabel: mapped.locationLabel,
           parkUrl: resolvedParkUrl,
           managedByLipasImport: true,
-          markerLat: mapped.markerPoint.lat,
-          removed: insertAsRemoved,
-          markerLon: mapped.markerPoint.lon,
+          markerLat: marker.lat,
+          removed: true,
+          markerLon: marker.lon,
           municipalityCode: mapped.municipalityCode,
           name: mapped.name,
           postalCode: mapped.postalCode,
@@ -279,7 +289,22 @@ export const importParks = async ({
         });
       }
 
+      const activeIds = new Set(importedLipasIds);
+      const previouslyActive = await tx
+        .select({ lipasId: parks.lipasId, slug: parks.slug })
+        .from(parks)
+        .where(and(eq(parks.managedByLipasImport, true), eq(parks.catalogStatus, 'active')));
+      deactivatedParks.push(...previouslyActive.filter((park) => !activeIds.has(park.lipasId)));
       await markMissingParksInactive(tx, importedLipasIds, importRunId!, importedAt);
+      trailAreaResult.value = await reconcileTrailAreas(tx, importedAt);
+      if (
+        requireNoPublicTrailConversions &&
+        trailAreaResult.value.newlyHiddenPublicSlugs.length > 0
+      ) {
+        throw new Error(
+          `Public trail conversion requires immediate frontend cache expiry: ${trailAreaResult.value.newlyHiddenPublicSlugs.join(', ')}`
+        );
+      }
 
       if (queueNewParkNotification && newParks.length > 0) {
         await tx.insert(parkImportNotifications).values({
@@ -308,9 +333,10 @@ export const importParks = async ({
 
   return {
     activeCount: importedParks.length,
+    trailAreaResult: trailAreaResult.value,
+    deactivatedParks,
     dryRun,
     newParks,
-    skippedTrailCount: activeItems.length - importedParks.length,
     sourceActiveCount: activeItems.length,
     importRunId,
     importedAt

@@ -5,9 +5,9 @@ import { parkDetailSchema, parkImageCandidatesResponseSchema } from '../../src/c
 import { createVisitImage } from '../../src/db/repositories.js';
 import { parks } from '../../src/db/schema.js';
 import { createSessionToken } from '../../src/http/session.js';
-import { importParks } from '../../src/importer/import-parks.js';
 import { createMemoryStorage } from '../../src/storage/memory-storage.js';
 import { createLipasPark } from '../fixtures/lipas.js';
+import { importPublishedParkFixtures } from '../helpers/import-published-park-fixtures.js';
 import { createTestDatabase } from '../helpers/test-db.js';
 
 const auth = {
@@ -31,7 +31,7 @@ describe('park featured images API', () => {
     publicMediaUrl.mockClear();
     db = await createTestDatabase();
     cookie = `__session=${await createSessionToken({ email: 'admin@example.com', name: 'Admin', picture: '', role: 'admin', sub: 'admin' }, new TextEncoder().encode(auth.jwtSecret))}`;
-    await importParks({
+    await importPublishedParkFixtures({
       database: db.database,
       expectedActiveCount: 1,
       now: () => '2026-05-01T09:00:00.000Z',
@@ -227,7 +227,7 @@ describe('park featured images API', () => {
           .status
       ).toBe(400);
     }
-    await importParks({
+    await importPublishedParkFixtures({
       database: db.database,
       expectedActiveCount: 2,
       now: () => '2026-05-01T09:00:00.000Z',

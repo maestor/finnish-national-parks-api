@@ -19,8 +19,6 @@ import {
 } from '../../src/db/repositories.js';
 import { parks, tripRoutes } from '../../src/db/schema.js';
 import { createSessionToken } from '../../src/http/session.js';
-import { importParks } from '../../src/importer/import-parks.js';
-import { importSpecialParks } from '../../src/importer/import-special-parks.js';
 import { createMemoryStorage } from '../../src/storage/memory-storage.js';
 import { createTripPlannerBudget } from '../../src/trip-planner/budget.js';
 import { TripPlannerError } from '../../src/trip-planner/search.js';
@@ -30,6 +28,10 @@ import type {
   TripPlannerService
 } from '../../src/trip-planner/types.js';
 import { createLipasPark, createLipasTrail, parkTypeFixtures } from '../fixtures/lipas.js';
+import {
+  importPublishedParkFixtures,
+  importPublishedSpecialParkFixtures
+} from '../helpers/import-published-park-fixtures.js';
 import { createTestDatabase } from '../helpers/test-db.js';
 
 const createAdminSessionCookie = async () => {
@@ -55,7 +57,7 @@ describe('API routes', () => {
     testDatabase = await createTestDatabase();
     adminSessionCookie = await createAdminSessionCookie();
 
-    await importParks({
+    await importPublishedParkFixtures({
       database: testDatabase.database,
       expectedActiveCount: 4,
       now: () => '2026-05-01T09:00:00.000Z',
@@ -1043,7 +1045,7 @@ describe('API routes', () => {
 
   it('includes an optional display type name for manual catalog parks', async () => {
     const { createSpecialParksSource } = await import('../fixtures/special-parks.js');
-    await importSpecialParks({
+    await importPublishedSpecialParkFixtures({
       database: testDatabase.database,
       fetchSource: createSpecialParksSource(),
       now: () => '2026-05-01T10:00:00.000Z'
@@ -1081,7 +1083,7 @@ describe('API routes', () => {
 
   it('filters manual cultural history areas by the normalized type slug', async () => {
     const { createSpecialParksSource } = await import('../fixtures/special-parks.js');
-    await importSpecialParks({
+    await importPublishedSpecialParkFixtures({
       database: testDatabase.database,
       fetchSource: createSpecialParksSource(),
       now: () => '2026-05-01T10:00:00.000Z'
@@ -1105,7 +1107,7 @@ describe('API routes', () => {
   }, 15_000);
 
   it('filters the public park list by the derived category slug', async () => {
-    await importParks({
+    await importPublishedParkFixtures({
       database: testDatabase.database,
       expectedActiveCount: 1,
       now: () => '2026-05-02T10:00:00.000Z',
@@ -1155,7 +1157,7 @@ describe('API routes', () => {
   });
 
   it('filters hiking and wilderness parks through the combined derived category slug', async () => {
-    await importParks({
+    await importPublishedParkFixtures({
       database: testDatabase.database,
       expectedActiveCount: 2,
       now: () => '2026-05-02T10:30:00.000Z',
@@ -1229,7 +1231,7 @@ describe('API routes', () => {
     const firstResponse = await app.request('/api/parks');
     const firstEtag = firstResponse.headers.get('etag');
 
-    await importParks({
+    await importPublishedParkFixtures({
       database: testDatabase.database,
       expectedActiveCount: 4,
       now: () => '2026-05-02T09:00:00.000Z',
@@ -1468,7 +1470,7 @@ describe('API routes', () => {
   });
 
   it('requires an admin session for park edits and reports missing, invalid, and conflicting updates', async () => {
-    await importParks({
+    await importPublishedParkFixtures({
       database: testDatabase.database,
       expectedActiveCount: 5,
       now: () => '2026-05-02T09:00:00.000Z',
@@ -1597,7 +1599,7 @@ describe('API routes', () => {
   });
 
   it('serves standalone nature trails through the HTTP contract', async () => {
-    await importParks({
+    await importPublishedParkFixtures({
       database: testDatabase.database,
       expectedActiveCount: 5,
       now: () => '2026-05-02T09:00:00.000Z',
@@ -1766,7 +1768,7 @@ describe('API routes', () => {
   });
 
   it('marks trail progress types hidden while exposing combined trail category progress', async () => {
-    await importParks({
+    await importPublishedParkFixtures({
       database: testDatabase.database,
       expectedActiveCount: 1,
       now: () => '2026-05-02T11:00:00.000Z',
@@ -1836,7 +1838,7 @@ describe('API routes', () => {
   });
 
   it('aggregates hiking and wilderness parks under one frontend category while keeping separate types', async () => {
-    await importParks({
+    await importPublishedParkFixtures({
       database: testDatabase.database,
       expectedActiveCount: 2,
       now: () => '2026-05-02T11:30:00.000Z',
@@ -4980,7 +4982,7 @@ describe('API routes', () => {
 
     const brokenStopCreateDatabase = await createTestDatabase();
 
-    await importParks({
+    await importPublishedParkFixtures({
       database: brokenStopCreateDatabase.database,
       expectedActiveCount: 1,
       now: () => '2026-05-01T09:00:00.000Z',
@@ -5023,7 +5025,7 @@ describe('API routes', () => {
 
     const brokenStopUpdateDatabase = await createTestDatabase();
 
-    await importParks({
+    await importPublishedParkFixtures({
       database: brokenStopUpdateDatabase.database,
       expectedActiveCount: 1,
       now: () => '2026-05-01T09:00:00.000Z',
@@ -5272,7 +5274,7 @@ describe('API routes', () => {
   it('returns 500 for unexpected visit write failures', async () => {
     const brokenCreateDatabase = await createTestDatabase();
 
-    await importParks({
+    await importPublishedParkFixtures({
       database: brokenCreateDatabase.database,
       expectedActiveCount: 1,
       now: () => '2026-05-01T09:00:00.000Z',
@@ -5307,7 +5309,7 @@ describe('API routes', () => {
 
     const brokenUpdateDatabase = await createTestDatabase();
 
-    await importParks({
+    await importPublishedParkFixtures({
       database: brokenUpdateDatabase.database,
       expectedActiveCount: 1,
       now: () => '2026-05-01T09:00:00.000Z',

@@ -2,10 +2,10 @@ import { sql } from 'drizzle-orm';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { createVisit, createVisitImage } from '../../src/db/repositories.js';
-import { importParks } from '../../src/importer/import-parks.js';
 import { runUnusedMediaCleanup } from '../../src/media/unused-media-cleanup.js';
 import { createMemoryStorage } from '../../src/storage/memory-storage.js';
 import { createLipasPark } from '../fixtures/lipas.js';
+import { importPublishedParkFixtures } from '../helpers/import-published-park-fixtures.js';
 import { createTestDatabase } from '../helpers/test-db.js';
 
 describe('unused media cleanup', () => {
@@ -144,7 +144,7 @@ describe('unused media cleanup', () => {
 
   it('keeps image files that are still referenced by a current visit row', async () => {
     const timestamp = '2026-05-01T10:00:00.000Z';
-    await importParks({
+    await importPublishedParkFixtures({
       database: testDatabase.database,
       expectedActiveCount: 1,
       fetchSource: async () => ({ items: [createLipasPark()] }),
@@ -187,7 +187,7 @@ describe('unused media cleanup', () => {
 
   it('cleans a completed direct-upload staging file after its recovery window', async () => {
     const timestamp = '2026-05-01T10:00:00.000Z';
-    await importParks({
+    await importPublishedParkFixtures({
       database: testDatabase.database,
       expectedActiveCount: 1,
       fetchSource: async () => ({ items: [createLipasPark()] }),

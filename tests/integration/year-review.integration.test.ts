@@ -3,9 +3,9 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { createApp } from '../../src/app.js';
 import { createSessionToken } from '../../src/http/session.js';
-import { importParks } from '../../src/importer/import-parks.js';
 import { createMemoryStorage } from '../../src/storage/memory-storage.js';
 import { createLipasPark, parkTypeFixtures } from '../fixtures/lipas.js';
+import { importPublishedParkFixtures } from '../helpers/import-published-park-fixtures.js';
 import { createTestDatabase } from '../helpers/test-db.js';
 
 const authConfig = {
@@ -39,7 +39,7 @@ describe('year review routes', () => {
     testDatabase = await createTestDatabase();
     adminSessionCookie = await createAdminSessionCookie();
 
-    await importParks({
+    await importPublishedParkFixtures({
       database: testDatabase.database,
       expectedActiveCount: 3,
       now: () => '2026-05-01T09:00:00.000Z',

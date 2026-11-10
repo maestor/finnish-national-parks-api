@@ -2,12 +2,16 @@ import { eq } from 'drizzle-orm';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { getParkBySlug, listParks } from '../../src/db/repositories.js';
-import { parks } from '../../src/db/schema.js';
+import { parks, trailAreaLinks } from '../../src/db/schema.js';
 import { isFullyInsideArea } from '../../src/importer/geometry.js';
 import { importParks } from '../../src/importer/import-parks.js';
 import { importSpecialParks } from '../../src/importer/import-special-parks.js';
-import { createLipasPark } from '../fixtures/lipas.js';
+import { createLipasPark, createLipasTrail } from '../fixtures/lipas.js';
 import { createSpecialParksSource } from '../fixtures/special-parks.js';
+import {
+  importPublishedParkFixtures,
+  importPublishedSpecialParkFixtures
+} from '../helpers/import-published-park-fixtures.js';
 import { createTestDatabase } from '../helpers/test-db.js';
 
 type ExpectedLuontoonDestinationImport = {
@@ -49,8 +53,116 @@ describe('manual catalog imports', () => {
     await testDatabase.dispose();
   });
 
-  it('imports the two Haltiala nature reserves with their own boundaries', async () => {
+  it('inserts special trails disabled and pins them independent', async () => {
     await importSpecialParks({
+      database: testDatabase.database,
+      includeSlugs: ['torholan-luola'],
+      fetchSource: createSpecialParksSource()
+    });
+    const trail = await testDatabase.database.query.parks.findFirst({
+      where: eq(parks.slug, 'torholan-luola')
+    });
+    expect(trail).toMatchObject({
+      removed: true,
+      managedByLipasImport: false,
+      trailPublicationRole: 'independent'
+    });
+    await expect(getParkBySlug(testDatabase.database, 'torholan-luola')).resolves.toBeNull();
+  });
+
+  it('recomputes LIPAS links when a special area is imported', async () => {
+    await importParks({
+      database: testDatabase.database,
+      sourceUrl: 'https://example.test',
+      fetchSource: async () => ({ items: [createLipasTrail()] })
+    });
+    const trail = await testDatabase.database.query.parks.findFirst({
+      where: eq(parks.lipasId, 440401)
+    });
+    expect(trail?.trailPublicationRole).toBe('independent');
+    await testDatabase.database
+      .update(parks)
+      .set({ removed: false })
+      .where(eq(parks.id, trail!.id));
+    const specialOptions = {
+      database: testDatabase.database,
+      includeSlugs: ['paistjarvi'],
+      fetchSource: async () => ({
+        type: 'FeatureCollection',
+        features: [
+          {
+            type: 'Feature',
+            properties: {},
+            geometry: {
+              type: 'Polygon',
+              coordinates: [
+                [
+                  [24, 60],
+                  [26, 60],
+                  [26, 62],
+                  [24, 62],
+                  [24, 60]
+                ]
+              ]
+            }
+          }
+        ]
+      })
+    };
+    await expect(importSpecialParks(specialOptions)).rejects.toThrow(
+      'immediate frontend cache expiry'
+    );
+    expect(
+      await testDatabase.database.query.parks.findFirst({ where: eq(parks.slug, 'paistjarvi') })
+    ).toBeUndefined();
+    const result = await importSpecialParks({
+      ...specialOptions,
+      allowPublicTrailConversions: true
+    });
+    expect(result.publicTrailSlugs).toEqual([trail!.slug]);
+    const area = await testDatabase.database.query.parks.findFirst({
+      where: eq(parks.slug, 'paistjarvi')
+    });
+    expect(area).toMatchObject({ removed: true, managedByLipasImport: false });
+    expect(await testDatabase.database.select().from(trailAreaLinks)).toMatchObject([
+      { trailId: trail!.id, areaId: area!.id, automaticMatch: true }
+    ]);
+    expect(
+      await testDatabase.database.query.parks.findFirst({ where: eq(parks.id, trail!.id) })
+    ).toMatchObject({ trailPublicationRole: 'area_member', removed: false });
+  });
+
+  it('requires one selected special area when public conversions are explicitly allowed', async () => {
+    await expect(
+      importSpecialParks({
+        database: testDatabase.database,
+        allowPublicTrailConversions: true,
+        includeSlugs: ['torholan-luola', 'paistjarvi'],
+        fetchSource: createSpecialParksSource()
+      })
+    ).rejects.toThrow('exactly one');
+    expect(await testDatabase.database.select().from(parks)).toHaveLength(0);
+  });
+
+  it('does not partially import a batch when a later special-area source fails', async () => {
+    const source = createSpecialParksSource();
+    let calls = 0;
+    await expect(
+      importSpecialParks({
+        database: testDatabase.database,
+        includeSlugs: ['torholan-luola', 'paistjarvi'],
+        fetchSource: async (url) => {
+          calls += 1;
+          if (calls === 2) throw new Error('source failure');
+          return source(url);
+        }
+      })
+    ).rejects.toThrow('source failure');
+    expect(await testDatabase.database.select().from(parks)).toHaveLength(0);
+  });
+
+  it('imports the two Haltiala nature reserves with their own boundaries', async () => {
+    await importPublishedSpecialParkFixtures({
       database: testDatabase.database,
       includeSlugs: ['haltialanmetsan-luonnonsuojelualue', 'haltialan-aarnialue']
     });
@@ -76,7 +188,7 @@ describe('manual catalog imports', () => {
   });
 
   it('imports all special parks with correct metadata', async () => {
-    const result = await importSpecialParks({
+    const result = await importPublishedSpecialParkFixtures({
       database: testDatabase.database,
       fetchSource: createSpecialParksSource(),
       now: () => '2026-05-27T08:00:00.000Z'
@@ -1433,13 +1545,13 @@ describe('manual catalog imports', () => {
   }, 20_000);
 
   it('keeps non-LIPAS-managed parks active when a later LIPAS import deactivates managed rows', async () => {
-    await importSpecialParks({
+    await importPublishedSpecialParkFixtures({
       database: testDatabase.database,
       fetchSource: createSpecialParksSource(),
       now: () => '2026-05-27T08:00:00.000Z'
     });
 
-    await importParks({
+    await importPublishedParkFixtures({
       database: testDatabase.database,
       expectedActiveCount: 0,
       now: () => '2026-05-28T08:00:00.000Z',
@@ -1475,7 +1587,7 @@ describe('manual catalog imports', () => {
     );
 
     await expect(
-      importSpecialParks({
+      importPublishedSpecialParkFixtures({
         database: testDatabase.database
       })
     ).rejects.toThrow('Special parks import failed with status 503');
@@ -1483,7 +1595,7 @@ describe('manual catalog imports', () => {
 
   it('fails when a source payload has no matching features', async () => {
     await expect(
-      importSpecialParks({
+      importPublishedSpecialParkFixtures({
         database: testDatabase.database,
         fetchSource: async (sourceUrl) => {
           if (sourceUrl === kevoSourceUrl) {
@@ -1498,7 +1610,7 @@ describe('manual catalog imports', () => {
 
   it('fails when a geojson source contains an unsupported geometry type', async () => {
     await expect(
-      importSpecialParks({
+      importPublishedSpecialParkFixtures({
         database: testDatabase.database,
         fetchSource: async (sourceUrl) => {
           if (sourceUrl === 'special://seili') {
@@ -1533,7 +1645,7 @@ describe('manual catalog imports', () => {
       }))
     );
 
-    const result = await importSpecialParks({
+    const result = await importPublishedSpecialParkFixtures({
       database: testDatabase.database
     });
 
@@ -1606,7 +1718,7 @@ describe('manual catalog imports', () => {
   });
 
   it('can import only selected special parks by slug', async () => {
-    const result = await importSpecialParks({
+    const result = await importPublishedSpecialParkFixtures({
       database: testDatabase.database,
       fetchSource: createSpecialParksSource(),
       includeSlugs: ['loviisan-alakaupunki', 'turunmaan-kalkkilouhokset'],
@@ -1650,7 +1762,7 @@ describe('manual catalog imports', () => {
   });
 
   it('can import Tammion saaristokylä without the Kuorsalo sibling geometry', async () => {
-    const result = await importSpecialParks({
+    const result = await importPublishedSpecialParkFixtures({
       database: testDatabase.database,
       fetchSource: createSpecialParksSource(),
       includeSlugs: ['tammion-saaristokyla'],
@@ -1679,7 +1791,7 @@ describe('manual catalog imports', () => {
   });
 
   it('imports Ruotsinkylän tutkimusmetsä from the local Luke map boundary', async () => {
-    const result = await importSpecialParks({
+    const result = await importPublishedSpecialParkFixtures({
       database: testDatabase.database,
       includeSlugs: ['ruotsinkylan-tutkimusmetsa'],
       now: () => '2026-10-17T12:00:00.000Z'
@@ -1727,7 +1839,7 @@ describe('manual catalog imports', () => {
   });
 
   it('imports Nummelanharju using the local LIPAS MOBO area snapshot', async () => {
-    const result = await importSpecialParks({
+    const result = await importPublishedSpecialParkFixtures({
       database: testDatabase.database,
       includeSlugs: ['nummelanharju'],
       now: () => '2026-10-10T12:00:00.000Z'
@@ -1751,7 +1863,7 @@ describe('manual catalog imports', () => {
   });
 
   it('imports Vihdin kirkonkylä with the published combined RKY boundary', async () => {
-    const result = await importSpecialParks({
+    const result = await importPublishedSpecialParkFixtures({
       database: testDatabase.database,
       fetchSource: createSpecialParksSource(),
       includeSlugs: ['vihdin-kirkonkyla'],
@@ -1774,7 +1886,7 @@ describe('manual catalog imports', () => {
   });
 
   it('can import Isohaaran voimalaitos from the RKY source set', async () => {
-    const result = await importSpecialParks({
+    const result = await importPublishedSpecialParkFixtures({
       database: testDatabase.database,
       fetchSource: createSpecialParksSource(),
       includeSlugs: ['isohaaran-voimalaitos'],
@@ -1806,7 +1918,7 @@ describe('manual catalog imports', () => {
   });
 
   it('re-imports Viikin luontoalue in place when stale imported metadata exists', async () => {
-    await importSpecialParks({
+    await importPublishedSpecialParkFixtures({
       database: testDatabase.database,
       fetchSource: createSpecialParksSource(),
       includeSlugs: ['viikin-luontoalue'],
@@ -1835,7 +1947,7 @@ describe('manual catalog imports', () => {
       type: { slug: 'outdoor-recreation-area' }
     });
 
-    await importSpecialParks({
+    await importPublishedSpecialParkFixtures({
       database: testDatabase.database,
       fetchSource: createSpecialParksSource(),
       includeSlugs: ['viikin-luontoalue'],
@@ -1859,7 +1971,7 @@ describe('manual catalog imports', () => {
   });
 
   it('re-imports Hallainvuori in place when stale imported metadata exists', async () => {
-    await importSpecialParks({
+    await importPublishedSpecialParkFixtures({
       database: testDatabase.database,
       fetchSource: createSpecialParksSource(),
       includeSlugs: ['hallainvuoren-luonnonsuojelualue'],
@@ -1896,7 +2008,7 @@ describe('manual catalog imports', () => {
       type: { slug: 'outdoor-recreation-area' }
     });
 
-    await importSpecialParks({
+    await importPublishedSpecialParkFixtures({
       database: testDatabase.database,
       fetchSource: createSpecialParksSource(),
       includeSlugs: ['hallainvuoren-luonnonsuojelualue'],
@@ -1921,7 +2033,7 @@ describe('manual catalog imports', () => {
   });
 
   it('treats an empty selected-slug list like a full special import', async () => {
-    const result = await importSpecialParks({
+    const result = await importPublishedSpecialParkFixtures({
       database: testDatabase.database,
       fetchSource: createSpecialParksSource(),
       includeSlugs: [],
@@ -1933,7 +2045,7 @@ describe('manual catalog imports', () => {
 
   it('fails clearly when a selected special-park slug is unknown', async () => {
     await expect(
-      importSpecialParks({
+      importPublishedSpecialParkFixtures({
         database: testDatabase.database,
         fetchSource: createSpecialParksSource(),
         includeSlugs: ['missing-special-park'],
@@ -1943,7 +2055,7 @@ describe('manual catalog imports', () => {
   });
 
   it('derives area and establishment year from SYKE features', async () => {
-    await importSpecialParks({
+    await importPublishedSpecialParkFixtures({
       database: testDatabase.database,
       fetchSource: createSpecialParksSource(),
       now: () => '2026-05-27T08:00:00.000Z'
@@ -1965,7 +2077,7 @@ describe('manual catalog imports', () => {
   });
 
   it('keeps luontoon destination area null when surface area metadata is missing', async () => {
-    await importSpecialParks({
+    await importPublishedSpecialParkFixtures({
       database: testDatabase.database,
       fetchSource: async (sourceUrl) => {
         if (sourceUrl === paistjarviSourceUrl) {
@@ -2008,7 +2120,7 @@ describe('manual catalog imports', () => {
   });
 
   it('filters Laajalahti by ELY to pick the Espoo feature', async () => {
-    await importSpecialParks({
+    await importPublishedSpecialParkFixtures({
       database: testDatabase.database,
       fetchSource: createSpecialParksSource(),
       now: () => '2026-05-27T08:00:00.000Z'
@@ -2024,7 +2136,7 @@ describe('manual catalog imports', () => {
 
   it('fails when Merenkurkku source has no matching features', async () => {
     await expect(
-      importSpecialParks({
+      importPublishedSpecialParkFixtures({
         database: testDatabase.database,
         fetchSource: async (sourceUrl) => {
           if (sourceUrl === merenkurkkuSourceUrl) {
@@ -2039,7 +2151,7 @@ describe('manual catalog imports', () => {
 
   it('fails when a non-Merenkurkku world heritage source has no matching kohde feature', async () => {
     await expect(
-      importSpecialParks({
+      importPublishedSpecialParkFixtures({
         database: testDatabase.database,
         fetchSource: async (sourceUrl) => {
           if (sourceUrl === merenkurkkuSourceUrl) {
@@ -2080,7 +2192,7 @@ describe('manual catalog imports', () => {
   });
 
   it('handles MultiPolygon geometries from SYKE', async () => {
-    await importSpecialParks({
+    await importPublishedSpecialParkFixtures({
       database: testDatabase.database,
       fetchSource: async (sourceUrl) => {
         if (sourceUrl === kevoSourceUrl) {
@@ -2134,7 +2246,7 @@ describe('manual catalog imports', () => {
   });
 
   it('derives area from GeoJSON shapefile features for hiking areas', async () => {
-    await importSpecialParks({
+    await importPublishedSpecialParkFixtures({
       database: testDatabase.database,
       fetchSource: createSpecialParksSource(),
       now: () => '2026-05-27T08:00:00.000Z'
@@ -2156,7 +2268,7 @@ describe('manual catalog imports', () => {
   });
 
   it('keeps GeoJSON area metadata null when area_m2 is missing', async () => {
-    await importSpecialParks({
+    await importPublishedSpecialParkFixtures({
       database: testDatabase.database,
       fetchSource: async (sourceUrl) => {
         if (sourceUrl.includes("cql_filter=nimi='Rokokallio'")) {
@@ -2202,7 +2314,7 @@ describe('manual catalog imports', () => {
 
   it('fails when a special:// source has no matching features', async () => {
     await expect(
-      importSpecialParks({
+      importPublishedSpecialParkFixtures({
         database: testDatabase.database,
         fetchSource: async (sourceUrl) => {
           if (sourceUrl === 'special://napapiirin-retkeilyalue') {
@@ -2216,7 +2328,7 @@ describe('manual catalog imports', () => {
   });
 
   it('handles missing SYKE metadata fields gracefully', async () => {
-    await importSpecialParks({
+    await importPublishedSpecialParkFixtures({
       database: testDatabase.database,
       fetchSource: async (sourceUrl) => {
         if (sourceUrl === kevoSourceUrl) {

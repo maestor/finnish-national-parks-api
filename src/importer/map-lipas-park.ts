@@ -19,6 +19,14 @@ const geometryLineStringSchema = z.object({
   coordinates: z.array(coordinateSchema),
   type: z.literal('LineString')
 });
+const geometryMultiLineStringSchema = z.object({
+  coordinates: z.array(z.array(coordinateSchema)),
+  type: z.literal('MultiLineString')
+});
+const geometryMultiPolygonSchema = z.object({
+  coordinates: z.array(z.array(z.array(coordinateSchema))),
+  type: z.literal('MultiPolygon')
+});
 
 const lipasParkSchema = z.object({
   'construction-year': z.number().int().optional(),
@@ -39,7 +47,12 @@ const lipasParkSchema = z.object({
     geometries: z.object({
       features: z.array(
         z.object({
-          geometry: z.union([geometryPolygonSchema, geometryLineStringSchema]),
+          geometry: z.union([
+            geometryPolygonSchema,
+            geometryLineStringSchema,
+            geometryMultiLineStringSchema,
+            geometryMultiPolygonSchema
+          ]),
           type: z.literal('Feature')
         })
       ),
@@ -105,7 +118,28 @@ export const mapLipasPark = (source: unknown, existingSlug?: string): MappedPark
   const parkType = shouldPromoteToHikingArea(park)
     ? getSupportedParkTypeBySlug('hiking-area')
     : getSupportedParkTypeByCode(sourceTypeCode);
-  const boundaryGeoJson = park.location.geometries as GeoJsonFeatureCollection;
+  const sourceGeometry = park.location.geometries;
+  const hasMultipart = sourceGeometry.features.some(
+    ({ geometry }) => geometry.type === 'MultiLineString' || geometry.type === 'MultiPolygon'
+  );
+  const boundaryGeoJson: GeoJsonFeatureCollection = hasMultipart
+    ? {
+        type: 'FeatureCollection',
+        features: sourceGeometry.features.flatMap(({ geometry }) => {
+          if (geometry.type === 'MultiLineString')
+            return geometry.coordinates.map((coordinates) => ({
+              type: 'Feature' as const,
+              geometry: { type: 'LineString' as const, coordinates }
+            }));
+          if (geometry.type === 'MultiPolygon')
+            return geometry.coordinates.map((coordinates) => ({
+              type: 'Feature' as const,
+              geometry: { type: 'Polygon' as const, coordinates }
+            }));
+          return [{ type: 'Feature' as const, geometry }];
+        })
+      }
+    : (sourceGeometry as GeoJsonFeatureCollection);
   const boundingBox = deriveBoundingBox(boundaryGeoJson);
 
   return {

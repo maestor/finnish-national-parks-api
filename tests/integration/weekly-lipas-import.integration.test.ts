@@ -6,7 +6,8 @@ import { parkImportNotifications, parks } from '../../src/db/schema.js';
 import { importParks } from '../../src/importer/import-parks.js';
 import { sendPendingParkReviews } from '../../src/importer/park-review-notifications.js';
 import { runScheduledParkImport } from '../../src/importer/scheduled-park-import.js';
-import { createLipasPark } from '../fixtures/lipas.js';
+import { createLipasPark, createLipasTrail } from '../fixtures/lipas.js';
+import { importPublishedParkFixtures } from '../helpers/import-published-park-fixtures.js';
 import { createTestDatabase } from '../helpers/test-db.js';
 
 describe('weekly LIPAS import', () => {
@@ -43,7 +44,7 @@ describe('weekly LIPAS import', () => {
       return Response.json(issues);
     });
     vi.stubGlobal('fetch', fetchMock);
-    await importParks({
+    await importPublishedParkFixtures({
       database: db.database,
       sourceUrl: 'https://example.test/lipas',
       fetchSource: async () => ({ items: [createLipasPark()] })
@@ -70,6 +71,45 @@ describe('weekly LIPAS import', () => {
 
     await runScheduledParkImport(db.client, github);
     expect(issues).toHaveLength(1);
+  });
+
+  it('rolls back an unattended public trail conversion that needs immediate frontend expiry', async () => {
+    const outside = createLipasTrail({
+      location: {
+        geometries: {
+          type: 'FeatureCollection',
+          features: [
+            {
+              type: 'Feature',
+              geometry: {
+                type: 'LineString',
+                coordinates: [
+                  [35, 66],
+                  [35.1, 66.1]
+                ]
+              }
+            }
+          ]
+        }
+      }
+    });
+    await importPublishedParkFixtures({
+      database: db.database,
+      sourceUrl: 'https://example.test',
+      fetchSource: async () => ({ items: [createLipasPark(), outside] })
+    });
+    const normalFetch = fetchMock.getMockImplementation()!;
+    fetchMock.mockImplementation((input, init) =>
+      String(input).startsWith('https://api.lipas.fi/')
+        ? Promise.resolve(Response.json({ items: [createLipasPark(), createLipasTrail()] }))
+        : normalFetch(input, init)
+    );
+    await expect(runScheduledParkImport(db.client, github)).rejects.toThrow(
+      'immediate frontend cache expiry'
+    );
+    const trail = (await db.database.select().from(parks).where(eq(parks.lipasId, 440401)))[0]!;
+    expect(trail).toMatchObject({ removed: false, trailPublicationRole: 'independent' });
+    expect(issues).toEqual([]);
   });
 
   it('keeps a failed notification for the next run even though the park is already imported', async () => {
@@ -211,7 +251,6 @@ describe('weekly LIPAS import', () => {
           }
         ]
       }),
-      markNewParksRemoved: true,
       queueNewParkNotification: true
     });
     await sendPendingParkReviews(db.database, github);
