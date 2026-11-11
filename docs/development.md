@@ -303,6 +303,7 @@ Key route behavior:
 
 - `GET /api/parks` is optimized for map/list views and omits boundary geometry.
 - `GET /api/parks/search` returns a minimal visible-park payload for search and autocomplete flows.
+- `GET /api/admin/parks/:slug/areas` returns effective linked areas for a trail, including areas without public pages, as a private admin read; it does not expose excluded links. Deploy this endpoint before UI consumers.
 - `GET /api/admin/parks/visibility` returns lightweight visible and removed park arrays in one private admin response for admin visibility tooling.
 - `GET /api/parks?type=hiking-area` filters by normalized catalog type slug.
 - `GET /api/parks?category=hiking-and-wilderness-areas` filters by the derived `Erämaa-/retkeilyalue` category while preserving each park's imported `type`.

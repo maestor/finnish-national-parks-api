@@ -5,7 +5,8 @@ import { createApp } from '../../src/app.js';
 import {
   trailAreaCandidateSchema,
   trailAreaLinkSchema,
-  trailAreaValidationFailureSchema
+  trailAreaValidationFailureSchema,
+  trailLinkedAreaSchema
 } from '../../src/contracts/trail-areas.js';
 import {
   createTrip,
@@ -65,6 +66,99 @@ describe('admin trail relationships', () => {
   });
   afterEach(async () => {
     await db.dispose();
+  });
+  it('lists a trail’s effective areas privately, including after changes to links', async () => {
+    const app = createApp({ auth, database: db.database, apiKey: 'secret' });
+    const trail = (
+      await db.database
+        .select()
+        .from(parks)
+        .where(eq(parks.lipasId, createLipasTrail()['lipas-id']))
+    )[0]!;
+    const area = (
+      await db.database.select().from(parks).where(eq(parks.lipasId, createLipasPark()['lipas-id']))
+    )[0]!;
+    const path = `/api/admin/parks/${trail.slug}/areas`;
+    const headers = { cookie, authorization: 'Bearer secret' };
+    expect((await app.request(path, { headers: { authorization: 'Bearer secret' } })).status).toBe(
+      401
+    );
+    expect(await (await app.request(path, { headers })).json()).toEqual({ areas: [] });
+    await app.request(`/api/admin/parks/${area.slug}/trails/${trail.id}`, {
+      method: 'PUT',
+      headers
+    });
+    const response = await app.request(path, { headers });
+    expect(response.status).toBe(200);
+    expect(response.headers.get('cache-control')).toContain('no-store');
+    const payload = (await response.json()) as { areas: unknown[] };
+    expect(payload).toEqual({ areas: [{ name: area.name, slug: area.slug }] });
+    expect(payload.areas.every((item) => trailLinkedAreaSchema.safeParse(item).success)).toBe(true);
+    const [second] = await db.database
+      .insert(parks)
+      .values({
+        ...area,
+        id: undefined,
+        name: 'Toinen alue',
+        slug: 'toinen-alue',
+        lipasId: 987654321
+      })
+      .returning();
+    await db.database.insert(trailAreaLinks).values({
+      trailId: trail.id,
+      areaId: second!.id,
+      automaticMatch: true,
+      createdAt: '2026-01-01',
+      updatedAt: '2026-01-01'
+    });
+    expect(await (await app.request(path, { headers })).json()).toEqual({
+      areas: [
+        { name: second!.name, slug: second!.slug },
+        { name: area.name, slug: area.slug }
+      ]
+    });
+    await db.database
+      .update(trailAreaLinks)
+      .set({ override: 'exclude' })
+      .where(eq(trailAreaLinks.areaId, second!.id));
+    expect(await (await app.request(path, { headers })).json()).toEqual({
+      areas: [{ name: area.name, slug: area.slug }]
+    });
+    await app.request(`/api/admin/parks/${area.slug}/trails/${trail.id}`, {
+      method: 'DELETE',
+      headers
+    });
+    expect(await (await app.request(path, { headers })).json()).toEqual({ areas: [] });
+    expect((await app.request('/api/admin/parks/unknown/areas', { headers })).status).toBe(404);
+    expect((await app.request(`/api/admin/parks/${area.slug}/areas`, { headers })).status).toBe(
+      422
+    );
+    await db.database
+      .update(parks)
+      .set({ catalogStatus: 'inactive' })
+      .where(eq(parks.id, trail.id));
+    expect(await (await app.request(path, { headers })).json()).toEqual({ areas: [] });
+    await db.database
+      .update(parks)
+      .set({ catalogStatus: 'active', managedByLipasImport: false })
+      .where(eq(parks.id, trail.id));
+    expect(await (await app.request(path, { headers })).json()).toEqual({ areas: [] });
+    expect((await createApp({ database: db.database }).request(path)).status).toBe(503);
+  });
+  it('reports an operational error if the trail relationship read fails', async () => {
+    const trail = (
+      await db.database
+        .select()
+        .from(parks)
+        .where(eq(parks.lipasId, createLipasTrail()['lipas-id']))
+    )[0]!;
+    const app = createApp({ auth, database: db.database });
+    await db.client.execute('DROP TABLE trail_area_links');
+    const response = await app.request(`/api/admin/parks/${trail.slug}/areas`, {
+      headers: { cookie }
+    });
+    expect(response.status).toBe(500);
+    expect(response.headers.get('cache-control')).toContain('no-store');
   });
   it('returns effective linked trail geometry in public boundary details and refreshes validators', async () => {
     const app = createApp({ auth, database: db.database });

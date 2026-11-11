@@ -122,6 +122,7 @@ import {
   listAreaTrailCandidates,
   listAreaTrails,
   listPublicAreaTrails,
+  listTrailAreas,
   setAreaTrailOverride,
   TrailAreaValidationError
 } from './db/trail-areas.js';
@@ -227,6 +228,7 @@ import {
   addAreaTrailRoute,
   listAreaTrailCandidatesRoute,
   listAreaTrailsRoute,
+  listTrailAreasRoute,
   removeAreaTrailRoute
 } from './routes/trail-areas.js';
 import {
@@ -1384,6 +1386,7 @@ export const createApp = ({
 
   if (database) {
     for (const path of [
+      '/api/admin/parks/:slug/areas',
       '/api/admin/parks/:slug/trails',
       '/api/admin/parks/:slug/trails/:trailId',
       '/api/admin/parks/:slug/trail-candidates'
@@ -1799,6 +1802,18 @@ export const createApp = ({
       const visibility = await listAdminParkVisibility(database);
 
       return context.json(visibility, 200);
+    });
+
+    app.openapi(listTrailAreasRoute, async (context) => {
+      try {
+        const areas = await listTrailAreas(database, context.req.valid('param').slug);
+        if (!areas) return context.json(jsonNotFound('Trail not found.'), 404);
+        return context.json({ areas }, 200);
+      } catch (error) {
+        if (error instanceof TrailAreaValidationError)
+          return context.json({ error: error.message }, 422);
+        throw error;
+      }
     });
 
     app.openapi(listAreaTrailsRoute, async (context) => {

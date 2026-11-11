@@ -58,6 +58,28 @@ export const listAreaTrails = async (database: DbClient, areaId: number) => {
       selectLink(link, trail).effective
   }));
 };
+export const listTrailAreas = async (database: DbClient, slug: string) => {
+  const trail = (await database.select().from(parks).where(eq(parks.slug, slug)).limit(1))[0];
+  if (!trail) return null;
+  if (!isTrailTypeCode(trail.typeId)) throw new TrailAreaValidationError('A trail is required.');
+  const source = (
+    await database
+      .select()
+      .from(osmTrailSources)
+      .where(eq(osmTrailSources.trailId, trail.id))
+      .limit(1)
+  )[0];
+  if (trail.catalogStatus !== 'active' || (!trail.managedByLipasImport && !source)) return [];
+  const rows = await database
+    .select({ link: trailAreaLinks, name: parks.name, slug: parks.slug })
+    .from(trailAreaLinks)
+    .innerJoin(parks, eq(parks.id, trailAreaLinks.areaId))
+    .where(eq(trailAreaLinks.trailId, trail.id))
+    .orderBy(asc(parks.name), asc(parks.id));
+  return rows
+    .filter(({ link }) => selectLink(link, trail).effective)
+    .map(({ name, slug: areaSlug }) => ({ name, slug: areaSlug }));
+};
 export const listPublicAreaTrails = async (database: DbClient, areaId: number) => {
   const rows = await database
     .select({ link: trailAreaLinks, trail: parks, source: osmTrailSources })
