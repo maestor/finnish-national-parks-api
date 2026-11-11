@@ -8,7 +8,8 @@ import {
   listParkRecordsIncludingRemoved,
   markMissingParksInactive,
   syncParkTypes,
-  upsertImportedPark
+  type UpsertCatalogParkInput,
+  upsertCatalogParks
 } from '../db/repositories.js';
 import { parkImportNotifications, parks } from '../db/schema.js';
 import {
@@ -47,6 +48,8 @@ type ImportParksOptions = {
 };
 
 const RESPONSE_SHAPE_VERSION = 'catalog-v2';
+const IMPORT_BATCH_SIZE = 10;
+const IMPORT_BATCH_GEOMETRY_BYTES = 1024 * 1024;
 const LUONTOON_SITEMAP_URL = 'https://www.luontoon.fi/resources/sitemap/fi.xml';
 const SUPPORTED_LIPAS_TYPE_CODES = [103, 109, 110, 111, 112, 4403, 4404, 4405] as const;
 
@@ -220,6 +223,14 @@ export const importParks = async ({
         sourceUrl
       });
 
+      let batch: UpsertCatalogParkInput[] = [];
+      let batchGeometryBytes = 0;
+      const flushBatch = async () => {
+        await upsertCatalogParks(tx, batch);
+        batch = [];
+        batchGeometryBytes = 0;
+      };
+
       for (let index = 0; index < importableItems.length; index += 1) {
         const item = importableItems[index];
         const lipasId = (item as { 'lipas-id': number })['lipas-id'];
@@ -257,14 +268,19 @@ export const importParks = async ({
               lon: previous?.importedMarkerLon ?? previous?.markerLon ?? 0,
               lat: previous?.importedMarkerLat ?? previous?.markerLat ?? 0
             };
-        await upsertImportedPark(tx, {
+        const boundaryGeojson = JSON.stringify(mapped.boundaryGeoJson);
+        const geometryBytes = Buffer.byteLength(boundaryGeojson);
+        if (batch.length > 0 && batchGeometryBytes + geometryBytes > IMPORT_BATCH_GEOMETRY_BYTES) {
+          await flushBatch();
+        }
+        batch.push({
           areaKm2: mapped.areaKm2,
           lengthKm: mapped.lengthKm,
           bboxMaxLat: bounds.maxLat,
           bboxMaxLon: bounds.maxLon,
           bboxMinLat: bounds.minLat,
           bboxMinLon: bounds.minLon,
-          boundaryGeojson: JSON.stringify(mapped.boundaryGeoJson),
+          boundaryGeojson,
           catalogStatus: 'active',
           createdAt: importedAt,
           displayTypeName:
@@ -288,7 +304,11 @@ export const importParks = async ({
           typeId: mapped.type.id,
           updatedAt: importedAt
         });
+        batchGeometryBytes += geometryBytes;
+        if (batch.length === IMPORT_BATCH_SIZE) await flushBatch();
       }
+
+      if (batch.length > 0) await flushBatch();
 
       const activeIds = new Set(importedLipasIds);
       const previouslyActive = await tx

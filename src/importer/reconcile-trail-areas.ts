@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 
-import { and, eq } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 
 import type { DbClient } from '../db/database.js';
 import { parks, parkVisits, trailAreaLinks } from '../db/schema.js';
@@ -14,7 +14,14 @@ import {
 } from './trail-area-geometry.js';
 
 const method = 'jsts-wgs84-clip-epsg3067-v3';
-const intersectsBounds = (a: typeof parks.$inferSelect, b: typeof parks.$inferSelect) =>
+const MAX_GEOMETRY_BATCH_BYTES = 2 * 1024 * 1024;
+const MAX_GEOMETRY_BATCH_ROWS = 50;
+const TRANSACTION_KEEPALIVE_INTERVAL_MS = 1000;
+type BoundedPark = Pick<
+  typeof parks.$inferSelect,
+  'bboxMinLon' | 'bboxMaxLon' | 'bboxMinLat' | 'bboxMaxLat'
+>;
+const intersectsBounds = (a: BoundedPark, b: BoundedPark) =>
   a.bboxMinLon <= b.bboxMaxLon &&
   a.bboxMaxLon >= b.bboxMinLon &&
   a.bboxMinLat <= b.bboxMaxLat &&
@@ -25,7 +32,48 @@ const fingerprint = (trail: string, area: string) =>
     .digest('hex');
 
 export const reconcileTrailAreas = async (database: DbClient, timestamp: string) => {
-  const records = await database.select().from(parks);
+  const metadata = await database
+    .select({
+      id: parks.id,
+      slug: parks.slug,
+      catalogStatus: parks.catalogStatus,
+      typeId: parks.typeId,
+      managedByLipasImport: parks.managedByLipasImport,
+      trailPublicationRole: parks.trailPublicationRole,
+      removed: parks.removed,
+      bboxMinLon: parks.bboxMinLon,
+      bboxMinLat: parks.bboxMinLat,
+      bboxMaxLon: parks.bboxMaxLon,
+      bboxMaxLat: parks.bboxMaxLat,
+      geometryBytes: sql<number>`length(cast(${parks.boundaryGeojson} as blob))`
+    })
+    .from(parks)
+    .where(eq(parks.catalogStatus, 'active'));
+  const geometries = new Map<number, string>();
+  let ids: number[] = [];
+  let bytes = 0;
+  const flushGeometryBatch = async () => {
+    const rows = await database
+      .select({ id: parks.id, geometry: parks.boundaryGeojson })
+      .from(parks)
+      .where(inArray(parks.id, ids));
+    for (const row of rows) geometries.set(row.id, row.geometry);
+    ids = [];
+    bytes = 0;
+  };
+  for (const park of metadata) {
+    if (
+      ids.length > 0 &&
+      (ids.length === MAX_GEOMETRY_BATCH_ROWS ||
+        bytes + park.geometryBytes > MAX_GEOMETRY_BATCH_BYTES)
+    ) {
+      await flushGeometryBatch();
+    }
+    ids.push(park.id);
+    bytes += park.geometryBytes;
+  }
+  if (ids.length > 0) await flushGeometryBatch();
+  const records = metadata.map((park) => ({ ...park, boundaryGeojson: geometries.get(park.id)! }));
   const links = await database.select().from(trailAreaLinks);
   const visited = new Set(
     (await database.selectDistinct({ id: parkVisits.parkId }).from(parkVisits)).map((row) => row.id)
@@ -43,8 +91,18 @@ export const reconcileTrailAreas = async (database: DbClient, timestamp: string)
   const newlyHiddenPublicSlugs: string[] = [];
   let automaticLinks = 0;
   let newlyHidden = 0;
+  // Geometry matching can otherwise leave a remote interactive transaction idle
+  // long enough for its libSQL stream to expire before commit or rollback.
+  let lastKeepalive = Date.now();
+  const keepTransactionActive = async () => {
+    if (Date.now() - lastKeepalive >= TRANSACTION_KEEPALIVE_INTERVAL_MS) {
+      await database.run(sql`select 1`);
+      lastKeepalive = Date.now();
+    }
+  };
 
   for (const trail of trails) {
+    await keepTransactionActive();
     let geometryQuality = 'valid';
     try {
       const geometry = JSON.parse(trail.boundaryGeojson) as GeoJsonFeatureCollection;
@@ -77,6 +135,7 @@ export const reconcileTrailAreas = async (database: DbClient, timestamp: string)
     }
     for (const area of areas) {
       if (!intersectsBounds(trail, area)) continue;
+      await keepTransactionActive();
       const key = `${trail.id}:${area.id}`;
       const prior = byPair.get(key);
       const hash = fingerprint(trail.boundaryGeojson, area.boundaryGeojson);
