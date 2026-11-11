@@ -33,6 +33,36 @@ describe('importParks', () => {
     await testDatabase.dispose();
   });
 
+  it('imports and refreshes a trail length, retaining a local override', async () => {
+    const run = async (length: number | undefined) =>
+      importPublishedParkFixtures({
+        database: testDatabase.database,
+        sourceUrl: 'https://example.test/lipas',
+        fetchSource: async () => ({
+          items: [
+            {
+              ...createLipasTrail(),
+              properties: length === undefined ? {} : { 'route-length-km': length }
+            }
+          ]
+        })
+      });
+    await run(2.4);
+    const [trail] = await testDatabase.database.select().from(parks);
+    expect(trail?.lengthKm).toBe(2.4);
+    await run(3.1);
+    expect((await testDatabase.database.select().from(parks))[0]?.lengthKm).toBe(3.1);
+    await run(undefined);
+    expect((await testDatabase.database.select().from(parks))[0]?.lengthKm).toBeNull();
+    await run(3.1);
+    await testDatabase.database.update(parks).set({ lengthKm: 4 }).where(eq(parks.id, trail!.id));
+    await run(undefined);
+    expect((await testDatabase.database.select().from(parks))[0]).toMatchObject({
+      lengthKm: 4,
+      importedLengthKm: null
+    });
+  });
+
   it('imports active rows without blocking on source count drift and reports newly added parks', async () => {
     const result = await importParks({
       database: testDatabase.database,

@@ -640,7 +640,7 @@ describe('home memories API', () => {
     expect(cached.status).toBe(304);
     expect(await cached.text()).toBe('');
     const oldShape = await app.request('/api/home-summary', {
-      headers: { 'if-none-match': changed.etag.replace('public-summary:v4:', 'public-summary:v3:') }
+      headers: { 'if-none-match': changed.etag.replace('public-summary:v5:', 'public-summary:v4:') }
     });
     expect(oldShape.status).toBe(200);
   });

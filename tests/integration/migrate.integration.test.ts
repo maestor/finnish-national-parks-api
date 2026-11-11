@@ -95,7 +95,8 @@ describe('migrateDatabase', () => {
       '0044_park_description.sql',
       '0045_home_featured_park.sql',
       '0046_park_import_notifications.sql',
-      '0047_trail_area_links.sql'
+      '0047_trail_area_links.sql',
+      '0048_trail_length.sql'
     ]);
     expect(parkTypes.rows.map((row) => String(row.slug))).toEqual([
       'outdoor-recreation-area',
@@ -109,6 +110,12 @@ describe('migrateDatabase', () => {
       'cultural-history-area'
     ]);
     expect(parkColumns.rows.some((row) => String(row.name) === 'removed')).toBe(true);
+    expect(
+      parkColumns.rows.some((row) => String(row.name) === 'length_km' && row.notnull === 0)
+    ).toBe(true);
+    expect(
+      parkColumns.rows.some((row) => String(row.name) === 'imported_length_km' && row.notnull === 0)
+    ).toBe(true);
     expect(parkColumns.rows.some((row) => String(row.name) === 'trail_publication_role')).toBe(
       true
     );
@@ -313,7 +320,8 @@ describe('migrateDatabase', () => {
       '0044_park_description.sql',
       '0045_home_featured_park.sql',
       '0046_park_import_notifications.sql',
-      '0047_trail_area_links.sql'
+      '0047_trail_area_links.sql',
+      '0048_trail_length.sql'
     ]);
     expect(schemaMigrationTableBeforeApply.rows).toEqual([]);
     expect(pendingAfterApply).toEqual([]);

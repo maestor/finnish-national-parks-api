@@ -76,6 +76,7 @@ export const geoJsonFeatureCollectionSchema = z.object({
 export const parkListItemSchema = z.object({
   address: z.string(),
   areaKm2: z.number().nullable(),
+  lengthKm: z.number().nullable(),
   boundingBox: boundingBoxSchema,
   category: parkCategorySchema,
   displayTypeName: z.string().nullable().optional(),
@@ -495,6 +496,7 @@ export const adminHomeFeaturedParkResponseSchema = homeFeaturedParkSelectionSche
 export const homeParkPreviewSchema = parkListItemSchema
   .pick({
     areaKm2: true,
+    lengthKm: true,
     establishmentYear: true,
     displayTypeName: true,
     name: true,
@@ -640,6 +642,7 @@ export const updateParkRequestSchema = z
   .object({
     description: z.string().max(5000).nullable().optional(),
     areaKm2: z.number().nonnegative().nullable().optional(),
+    lengthKm: z.number().nonnegative().nullable().optional(),
     displayTypeName: z.string().max(120).nullable().optional(),
     establishmentYear: z.number().int().nullable().optional(),
     hasMagnet: z.boolean().optional(),
@@ -655,6 +658,7 @@ export const updateParkRequestSchema = z
     (input) =>
       input.description !== undefined ||
       input.areaKm2 !== undefined ||
+      input.lengthKm !== undefined ||
       input.displayTypeName !== undefined ||
       input.establishmentYear !== undefined ||
       input.hasMagnet !== undefined ||

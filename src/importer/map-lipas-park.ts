@@ -64,7 +64,8 @@ const lipasParkSchema = z.object({
   'phone-number': z.string().optional(),
   properties: z
     .object({
-      'area-km2': z.number().optional()
+      'area-km2': z.number().optional(),
+      'route-length-km': z.number().optional()
     })
     .passthrough()
     .optional(),
@@ -79,6 +80,7 @@ export type LipasPark = z.infer<typeof lipasParkSchema>;
 
 export type MappedPark = {
   areaKm2: number | null;
+  lengthKm: number | null;
   boundingBox: BoundingBox;
   boundaryGeoJson: GeoJsonFeatureCollection;
   establishmentYear: number | null;
@@ -144,6 +146,7 @@ export const mapLipasPark = (source: unknown, existingSlug?: string): MappedPark
 
   return {
     areaKm2: park.properties?.['area-km2'] ?? null,
+    lengthKm: park.properties?.['route-length-km'] ?? null,
     boundingBox,
     boundaryGeoJson,
     establishmentYear: park['construction-year'] ?? null,

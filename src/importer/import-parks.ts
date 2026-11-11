@@ -259,6 +259,7 @@ export const importParks = async ({
             };
         await upsertImportedPark(tx, {
           areaKm2: mapped.areaKm2,
+          lengthKm: mapped.lengthKm,
           bboxMaxLat: bounds.maxLat,
           bboxMaxLon: bounds.maxLon,
           bboxMinLat: bounds.minLat,
