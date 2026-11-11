@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 
 import { OpenAPIHono } from '@hono/zod-openapi';
 import { cors } from 'hono/cors';
@@ -121,6 +121,7 @@ import {
   findEligibleArea,
   listAreaTrailCandidates,
   listAreaTrails,
+  listPublicAreaTrails,
   setAreaTrailOverride,
   TrailAreaValidationError
 } from './db/trail-areas.js';
@@ -1936,7 +1937,10 @@ export const createApp = ({
               canViewRemovedPark ? getImagePublicUrl : publicMediaUrl
             )
           : null;
-      const parkWithImage = { ...park, featuredImage: featuredImage?.image ?? null };
+      const linkedTrails = includeBoundary
+        ? await listPublicAreaTrails(database, record!.id)
+        : undefined;
+      const parkWithImage = { ...park, featuredImage: featuredImage?.image ?? null, linkedTrails };
 
       if (canViewRemovedPark) {
         context.header('Cache-Control', PRIVATE_CACHE_CONTROL);
@@ -1953,7 +1957,11 @@ export const createApp = ({
       const etag = createCatalogDetailEtag({
         includeBoundary,
         lipasId: park.lipasId,
-        updatedAt: `${park.updatedAt}:description-v1:cover-v1:length-v1:${(await getPublicVisitDataVersion(database)).version}`
+        updatedAt: `${park.updatedAt}:description-v1:cover-v1:length-v1:${(await getPublicVisitDataVersion(database)).version}:${createHash(
+          'sha256'
+        )
+          .update(JSON.stringify(linkedTrails ?? null))
+          .digest('hex')}`
       });
       context.header('Cache-Control', CATALOG_CACHE_CONTROL);
       context.header('ETag', etag);
