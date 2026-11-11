@@ -1696,13 +1696,30 @@ describe('API routes', () => {
     expect(listBody.parks).toHaveLength(1);
     expect(listBody.parks[0]).toMatchObject({
       name: 'Testin luontopolku',
+      lengthKm: 2.4,
       type: {
         slug: 'nature-trail'
       }
     });
     expect(detailResponse.status).toBe(200);
+    expect(detailBody).toMatchObject({ lengthKm: 2.4 });
     expect(detailBody.type.slug).toBe('nature-trail');
     expect(detailBody.boundaryGeoJson.features[0]?.geometry.type).toBe('LineString');
+    const edited = await app.request('/api/parks/testin-luontopolku', {
+      method: 'PATCH',
+      headers: { cookie: adminSessionCookie, 'content-type': 'application/json' },
+      body: JSON.stringify({ lengthKm: 3.2 })
+    });
+    expect(edited.status).toBe(200);
+    expect(await edited.json()).toMatchObject({ lengthKm: 3.2 });
+    const refreshed = await app.request('/api/parks/testin-luontopolku');
+    expect(await refreshed.json()).toMatchObject({ lengthKm: 3.2 });
+    const invalid = await app.request('/api/parks/testin-luontopolku', {
+      method: 'PATCH',
+      headers: { cookie: adminSessionCookie, 'content-type': 'application/json' },
+      body: JSON.stringify({ lengthKm: -1 })
+    });
+    expect(invalid.status).toBe(400);
   });
 
   it('normalizes API address values when postal fields duplicate or replace the address', async () => {

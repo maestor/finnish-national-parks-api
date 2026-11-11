@@ -57,6 +57,8 @@ export const parks = sqliteTable(
     importedDisplayTypeName: text('imported_display_type_name'),
     areaKm2: real('area_km2'),
     importedAreaKm2: real('imported_area_km2'),
+    lengthKm: real('length_km'),
+    importedLengthKm: real('imported_length_km'),
     establishmentYear: integer('establishment_year'),
     importedEstablishmentYear: integer('imported_establishment_year'),
     hasMagnet: integer('has_magnet', { mode: 'boolean' }).notNull().default(false),

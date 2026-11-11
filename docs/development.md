@@ -84,6 +84,7 @@ authorized production-mode runtime and are tracked separately from this CI gate.
 ### Paired UI/API changes
 
 - The companion frontend repository is [finnish-national-parks-ui](https://github.com/maestor/finnish-national-parks-ui). Keep the backend contract source, generated OpenAPI, runtime handlers, and integration tests aligned here before updating frontend consumers.
+- Park responses and the home park preview include nullable `lengthKm`; the admin park update accepts a nullable nonnegative value. Deploy migration `0048_trail_length.sql` and the API before the UI, then immediately expire cached public park and home pages. Existing lengths populate on the next LIPAS import. List, detail, map and home response validators account for the new representation; offline behavior is unchanged.
 - For cross-repository work, use matching branch suffixes but separate Git histories, commits, and pull requests. Run focused checks during implementation, pause for review, then run `npm run verify` after acceptance in each affected repository. Cross-link dependent pull requests and document merge order.
 
 ## Environment

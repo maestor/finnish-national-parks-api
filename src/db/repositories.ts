@@ -387,6 +387,7 @@ export type PublishedDateRangeReviewShare = {
 type UpdateParkDetailsInput = {
   description?: string | null | undefined;
   areaKm2?: number | null | undefined;
+  lengthKm?: number | null | undefined;
   displayTypeName?: string | null | undefined;
   establishmentYear?: number | null | undefined;
   hasMagnet?: boolean | undefined;
@@ -532,6 +533,7 @@ type PublicTripDetailVisitRow = TripDetailVisitRow & {
 
 type PublicParkRow = {
   areaKm2: number | null;
+  lengthKm: number | null;
   bboxMaxLat: number;
   bboxMaxLon: number;
   bboxMinLat: number;
@@ -645,6 +647,7 @@ type UpsertCatalogParkInput = Omit<
   typeof parks.$inferInsert,
   | 'id'
   | 'importedAreaKm2'
+  | 'importedLengthKm'
   | 'importedDisplayTypeName'
   | 'importedEstablishmentYear'
   | 'importedMarkerLat'
@@ -1115,6 +1118,7 @@ const toPark = async (
   return withOptionalDisplayTypeName(row.park, {
     address: toAddress(row.park.locationLabel, row.park.postalCode, row.park.postalOffice),
     areaKm2: row.park.areaKm2,
+    lengthKm: row.park.lengthKm,
     boundingBox: toBoundingBox(row.park),
     boundaryGeoJson: JSON.parse(row.park.boundaryGeojson) as GeoJsonFeatureCollection,
     category: toParkCategory(row.parkType.slug as SupportedParkTypeSlug),
@@ -1144,6 +1148,7 @@ const toPublicPark = async (
   return withOptionalDisplayTypeName(row, {
     address: toAddress(row.locationLabel, row.postalCode, row.postalOffice),
     areaKm2: row.areaKm2,
+    lengthKm: row.lengthKm,
     boundingBox: {
       maxLat: row.bboxMaxLat,
       maxLon: row.bboxMaxLon,
@@ -1662,6 +1667,7 @@ const listPublicParkRows = async (database: Database) => {
   return database
     .select({
       areaKm2: parks.areaKm2,
+      lengthKm: parks.lengthKm,
       bboxMaxLat: parks.bboxMaxLat,
       bboxMaxLon: parks.bboxMaxLon,
       bboxMinLat: parks.bboxMinLat,
@@ -1700,6 +1706,7 @@ const listPublicParkRowsByFilter = async (
   return database
     .select({
       areaKm2: parks.areaKm2,
+      lengthKm: parks.lengthKm,
       bboxMaxLat: parks.bboxMaxLat,
       bboxMaxLon: parks.bboxMaxLon,
       bboxMinLat: parks.bboxMinLat,
@@ -3272,6 +3279,7 @@ export const listRemovedParks = async (
       withOptionalDisplayTypeName(row.park, {
         address: toAddress(row.park.locationLabel, row.park.postalCode, row.park.postalOffice),
         areaKm2: row.park.areaKm2,
+        lengthKm: row.park.lengthKm,
         boundingBox: toBoundingBox(row.park),
         catalogStatus: row.park.catalogStatus as 'active' | 'inactive',
         establishmentYear: row.park.establishmentYear,
@@ -4202,6 +4210,7 @@ const getSelectedHomeParkPreview = async (
       slug: parks.slug,
       description: parks.description,
       areaKm2: parks.areaKm2,
+      lengthKm: parks.lengthKm,
       establishmentYear: parks.establishmentYear,
       visitCount: sql<number>`count(${parkVisits.id})`.mapWith(Number),
       displayTypeName: parks.displayTypeName,
@@ -4226,6 +4235,7 @@ const getSelectedHomeParkPreview = async (
     name: row.name,
     slug: row.slug,
     areaKm2: row.areaKm2,
+    lengthKm: row.lengthKm,
     establishmentYear: row.establishmentYear,
     visitCount: row.visitCount,
     displayTypeName: row.displayTypeName,
@@ -5051,6 +5061,7 @@ export const updateParkDetails = async (
     .update(parks)
     .set({
       areaKm2: input.areaKm2 === undefined ? park.areaKm2 : input.areaKm2,
+      lengthKm: input.lengthKm === undefined ? park.lengthKm : input.lengthKm,
       description:
         input.description === undefined
           ? park.description
@@ -6077,6 +6088,7 @@ export const upsertCatalogPark = async (database: DbClient, values: UpsertCatalo
   const valuesWithImportedFields = {
     ...values,
     importedAreaKm2: values.areaKm2,
+    importedLengthKm: values.lengthKm ?? null,
     importedDisplayTypeName: values.displayTypeName,
     importedEstablishmentYear: values.establishmentYear,
     importedHasMagnet: values.hasMagnet,
@@ -6100,6 +6112,11 @@ export const upsertCatalogPark = async (database: DbClient, values: UpsertCatalo
             THEN excluded.imported_area_km2
           ELSE ${parks.areaKm2}
         END`,
+        lengthKm: sql`CASE
+          WHEN ${parks.lengthKm} IS ${parks.importedLengthKm}
+            THEN excluded.imported_length_km
+          ELSE ${parks.lengthKm}
+        END`,
         bboxMaxLat: values.bboxMaxLat,
         bboxMaxLon: values.bboxMaxLon,
         bboxMinLat: values.bboxMinLat,
@@ -6122,6 +6139,7 @@ export const upsertCatalogPark = async (database: DbClient, values: UpsertCatalo
           ELSE ${parks.hasMagnet}
         END`,
         importedAreaKm2: valuesWithImportedFields.importedAreaKm2,
+        importedLengthKm: valuesWithImportedFields.importedLengthKm,
         importedDisplayTypeName: valuesWithImportedFields.importedDisplayTypeName,
         importedEstablishmentYear: valuesWithImportedFields.importedEstablishmentYear,
         importedHasMagnet: valuesWithImportedFields.importedHasMagnet,

@@ -1735,7 +1735,11 @@ export const createApp = ({
         ...(query.category ? { categorySlug: query.category } : {}),
         ...(query.type ? { typeSlug: query.type } : {})
       };
-      const etag = createCatalogListEtag(await getCatalogListEtagSeed(database, filter));
+      const seed = await getCatalogListEtagSeed(database, filter);
+      const etag = createCatalogListEtag({
+        ...seed,
+        filterKey: `${seed.filterKey ?? ''}|length-v1`
+      });
       context.header('Cache-Control', CATALOG_CACHE_CONTROL);
       context.header('ETag', etag);
 
@@ -1949,7 +1953,7 @@ export const createApp = ({
       const etag = createCatalogDetailEtag({
         includeBoundary,
         lipasId: park.lipasId,
-        updatedAt: `${park.updatedAt}:description-v1:cover-v1:${(await getPublicVisitDataVersion(database)).version}`
+        updatedAt: `${park.updatedAt}:description-v1:cover-v1:length-v1:${(await getPublicVisitDataVersion(database)).version}`
       });
       context.header('Cache-Control', CATALOG_CACHE_CONTROL);
       context.header('ETag', etag);
@@ -2081,7 +2085,7 @@ export const createApp = ({
 
     app.openapi(getPublicHomeSummaryRoute, async (context) => {
       const seed = await getPublicVisitSummaryEtagSeed(database);
-      const etag = createPublicSummaryEtag({ ...seed, kind: 'home', responseVersion: 'v4' });
+      const etag = createPublicSummaryEtag({ ...seed, kind: 'home', responseVersion: 'v5' });
       context.header('Cache-Control', PUBLICATION_SUMMARY_CACHE_CONTROL);
       context.header('ETag', etag);
 
@@ -2104,6 +2108,7 @@ export const createApp = ({
       const etag = createPublicSummaryEtag({
         activeCount: catalogSeed.activeCount,
         kind: 'map',
+        responseVersion: 'v3',
         latestCatalogImportRunId: catalogSeed.latestImportRunId,
         latestCatalogUpdatedAt: catalogSeed.latestUpdatedAt,
         publicUpdatedAt: summary.updatedAt,
