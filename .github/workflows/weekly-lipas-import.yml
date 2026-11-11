@@ -1,6 +1,7 @@
 name: Weekly LIPAS Import
 
 on:
+  workflow_dispatch:
   schedule:
     - cron: '43 9 * * 1'
       timezone: Europe/Helsinki
@@ -11,6 +12,7 @@ concurrency:
 
 jobs:
   import-parks:
+    if: github.ref == 'refs/heads/main'
     name: Import LIPAS parks and notify maestor
     runs-on: ubuntu-latest
     timeout-minutes: 30

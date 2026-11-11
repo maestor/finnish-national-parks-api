@@ -28,8 +28,11 @@ Admin-session endpoints `GET /api/admin/parks/{slug}/trails` and `/trail-candida
 ## Weekly LIPAS automation
 
 The API repository's `Weekly LIPAS Import` workflow runs every Monday at 09:43
-in `Europe/Helsinki`, including daylight saving time. It has no manual trigger;
-continue using `npm run import:parks` for imports from your computer.
+in `Europe/Helsinki`, including daylight saving time. To run it manually against
+production, open **Actions → Weekly LIPAS Import → Run workflow**, select
+`main`, and start the run. Manual runs use the same backup, safeguards,
+notifications and concurrency as scheduled runs; other branches are skipped.
+Use `npm run import:parks` for imports from your computer.
 
 Each run backs up production to a GitHub Actions artifact retained for 14 days,
 then runs `npm run import:parks:scheduled` using the `production` environment's
@@ -46,11 +49,11 @@ LIPAS-managed parks become inactive. Normal API reads remain local-first, and
 the frontend cache must be immediately expired for any retired public trail pages as described below.
 
 Notification reports are queued in the same database transaction as the import.
-Failed notifications remain queued for the next scheduled run, which retries
+Failed notifications remain queued for the next workflow run, which retries
 them before fetching LIPAS. A hidden import-run marker in each issue prevents
 duplicates if GitHub accepted an issue but database acknowledgement failed;
 closed issues are included in that check. Keep that marker when editing issues.
-Manual imports and dry runs do not queue GitHub notifications.
+Local manual imports and dry runs do not queue GitHub notifications.
 
 GitHub supplies the short-lived `GITHUB_TOKEN` with `issues: write` and
 `GITHUB_REPOSITORY` to this workflow; no personal token or mail service is needed.
