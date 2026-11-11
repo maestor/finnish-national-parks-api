@@ -162,6 +162,15 @@ export const parkDetailSchema = parkListItemSchema.extend({
         slug: z.string(),
         address: z.string().nullable(),
         lengthKm: z.number().nullable(),
+        source: z
+          .object({
+            type: z.literal('openstreetmap'),
+            relationId: z.number().int().positive(),
+            attribution: z.string(),
+            licenseUrl: z.string().url(),
+            sourceUrl: z.string().url()
+          })
+          .optional(),
         boundaryGeoJson: geoJsonFeatureCollectionSchema
       })
     )

@@ -32,7 +32,8 @@
     "test:coverage": "vitest run --coverage",
     "lint": "node scripts/run-biome-check.mjs .",
     "lint:fix": "node scripts/run-biome-check.mjs --write .",
-    "verify": "npm run typecheck && npm run lint:fix && npm run test:coverage"
+    "verify": "npm run typecheck && npm run lint:fix && npm run test:coverage",
+    "import:osm-trails": "tsx src/cli/import-osm-trails.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1121.0",

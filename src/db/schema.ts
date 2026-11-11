@@ -506,3 +506,11 @@ export const homeFeaturedPark = sqliteTable('home_featured_park', {
   id: integer('id').primaryKey(),
   parkId: integer('park_id').references(() => parks.id, { onDelete: 'set null' })
 });
+
+export const osmTrailSources = sqliteTable('osm_trail_sources', {
+  trailId: integer('trail_id')
+    .primaryKey()
+    .references(() => parks.id),
+  relationId: integer('relation_id').notNull().unique(),
+  sourceTimestamp: text('source_timestamp').notNull()
+});

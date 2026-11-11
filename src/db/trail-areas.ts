@@ -1,10 +1,16 @@
-import { and, asc, eq, inArray, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNotNull, or, sql } from 'drizzle-orm';
 
 import type { GeoJsonFeatureCollection } from '../importer/geometry.js';
 import { isTrailTypeCode } from '../parks/park-types.js';
 import { toAddress } from './address.js';
 import type { Database, DbClient } from './database.js';
-import { parks, parkVisits, publicDataVersions, trailAreaLinks } from './schema.js';
+import {
+  osmTrailSources,
+  parks,
+  parkVisits,
+  publicDataVersions,
+  trailAreaLinks
+} from './schema.js';
 
 const trailTypes = [4403, 4404, 4405];
 export class TrailAreaValidationError extends Error {}
@@ -37,36 +43,49 @@ const selectLink = (
 });
 export const listAreaTrails = async (database: DbClient, areaId: number) => {
   const rows = await database
-    .select({ link: trailAreaLinks, trail: parks })
+    .select({ link: trailAreaLinks, trail: parks, source: osmTrailSources })
     .from(trailAreaLinks)
     .innerJoin(parks, eq(parks.id, trailAreaLinks.trailId))
+    .leftJoin(osmTrailSources, eq(osmTrailSources.trailId, parks.id))
     .where(eq(trailAreaLinks.areaId, areaId))
     .orderBy(asc(parks.name));
-  return rows.map(({ link, trail }) => ({
+  return rows.map(({ link, trail, source }) => ({
     ...selectLink(link, trail),
     effective:
       trail.catalogStatus === 'active' &&
-      trail.managedByLipasImport &&
+      (trail.managedByLipasImport || source !== null) &&
       isTrailTypeCode(trail.typeId) &&
       selectLink(link, trail).effective
   }));
 };
 export const listPublicAreaTrails = async (database: DbClient, areaId: number) => {
   const rows = await database
-    .select({ link: trailAreaLinks, trail: parks })
+    .select({ link: trailAreaLinks, trail: parks, source: osmTrailSources })
     .from(trailAreaLinks)
     .innerJoin(parks, eq(parks.id, trailAreaLinks.trailId))
+    .leftJoin(osmTrailSources, eq(osmTrailSources.trailId, parks.id))
     .where(eq(trailAreaLinks.areaId, areaId))
     .orderBy(asc(parks.name), asc(parks.id));
   return rows
     .filter(
-      ({ link, trail }) =>
+      ({ link, trail, source }) =>
         trail.catalogStatus === 'active' &&
-        trail.managedByLipasImport &&
+        (trail.managedByLipasImport || source !== null) &&
         isTrailTypeCode(trail.typeId) &&
         selectLink(link, trail).effective
     )
-    .map(({ trail }) => ({
+    .map(({ trail, source }) => ({
+      ...(source
+        ? {
+            source: {
+              type: 'openstreetmap' as const,
+              relationId: source.relationId,
+              attribution: '© OpenStreetMap contributors',
+              licenseUrl: 'https://opendatacommons.org/licenses/odbl/1-0/',
+              sourceUrl: `https://www.openstreetmap.org/relation/${source.relationId}`
+            }
+          }
+        : {}),
       name: trail.name,
       slug: trail.slug,
       address:
@@ -91,10 +110,11 @@ export const listAreaTrailCandidates = async (
   const rows = await database
     .select({ trailId: parks.id, name: parks.name, slug: parks.slug })
     .from(parks)
+    .leftJoin(osmTrailSources, eq(osmTrailSources.trailId, parks.id))
     .where(
       and(
         eq(parks.catalogStatus, 'active'),
-        eq(parks.managedByLipasImport, true),
+        or(eq(parks.managedByLipasImport, true), isNotNull(osmTrailSources.trailId)),
         inArray(parks.typeId, trailTypes),
         sql`instr(lower(${parks.name}), lower(${q})) > 0`
       )
@@ -114,13 +134,16 @@ export const setAreaTrailOverride = async (
     const area = await findEligibleArea(tx, slug);
     const trail = (await tx.select().from(parks).where(eq(parks.id, trailId)).limit(1))[0];
     if (!area || !trail) return null;
+    const source = (
+      await tx.select().from(osmTrailSources).where(eq(osmTrailSources.trailId, trail.id)).limit(1)
+    )[0];
     if (
       trail.id === area.id ||
       !isTrailTypeCode(trail.typeId) ||
-      !trail.managedByLipasImport ||
+      (!trail.managedByLipasImport && !source) ||
       trail.catalogStatus !== 'active'
     )
-      throw new TrailAreaValidationError('An active LIPAS trail is required.');
+      throw new TrailAreaValidationError('An active supported trail is required.');
     if (override === 'include' && trail.trailPublicationRole === 'independent') {
       const visits = await tx
         .select({ id: parkVisits.id })
