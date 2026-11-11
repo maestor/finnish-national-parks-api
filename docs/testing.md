@@ -61,6 +61,7 @@ If an upload limit exists, at least one test should cover the real stored-object
 - Import keeps only active supported LIPAS catalog records.
 - Import persists normalized catalog type metadata and park-to-type references.
 - Import retains supported source-active trails disabled when new, calculates per-area length coverage, and preserves source IDs, local edits, visits and manual link overrides. Geometry tests cover segment crossings, holes, repeated segments, invalid inputs and the 10% threshold; admin and public tests cover access, durable overrides, visibility and cache validators.
+- Trail-length policy tests cover the measured/reported 100 km boundary, exclusions with unknown geometry, locally corrected source unit errors surviving reimports, retirement/reimport, preserved visits/manual overrides, admin enable rejection, special-import atomicity and read-only retirement previews with affected area cache slugs.
 - Import integration tests check bounded park writes and geometry reads, including records larger than a batch budget, alongside transactional rollback and preservation of local edits.
 - Import excludes contact email, phone number, and comment text.
 - Import stores the expected catalog fields.

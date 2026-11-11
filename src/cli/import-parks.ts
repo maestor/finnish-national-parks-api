@@ -81,3 +81,11 @@ if (result.trailAreaResult) {
 
 console.log(`Source deactivations: ${result.deactivatedParks.length}.`);
 for (const park of result.deactivatedParks) console.log(`- ${park.slug} [${park.lipasId}]`);
+for (const trail of result.excludedLongTrails)
+  console.log(
+    `Excluded long trail: ${trail.name} [${trail.lipasId}]: ${trail.reportedLengthKm?.toFixed(3) ?? 'unknown'} km reported, ${trail.measuredLengthKm?.toFixed(3) ?? 'unknown'} km measured.`
+  );
+if (result.affectedLongTrailSlugs.length)
+  console.log(
+    `Expire these public park URLs immediately: ${result.affectedLongTrailSlugs.join(', ')}`
+  );

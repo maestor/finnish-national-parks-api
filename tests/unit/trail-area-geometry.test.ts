@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import type { GeoJsonFeatureCollection } from '../../src/importer/geometry.js';
 import {
   measureTrailAreaOverlap,
+  measureTrailLengthKm,
   qualifiesTrailAreaOverlap
 } from '../../src/importer/trail-area-geometry.js';
 
@@ -24,6 +25,16 @@ const square = (west: number, east: number, south = 60, north = 60.01): [number,
 ];
 
 describe('trail–area length measurement', () => {
+  it('measures the whole route for the length ceiling and leaves unusable geometry unresolved', () => {
+    const route = line([24, 60], [24.01, 60], [24, 60]);
+    expect(measureTrailLengthKm(route)).toBeCloseTo(
+      measureTrailLengthKm(line([24, 60], [24.01, 60]))!,
+      8
+    );
+    expect(measureTrailLengthKm(route)).toBeGreaterThan(0.5);
+    expect(measureTrailLengthKm(polygon(square(24, 24.01)))).toBeNull();
+    expect(measureTrailLengthKm(line([24, 60], [24, 60]))).toBeNull();
+  });
   it('clips crossing segments by length and treats boundary-only contact as outside', () => {
     const area = polygon(square(24, 24.01));
     const crossing = measureTrailAreaOverlap(line([23.99, 60.005], [24.02, 60.005]), area);

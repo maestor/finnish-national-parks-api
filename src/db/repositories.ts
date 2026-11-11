@@ -24,6 +24,7 @@ import {
   getParkCategoryByTypeSlug,
   getSupportedParkTypeSlugsByCategorySlug,
   isHikingAndWildernessAreaTypeSlug,
+  isTrailTypeCode,
   isTrailTypeSlug,
   supportedParkTypes
 } from '../parks/park-types.js';
@@ -3212,7 +3213,9 @@ export const listExistingParksByLipasIds = async (database: Database, lipasIds: 
       importedMarkerLon: true,
       importedMarkerLat: true,
       markerLon: true,
-      markerLat: true
+      markerLat: true,
+      lengthKm: true,
+      importedLengthKm: true
     },
     where: and(inArray(parks.lipasId, lipasIds), eq(parks.managedByLipasImport, true))
   });
@@ -4939,6 +4942,20 @@ export const updateParkRemoved = async (database: Database, slug: string, remove
   database.transaction(async (tx) => {
     const park = await findParkRecordBySlugIncludingRemoved(tx, slug);
     if (!park) return false;
+
+    if (!removed && isTrailTypeCode(park.typeId)) {
+      const { exceedsTrailLengthLimit, measureTrailLengthKm } = await import(
+        '../importer/trail-area-geometry.js'
+      );
+      if (
+        exceedsTrailLengthLimit(
+          measureTrailLengthKm(JSON.parse(park.boundaryGeojson) as GeoJsonFeatureCollection),
+          park.lengthKm
+        )
+      ) {
+        throw new RepositoryValidationError('A trail over 100 km cannot be enabled.');
+      }
+    }
 
     if (
       !removed &&

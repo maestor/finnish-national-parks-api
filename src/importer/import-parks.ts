@@ -1,4 +1,4 @@
-import { and, eq } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import { z } from 'zod';
 
 import type { Database } from '../db/database.js';
@@ -11,7 +11,7 @@ import {
   type UpsertCatalogParkInput,
   upsertCatalogParks
 } from '../db/repositories.js';
-import { parkImportNotifications, parks } from '../db/schema.js';
+import { parkImportNotifications, parks, trailAreaLinks } from '../db/schema.js';
 import {
   getSupportedParkTypeByCode,
   hikingAreaDisplayTypeName,
@@ -21,6 +21,7 @@ import {
 import { createLuontoonUrlResolver } from './luontoon-sitemap.js';
 import { mapLipasPark } from './map-lipas-park.js';
 import { reconcileTrailAreas } from './reconcile-trail-areas.js';
+import { exceedsTrailLengthLimit, measureTrailLengthKm } from './trail-area-geometry.js';
 
 const lipasResponseSchema = z.object({
   items: z.array(z.unknown()),
@@ -179,11 +180,38 @@ export const importParks = async ({
     return candidate.status === 'active';
   });
   const mappedActiveParks = activeItems.map((item) => mapLipasPark(item));
-  const importedParks = mappedActiveParks;
-  const importedLipasIds = importedParks.map((park) => park.lipasId);
-  const existingParks = await listExistingParksByLipasIds(database, importedLipasIds);
-  const existingLipasIds = new Set(existingParks.map((park) => park.lipasId));
+  const existingParks = await listExistingParksByLipasIds(
+    database,
+    mappedActiveParks.map((park) => park.lipasId)
+  );
   const existingByLipasId = new Map(existingParks.map((park) => [park.lipasId, park]));
+  const excludedLongTrails: Array<{
+    lipasId: number;
+    name: string;
+    reportedLengthKm: number | null;
+    measuredLengthKm: number | null;
+  }> = [];
+  const importedParks = mappedActiveParks.filter((park) => {
+    if (!isTrailTypeCode(park.type.code)) return true;
+    const measuredLengthKm = measureTrailLengthKm(park.boundaryGeoJson);
+    const previous = existingByLipasId.get(park.lipasId);
+    const reportedLengthKm =
+      previous && previous.lengthKm !== previous.importedLengthKm
+        ? previous.lengthKm
+        : park.lengthKm;
+    if (exceedsTrailLengthLimit(measuredLengthKm, reportedLengthKm)) {
+      excludedLongTrails.push({
+        lipasId: park.lipasId,
+        name: park.name,
+        reportedLengthKm,
+        measuredLengthKm
+      });
+      return false;
+    }
+    return true;
+  });
+  const importedLipasIds = importedParks.map((park) => park.lipasId);
+  const existingLipasIds = new Set(existingParks.map((park) => park.lipasId));
   const existingImportedSlugByLipasId = new Map(
     existingParks.map((park) => [park.lipasId, park.importedSlug ?? park.slug])
   );
@@ -211,6 +239,7 @@ export const importParks = async ({
     value: null
   };
   const deactivatedParks: { lipasId: number; slug: string }[] = [];
+  const affectedLongTrailSlugs = new Set<string>();
 
   try {
     await database.transaction(async (tx) => {
@@ -310,6 +339,33 @@ export const importParks = async ({
 
       if (batch.length > 0) await flushBatch();
 
+      const newlyHiddenLongTrailSlugs: string[] = [];
+      if (excludedLongTrails.length) {
+        const excludedIds = excludedLongTrails.map((trail) => trail.lipasId);
+        const excludedExisting = await tx
+          .select({ id: parks.id, slug: parks.slug, removed: parks.removed })
+          .from(parks)
+          .where(inArray(parks.lipasId, excludedIds));
+        for (const trail of excludedExisting) {
+          affectedLongTrailSlugs.add(trail.slug);
+          if (!trail.removed) newlyHiddenLongTrailSlugs.push(trail.slug);
+        }
+        if (excludedExisting.length) {
+          const linkedAreas = await tx
+            .select({ slug: parks.slug })
+            .from(trailAreaLinks)
+            .innerJoin(parks, eq(parks.id, trailAreaLinks.areaId))
+            .where(
+              inArray(
+                trailAreaLinks.trailId,
+                excludedExisting.map((trail) => trail.id)
+              )
+            );
+          for (const area of linkedAreas) affectedLongTrailSlugs.add(area.slug);
+        }
+        await tx.update(parks).set({ removed: true }).where(inArray(parks.lipasId, excludedIds));
+      }
+
       const activeIds = new Set(importedLipasIds);
       const previouslyActive = await tx
         .select({ lipasId: parks.lipasId, slug: parks.slug })
@@ -320,10 +376,11 @@ export const importParks = async ({
       trailAreaResult.value = await reconcileTrailAreas(tx, importedAt);
       if (
         requireNoPublicTrailConversions &&
-        trailAreaResult.value.newlyHiddenPublicSlugs.length > 0
+        (trailAreaResult.value.newlyHiddenPublicSlugs.length > 0 ||
+          newlyHiddenLongTrailSlugs.length > 0)
       ) {
         throw new Error(
-          `Public trail conversion requires immediate frontend cache expiry: ${trailAreaResult.value.newlyHiddenPublicSlugs.join(', ')}`
+          `Public trail conversion requires immediate frontend cache expiry: ${[...trailAreaResult.value.newlyHiddenPublicSlugs, ...newlyHiddenLongTrailSlugs].join(', ')}`
         );
       }
 
@@ -359,6 +416,8 @@ export const importParks = async ({
     dryRun,
     newParks,
     sourceActiveCount: activeItems.length,
+    excludedLongTrails,
+    affectedLongTrailSlugs: [...affectedLongTrailSlugs],
     importRunId,
     importedAt
   };

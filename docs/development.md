@@ -169,7 +169,7 @@ The importer should:
 - Print the newly added catalog rows after each import run so changes stay visible without halting the sync.
 - Upsert catalog rows by `lipasId`.
 - Upsert normalized catalog types in a dedicated `park_types` table.
-- Retain source-active supported trails and link each area covering at least 10% of measured route length; never infer membership from address. Special-import trails remain independent.
+- Retain source-active supported trails only when neither measured unique geometry nor effective reported length exceeds 100 km, and link each area covering at least 10% of measured route length; never infer membership from address. Honor local reported-length overrides before evaluating incoming LIPAS values. Unmeasurable trails with no oversized reported length follow the existing private/unresolved workflow. Special-import trails remain independent and reject oversized geometry or stored reported length. See [maximum trail length and existing-row retirement](./importing.md#maximum-trail-length).
 - Keep effective or formerly linked trails out of standalone public destinations. Manual inclusion/exclusion overrides survive recomputation, and existing visit history requires an explicit preservation decision before a new conversion.
 - Recompute links after LIPAS and special-area imports; use the preview, geometry report, and cache-expiry procedure in [Importing Guide](./importing.md#trailarea-reconciliation).
 - Preserve personal visit history during catalog re-imports.

@@ -28,6 +28,14 @@ const project = (coordinate: GeoJsonCoordinate) => {
 };
 const reader = new GeoJSONReader(new GeometryFactory());
 
+export const MAX_TRAIL_LENGTH_KM = 100;
+export const exceedsTrailLengthLimit = (
+  lengthKm: number | null,
+  reportedLengthKm: number | null = null
+) =>
+  (lengthKm !== null && lengthKm - MAX_TRAIL_LENGTH_KM > 1e-7) ||
+  (reportedLengthKm !== null && reportedLengthKm - MAX_TRAIL_LENGTH_KM > 1e-7);
+
 const projectedLength = (geometry: Geometry) => {
   const projected = geometry.copy() as Geometry & {
     apply: (filter: {
@@ -53,6 +61,34 @@ export const hasUsableLineLength = (line: LineStringGeometry) =>
     return previous !== undefined && (point[0] !== previous[0] || point[1] !== previous[1]);
   });
 
+const measureLines = (
+  lines: LineStringGeometry[]
+): { status: 'ok'; route: Geometry; routeMetres: number } | { status: 'invalid-line' } => {
+  try {
+    const lineGeometry = reader.read({
+      type: 'GeometryCollection',
+      geometries: lines.map((geometry) => ({
+        type: 'LineString',
+        coordinates: geometry.coordinates
+      }))
+    });
+    const route = UnaryUnionOp.union(lineGeometry) as Geometry;
+    const routeMetres = projectedLength(route);
+    if (!Number.isFinite(routeMetres) || routeMetres <= 0) return { status: 'invalid-line' };
+    return { status: 'ok', route, routeMetres };
+  } catch {
+    return { status: 'invalid-line' };
+  }
+};
+
+export const measureTrailLengthKm = (trail: GeoJsonFeatureCollection): number | null => {
+  const lines = trail.features.flatMap(({ geometry }) =>
+    geometry.type === 'LineString' && hasUsableLineLength(geometry) ? [geometry] : []
+  );
+  const measurement = measureLines(lines);
+  return measurement.status === 'ok' ? measurement.routeMetres / 1000 : null;
+};
+
 export const qualifiesTrailAreaOverlap = (ratio: number) => ratio + 1e-7 >= 0.1;
 
 type Measurement =
@@ -72,22 +108,9 @@ export const measureTrailAreaOverlap = (
   const polygons = area.features.filter((feature) => feature.geometry.type === 'Polygon');
   if (!polygons.length) return { status: 'invalid-area' };
 
-  let route: Geometry;
-  let routeMetres: number;
-  try {
-    const lineGeometry = reader.read({
-      type: 'GeometryCollection',
-      geometries: lines.map((geometry) => ({
-        type: 'LineString',
-        coordinates: geometry.coordinates
-      }))
-    });
-    route = UnaryUnionOp.union(lineGeometry) as Geometry;
-    routeMetres = projectedLength(route);
-    if (!Number.isFinite(routeMetres) || routeMetres <= 0) return { status: 'invalid-line' };
-  } catch {
-    return { status: 'invalid-line' };
-  }
+  const measurement = measureLines(lines);
+  if (measurement.status !== 'ok') return measurement;
+  const { route, routeMetres } = measurement;
 
   try {
     if (
