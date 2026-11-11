@@ -1,10 +1,11 @@
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
-
+import { inArray } from 'drizzle-orm';
 import { z } from 'zod';
 
 import type { Database } from '../db/database.js';
 import { createImportRun, syncParkTypes, upsertCatalogPark } from '../db/repositories.js';
+import { parks } from '../db/schema.js';
 import {
   getSupportedParkTypeBySlug,
   hasMagnetByDefaultForTypeSlug,
@@ -15,6 +16,7 @@ import { deriveBoundingBox } from './geometry.js';
 import { reconcileTrailAreas } from './reconcile-trail-areas.js';
 import { extractHikingAreaMetadata } from './special-parks/builders.js';
 import { specialParkConfigs } from './special-parks/index.js';
+import { exceedsTrailLengthLimit, measureTrailLengthKm } from './trail-area-geometry.js';
 
 const coordinateSchema = z.tuple([z.number(), z.number()]).rest(z.number());
 
@@ -230,6 +232,19 @@ export const importSpecialParks = async ({
   if (allowPublicTrailConversions && selectedConfigs.length !== 1) {
     throw new Error('Public trail conversion requires exactly one selected special area.');
   }
+  const existingLengths = new Map(
+    (
+      await database
+        .select({ lipasId: parks.lipasId, lengthKm: parks.lengthKm })
+        .from(parks)
+        .where(
+          inArray(
+            parks.lipasId,
+            selectedConfigs.map((config) => config.syntheticLipasId)
+          )
+        )
+    ).map((park) => [park.lipasId, park.lengthKm])
+  );
   const publicTrailSlugs: string[] = [];
   const trailAreaReports: Array<{
     areaSlug: string;
@@ -305,6 +320,15 @@ export const importSpecialParks = async ({
 
     const boundingBox = deriveBoundingBox(boundaryGeoJson);
     const parkType = getSupportedParkTypeBySlug(config.parkTypeSlug);
+    if (
+      isTrailTypeCode(parkType.code) &&
+      exceedsTrailLengthLimit(
+        measureTrailLengthKm(boundaryGeoJson),
+        existingLengths.get(config.syntheticLipasId) ?? null
+      )
+    ) {
+      throw new Error(`Trail ${config.slug} exceeds the 100 km length limit.`);
+    }
 
     prepared.push({
       config,

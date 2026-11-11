@@ -19,6 +19,45 @@ Both import paths insert new records disabled and preserve existing visibility a
 
 The LIPAS `route-length-km` property is stored as nullable `lengthKm` independently of the geometry measurements used for matching. Re-imports refresh the source value while preserving administrator edits, as with area. Existing rows receive their source length on the next LIPAS import after migration `0048_trail_length.sql`; missing values remain null.
 
+### Maximum trail length
+
+Trails whose **measured geometry or effective reported length exceeds 100 km**
+are outside the catalog scope.
+The measurement unions mapped line segments and measures their unique length in
+EPSG:3067, independently of area clipping; repeated or retraced segments are not
+counted twice. Exactly 100 km is allowed, with a `1e-7` km numerical tolerance.
+The limit applies to trails, not area perimeters. The retirement command evaluates
+the current editable `lengthKm` alongside measured geometry: either value over
+the limit retires the trail, even when geometry is short or unmeasurable. Correct
+obvious reported-length unit errors before applying retirement. An admin override
+(`lengthKm` different from `importedLengthKm`) takes precedence over the incoming
+LIPAS reported length, matching the existing edit-preservation rules. Otherwise,
+the incoming source length is used. Unmeasurable geometry with no oversized
+reported length follows the existing private/unresolved import rules.
+
+The LIPAS import skips new oversized trails and retires existing ones as inactive
+and hidden. Special-trail imports reject an oversized source batch before writes.
+Oversized trails cannot be enabled from admin visibility management. A scheduled
+import rolls back if this would newly hide an enabled trail, requiring the manual
+import/cache-expiry procedure instead. Manual and scheduled import logs report
+excluded trails with both measured and effective reported lengths.
+
+To retire existing trails without reimporting source data, back up the database,
+then run `npm run trails:retire-long -- --dry-run`. It only reads the current
+catalog and reports every trail oversized by either length with both length
+values. Unresolved geometry stays in the result for diagnostics but is not printed.
+After correcting unit errors and reviewing the preview, run
+`npm run trails:retire-long`, then use the UI's full cache clear to refresh park
+details and their summary/list caches together. The CLI prints a short park-cache
+reminder instead of a URL list. The
+command refuses pending migrations and never applies them. It sets
+oversized trails inactive and hidden while preserving their IDs, visit records
+and durable manual link overrides; inactive trails no longer appear as linked
+public routes. Subsequent LIPAS imports keep oversized geometry excluded. A later
+source/edited length reduced to the limit may reactivate the row when geometry is
+also within the limit, but it stays hidden
+until explicitly reviewed/enabled or linked. No offline storage changes.
+
 To reduce traffic to remote libSQL, the main import upserts at most ten parks per statement, with a 1 MiB geometry budget per batch. Trail reconciliation loads geometry in groups of at most 50 records and 2 MiB. A single geometry larger than a budget is sent or read on its own. During lengthy geometry matching, periodic lightweight queries keep the remote transaction stream active. All catalog writes, reconciliation and notification queuing remain in one transaction; dry runs roll it back.
 
 Back up the target database before applying. Run `npm run import:parks -- --dry-run` first; it rolls back catalog changes and reports new rows, automatic links, exclusions, unresolved geometry, deactivations and affected public slugs. A trail with visits that would newly become a member aborts the transaction for a separate preservation decision. After review, run `npm run import:parks` and immediately expire every reported slug through the UI's authenticated `POST /api/revalidate-public-cache` with `{ "parkSlugs": ["slug"] }` (maximum 500 per request). That endpoint also expires summary, map, planner and sitemap paths. API ETags do not invalidate the UI cache by themselves. Repeat the dry run to check stability before rollout.
