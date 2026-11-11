@@ -23,3 +23,5 @@ export const trailAreaValidationFailureSchema = z.object({
   success: z.literal(false),
   error: z.object({ name: z.string(), message: z.string() }).passthrough()
 });
+
+export const trailLinkedAreaSchema = z.object({ name: z.string(), slug: z.string() });

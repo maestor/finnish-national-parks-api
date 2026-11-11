@@ -3,7 +3,11 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createApp } from '../../src/app.js';
 import { parkDetailSchema } from '../../src/contracts/parks.js';
 import { parks, trailAreaLinks } from '../../src/db/schema.js';
-import { listPublicAreaTrails, setAreaTrailOverride } from '../../src/db/trail-areas.js';
+import {
+  listPublicAreaTrails,
+  listTrailAreas,
+  setAreaTrailOverride
+} from '../../src/db/trail-areas.js';
 import { importOsmTrails } from '../../src/importer/import-osm-trails.js';
 import { importParks } from '../../src/importer/import-parks.js';
 import { reconcileTrailAreas } from '../../src/importer/reconcile-trail-areas.js';
@@ -79,7 +83,11 @@ describe('OSM linked trail import', () => {
     expect(await listPublicAreaTrails(db.database, area.id)).toMatchObject([
       { name: 'Testipolku', source: { type: 'openstreetmap', relationId: 12345 } }
     ]);
+    expect(await listTrailAreas(db.database, trail.slug)).toEqual([
+      { name: area.name, slug: area.slug }
+    ]);
     await setAreaTrailOverride(db.database, area.slug, trail.id, 'exclude');
+    expect(await listTrailAreas(db.database, trail.slug)).toEqual([]);
     await importOsmTrails({ database: db.database, snapshot });
     expect(await listPublicAreaTrails(db.database, area.id)).toHaveLength(0);
     await reconcileTrailAreas(db.database, new Date().toISOString());

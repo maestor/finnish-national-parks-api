@@ -3,7 +3,8 @@ import { errorSchema } from '../contracts/common.js';
 import {
   trailAreaCandidateSchema,
   trailAreaLinkSchema,
-  trailAreaValidationFailureSchema
+  trailAreaValidationFailureSchema,
+  trailLinkedAreaSchema
 } from '../contracts/trail-areas.js';
 
 const params = z.object({ slug: z.string() });
@@ -41,6 +42,21 @@ export const listAreaTrailsRoute = createRoute({
       description: 'Trail links and overrides',
       content: {
         'application/json': { schema: z.object({ trails: z.array(trailAreaLinkSchema) }) }
+      }
+    },
+    ...errors
+  }
+});
+export const listTrailAreasRoute = createRoute({
+  ...common,
+  method: 'get',
+  path: '/api/admin/parks/{slug}/areas',
+  request: { params },
+  responses: {
+    200: {
+      description: 'Effective areas linked to a trail',
+      content: {
+        'application/json': { schema: z.object({ areas: z.array(trailLinkedAreaSchema) }) }
       }
     },
     ...errors
