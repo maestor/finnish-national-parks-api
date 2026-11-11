@@ -643,7 +643,7 @@ type PublicVisitSummaryEtagSeed = {
   publicVersion: number;
 };
 
-type UpsertCatalogParkInput = Omit<
+export type UpsertCatalogParkInput = Omit<
   typeof parks.$inferInsert,
   | 'id'
   | 'importedAreaKm2'
@@ -3229,6 +3229,19 @@ export const listExistingParksByLipasIds = async (database: Database, lipasIds: 
   }
 
   return database.query.parks.findMany({
+    columns: {
+      lipasId: true,
+      slug: true,
+      importedSlug: true,
+      bboxMinLon: true,
+      bboxMinLat: true,
+      bboxMaxLon: true,
+      bboxMaxLat: true,
+      importedMarkerLon: true,
+      importedMarkerLat: true,
+      markerLon: true,
+      markerLat: true
+    },
     where: and(inArray(parks.lipasId, lipasIds), eq(parks.managedByLipasImport, true))
   });
 };
@@ -6084,8 +6097,8 @@ export const reorderTripStopImages = async (
   await bumpPublicVisitDataVersion(database, timestamp);
 };
 
-export const upsertCatalogPark = async (database: DbClient, values: UpsertCatalogParkInput) => {
-  const valuesWithImportedFields = {
+export const upsertCatalogParks = async (database: DbClient, inputs: UpsertCatalogParkInput[]) => {
+  const valuesWithImportedFields = inputs.map((values) => ({
     ...values,
     importedAreaKm2: values.areaKm2,
     importedLengthKm: values.lengthKm ?? null,
@@ -6100,12 +6113,13 @@ export const upsertCatalogPark = async (database: DbClient, values: UpsertCatalo
     importedPostalCode: values.postalCode,
     importedPostalOffice: values.postalOffice,
     importedSlug: values.slug
-  };
+  }));
 
   await database
     .insert(parks)
     .values(valuesWithImportedFields)
     .onConflictDoUpdate({
+      // Reuse the inserted row so large geometries are not sent a second time.
       set: {
         areaKm2: sql`CASE
           WHEN ${parks.areaKm2} IS ${parks.importedAreaKm2}
@@ -6117,12 +6131,12 @@ export const upsertCatalogPark = async (database: DbClient, values: UpsertCatalo
             THEN excluded.imported_length_km
           ELSE ${parks.lengthKm}
         END`,
-        bboxMaxLat: values.bboxMaxLat,
-        bboxMaxLon: values.bboxMaxLon,
-        bboxMinLat: values.bboxMinLat,
-        bboxMinLon: values.bboxMinLon,
-        boundaryGeojson: values.boundaryGeojson,
-        catalogStatus: values.catalogStatus,
+        bboxMaxLat: sql`excluded.bbox_max_lat`,
+        bboxMaxLon: sql`excluded.bbox_max_lon`,
+        bboxMinLat: sql`excluded.bbox_min_lat`,
+        bboxMinLon: sql`excluded.bbox_min_lon`,
+        boundaryGeojson: sql`excluded.boundary_geojson`,
+        catalogStatus: sql`excluded.catalog_status`,
         displayTypeName: sql`CASE
           WHEN ${parks.displayTypeName} IS ${parks.importedDisplayTypeName}
             THEN excluded.imported_display_type_name
@@ -6138,20 +6152,20 @@ export const upsertCatalogPark = async (database: DbClient, values: UpsertCatalo
             THEN excluded.imported_has_magnet
           ELSE ${parks.hasMagnet}
         END`,
-        importedAreaKm2: valuesWithImportedFields.importedAreaKm2,
-        importedLengthKm: valuesWithImportedFields.importedLengthKm,
-        importedDisplayTypeName: valuesWithImportedFields.importedDisplayTypeName,
-        importedEstablishmentYear: valuesWithImportedFields.importedEstablishmentYear,
-        importedHasMagnet: valuesWithImportedFields.importedHasMagnet,
-        importedMarkerLat: valuesWithImportedFields.importedMarkerLat,
-        importedMarkerLon: valuesWithImportedFields.importedMarkerLon,
-        importedLocationLabel: valuesWithImportedFields.importedLocationLabel,
-        importedParkUrl: valuesWithImportedFields.importedParkUrl,
-        importedName: valuesWithImportedFields.importedName,
-        importedPostalCode: valuesWithImportedFields.importedPostalCode,
-        importedPostalOffice: valuesWithImportedFields.importedPostalOffice,
-        importedSlug: valuesWithImportedFields.importedSlug,
-        lastImportRunId: values.lastImportRunId,
+        importedAreaKm2: sql`excluded.imported_area_km2`,
+        importedLengthKm: sql`excluded.imported_length_km`,
+        importedDisplayTypeName: sql`excluded.imported_display_type_name`,
+        importedEstablishmentYear: sql`excluded.imported_establishment_year`,
+        importedHasMagnet: sql`excluded.imported_has_magnet`,
+        importedMarkerLat: sql`excluded.imported_marker_lat`,
+        importedMarkerLon: sql`excluded.imported_marker_lon`,
+        importedLocationLabel: sql`excluded.imported_location_label`,
+        importedParkUrl: sql`excluded.imported_park_url`,
+        importedName: sql`excluded.imported_name`,
+        importedPostalCode: sql`excluded.imported_postal_code`,
+        importedPostalOffice: sql`excluded.imported_postal_office`,
+        importedSlug: sql`excluded.imported_slug`,
+        lastImportRunId: sql`excluded.last_import_run_id`,
         locationLabel: sql`CASE
           WHEN ${parks.locationLabel} IS ${parks.importedLocationLabel}
             THEN excluded.imported_location_label
@@ -6162,7 +6176,7 @@ export const upsertCatalogPark = async (database: DbClient, values: UpsertCatalo
             THEN excluded.imported_park_url
           ELSE ${parks.parkUrl}
         END`,
-        managedByLipasImport: values.managedByLipasImport,
+        managedByLipasImport: sql`excluded.managed_by_lipas_import`,
         markerLat: sql`CASE
           WHEN ${parks.markerLat} IS ${parks.importedMarkerLat}
             AND ${parks.markerLon} IS ${parks.importedMarkerLon}
@@ -6175,7 +6189,7 @@ export const upsertCatalogPark = async (database: DbClient, values: UpsertCatalo
             THEN excluded.imported_marker_lon
           ELSE ${parks.markerLon}
         END`,
-        municipalityCode: values.municipalityCode,
+        municipalityCode: sql`excluded.municipality_code`,
         name: sql`CASE
           WHEN ${parks.name} IS ${parks.importedName}
             THEN excluded.imported_name
@@ -6196,16 +6210,16 @@ export const upsertCatalogPark = async (database: DbClient, values: UpsertCatalo
             THEN excluded.imported_slug
           ELSE ${parks.slug}
         END`,
-        sourceEventDate: values.sourceEventDate,
-        typeId: values.typeId,
-        updatedAt: values.updatedAt
+        sourceEventDate: sql`excluded.source_event_date`,
+        typeId: sql`excluded.type_id`,
+        updatedAt: sql`excluded.updated_at`
       },
       target: parks.lipasId
     });
 };
 
-export const upsertImportedPark = async (database: DbClient, values: UpsertCatalogParkInput) =>
-  upsertCatalogPark(database, values);
+export const upsertCatalogPark = async (database: DbClient, values: UpsertCatalogParkInput) =>
+  upsertCatalogParks(database, [values]);
 
 export const markMissingParksInactive = async (
   database: DbClient,

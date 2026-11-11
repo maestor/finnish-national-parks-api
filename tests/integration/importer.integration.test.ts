@@ -9,6 +9,7 @@ import {
 } from '../../src/db/repositories.js';
 import { importRuns, parks, trailAreaLinks } from '../../src/db/schema.js';
 import { importParks } from '../../src/importer/import-parks.js';
+import { reconcileTrailAreas } from '../../src/importer/reconcile-trail-areas.js';
 import {
   createLipasHikingTrail,
   createLipasPark,
@@ -31,6 +32,124 @@ describe('importParks', () => {
 
   afterEach(async () => {
     await testDatabase.dispose();
+  });
+
+  it('imports a catalog in bounded writes without sending each geometry twice', async () => {
+    const originalTransaction = testDatabase.client.transaction.bind(testDatabase.client);
+    const executed: Array<{ sql: string; args?: unknown }> = [];
+    vi.spyOn(testDatabase.client, 'transaction').mockImplementation(async () => {
+      const transaction = await originalTransaction();
+      const execute = transaction.execute.bind(transaction);
+      vi.spyOn(transaction, 'execute').mockImplementation((statement) => {
+        if (typeof statement !== 'string') executed.push(statement);
+        return execute(statement);
+      });
+      return transaction;
+    });
+    const items = Array.from({ length: 30 }, (_, index) =>
+      createLipasTrail({ 'lipas-id': 500000 + index, name: `Polku ${index}` })
+    );
+    await importParks({
+      database: testDatabase.database,
+      sourceUrl: 'https://example.test/lipas',
+      fetchSource: async () => ({ items })
+    });
+    const writes = executed.filter((statement) => /insert into "parks"/i.test(statement.sql));
+    expect(writes.length).toBeLessThanOrEqual(3);
+    expect(
+      writes
+        .flatMap((statement) => (Array.isArray(statement.args) ? statement.args : []))
+        .filter((value) => typeof value === 'string' && value.includes('"coordinates"'))
+    ).toHaveLength(30);
+    expect(await testDatabase.database.select().from(parks)).toHaveLength(30);
+
+    await testDatabase.database
+      .update(parks)
+      .set({ lengthKm: 99 })
+      .where(eq(parks.lipasId, 500000));
+    const updated = items.map((item, index) => ({
+      ...item,
+      properties: { 'route-length-km': index + 1 }
+    }));
+    await importParks({
+      database: testDatabase.database,
+      sourceUrl: 'https://example.test/lipas',
+      fetchSource: async () => ({ items: updated })
+    });
+    const preserved = await testDatabase.database.query.parks.findFirst({
+      where: eq(parks.lipasId, 500000)
+    });
+    const refreshed = await testDatabase.database.query.parks.findFirst({
+      where: eq(parks.lipasId, 500001)
+    });
+    expect(preserved).toMatchObject({ lengthKm: 99, importedLengthKm: 1 });
+    expect(refreshed).toMatchObject({ lengthKm: 2, importedLengthKm: 2 });
+  });
+
+  it('splits large geometry writes and reconciliation reads into bounded batches', async () => {
+    const originalTransaction = testDatabase.client.transaction.bind(testDatabase.client);
+    const statements: string[] = [];
+    vi.spyOn(testDatabase.client, 'transaction').mockImplementation(async () => {
+      const transaction = await originalTransaction();
+      const execute = transaction.execute.bind(transaction);
+      vi.spyOn(transaction, 'execute').mockImplementation((statement) => {
+        statements.push(typeof statement === 'string' ? statement : statement.sql);
+        return execute(statement);
+      });
+      return transaction;
+    });
+    const coordinates = Array.from({ length: 60000 }, () => [24.123456, 60.123456]);
+    coordinates.push([24.2, 60.2]);
+    const geometries = {
+      type: 'FeatureCollection' as const,
+      features: [
+        {
+          type: 'Feature' as const,
+          geometry: { type: 'LineString' as const, coordinates }
+        }
+      ]
+    };
+    const items = [
+      createLipasTrail({ 'lipas-id': 600001, name: 'Iso polku 1', location: { geometries } }),
+      createLipasTrail({ 'lipas-id': 600002, name: 'Iso polku 2', location: { geometries } })
+    ];
+    await importParks({
+      database: testDatabase.database,
+      sourceUrl: 'https://example.test/lipas',
+      fetchSource: async () => ({ items })
+    });
+    expect(statements.filter((sql) => /insert into "parks"/i.test(sql))).toHaveLength(2);
+    expect(
+      statements.filter((sql) => /select "id", "boundary_geojson" from "parks"/i.test(sql))
+    ).toHaveLength(2);
+    expect(await testDatabase.database.select().from(parks)).toHaveLength(2);
+  });
+
+  it('keeps the transaction active during long trail reconciliation', async () => {
+    await importParks({
+      database: testDatabase.database,
+      sourceUrl: 'https://example.test/lipas',
+      fetchSource: async () => ({ items: [createLipasTrail()] })
+    });
+    const originalTransaction = testDatabase.client.transaction.bind(testDatabase.client);
+    const statements: string[] = [];
+    vi.spyOn(testDatabase.client, 'transaction').mockImplementation(async () => {
+      const transaction = await originalTransaction();
+      const execute = transaction.execute.bind(transaction);
+      vi.spyOn(transaction, 'execute').mockImplementation((statement) => {
+        statements.push(typeof statement === 'string' ? statement : statement.sql);
+        return execute(statement);
+      });
+      return transaction;
+    });
+    let time = 0;
+    const clock = vi.spyOn(Date, 'now').mockImplementation(() => (time += 2500));
+    try {
+      await testDatabase.database.transaction((tx) => reconcileTrailAreas(tx, '2026-11-11'));
+    } finally {
+      clock.mockRestore();
+    }
+    expect(statements.some((statement) => /^select 1$/i.test(statement))).toBe(true);
   });
 
   it('imports and refreshes a trail length, retaining a local override', async () => {
