@@ -1,6 +1,8 @@
 import { and, asc, eq, inArray, sql } from 'drizzle-orm';
 
+import type { GeoJsonFeatureCollection } from '../importer/geometry.js';
 import { isTrailTypeCode } from '../parks/park-types.js';
+import { toAddress } from './address.js';
 import type { Database, DbClient } from './database.js';
 import { parks, parkVisits, publicDataVersions, trailAreaLinks } from './schema.js';
 
@@ -48,6 +50,37 @@ export const listAreaTrails = async (database: DbClient, areaId: number) => {
       isTrailTypeCode(trail.typeId) &&
       selectLink(link, trail).effective
   }));
+};
+export const listPublicAreaTrails = async (database: DbClient, areaId: number) => {
+  const rows = await database
+    .select({ link: trailAreaLinks, trail: parks })
+    .from(trailAreaLinks)
+    .innerJoin(parks, eq(parks.id, trailAreaLinks.trailId))
+    .where(eq(trailAreaLinks.areaId, areaId))
+    .orderBy(asc(parks.name), asc(parks.id));
+  return rows
+    .filter(
+      ({ link, trail }) =>
+        trail.catalogStatus === 'active' &&
+        trail.managedByLipasImport &&
+        isTrailTypeCode(trail.typeId) &&
+        selectLink(link, trail).effective
+    )
+    .map(({ trail }) => ({
+      name: trail.name,
+      slug: trail.slug,
+      address:
+        toAddress(
+          trail.locationLabel === trail.name ? '' : trail.locationLabel,
+          trail.postalCode,
+          trail.postalOffice
+        ) || null,
+      lengthKm: trail.lengthKm,
+      boundaryGeoJson: JSON.parse(trail.boundaryGeojson) as GeoJsonFeatureCollection
+    }))
+    .filter((trail) =>
+      trail.boundaryGeoJson.features.some((feature) => feature.geometry.type === 'LineString')
+    );
 };
 export const listAreaTrailCandidates = async (
   database: DbClient,

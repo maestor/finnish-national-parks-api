@@ -155,6 +155,17 @@ export const parkDetailSchema = parkListItemSchema.extend({
   description: z.string().nullable(),
   featuredImage: visitImageSchema.nullable(),
   boundaryGeoJson: geoJsonFeatureCollectionSchema.optional(),
+  linkedTrails: z
+    .array(
+      z.object({
+        name: z.string(),
+        slug: z.string(),
+        address: z.string().nullable(),
+        lengthKm: z.number().nullable(),
+        boundaryGeoJson: geoJsonFeatureCollectionSchema
+      })
+    )
+    .optional(),
   catalogStatus: z.enum(['active', 'inactive']),
   lipasId: z.number().int(),
   municipalityCode: z.number().int().nullable(),

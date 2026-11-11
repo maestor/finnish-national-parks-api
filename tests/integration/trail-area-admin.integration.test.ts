@@ -66,6 +66,54 @@ describe('admin trail relationships', () => {
   afterEach(async () => {
     await db.dispose();
   });
+  it('returns effective linked trail geometry in public boundary details and refreshes validators', async () => {
+    const app = createApp({ auth, database: db.database });
+    const trail = (
+      await db.database
+        .select()
+        .from(parks)
+        .where(eq(parks.lipasId, createLipasTrail()['lipas-id']))
+    )[0]!;
+    await db.database
+      .update(parks)
+      .set({ removed: false })
+      .where(eq(parks.lipasId, createLipasPark()['lipas-id']));
+    const detailPath = '/api/parks/akasmannyn-kansallispuisto?includeBoundary=true';
+    const initial = await app.request(detailPath);
+    const initialEtag = initial.headers.get('etag')!;
+    expect(await initial.json()).toMatchObject({ linkedTrails: [] });
+    await app.request(`/api/admin/parks/akasmannyn-kansallispuisto/trails/${trail.id}`, {
+      method: 'PUT',
+      headers: { cookie }
+    });
+    const linked = await app.request(detailPath, { headers: { 'if-none-match': initialEtag } });
+    expect(linked.status).toBe(200);
+    expect(await linked.json()).toMatchObject({
+      linkedTrails: [
+        {
+          name: trail.name,
+          address: 'Polkutie 1, 00999 Testikylä',
+          boundaryGeoJson: JSON.parse(trail.boundaryGeojson)
+        }
+      ]
+    });
+    await db.database
+      .update(parks)
+      .set({ locationLabel: trail.name, postalCode: null, postalOffice: null })
+      .where(eq(parks.id, trail.id));
+    const withoutAddress = await app.request(detailPath, {
+      headers: { 'if-none-match': linked.headers.get('etag')! }
+    });
+    expect(withoutAddress.status).toBe(200);
+    expect(await withoutAddress.json()).toMatchObject({ linkedTrails: [{ address: null }] });
+    const summary = await app.request('/api/parks/akasmannyn-kansallispuisto');
+    expect(await summary.json()).not.toHaveProperty('linkedTrails');
+    await app.request(`/api/admin/parks/akasmannyn-kansallispuisto/trails/${trail.id}`, {
+      method: 'DELETE',
+      headers: { cookie }
+    });
+    expect(await (await app.request(detailPath)).json()).toMatchObject({ linkedTrails: [] });
+  });
   it('rejects ineligible trails and exposes bounded candidate search only to an admin', async () => {
     const app = createApp({ auth, database: db.database, apiKey: 'secret' });
     const trail = (
