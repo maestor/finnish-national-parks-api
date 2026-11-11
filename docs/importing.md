@@ -1,9 +1,10 @@
 # Importing Guide
 
-This repo has two import paths:
+This repo has three separate import paths:
 
 - `npm run import:parks` for the main LIPAS-backed catalog import
 - `npm run import:special-parks` for curated non-LIPAS additions that still belong in the shared park catalog
+- `npm run import:osm-trails` for supplemental OpenStreetMap routes linked to existing areas
 
 The main LIPAS import does not block on raw upstream count drift.
 When `npm run import:parks` finds brand-new parks, it imports them as removed so they stay hidden until you explicitly enable them from the admin UI, and it prints the newly added names in the CLI output.
@@ -65,6 +66,52 @@ Back up the target database before applying. Run `npm run import:parks -- --dry-
 A scheduled import rolls back when it would newly hide an enabled trail, because it cannot perform the UI's authenticated expiry. Review the reported slugs, run the manual import and expire those URLs immediately. Special-area imports have the same guard; after review a single area can be imported with `npm run import:special-parks -- --allow-public-trail-conversions <slug>`, followed immediately by expiry of every printed slug. The default special-import command refuses that conversion.
 
 Admin-session endpoints `GET /api/admin/parks/{slug}/trails` and `/trail-candidates` expose private link and candidate data; `PUT`/`DELETE /api/admin/parks/{slug}/trails/{trailId}` record durable inclusion/exclusion overrides. The candidate read accepts `q`, `limit` (1–100) and `offset`. An API key alone is insufficient. Callers making a manual change must immediately expire both the area slug and returned trail slug through the same UI endpoint. Public area detail requests with `includeBoundary=true` include effective linked trails, their names, available addresses and lengths, and stored geometry. Park detail caches revalidate after one hour to pick up scheduled imports; immediately expire affected area details after an import when prompt updates are required. No relation editor is included.
+
+## Supplemental OpenStreetMap trails
+
+The OSM importer operates independently of the LIPAS and special-park imports.
+It requires migration `0049_osm_trails.sql` to have already been applied; it
+never runs migrations. Set `DATABASE_URL` deliberately. Run:
+
+```sh
+npm run import:osm-trails -- --dry-run
+```
+
+The command fetches named hiking and foot route relations from the Europe
+Overpass service (`https://ovp.dresel.systems/api/interpreter`), selects routes
+intersecting current active area bounds, and downloads their complete nested
+relation members in batches. Requests have a 60-second timeout. Partial server
+responses abort the run; routes with missing member geometry or ambiguous
+reported lengths are skipped. It does not invent route segments. OSM `distance`
+without a unit means kilometres and `length` without a unit means metres.
+Normal application reads remain local and never call Overpass.
+
+The importer caches its source snapshot in `data/osm-trails-snapshot.json`
+(ignored by Git) for one hour. A dry run and an import within that period use the
+same snapshot when area bounds have not changed. After the cache expires or area
+bounds change, the next run fetches a fresh snapshot. National-park results
+appear first, followed by other areas.
+
+The dry run lists trails that would be added or updated, their matched area names,
+OSM relation IDs, measured lengths and review flags. It also lists existing trails
+that would be retired for exceeding the length limit.
+It rejects routes over 100 km by measured geometry or effective reported length,
+nearby same-name matches, and routes whose sampled geometry is at least 90%
+within 25 m of a stored trail or a longer selected OSM route. The geometric
+screen is approximate and the report requires review. Local length and name
+edits and manual link overrides survive refreshes. Missing source relations and
+routes with no current area match are not withdrawn automatically. Automatic
+links which cease matching on an otherwise eligible refreshed route are removed
+or disabled while manual overrides remain.
+
+After review and backup, run `npm run import:osm-trails` to import and immediately
+use the UI's full cache clear to refresh the affected areas. An unchanged rerun does not
+write catalog records. The public linked-trail representation identifies its
+OSM relation and carries attribution and the ODbL licence URL. Source data is
+© OpenStreetMap contributors, available under the Open Database License:
+https://www.openstreetmap.org/copyright. Retain the source snapshot and review
+ODbL obligations for public distribution of the resulting database before
+publishing imported data.
 
 ## Weekly LIPAS automation
 

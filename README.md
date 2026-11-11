@@ -35,6 +35,7 @@ npm run db:migrate
 npm run import:parks
 npm run import:special-parks
 npm run import:special-parks -- <special-park-slug> [<special-park-slug> ...]
+npm run import:osm-trails -- --dry-run
 npm run park:move-visits -- (--from <source-slug> | --visit-id <visit-id>) --to <target-slug> [--dry-run]
 npm run park:logo -- <park-slug>
 npm run db:backup
@@ -100,6 +101,7 @@ Production notes:
 - `npm run media:cleanup-unused-images [-- --apply]` reviews unused visit and trip-stop image files older than eight days. The database must already have all migrations applied; this command never migrates it. It scans all pages internally, keeps active uploads/current rows/published-review references, and changes nothing unless `--apply` is supplied after reviewing its report. See [the cleanup guide](docs/security.md#remove-unused-image-files-safely).
 - `npm run park:move-visits -- (--from <source-slug> | --visit-id <visit-id>) --to <target-slug> [--dry-run]` reassigns either all visits for one park slug or one specific visit to another park. Visit images stay attached automatically because they belong to the visit rows.
 - `npm run park:backfill-featured-images [-- --dry-run]` fills missing park featured images from published visit photos, preserving existing selections. Use `--dry-run` to preview the affected parks; rerun after adding visits to fill new gaps. See [the backfill workflow](docs/development.md#backfill-park-featured-images).
+- `npm run import:osm-trails -- --dry-run` fetches and previews supplemental OSM trails; see [the OSM import workflow](docs/importing.md#supplemental-openstreetmap-trails) before applying.
 - `npm run trails:retire-long -- --dry-run` previews retirement of trails whose measured geometry or reported catalog length exceeds 100 km. See [the length-limit and apply/cache-expiry procedure](docs/importing.md#maximum-trail-length).
 - `npm run park:logo -- <park-slug>` uploads either `data/logos/<park-slug>.png` or, when multiple parks share one `displayTypeName`, `data/logos/display-types/<normalized-display-type>.png`. Shared display-type logos are stored once under `logos/display-types/` in R2 and linked from every matching park row. When `PUBLIC_API_BASE_URL` is set, park APIs expose stable versioned logo URLs through `GET /assets/logos/*`; those redirects are cached for one day, shorter than their seven-day presigned targets. Public visit, trip-stop, trip, review, and park-map media use stable `GET /assets/media/*` URLs that redirect through the private bucket. Otherwise APIs fall back to presigned media URLs for local development.
 
