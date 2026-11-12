@@ -22,6 +22,7 @@ Use API integration tests for:
 - persistence behavior
 - park featured-image backfill previews, published-only deterministic selection, preserved selections, repeat runs, transactional rollback, and real CLI migration/argument boundaries against temporary databases
 - visit workflows
+- manual OSM linked-trail merge CLI preview/apply/rerun, real membership triggers, visit-link deduplication, atomic rollback, source snapshot refresh, slug collisions and unchanged visit/photo data
 - importer plus database behavior when realistic enough
 - deployment-entry contracts that cannot be reproduced reliably through localhost alone, such as Vercel's Hono auto-detection behavior
 

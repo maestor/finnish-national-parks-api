@@ -57,6 +57,27 @@ Applying adds only missing associations, preserving existing trails, the origina
 
 After applying, immediately expire the listed frontend `public-park:{slug}` caches through the authenticated UI cache flow (`parkSlug`, `expireImmediately: true`; or `parkSlugs` in batches of at most 500). The script does not contact the UI or clear its caches.
 
+## Merge Linked Trails
+
+Use this maintainer command for two OSM-backed linked trails representing one route. Set `DATABASE_URL` and optional `DATABASE_AUTH_TOKEN` deliberately, apply migration `0051_trail_merges.sql` separately, and back up the intended database before applying. The command checks all pending migrations and never applies them, even during preview.
+
+```sh
+npm run trails:merge -- --from osm-relation-1730725 --to osm-relation-10745415 --dry-run
+npm run trails:merge -- --from osm-relation-1730725 --to osm-relation-10745415
+
+npm run trails:merge -- --from osm-relation-10766319 --to osm-relation-11924473 --name "Storträskin reitti" --dry-run
+```
+
+Preview changes nothing. Review the destination name/slug, contributing OSM relations, moved/shared visit-link counts, extra pinned areas, combined unique mapped-line length and cache slugs. Omit `--dry-run` to apply. Without `--name`, the destination keeps its name and slug; with it, the same normalization as ordinary park editing generates a slug (`Storträskin reitti` → `stortraskin-reitti`). A collision with any other retained catalog row aborts the whole transaction; no numeric suffix is invented. The destination ID stays unchanged.
+
+Both inputs must be active OSM-backed area members sharing an effective active parent area. Hidden standalone pages (`removed=true`) are normal for linked trails. Direct source-owned park visits, explicit destination exclusions of source areas, invalid/degenerate line geometry and combined geometry over 100 km block the merge. LIPAS, mixed-source and standalone merges are not supported.
+
+Apply combines the original map lines without inventing connections. Coincident lines are measured once; the result is not an ordered itinerary distance. The first merge replaces component-reported length with the measured combined length; later administrator length edits (including clearing it) survive source refresh and additional merges. Memberships from both trails are pinned on the destination before visit assignments move. Draft and published assignments transfer, shared assignments collapse, and all unrelated assignments, visit rows, free-text route descriptions, photos and trip associations remain intact.
+
+The original source row remains inactive and hidden with its OSM identity. The destination name and slug survive OSM refreshes. An unmerged source can later join an existing destination group; a group cannot itself be absorbed. Repeating the same request, including its original destination slug after renaming, is a no-op through merge audit metadata; this does not create public URL redirects. A different name or a request slug reassigned to another row is rejected. Use the ordinary editor for later name changes. There is no automatic unmerge; recovery requires a reviewed backup.
+
+After applying, immediately use the UI's full cache clear or authenticated public-cache revalidation for **every printed slug**, including parent areas and old/new destination slugs. The command bumps the API public-data version but does not contact the UI or invalidate its Next.js caches. Offline storage policy is unchanged. See [OSM refresh behavior](importing.md#merged-osm-trail-refresh).
+
 ## Security And Sustainability Baseline
 
 - Route naming is not the auth policy. Catalog and visit `GET` data is public from an end-user perspective when accessed through the Reissuvihko UI, but the backend remains a separate API boundary: frontend-facing `/api/*` routes generally require the server-side API key outside localhost when `API_KEY` is configured, including `GET /api/year-review/shares/:shareId` for server-rendered share pages.

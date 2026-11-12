@@ -168,7 +168,15 @@ export const parkDetailSchema = parkListItemSchema.extend({
             relationId: z.number().int().positive(),
             attribution: z.string(),
             licenseUrl: z.string().url(),
-            sourceUrl: z.string().url()
+            sourceUrl: z.string().url(),
+            relations: z
+              .array(
+                z.object({
+                  relationId: z.number().int().positive(),
+                  sourceUrl: z.string().url()
+                })
+              )
+              .optional()
           })
           .optional(),
         boundaryGeoJson: geoJsonFeatureCollectionSchema

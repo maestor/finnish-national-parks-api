@@ -18,6 +18,7 @@
     "import:parks:scheduled": "tsx src/cli/import-parks-scheduled.ts",
     "import:special-parks": "tsx src/cli/import-special-parks.ts",
     "trails:retire-long": "tsx src/cli/retire-long-trails.ts",
+    "trails:merge": "tsx src/cli/merge-trails.ts",
     "media:cleanup-unused-images": "tsx src/cli/cleanup-unused-images.ts",
     "media:convert-existing-images": "tsx src/cli/backfill-image-derivatives.ts",
     "media:remove-converted-originals": "tsx src/cli/retire-converted-image-originals.ts",

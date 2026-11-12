@@ -530,3 +530,42 @@ export const osmTrailSources = sqliteTable('osm_trail_sources', {
   relationId: integer('relation_id').notNull().unique(),
   sourceTimestamp: text('source_timestamp').notNull()
 });
+
+export const trailMergeGroups = sqliteTable('trail_merge_groups', {
+  trailId: integer('trail_id')
+    .primaryKey()
+    .references(() => parks.id),
+  measuredLengthKm: real('measured_length_km').notNull(),
+  createdAt: text('created_at').notNull()
+});
+
+export const trailMergeMembers = sqliteTable(
+  'trail_merge_members',
+  {
+    trailId: integer('trail_id')
+      .primaryKey()
+      .references(() => parks.id),
+    canonicalTrailId: integer('canonical_trail_id')
+      .notNull()
+      .references(() => trailMergeGroups.trailId),
+    sourceGeometry: text('source_geometry').notNull(),
+    sourceLengthKm: real('source_length_km'),
+    sourceTimestamp: text('source_timestamp').notNull()
+  },
+  (table) => ({
+    canonicalIndex: index('trail_merge_members_canonical_idx').on(table.canonicalTrailId)
+  })
+);
+
+export const trailMergeEvents = sqliteTable('trail_merge_events', {
+  fromTrailId: integer('from_trail_id')
+    .primaryKey()
+    .references(() => parks.id),
+  toTrailId: integer('to_trail_id')
+    .notNull()
+    .references(() => trailMergeGroups.trailId),
+  fromSlug: text('from_slug').notNull(),
+  toSlug: text('to_slug').notNull(),
+  requestedName: text('requested_name'),
+  createdAt: text('created_at').notNull()
+});

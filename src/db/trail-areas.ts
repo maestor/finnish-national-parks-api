@@ -10,6 +10,7 @@ import {
   parkVisits,
   publicDataVersions,
   trailAreaLinks,
+  trailMergeMembers,
   visitTrails
 } from './schema.js';
 
@@ -87,6 +88,21 @@ export const listTrailAreas = async (database: DbClient, slug: string) => {
     .map(({ name, slug: areaSlug }) => ({ name, slug: areaSlug }));
 };
 export const listPublicAreaTrails = async (database: DbClient, areaId: number) => {
+  const mergedSources = await database
+    .select({
+      canonicalTrailId: trailMergeMembers.canonicalTrailId,
+      relationId: osmTrailSources.relationId
+    })
+    .from(trailMergeMembers)
+    .innerJoin(osmTrailSources, eq(osmTrailSources.trailId, trailMergeMembers.trailId))
+    .innerJoin(
+      trailAreaLinks,
+      and(
+        eq(trailAreaLinks.trailId, trailMergeMembers.canonicalTrailId),
+        eq(trailAreaLinks.areaId, areaId)
+      )
+    )
+    .orderBy(asc(osmTrailSources.relationId));
   const rows = await database
     .select({ link: trailAreaLinks, trail: parks, source: osmTrailSources })
     .from(trailAreaLinks)
@@ -108,6 +124,16 @@ export const listPublicAreaTrails = async (database: DbClient, areaId: number) =
             source: {
               type: 'openstreetmap' as const,
               relationId: source.relationId,
+              ...(mergedSources.some((s) => s.canonicalTrailId === trail.id)
+                ? {
+                    relations: mergedSources
+                      .filter((s) => s.canonicalTrailId === trail.id)
+                      .map((s) => ({
+                        relationId: s.relationId,
+                        sourceUrl: `https://www.openstreetmap.org/relation/${s.relationId}`
+                      }))
+                  }
+                : {}),
               attribution: '© OpenStreetMap contributors',
               licenseUrl: 'https://opendatacommons.org/licenses/odbl/1-0/',
               sourceUrl: `https://www.openstreetmap.org/relation/${source.relationId}`

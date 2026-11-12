@@ -115,6 +115,14 @@ https://www.openstreetmap.org/copyright. Retain the source snapshot and review
 ODbL obligations for public distribution of the resulting database before
 publishing imported data.
 
+### Merged OSM trail refresh
+
+Maintainers can [merge linked OSM trails manually](development.md#merge-linked-trails) after migration `0051_trail_merges.sql`. Original relation identities and raw component snapshots remain separate from the destination's combined geometry. The public linked-trail `source.relations` array lists every contributing relation ID and URL; existing singular `relationId`/`sourceUrl` fields still identify the destination's primary source.
+
+Known merge members refresh before duplicate/containment filtering. The importer rebuilds each changed destination once from current valid components, preserving its chosen name, slug, administrator length correction and manual memberships. Absorbed sources stay inactive and hidden; database guards also prevent re-enabling them. A missing or rejected member keeps its last valid component and is reported, while valid members can still refresh. Invalid combined geometry, a combined route over 100 km or concurrent edits abort the transaction instead of partly replacing snapshots. Normal reads remain local-first. An unchanged rerun writes nothing.
+
+New automatic area matches use combined geometry and are included in the affected cache slugs. Previously pinned memberships survive geometry changes. After import, immediately clear the UI's public caches as above; API data-version updates do not expire them. LIPAS area imports and long-trail retirement retain source identities and merge membership. Source snapshots cannot be treated as a reversible edit history: there is no automatic unmerge.
+
 ## Weekly LIPAS automation
 
 The API repository's `Weekly LIPAS Import` workflow runs every Monday at 09:43
