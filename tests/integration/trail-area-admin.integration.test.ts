@@ -14,7 +14,7 @@ import {
   createVisitImage,
   findPublicMediaKey
 } from '../../src/db/repositories.js';
-import { parks, trailAreaLinks } from '../../src/db/schema.js';
+import { parks, parkVisits, trailAreaLinks, visitTrails } from '../../src/db/schema.js';
 import { createSessionToken } from '../../src/http/session.js';
 import { importParks } from '../../src/importer/import-parks.js';
 import { reconcileTrailAreas } from '../../src/importer/reconcile-trail-areas.js';
@@ -66,6 +66,162 @@ describe('admin trail relationships', () => {
   });
   afterEach(async () => {
     await db.dispose();
+  });
+  it('roundtrips visit trails and blocks unlink until every draft and published visit releases it', async () => {
+    const app = createApp({ auth, database: db.database });
+    const trail = (await db.database.select().from(parks).where(eq(parks.lipasId, 440401)))[0]!;
+    const slug = 'akasmannyn-kansallispuisto';
+    await db.database.update(parks).set({ removed: false }).where(eq(parks.slug, slug));
+    const path = `/api/admin/parks/${slug}/trails/${trail.id}`;
+    const headers = { cookie, 'content-type': 'application/json' };
+    await app.request(path, { method: 'PUT', headers });
+    const ids: number[] = [];
+    for (const status of ['draft', 'published']) {
+      const created = await app.request(`/api/parks/${slug}/visits`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          visitedOn: '2026-11-12',
+          status,
+          route: 'Original route',
+          trailIds: [trail.id]
+        })
+      });
+      expect(created.status).toBe(201);
+      const visit = (await created.json()) as { id: number };
+      expect(visit).toMatchObject({
+        trails: [{ id: trail.id, name: trail.name, slug: trail.slug }],
+        route: 'Original route'
+      });
+      ids.push(visit.id);
+    }
+    const publicVisits = await app.request(`/api/parks/${slug}/visits`);
+    expect(await publicVisits.json()).toMatchObject({
+      visits: [{ id: ids[1], trails: [{ id: trail.id }] }]
+    });
+    expect((await app.request(path, { method: 'DELETE' })).status).toBe(401);
+    const blocked = await app.request(path, { method: 'DELETE', headers });
+    expect(blocked.status).toBe(409);
+    expect(blocked.headers.get('cache-control')).toContain('no-store');
+    expect(await blocked.json()).toMatchObject({
+      code: 'TRAIL_HAS_VISITS',
+      visits: expect.arrayContaining(ids.map((id) => ({ id, visitedOn: '2026-11-12' })))
+    });
+    for (const id of ids) {
+      const read = await app.request(`/api/admin/visits/${id}`, { headers });
+      expect(await read.json()).toMatchObject({ trails: [{ id: trail.id }] });
+      const edited = await app.request(`/api/visits/${id}`, {
+        method: 'PATCH',
+        headers,
+        body: JSON.stringify({ trailIds: [] })
+      });
+      expect(edited.status).toBe(200);
+      expect(await edited.json()).toMatchObject({ trails: [], route: 'Original route' });
+      if (id === ids[0]) {
+        const stillBlocked = await app.request(path, { method: 'DELETE', headers });
+        expect(stillBlocked.status).toBe(409);
+        expect(await stillBlocked.json()).toMatchObject({
+          visits: [{ id: ids[1], visitedOn: '2026-11-12' }]
+        });
+      }
+    }
+    expect((await app.request(path, { method: 'DELETE', headers })).status).toBe(200);
+  });
+  it('rejects unavailable and wrong-park trails atomically and preserves assignments when omitted', async () => {
+    const app = createApp({ auth, database: db.database });
+    const headers = { cookie, 'content-type': 'application/json' };
+    const slug = 'akasmannyn-kansallispuisto';
+    await db.database.update(parks).set({ removed: false }).where(eq(parks.slug, slug));
+    const trail = (await db.database.select().from(parks).where(eq(parks.lipasId, 440401)))[0]!;
+    const create = (trailIds: unknown) =>
+      app.request(`/api/parks/${slug}/visits`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ visitedOn: '2026-11-12', trailIds })
+      });
+    expect((await create([trail.id])).status).toBe(422);
+    expect((await create([-1])).status).toBe(400);
+    expect((await create([999999])).status).toBe(422);
+    expect(await db.database.select().from(parkVisits)).toEqual([]);
+    await app.request(`/api/admin/parks/${slug}/trails/${trail.id}`, { method: 'PUT', headers });
+    const created = (await (await create([trail.id, trail.id])).json()) as {
+      id: number;
+      trails: unknown[];
+    };
+    expect(created.trails).toHaveLength(1);
+    const update = (body: unknown) =>
+      app.request(`/api/visits/${created.id}`, {
+        method: 'PATCH',
+        headers,
+        body: JSON.stringify(body)
+      });
+    expect((await update({ note: 'must roll back', trailIds: [999999] })).status).toBe(422);
+    const read = await app.request(`/api/admin/visits/${created.id}`, { headers });
+    expect(await read.json()).toMatchObject({ note: null, trails: [{ id: trail.id }] });
+    const edited = await update({ route: 'Still independent' });
+    expect(await edited.json()).toMatchObject({
+      route: 'Still independent',
+      trails: [{ id: trail.id }]
+    });
+    expect((await app.request(`/api/admin/parks/${slug}/visit-trails`)).status).toBe(401);
+    const choices = await app.request(`/api/admin/parks/${slug}/visit-trails`, { headers });
+    expect(choices.headers.get('cache-control')).toContain('no-store');
+    expect(await choices.json()).toMatchObject({
+      trails: [{ trailId: trail.id, effective: true }]
+    });
+    expect(
+      await (await app.request(`/api/admin/parks/${trail.slug}/visit-trails`, { headers })).json()
+    ).toEqual({ trails: [] });
+    expect((await app.request('/api/admin/parks/missing/visit-trails', { headers })).status).toBe(
+      404
+    );
+    await app.request(`/api/visits/${created.id}`, { method: 'DELETE', headers });
+    expect(await db.database.select().from(visitTrails)).toEqual([]);
+    expect(
+      (
+        await app.request(`/api/admin/parks/${slug}/trails/${trail.id}`, {
+          method: 'DELETE',
+          headers
+        })
+      ).status
+    ).toBe(200);
+  });
+  it('pins automatic membership through imports and guards direct database unlink or reassignment', async () => {
+    await importParks({
+      database: db.database,
+      sourceUrl: 'https://example.test',
+      fetchSource: async () => ({ items: [createLipasPark(), createLipasTrail()] })
+    });
+    const slug = 'akasmannyn-kansallispuisto';
+    const area = (await db.database.select().from(parks).where(eq(parks.slug, slug)))[0]!;
+    const trail = (await db.database.select().from(parks).where(eq(parks.lipasId, 440401)))[0]!;
+    await db.database.update(parks).set({ removed: false }).where(eq(parks.id, area.id));
+    const visit = await createVisit(db.database, slug, {
+      visitedOn: '2026-11-12',
+      trailIds: [trail.id]
+    });
+    expect(visit.trails).toHaveLength(1);
+    await expect(db.database.delete(trailAreaLinks)).rejects.toThrow();
+    await expect(db.database.update(trailAreaLinks).set({ override: 'exclude' })).rejects.toThrow();
+    await expect(db.database.update(trailAreaLinks).set({ trailId: area.id })).rejects.toThrow();
+    await expect(
+      db.database.update(parkVisits).set({ parkId: trail.id }).where(eq(parkVisits.id, visit.id))
+    ).rejects.toThrow();
+    await expect(
+      db.database.insert(visitTrails).values({ visitId: visit.id, trailId: area.id })
+    ).rejects.toThrow();
+    await expect(db.database.update(visitTrails).set({ trailId: area.id })).rejects.toThrow();
+    await importParks({
+      database: db.database,
+      sourceUrl: 'https://example.test',
+      fetchSource: async () => ({ items: [createLipasPark(), independentTrail()] })
+    });
+    expect(await db.database.select().from(trailAreaLinks)).toMatchObject([
+      { override: 'include', automaticMatch: false }
+    ]);
+    expect(await db.database.select().from(visitTrails)).toEqual([
+      { visitId: visit.id, trailId: trail.id }
+    ]);
   });
   it('lists a trail’s effective areas privately, including after changes to links', async () => {
     const app = createApp({ auth, database: db.database, apiKey: 'secret' });

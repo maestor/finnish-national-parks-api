@@ -254,6 +254,22 @@ export const parkVisits = sqliteTable(
   })
 );
 
+export const visitTrails = sqliteTable(
+  'visit_trails',
+  {
+    visitId: integer('visit_id')
+      .notNull()
+      .references(() => parkVisits.id, { onDelete: 'cascade' }),
+    trailId: integer('trail_id')
+      .notNull()
+      .references(() => parks.id)
+  },
+  (table) => ({
+    primaryKey: primaryKey({ columns: [table.visitId, table.trailId] }),
+    trailIndex: index('visit_trails_trail_idx').on(table.trailId, table.visitId)
+  })
+);
+
 export const visitImages = sqliteTable(
   'visit_images',
   {

@@ -124,7 +124,8 @@ import {
   listPublicAreaTrails,
   listTrailAreas,
   setAreaTrailOverride,
-  TrailAreaValidationError
+  TrailAreaValidationError,
+  TrailVisitConflictError
 } from './db/trail-areas.js';
 import { createAuthMiddleware } from './http/auth.js';
 import {
@@ -229,6 +230,7 @@ import {
   listAreaTrailCandidatesRoute,
   listAreaTrailsRoute,
   listTrailAreasRoute,
+  listVisitTrailChoicesRoute,
   removeAreaTrailRoute
 } from './routes/trail-areas.js';
 import {
@@ -1388,6 +1390,7 @@ export const createApp = ({
     for (const path of [
       '/api/admin/parks/:slug/areas',
       '/api/admin/parks/:slug/trails',
+      '/api/admin/parks/:slug/visit-trails',
       '/api/admin/parks/:slug/trails/:trailId',
       '/api/admin/parks/:slug/trail-candidates'
     ]) {
@@ -1816,6 +1819,14 @@ export const createApp = ({
       }
     });
 
+    app.openapi(listVisitTrailChoicesRoute, async (context) => {
+      const park = await findParkRecordBySlugIncludingRemoved(
+        database,
+        context.req.valid('param').slug
+      );
+      if (!park) return context.json(jsonNotFound('Park not found.'), 404);
+      return context.json({ trails: await listAreaTrails(database, park.id) }, 200);
+    });
     app.openapi(listAreaTrailsRoute, async (context) => {
       try {
         const area = await findEligibleArea(database, context.req.valid('param').slug);
@@ -1858,6 +1869,11 @@ export const createApp = ({
         if (!link) return context.json(jsonNotFound('Area or trail not found.'), 404);
         return context.json(link, 200);
       } catch (error) {
+        if (error instanceof TrailVisitConflictError)
+          return context.json(
+            { error: error.message, code: 'TRAIL_HAS_VISITS' as const, visits: error.visits },
+            409
+          );
         if (error instanceof TrailAreaValidationError)
           return context.json({ error: error.message }, 422);
         throw error;

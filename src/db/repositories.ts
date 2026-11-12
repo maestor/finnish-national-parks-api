@@ -53,8 +53,10 @@ import {
   tripStops,
   trips,
   visitImages,
+  visitTrails,
   yearReviewShares
 } from './schema.js';
+import { listAreaTrails } from './trail-areas.js';
 
 const standalonePublicParkWhere = () =>
   and(eq(parks.removed, false), eq(parks.trailPublicationRole, 'independent'));
@@ -249,6 +251,7 @@ const listMediaUploadKeysForParent = async (
 };
 
 type PutVisitInput = {
+  trailIds?: number[] | undefined;
   author?: string | null | undefined;
   excludeFromRoute?: boolean | undefined;
   location?:
@@ -267,6 +270,7 @@ type PutVisitInput = {
 };
 
 type UpdateVisitInput = {
+  trailIds?: number[] | undefined;
   author?: string | null | undefined;
   excludeFromRoute?: boolean | undefined;
   location?:
@@ -1497,7 +1501,8 @@ const toVisit = (
   row: typeof parkVisits.$inferSelect,
   images: VisitImage[] = [],
   trip: TripReference | null = null,
-  tripStopOrder = row.tripStopOrder
+  tripStopOrder = row.tripStopOrder,
+  trails: { id: number; name: string; slug: string }[]
 ) => {
   return {
     author: row.author,
@@ -1508,6 +1513,7 @@ const toVisit = (
     location: toOptionalMarkerPoint(row),
     note: row.note,
     route: row.route,
+    trails,
     status: row.status,
     trip,
     tripStopOrder,
@@ -1985,6 +1991,7 @@ const buildVisits = async (
     getImagePublicUrl
   );
   const visitTripsByTripId = await buildVisitTripsByTripId(database, visitRows, includeDraftTrips);
+  const trailsByVisitId = await getVisitTrails(database, visitIds);
 
   return visitRows.map((visit) => {
     const trip = visit.tripId === null ? null : (visitTripsByTripId.get(visit.tripId) ?? null);
@@ -1992,7 +1999,8 @@ const buildVisits = async (
       visit,
       visitImagesByVisitId.get(visit.id)!,
       trip,
-      visit.tripId !== null && trip === null ? null : visit.tripStopOrder
+      visit.tripId !== null && trip === null ? null : visit.tripStopOrder,
+      trailsByVisitId.get(visit.id) ?? []
     );
   });
 };
@@ -4747,6 +4755,120 @@ export const createTripRouteWaypoint = async (
   });
 };
 
+const getVisitTrails = async (database: DbClient, visitIds: number[]) => {
+  const byVisit = new Map<number, { id: number; name: string; slug: string }[]>();
+  if (visitIds.length === 0) return byVisit;
+  const rows = await database
+    .select({ visitId: visitTrails.visitId, id: parks.id, name: parks.name, slug: parks.slug })
+    .from(visitTrails)
+    .innerJoin(parks, eq(parks.id, visitTrails.trailId))
+    .where(inArray(visitTrails.visitId, visitIds))
+    .orderBy(asc(parks.name), asc(parks.id));
+  for (const { visitId, ...trail } of rows) {
+    const trails = byVisit.get(visitId) ?? [];
+    trails.push(trail);
+    byVisit.set(visitId, trails);
+  }
+  return byVisit;
+};
+
+const replaceVisitTrails = async (
+  database: DbClient,
+  visitId: number,
+  parkId: number,
+  trailIds: number[],
+  timestamp: string
+) => {
+  const ids = [...new Set(trailIds)];
+  if (ids.length > 0) {
+    const eligible = new Set(
+      (await listAreaTrails(database, parkId))
+        .filter((trail) => trail.effective)
+        .map((trail) => trail.trailId)
+    );
+    if (ids.some((id) => !eligible.has(id)))
+      throw new RepositoryValidationError(
+        'Only trails linked to this park can be attached to a visit.'
+      );
+    // A recorded visit pins membership across later geometry/import changes.
+    await database
+      .update(trailAreaLinks)
+      .set({ override: 'include', updatedAt: timestamp })
+      .where(and(eq(trailAreaLinks.areaId, parkId), inArray(trailAreaLinks.trailId, ids)));
+  }
+  await database.delete(visitTrails).where(eq(visitTrails.visitId, visitId));
+  if (ids.length > 0)
+    await database.insert(visitTrails).values(ids.map((trailId) => ({ visitId, trailId })));
+};
+
+type VisitTrailBackfillVisit = {
+  visitId: number;
+  visitedOn: string;
+  parkSlug: string;
+  route: string;
+};
+
+export const backfillVisitTrails = async (database: Database, dryRun: boolean) =>
+  database.transaction(async (tx) => {
+    const visits = await tx
+      .select({
+        visitId: parkVisits.id,
+        visitedOn: parkVisits.visitedOn,
+        parkId: parkVisits.parkId,
+        parkSlug: parks.slug,
+        route: sql<string>`${parkVisits.route}`
+      })
+      .from(parkVisits)
+      .innerJoin(parks, eq(parks.id, parkVisits.parkId))
+      .where(sql`length(${parkVisits.route}) > 0`)
+      .orderBy(asc(parks.id), asc(parkVisits.id));
+    const existing = await getVisitTrails(
+      tx,
+      visits.map((visit) => visit.visitId)
+    );
+    const choices = new Map<number, Awaited<ReturnType<typeof listAreaTrails>>>();
+    const added: (VisitTrailBackfillVisit & { trailId: number })[] = [];
+    const ambiguous: (VisitTrailBackfillVisit & { trailIds: number[] })[] = [];
+    let alreadyLinked = 0;
+    let unmatched = 0;
+    const timestamp = new Date().toISOString();
+    for (const { parkId, ...visit } of visits) {
+      let trails = choices.get(parkId);
+      if (!trails) {
+        trails = (await listAreaTrails(tx, parkId)).filter((trail) => trail.effective);
+        choices.set(parkId, trails);
+      }
+      const matches = trails.filter((trail) => trail.name === visit.route);
+      if (matches.length === 0) {
+        unmatched += 1;
+        continue;
+      }
+      if (matches.length > 1) {
+        ambiguous.push({ ...visit, trailIds: matches.map((trail) => trail.trailId) });
+        continue;
+      }
+      const trailId = matches[0]!.trailId;
+      if (existing.get(visit.visitId)?.some((trail) => trail.id === trailId)) {
+        alreadyLinked += 1;
+        continue;
+      }
+      added.push({ ...visit, trailId });
+      if (!dryRun) {
+        await tx
+          .update(trailAreaLinks)
+          .set({ override: 'include', updatedAt: timestamp })
+          .where(and(eq(trailAreaLinks.areaId, parkId), eq(trailAreaLinks.trailId, trailId)));
+        await tx.insert(visitTrails).values({ visitId: visit.visitId, trailId });
+        await tx
+          .update(parkVisits)
+          .set({ updatedAt: timestamp })
+          .where(eq(parkVisits.id, visit.visitId));
+      }
+    }
+    if (!dryRun && added.length > 0) await bumpPublicVisitDataVersion(tx, timestamp);
+    return { dryRun, added, ambiguous, alreadyLinked, unmatched };
+  });
+
 export const createVisit = async (database: Database, slug: string, input: PutVisitInput) => {
   const park = await getParkRecordBySlug(database, slug);
 
@@ -4789,6 +4911,9 @@ export const createVisit = async (database: Database, slug: string, input: PutVi
         .returning()
     )[0]!;
 
+    if (input.trailIds !== undefined)
+      await replaceVisitTrails(tx, row.id, park.id, input.trailIds, timestamp);
+    const trails = (await getVisitTrails(tx, [row.id])).get(row.id) ?? [];
     await bumpPublicVisitDataVersion(tx, timestamp);
 
     if (row.tripId !== null && !row.excludeFromRoute) {
@@ -4798,7 +4923,7 @@ export const createVisit = async (database: Database, slug: string, input: PutVi
     const trip =
       row.tripId === null ? null : toTripReference((await getTripRecordById(tx, row.tripId))!);
 
-    return toVisit(row, [], trip);
+    return toVisit(row, [], trip, row.tripStopOrder, trails);
   });
 };
 
@@ -5373,6 +5498,8 @@ export const updateVisit = async (database: Database, visitId: number, input: Up
   const timestamp = new Date().toISOString();
 
   return database.transaction(async (tx) => {
+    if (input.trailIds !== undefined)
+      await replaceVisitTrails(tx, visitId, existingVisit.parkId, input.trailIds, timestamp);
     const resolvedTripId = nextTripId === undefined ? existingVisit.tripId : nextTripId;
     if (resolvedTripId !== existingVisit.tripId && existingVisit.tripId !== null) {
       const imageRows = await tx
@@ -5463,7 +5590,8 @@ export const updateVisit = async (database: Database, visitId: number, input: Up
         ? null
         : toTripReference((await getTripRecordById(tx, updatedVisit.tripId))!);
 
-    return toVisit(updatedVisit, [], trip);
+    const trails = (await getVisitTrails(tx, [visitId])).get(visitId) ?? [];
+    return toVisit(updatedVisit, [], trip, updatedVisit.tripStopOrder, trails);
   });
 };
 

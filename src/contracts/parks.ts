@@ -281,6 +281,12 @@ export const completeDirectVisitImageUploadResponseSchema = z.object({
   image: visitImageSchema
 });
 
+export const visitTrailSchema = z.object({
+  id: z.number().int(),
+  name: z.string(),
+  slug: z.string()
+});
+
 export const visitSchema = z.object({
   author: z.string().nullable(),
   createdAt: z.string(),
@@ -290,6 +296,7 @@ export const visitSchema = z.object({
   location: pointSchema.nullable(),
   note: z.string().nullable(),
   route: z.string().nullable(),
+  trails: z.array(visitTrailSchema).optional(),
   status: z.enum(['draft', 'published']).optional(),
   trip: visitTripSchema.nullable(),
   tripStopOrder: z.number().int().positive().nullable(),
@@ -622,6 +629,7 @@ export const adminVisitListResponseSchema = z.object({
 export const adminParkVisitsResponseSchema = adminVisitListResponseSchema;
 
 export const createVisitRequestSchema = z.object({
+  trailIds: z.array(z.number().int().positive()).max(500).optional(),
   author: z.string().max(50).nullable().optional(),
   excludeFromRoute: z.boolean().optional(),
   location: pointSchema.nullable().optional(),
@@ -698,6 +706,7 @@ export const updateVisitRequestSchema = createVisitRequestSchema
   .partial()
   .refine(
     (input) =>
+      input.trailIds !== undefined ||
       input.author !== undefined ||
       input.excludeFromRoute !== undefined ||
       input.location !== undefined ||

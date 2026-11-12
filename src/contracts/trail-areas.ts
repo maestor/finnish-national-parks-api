@@ -25,3 +25,9 @@ export const trailAreaValidationFailureSchema = z.object({
 });
 
 export const trailLinkedAreaSchema = z.object({ name: z.string(), slug: z.string() });
+
+export const trailVisitConflictSchema = z.object({
+  error: z.string(),
+  code: z.literal('TRAIL_HAS_VISITS'),
+  visits: z.array(z.object({ id: z.number().int(), visitedOn: z.string() }))
+});
