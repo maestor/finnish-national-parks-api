@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray, isNotNull, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, isNotNull, or, sql } from 'drizzle-orm';
 
 import type { GeoJsonFeatureCollection } from '../importer/geometry.js';
 import { isTrailTypeCode } from '../parks/park-types.js';
@@ -9,11 +9,17 @@ import {
   parks,
   parkVisits,
   publicDataVersions,
-  trailAreaLinks
+  trailAreaLinks,
+  visitTrails
 } from './schema.js';
 
 const trailTypes = [4403, 4404, 4405];
 export class TrailAreaValidationError extends Error {}
+export class TrailVisitConflictError extends Error {
+  constructor(public visits: { id: number; visitedOn: string }[]) {
+    super('Trail is linked to visits; review those visits before unlinking.');
+  }
+}
 
 export const findEligibleArea = async (database: DbClient, slug: string) => {
   const area = (await database.select().from(parks).where(eq(parks.slug, slug)).limit(1))[0];
@@ -156,6 +162,15 @@ export const setAreaTrailOverride = async (
     const area = await findEligibleArea(tx, slug);
     const trail = (await tx.select().from(parks).where(eq(parks.id, trailId)).limit(1))[0];
     if (!area || !trail) return null;
+    if (override === 'exclude') {
+      const visits = await tx
+        .select({ id: parkVisits.id, visitedOn: parkVisits.visitedOn })
+        .from(visitTrails)
+        .innerJoin(parkVisits, eq(parkVisits.id, visitTrails.visitId))
+        .where(and(eq(parkVisits.parkId, area.id), eq(visitTrails.trailId, trailId)))
+        .orderBy(desc(parkVisits.visitedOn), desc(parkVisits.id));
+      if (visits.length > 0) throw new TrailVisitConflictError(visits);
+    }
     const source = (
       await tx.select().from(osmTrailSources).where(eq(osmTrailSources.trailId, trail.id)).limit(1)
     )[0];

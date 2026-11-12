@@ -42,6 +42,21 @@ The backfill reads image metadata only, requires no storage credentials, and sav
 
 The output lists affected slugs. After applying, expire those frontend `public-park:{slug}` caches using the UI's authenticated public-cache revalidation flow with `parkSlug` and `expireImmediately: true` to show the photos immediately. The command updates API ETags but does not call the UI or clear its caches itself.
 
+## Backfill Visit Trails
+
+After applying migration `0050_visit_trails.sql` and importing/linking the relevant park trails, preview the one-time conversion of existing route text into visit-trail assignments:
+
+```sh
+npm run visit:backfill-trails -- --dry-run
+npm run visit:backfill-trails
+```
+
+The command uses the configured `DATABASE_URL` and optional `DATABASE_AUTH_TOKEN`, requires all migrations to be current, and never applies migrations itself. Preview mode makes no writes. Matching is character-for-character against the trail name, including case, whitespace and accents; no trimming, substring matching, route splitting or slug matching is performed. A trail must be an effective, active supported member of that visit's own park. Multiple eligible trails with the same name are skipped and listed for manual review. Both draft and published visits, including visits at hidden parks, are eligible.
+
+Applying adds only missing associations, preserving existing trails, the original route text, notes, publication status, coordinates and trip routing. It pins the matched membership with an inclusion override, updates each changed visit's timestamp, and bumps the public visit-data version once. All changes share one transaction and roll back together on failure. Reruns skip existing associations and make no writes when nothing new matches. Output lists proposed/applied visit IDs, trail IDs, affected park slugs, and counts of already linked, unmatched and ambiguous visits. Visits with null/empty route text are omitted from the scan.
+
+After applying, immediately expire the listed frontend `public-park:{slug}` caches through the authenticated UI cache flow (`parkSlug`, `expireImmediately: true`; or `parkSlugs` in batches of at most 500). The script does not contact the UI or clear its caches.
+
 ## Security And Sustainability Baseline
 
 - Route naming is not the auth policy. Catalog and visit `GET` data is public from an end-user perspective when accessed through the Reissuvihko UI, but the backend remains a separate API boundary: frontend-facing `/api/*` routes generally require the server-side API key outside localhost when `API_KEY` is configured, including `GET /api/year-review/shares/:shareId` for server-rendered share pages.
@@ -296,6 +311,9 @@ npm run db:backup -- before-import
 ```
 
 ## API Contract
+
+- Visit writes accept optional `trailIds` (positive IDs, at most 500; duplicates deduplicated). Only effective trails of the visit's own park may be attached; omission preserves assignments on PATCH and `[]` clears them. Responses include lightweight `trails` (`id`, `name`, `slug`), with the contract optional during cached-response rollout. Assignment writes and validation are transactional and leave `route`, coordinates, trip stop order and route-cache rules unchanged. `GET /api/admin/parks/:slug/visit-trails` returns private/no-store choices, including effective membership independently of map geometry; standalone trails return an empty list.
+- Migration `0050_visit_trails.sql` adds visit-trail assignments with cascade cleanup on visit deletion and database guards against unlinking used memberships or moving a visit to a park without those trails. Saving assignments pins their memberships with an inclusion override so LIPAS/OSM geometry reconciliation cannot remove them. `DELETE /api/admin/parks/:slug/trails/:trailId` returns private/no-store `409` with `code: TRAIL_HAS_VISITS` and blocking visit IDs/dates for this park, covering both drafts and published visits. Detach every blocking assignment before retrying. API migration/deployment precedes UI rollout; immediately expire public park detail caches on rollout and after assignment edits.
 
 The API uses Zod schemas as the contract source of truth with OpenAPI exposed at `GET /openapi.json`.
 

@@ -4,7 +4,8 @@ import {
   trailAreaCandidateSchema,
   trailAreaLinkSchema,
   trailAreaValidationFailureSchema,
-  trailLinkedAreaSchema
+  trailLinkedAreaSchema,
+  trailVisitConflictSchema
 } from '../contracts/trail-areas.js';
 
 const params = z.object({ slug: z.string() });
@@ -40,6 +41,21 @@ export const listAreaTrailsRoute = createRoute({
   responses: {
     200: {
       description: 'Trail links and overrides',
+      content: {
+        'application/json': { schema: z.object({ trails: z.array(trailAreaLinkSchema) }) }
+      }
+    },
+    ...errors
+  }
+});
+export const listVisitTrailChoicesRoute = createRoute({
+  ...common,
+  method: 'get',
+  path: '/api/admin/parks/{slug}/visit-trails',
+  request: { params },
+  responses: {
+    200: {
+      description: 'Park trail choices for visit editing; empty for standalone trails',
       content: {
         'application/json': { schema: z.object({ trails: z.array(trailAreaLinkSchema) }) }
       }
@@ -108,6 +124,10 @@ export const removeAreaTrailRoute = createRoute({
   path: '/api/admin/parks/{slug}/trails/{trailId}',
   request: { params: linkParams },
   responses: {
+    409: {
+      description: 'Visits still use this trail in this area',
+      content: { 'application/json': { schema: trailVisitConflictSchema } }
+    },
     200: {
       description: 'Manually excluded trail',
       content: { 'application/json': { schema: trailAreaLinkSchema } }
