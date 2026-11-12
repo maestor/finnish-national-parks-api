@@ -136,6 +136,11 @@ try {
     `${dryRun ? 'Dry run — would import or update' : 'Imported or updated'} ${changed.length} trails:`
   );
   for (const trail of changed) printTrail(trail);
+  for (const trail of report.mergedTrails)
+    console.log(
+      `- ${trail.name} [${trail.slug}]: ${dryRun ? 'would refresh' : 'refreshed'} merged source geometry (${trail.lengthKm?.toFixed(3) ?? 'unknown'} km).`
+    );
+  for (const warning of report.mergedWarnings) console.error(warning);
   const retired = report.excluded.filter((trail) => retiredIds.has(trail.id));
   if (retired.length) {
     console.log(`\n${dryRun ? 'Would retire' : 'Retired'} ${retired.length} trails over 100 km:`);

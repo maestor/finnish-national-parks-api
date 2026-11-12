@@ -10,6 +10,7 @@ import {
 } from '../db/schema.js';
 import { isTrailTypeCode } from '../parks/park-types.js';
 import { deriveBoundingBox, type GeoJsonFeatureCollection } from './geometry.js';
+import { applyMergedTrailRefresh, prepareMergedTrailRefresh } from './refresh-merged-trails.js';
 import {
   exceedsTrailLengthLimit,
   measureTrailAreaOverlap,
@@ -119,6 +120,7 @@ export const importOsmTrails = async ({
   dryRun?: boolean;
   beforeApply?: () => Promise<void>;
 }) => {
+  const mergedRefresh = await prepareMergedTrailRefresh(database, snapshot);
   const { boundaryGeojson: geometryColumn, ...columns } = getTableColumns(parks);
   const metadata = await database
     .select({ ...columns, geometryBytes: sql<number>`length(cast(${geometryColumn} as blob))` })
@@ -204,6 +206,7 @@ export const importOsmTrails = async ({
     .sort((a, b) => (b.length ?? 0) - (a.length ?? 0) || a.route.id - b.route.id);
   for (const { route, length, bounds } of prepared) {
     const prior = byRelation.get(route.id);
+    if (prior && mergedRefresh.memberIds.includes(prior.id)) continue;
     const effective =
       prior && prior.lengthKm !== prior.importedLengthKm ? prior.lengthKm : route.reportedLengthKm;
     const reject = (reason: string, containingTrails: string[] = []) =>
@@ -301,16 +304,21 @@ export const importOsmTrails = async ({
       );
     });
   });
-  if (!dryRun && (changed.length || retire.length)) {
+  if (!dryRun && (changed.length || retire.length || mergedRefresh.plans.length)) {
     await beforeApply();
     await database.transaction(async (tx) => {
+      if (
+        JSON.stringify(await prepareMergedTrailRefresh(tx, snapshot)) !==
+        JSON.stringify(mergedRefresh)
+      )
+        throw new Error('Merged trail data changed during import; retry the dry run.');
       const timestamp = new Date().toISOString();
       const run = (
         await tx
           .insert(importRuns)
           .values({
             sourceUrl: 'https://www.openstreetmap.org/',
-            activeCount: changed.length + retire.length,
+            activeCount: changed.length + retire.length + mergedRefresh.plans.length,
             importedAt: timestamp,
             responseShapeVersion: 'osm-linked-trails-v1'
           })
@@ -453,6 +461,7 @@ export const importOsmTrails = async ({
               }
             });
       }
+      await applyMergedTrailRefresh(tx, mergedRefresh, timestamp);
       await tx
         .insert(publicDataVersions)
         .values({ key: 'public-visits', version: 1, updatedAt: timestamp })
@@ -464,6 +473,7 @@ export const importOsmTrails = async ({
   }
   const affectedSlugs = [
     ...new Set([
+      ...mergedRefresh.plans.flatMap((plan) => plan.affectedSlugs),
       ...changed.flatMap((item) => {
         const prior = byRelation.get(item.id);
         return [
@@ -487,6 +497,12 @@ export const importOsmTrails = async ({
     ])
   ];
   return {
+    mergedTrails: mergedRefresh.plans.map((plan) => ({
+      slug: plan.canonical.slug,
+      name: plan.canonical.name,
+      lengthKm: plan.lengthKm
+    })),
+    mergedWarnings: mergedRefresh.warnings,
     imported,
     excluded,
     affectedSlugs,

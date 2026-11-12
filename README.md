@@ -36,6 +36,7 @@ npm run import:parks
 npm run import:special-parks
 npm run import:special-parks -- <special-park-slug> [<special-park-slug> ...]
 npm run import:osm-trails -- --dry-run
+npm run trails:merge -- --from <source-slug> --to <destination-slug> [--name <new-name>] --dry-run
 npm run park:move-visits -- (--from <source-slug> | --visit-id <visit-id>) --to <target-slug> [--dry-run]
 npm run park:logo -- <park-slug>
 npm run db:backup
@@ -104,6 +105,7 @@ Production notes:
 - `npm run visit:backfill-trails [-- --dry-run]` adds a trail to a visit when its route text exactly matches one effective linked trail of that park. Existing assignments and route text are preserved; ambiguous names are reported for review. See [the one-time backfill workflow](docs/development.md#backfill-visit-trails).
 - `npm run import:osm-trails -- --dry-run` fetches and previews supplemental OSM trails; see [the OSM import workflow](docs/importing.md#supplemental-openstreetmap-trails) before applying.
 - `npm run trails:retire-long -- --dry-run` previews retirement of trails whose measured geometry or reported catalog length exceeds 100 km. See [the length-limit and apply/cache-expiry procedure](docs/importing.md#maximum-trail-length).
+- `npm run trails:merge -- --from <source-slug> --to <destination-slug> [--name <new-name>] [--dry-run]` combines two OSM-backed linked trails and transfers their visit assignments. A new name also generates a new destination slug. See [the manual merge workflow](docs/development.md#merge-linked-trails) before applying.
 - `npm run park:logo -- <park-slug>` uploads either `data/logos/<park-slug>.png` or, when multiple parks share one `displayTypeName`, `data/logos/display-types/<normalized-display-type>.png`. Shared display-type logos are stored once under `logos/display-types/` in R2 and linked from every matching park row. When `PUBLIC_API_BASE_URL` is set, park APIs expose stable versioned logo URLs through `GET /assets/logos/*`; those redirects are cached for one day, shorter than their seven-day presigned targets. Public visit, trip-stop, trip, review, and park-map media use stable `GET /assets/media/*` URLs that redirect through the private bucket. Otherwise APIs fall back to presigned media URLs for local development.
 
 The importer's LIPAS source URL and supported type-code list are internal configuration, not a normal `.env` setting.
