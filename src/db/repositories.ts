@@ -1445,7 +1445,10 @@ const toTripItineraryVisitEntry = (row: TripDetailVisitRow) => {
   };
 };
 
-const toPublicTripItineraryVisitEntry = (row: PublicTripDetailVisitRow) => {
+const toPublicTripItineraryVisitEntry = (
+  row: PublicTripDetailVisitRow,
+  trails: { id: number; name: string; slug: string }[]
+) => {
   const markerPoint = toOptionalMarkerPoint(row) ?? {
     lat: row.markerLat,
     lon: row.markerLon
@@ -1469,6 +1472,7 @@ const toPublicTripItineraryVisitEntry = (row: PublicTripDetailVisitRow) => {
         typeLabel: resolveTypeLabel(row)
       },
       route: row.route,
+      trails,
       updatedAt: row.updatedAt,
       visitedOn: row.visitedOn
     }
@@ -3434,9 +3438,15 @@ export const getPublicTripBySlug = async (
     database,
     tripStopRows.map((row) => row.id)
   );
+  const visitTrailsById = await getVisitTrails(
+    database,
+    tripVisitRows.map((row) => row.id)
+  );
 
   const itinerary = [
-    ...tripVisitRows.map((row) => toPublicTripItineraryVisitEntry(row)),
+    ...tripVisitRows.map((row) =>
+      toPublicTripItineraryVisitEntry(row, visitTrailsById.get(row.id) ?? [])
+    ),
     ...tripStopRows.map((row) =>
       toPublicTripItineraryStopEntry(row, resolvedTripStopImageCounts.get(row.id) ?? 0)
     )
@@ -3489,8 +3499,14 @@ export const getAdminTripPreviewById = async (
     database,
     tripStopRows.map((row) => row.id)
   );
+  const visitTrailsById = await getVisitTrails(
+    database,
+    tripVisitRows.map((row) => row.id)
+  );
   const itinerary = [
-    ...tripVisitRows.map((row) => toPublicTripItineraryVisitEntry(row)),
+    ...tripVisitRows.map((row) =>
+      toPublicTripItineraryVisitEntry(row, visitTrailsById.get(row.id) ?? [])
+    ),
     ...tripStopRows.map((row) =>
       toPublicTripItineraryStopEntry(row, resolvedTripStopImageCounts.get(row.id) ?? 0)
     )
