@@ -389,7 +389,8 @@ export const publicTripVisitParkSchema = visitParkSchema.extend({
 
 export const publicTripItineraryVisitSchema = tripItineraryVisitSchema.extend({
   imageCount: z.number().int(),
-  park: publicTripVisitParkSchema
+  park: publicTripVisitParkSchema,
+  trails: z.array(visitTrailSchema).optional()
 });
 
 export const publicTripItineraryVisitEntrySchema = z.object({

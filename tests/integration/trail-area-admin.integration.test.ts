@@ -67,6 +67,33 @@ describe('admin trail relationships', () => {
   afterEach(async () => {
     await db.dispose();
   });
+  it('includes linked visit trails in public trips and admin previews', async () => {
+    const app = createApp({ auth, database: db.database });
+    const trail = (await db.database.select().from(parks).where(eq(parks.lipasId, 440401)))[0]!;
+    const slug = 'akasmannyn-kansallispuisto';
+    await db.database.update(parks).set({ removed: false }).where(eq(parks.slug, slug));
+    const headers = { cookie, 'content-type': 'application/json' };
+    await app.request(`/api/admin/parks/${slug}/trails/${trail.id}`, { method: 'PUT', headers });
+    const trip = await createTrip(db.database, { name: 'Testiretki', status: 'published' });
+    const response = await app.request(`/api/parks/${slug}/visits`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        visitedOn: '2026-11-12',
+        status: 'published',
+        tripId: trip.id,
+        trailIds: [trail.id]
+      })
+    });
+    expect(response.status).toBe(201);
+    for (const path of [`/api/trips/slug/${trip.slug}`, `/api/admin/trips/${trip.id}/preview`]) {
+      const result = await app.request(path, { headers });
+      expect(result.status).toBe(200);
+      expect(await result.json()).toMatchObject({
+        itinerary: [{ visit: { trails: [{ id: trail.id, name: trail.name, slug: trail.slug }] } }]
+      });
+    }
+  });
   it('roundtrips visit trails and blocks unlink until every draft and published visit releases it', async () => {
     const app = createApp({ auth, database: db.database });
     const trail = (await db.database.select().from(parks).where(eq(parks.lipasId, 440401)))[0]!;
