@@ -3,7 +3,13 @@ import { createHash } from 'node:crypto';
 import { and, eq, inArray, sql } from 'drizzle-orm';
 
 import type { DbClient } from '../db/database.js';
-import { osmTrailSources, parks, parkVisits, trailAreaLinks } from '../db/schema.js';
+import {
+  curatedTrailSources,
+  osmTrailSources,
+  parks,
+  parkVisits,
+  trailAreaLinks
+} from '../db/schema.js';
 import { isTrailTypeCode } from '../parks/park-types.js';
 import type { GeoJsonFeatureCollection } from './geometry.js';
 import {
@@ -227,6 +233,10 @@ export const reconcileTrailAreas = async (database: DbClient, timestamp: string)
       (row) => row.id
     )
   );
+  for (const row of await database
+    .select({ id: curatedTrailSources.trailId })
+    .from(curatedTrailSources))
+    osmTrailIds.add(row.id);
   for (const link of links) {
     if (osmTrailIds.has(link.trailId)) continue;
     if (seen.has(`${link.trailId}:${link.areaId}`) || !link.automaticMatch) continue;

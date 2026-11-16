@@ -2,6 +2,7 @@ import { and, eq, getTableColumns, inArray, isNull, sql } from 'drizzle-orm';
 import proj4 from 'proj4';
 import type { Database } from '../db/database.js';
 import {
+  curatedTrailSources,
   importRuns,
   osmTrailSources,
   parks,
@@ -111,7 +112,7 @@ const overlaps = (
 
 export const importOsmTrails = async ({
   database,
-  snapshot,
+  snapshot: incomingSnapshot,
   dryRun = false,
   beforeApply = async () => {}
 }: {
@@ -120,6 +121,20 @@ export const importOsmTrails = async ({
   dryRun?: boolean;
   beforeApply?: () => Promise<void>;
 }) => {
+  const selected = await database
+    .select({ trailId: curatedTrailSources.trailId })
+    .from(curatedTrailSources);
+  const selectedIds = new Set(selected.map((row) => row.trailId));
+  const selectedRelations = (await database.select().from(osmTrailSources)).filter((source) =>
+    selectedIds.has(source.trailId)
+  );
+  const selectedByRelation = new Map(
+    selectedRelations.map((source) => [source.relationId, source.trailId])
+  );
+  const snapshot = {
+    ...incomingSnapshot,
+    routes: incomingSnapshot.routes.filter((route) => !selectedByRelation.has(route.id))
+  };
   const mergedRefresh = await prepareMergedTrailRefresh(database, snapshot);
   const { boundaryGeojson: geometryColumn, ...columns } = getTableColumns(parks);
   const metadata = await database
@@ -148,6 +163,14 @@ export const importOsmTrails = async ({
     ...row,
     boundaryGeojson: geometries.get(row.id)!
   }));
+  const selectedWarnings = incomingSnapshot.routes.flatMap((route) => {
+    const trail = records.find((park) => park.id === selectedByRelation.get(route.id));
+    return trail && trail.boundaryGeojson !== JSON.stringify(route.geometry)
+      ? [
+          `${trail.slug}: OSM ${route.id} differs from the selected snapshot; retaining accepted geometry.`
+        ]
+      : [];
+  });
   const sources = await database.select().from(osmTrailSources);
   const byRelation = new Map(
     sources.map((s) => [s.relationId, records.find((p) => p.id === s.trailId)!])
@@ -307,6 +330,14 @@ export const importOsmTrails = async ({
   if (!dryRun && (changed.length || retire.length || mergedRefresh.plans.length)) {
     await beforeApply();
     await database.transaction(async (tx) => {
+      const currentSelected = await tx
+        .select({ trailId: curatedTrailSources.trailId })
+        .from(curatedTrailSources);
+      if (
+        JSON.stringify(currentSelected.map((row) => row.trailId).sort((a, b) => a - b)) !==
+        JSON.stringify(selected.map((row) => row.trailId).sort((a, b) => a - b))
+      )
+        throw new Error('Selected trail ownership changed during import; retry the dry run.');
       if (
         JSON.stringify(await prepareMergedTrailRefresh(tx, snapshot)) !==
         JSON.stringify(mergedRefresh)
@@ -502,7 +533,7 @@ export const importOsmTrails = async ({
       name: plan.canonical.name,
       lengthKm: plan.lengthKm
     })),
-    mergedWarnings: mergedRefresh.warnings,
+    mergedWarnings: [...mergedRefresh.warnings, ...selectedWarnings],
     imported,
     excluded,
     affectedSlugs,

@@ -99,7 +99,8 @@ describe('migrateDatabase', () => {
       '0048_trail_length.sql',
       '0049_osm_trails.sql',
       '0050_visit_trails.sql',
-      '0051_trail_merges.sql'
+      '0051_trail_merges.sql',
+      '0052_curated_trail_sources.sql'
     ]);
     expect(parkTypes.rows.map((row) => String(row.slug))).toEqual([
       'outdoor-recreation-area',
@@ -122,6 +123,17 @@ describe('migrateDatabase', () => {
     expect(parkColumns.rows.some((row) => String(row.name) === 'trail_publication_role')).toBe(
       true
     );
+    const selectedSourceColumns = await client.execute('PRAGMA table_info(curated_trail_sources)');
+    expect(selectedSourceColumns.rows.map((row) => String(row.name))).toEqual([
+      'selection_key',
+      'trail_id',
+      'source_kind',
+      'manifest_hash',
+      'geometry_hash',
+      'source_timestamp',
+      'source_urls_json',
+      'provenance_json'
+    ]);
     const linkColumns = await client.execute('PRAGMA table_info(trail_area_links)');
     expect(linkColumns.rows.map((row) => String(row.name))).toEqual(
       expect.arrayContaining([
@@ -327,7 +339,8 @@ describe('migrateDatabase', () => {
       '0048_trail_length.sql',
       '0049_osm_trails.sql',
       '0050_visit_trails.sql',
-      '0051_trail_merges.sql'
+      '0051_trail_merges.sql',
+      '0052_curated_trail_sources.sql'
     ]);
     expect(schemaMigrationTableBeforeApply.rows).toEqual([]);
     expect(pendingAfterApply).toEqual([]);
