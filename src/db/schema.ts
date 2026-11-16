@@ -531,6 +531,20 @@ export const osmTrailSources = sqliteTable('osm_trail_sources', {
   sourceTimestamp: text('source_timestamp').notNull()
 });
 
+export const curatedTrailSources = sqliteTable('curated_trail_sources', {
+  selectionKey: text('selection_key').primaryKey(),
+  trailId: integer('trail_id')
+    .notNull()
+    .unique()
+    .references(() => parks.id),
+  sourceKind: text('source_kind', { enum: ['osm-relation', 'osm-way-selection'] }).notNull(),
+  manifestHash: text('manifest_hash').notNull(),
+  geometryHash: text('geometry_hash').notNull(),
+  sourceTimestamp: text('source_timestamp').notNull(),
+  sourceUrlsJson: text('source_urls_json').notNull(),
+  provenanceJson: text('provenance_json').notNull()
+});
+
 export const trailMergeGroups = sqliteTable('trail_merge_groups', {
   trailId: integer('trail_id')
     .primaryKey()

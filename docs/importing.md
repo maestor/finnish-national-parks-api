@@ -115,6 +115,27 @@ https://www.openstreetmap.org/copyright. Retain the source snapshot and review
 ODbL obligations for public distribution of the resulting database before
 publishing imported data.
 
+### Selected linked trails
+
+Migration `0052_curated_trail_sources.sql` registers the approved November 2026 snapshot: 25 OSM way selections and two real OSM relations, across 11 existing parent areas. The tracked manifest and linework in `src/importer/selected-trails/` are the sole source; reads and this command never contact OSM. Geometry hashes, source identities and the manifest hash are checked before writes. The selection preserves branches and clipped lines. Nominal walking distance is separate from measured unique line length; networks without an agreed traversal retain a null displayed length.
+
+Set the intended `DATABASE_URL` and optional `DATABASE_AUTH_TOKEN`, verify a backup and apply pending migrations through the normal deployment workflow. The command checks for pending migrations and never applies them:
+
+```sh
+npm run import:selected-trails -- --selection visited-trails-2026-11 --dry-run
+npm run import:selected-trails -- --selection visited-trails-2026-11
+```
+
+The normal report groups trails by parent area and summarizes additions, updates and unchanged entries. Use `--json` for the complete source identities, geometry hashes, distant namesakes and affected cache slugs. To save a clean JSON preview, run:
+
+```sh
+DOTENV_CONFIG_QUIET=true npm run --silent import:selected-trails -- --selection visited-trails-2026-11 --dry-run --json > selected-trails-preview.json
+```
+
+Review the preview's manifest hash, all 27 identities and hashes, 11 resolved parents, actions and affected slugs before applying the identical files. Missing/inactive parents, nearby same-name trails or same-name trails linked to the selected parent, changed snapshots, selected link exclusions, merged sources and independent trails with direct visits abort the batch. Name collisions use a conservative bounding-box margin of 0.1° latitude and 0.3° longitude; unrelated distant namesakes are listed in `distantNamesakes` and are never reused or changed. Only matching relation-owned rows can be reused; other ambiguous candidates need an explicit preservation decision. The transaction preserves visits, photos, existing unrelated links and administrator name/length edits. New rows are linked-only and hidden as standalone destinations. An unchanged rerun writes nothing and reports no affected slugs.
+
+After applying, immediately expire every reported UI park cache through the authenticated cache-clear workflow; API version changes do not invalidate Next.js caches; offline storage behavior is unchanged. Retain the report and manifest hash as operator evidence. Regular LIPAS/special-area reconciliation preserves selected membership, and regular OSM discovery reports relation geometry drift while retaining the accepted snapshot. Revision of the accepted snapshot requires a separate reviewed implementation; selected snapshots cannot enter manual merges. Source attribution and ODbL links remain in the public contract. Deploy the migration and API first, followed by the generated UI consumer. Do not apply this batch to a target database without the operational preview and backup.
+
 ### Merged OSM trail refresh
 
 Maintainers can [merge linked OSM trails manually](development.md#merge-linked-trails) after migration `0051_trail_merges.sql`. Original relation identities and raw component snapshots remain separate from the destination's combined geometry. The public linked-trail `source.relations` array lists every contributing relation ID and URL; existing singular `relationId`/`sourceUrl` fields still identify the destination's primary source.

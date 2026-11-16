@@ -12,6 +12,7 @@ import { createParkSlug } from '../parks/park-normalization.js';
 import { isTrailTypeCode } from '../parks/park-types.js';
 import type { Database, DbClient } from './database.js';
 import {
+  curatedTrailSources,
   osmTrailSources,
   parks,
   parkVisits,
@@ -215,6 +216,16 @@ export const mergeTrails = async (database: Database, input: MergeTrailsInput) =
     if (from.id === destination.id)
       throw new Error('Source and destination must be different trails.');
     const pair = [from, destination];
+    const selectedSources = await tx
+      .select({ trailId: curatedTrailSources.trailId })
+      .from(curatedTrailSources)
+      .where(
+        inArray(
+          curatedTrailSources.trailId,
+          pair.map((p) => p.id)
+        )
+      );
+    if (selectedSources.length) throw new Error('Selected trail snapshots cannot be merged.');
     const sources = await tx
       .select()
       .from(osmTrailSources)

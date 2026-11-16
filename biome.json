@@ -43,7 +43,7 @@
   },
   "overrides": [
     {
-      "includes": ["**/src/importer/data/**/*.json"],
+      "includes": ["**/src/importer/data/**/*.json", "**/src/importer/selected-trails/*.json"],
       "formatter": {
         "enabled": false
       }

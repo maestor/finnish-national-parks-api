@@ -163,21 +163,29 @@ export const parkDetailSchema = parkListItemSchema.extend({
         address: z.string().nullable(),
         lengthKm: z.number().nullable(),
         source: z
-          .object({
-            type: z.literal('openstreetmap'),
-            relationId: z.number().int().positive(),
-            attribution: z.string(),
-            licenseUrl: z.string().url(),
-            sourceUrl: z.string().url(),
-            relations: z
-              .array(
-                z.object({
-                  relationId: z.number().int().positive(),
-                  sourceUrl: z.string().url()
-                })
-              )
-              .optional()
-          })
+          .union([
+            z.object({
+              type: z.literal('openstreetmap'),
+              relationId: z.number().int().positive(),
+              attribution: z.string(),
+              licenseUrl: z.string().url(),
+              sourceUrl: z.string().url(),
+              relations: z
+                .array(
+                  z.object({
+                    relationId: z.number().int().positive(),
+                    sourceUrl: z.string().url()
+                  })
+                )
+                .optional()
+            }),
+            z.object({
+              type: z.literal('openstreetmap-curated'),
+              attribution: z.string(),
+              licenseUrl: z.string().url(),
+              sourceUrls: z.array(z.string().url()).min(1)
+            })
+          ])
           .optional(),
         boundaryGeoJson: geoJsonFeatureCollectionSchema
       })

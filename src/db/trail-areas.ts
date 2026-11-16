@@ -5,6 +5,7 @@ import { isTrailTypeCode } from '../parks/park-types.js';
 import { toAddress } from './address.js';
 import type { Database, DbClient } from './database.js';
 import {
+  curatedTrailSources,
   osmTrailSources,
   parks,
   parkVisits,
@@ -31,7 +32,7 @@ export const findEligibleArea = async (database: DbClient, slug: string) => {
 };
 const selectLink = (
   link: typeof trailAreaLinks.$inferSelect,
-  trail: typeof parks.$inferSelect
+  trail: Pick<typeof parks.$inferSelect, 'id' | 'name' | 'slug'>
 ) => ({
   trailId: trail.id,
   name: trail.name,
@@ -50,17 +51,30 @@ const selectLink = (
 });
 export const listAreaTrails = async (database: DbClient, areaId: number) => {
   const rows = await database
-    .select({ link: trailAreaLinks, trail: parks, source: osmTrailSources })
+    .select({
+      link: trailAreaLinks,
+      trail: {
+        id: parks.id,
+        name: parks.name,
+        slug: parks.slug,
+        catalogStatus: parks.catalogStatus,
+        managedByLipasImport: parks.managedByLipasImport,
+        typeId: parks.typeId
+      },
+      source: osmTrailSources.trailId,
+      curatedId: curatedTrailSources.trailId
+    })
     .from(trailAreaLinks)
     .innerJoin(parks, eq(parks.id, trailAreaLinks.trailId))
     .leftJoin(osmTrailSources, eq(osmTrailSources.trailId, parks.id))
+    .leftJoin(curatedTrailSources, eq(curatedTrailSources.trailId, parks.id))
     .where(eq(trailAreaLinks.areaId, areaId))
     .orderBy(asc(parks.name));
-  return rows.map(({ link, trail, source }) => ({
+  return rows.map(({ link, trail, source, curatedId }) => ({
     ...selectLink(link, trail),
     effective:
       trail.catalogStatus === 'active' &&
-      (trail.managedByLipasImport || source !== null) &&
+      (trail.managedByLipasImport || source !== null || curatedId !== null) &&
       isTrailTypeCode(trail.typeId) &&
       selectLink(link, trail).effective
   }));
@@ -76,7 +90,15 @@ export const listTrailAreas = async (database: DbClient, slug: string) => {
       .where(eq(osmTrailSources.trailId, trail.id))
       .limit(1)
   )[0];
-  if (trail.catalogStatus !== 'active' || (!trail.managedByLipasImport && !source)) return [];
+  const curated = (
+    await database
+      .select({ trailId: curatedTrailSources.trailId })
+      .from(curatedTrailSources)
+      .where(eq(curatedTrailSources.trailId, trail.id))
+      .limit(1)
+  )[0];
+  if (trail.catalogStatus !== 'active' || (!trail.managedByLipasImport && !source && !curated))
+    return [];
   const rows = await database
     .select({ link: trailAreaLinks, name: parks.name, slug: parks.slug })
     .from(trailAreaLinks)
@@ -104,21 +126,28 @@ export const listPublicAreaTrails = async (database: DbClient, areaId: number) =
     )
     .orderBy(asc(osmTrailSources.relationId));
   const rows = await database
-    .select({ link: trailAreaLinks, trail: parks, source: osmTrailSources })
+    .select({
+      link: trailAreaLinks,
+      trail: parks,
+      source: osmTrailSources,
+      curatedId: curatedTrailSources.trailId,
+      sourceUrlsJson: curatedTrailSources.sourceUrlsJson
+    })
     .from(trailAreaLinks)
     .innerJoin(parks, eq(parks.id, trailAreaLinks.trailId))
     .leftJoin(osmTrailSources, eq(osmTrailSources.trailId, parks.id))
+    .leftJoin(curatedTrailSources, eq(curatedTrailSources.trailId, parks.id))
     .where(eq(trailAreaLinks.areaId, areaId))
     .orderBy(asc(parks.name), asc(parks.id));
   return rows
     .filter(
-      ({ link, trail, source }) =>
+      ({ link, trail, source, curatedId }) =>
         trail.catalogStatus === 'active' &&
-        (trail.managedByLipasImport || source !== null) &&
+        (trail.managedByLipasImport || source !== null || curatedId !== null) &&
         isTrailTypeCode(trail.typeId) &&
         selectLink(link, trail).effective
     )
-    .map(({ trail, source }) => ({
+    .map(({ trail, source, sourceUrlsJson }) => ({
       ...(source
         ? {
             source: {
@@ -139,7 +168,16 @@ export const listPublicAreaTrails = async (database: DbClient, areaId: number) =
               sourceUrl: `https://www.openstreetmap.org/relation/${source.relationId}`
             }
           }
-        : {}),
+        : sourceUrlsJson !== null
+          ? {
+              source: {
+                type: 'openstreetmap-curated' as const,
+                attribution: '© OpenStreetMap contributors',
+                licenseUrl: 'https://opendatacommons.org/licenses/odbl/1-0/',
+                sourceUrls: JSON.parse(sourceUrlsJson) as string[]
+              }
+            }
+          : {}),
       name: trail.name,
       slug: trail.slug,
       address:
@@ -165,10 +203,15 @@ export const listAreaTrailCandidates = async (
     .select({ trailId: parks.id, name: parks.name, slug: parks.slug })
     .from(parks)
     .leftJoin(osmTrailSources, eq(osmTrailSources.trailId, parks.id))
+    .leftJoin(curatedTrailSources, eq(curatedTrailSources.trailId, parks.id))
     .where(
       and(
         eq(parks.catalogStatus, 'active'),
-        or(eq(parks.managedByLipasImport, true), isNotNull(osmTrailSources.trailId)),
+        or(
+          eq(parks.managedByLipasImport, true),
+          isNotNull(osmTrailSources.trailId),
+          isNotNull(curatedTrailSources.trailId)
+        ),
         inArray(parks.typeId, trailTypes),
         sql`instr(lower(${parks.name}), lower(${q})) > 0`
       )
@@ -200,10 +243,17 @@ export const setAreaTrailOverride = async (
     const source = (
       await tx.select().from(osmTrailSources).where(eq(osmTrailSources.trailId, trail.id)).limit(1)
     )[0];
+    const curated = (
+      await tx
+        .select({ trailId: curatedTrailSources.trailId })
+        .from(curatedTrailSources)
+        .where(eq(curatedTrailSources.trailId, trail.id))
+        .limit(1)
+    )[0];
     if (
       trail.id === area.id ||
       !isTrailTypeCode(trail.typeId) ||
-      (!trail.managedByLipasImport && !source) ||
+      (!trail.managedByLipasImport && !source && !curated) ||
       trail.catalogStatus !== 'active'
     )
       throw new TrailAreaValidationError('An active supported trail is required.');
