@@ -1,6 +1,6 @@
 import { z } from '@hono/zod-openapi';
 
-import { visitDateSchema } from './parks.js';
+import { visitDateSchema, visitTrailSchema } from './parks.js';
 
 const dateRangeReviewOverviewSchema = z.object({
   endDate: visitDateSchema,
@@ -24,6 +24,7 @@ const dateRangeReviewVisitReferenceSchema = z.object({
   }),
   route: z.string().nullable(),
   trip: dateRangeReviewTripReferenceSchema.nullable(),
+  trails: z.array(visitTrailSchema).optional(),
   visitedOn: visitDateSchema
 });
 
@@ -46,6 +47,7 @@ const dateRangeReviewParkSummarySchema = z.object({
 
 const dateRangeReviewParkVisitSummarySchema = z.object({
   park: dateRangeReviewParkSummarySchema,
+  trails: z.array(visitTrailSchema).optional(),
   visitedOn: visitDateSchema
 });
 
@@ -101,6 +103,7 @@ const dateRangeReviewNewParksCardSchema = z.object({
         name: z.string(),
         slug: z.string()
       }),
+      trails: z.array(visitTrailSchema).optional(),
       visitedOn: visitDateSchema
     })
   )
@@ -117,6 +120,7 @@ const dateRangeReviewRevisitedParksCardSchema = z.object({
       }),
       previousVisitDate: visitDateSchema,
       revisitCount: z.number().int().positive(),
+      trails: z.array(visitTrailSchema).optional(),
       visitedOn: visitDateSchema
     })
   )

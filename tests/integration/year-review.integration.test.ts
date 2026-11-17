@@ -2,6 +2,10 @@ import sharp from 'sharp';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { createApp } from '../../src/app.js';
+import {
+  yearReviewPreviewSchema,
+  yearReviewShareResponseSchema
+} from '../../src/contracts/year-review.js';
 import { createSessionToken } from '../../src/http/session.js';
 import { createMemoryStorage } from '../../src/storage/memory-storage.js';
 import { createLipasPark, parkTypeFixtures } from '../fixtures/lipas.js';
@@ -173,6 +177,57 @@ describe('year review routes', () => {
       method: 'POST'
     });
   };
+
+  it('counts each published trip once in its visit year and freezes the count on publication', async () => {
+    const app = createAuthedApp();
+    const tripIds: number[] = [];
+    for (const [name, status] of [
+      ['Kesäretki', 'published'],
+      ['Syysretki', 'published'],
+      ['Vanha retki', 'published'],
+      ['Luonnosretki', 'draft']
+    ] as const) {
+      const response = await createTrip(app, { name, status });
+      expect(response.status).toBe(201);
+      tripIds.push(((await response.json()) as { id: number }).id);
+    }
+    for (const [tripId, visitedOn] of [
+      [tripIds[0]!, '2026-06-01'],
+      [tripIds[0]!, '2026-06-02'],
+      [tripIds[1]!, '2026-09-01'],
+      [null, '2026-09-02'],
+      [tripIds[3]!, '2026-09-03'],
+      [tripIds[2]!, '2025-06-01']
+    ] as const) {
+      expect(
+        (await createVisit(app, 'akasmannyn-kansallispuisto', { tripId, visitedOn })).status
+      ).toBe(201);
+    }
+    const readPreview = async (year: number) =>
+      yearReviewPreviewSchema.parse(
+        await (await requestAsAdmin(app, `/api/year-review/${year}/preview`)).json()
+      );
+    expect((await readPreview(2026)).story.summary).toMatchObject({
+      tripCount: 2,
+      visitCount: 5,
+      distinctParkCount: 1
+    });
+    expect((await readPreview(2025)).story.summary).toMatchObject({ tripCount: 1 });
+    expect((await readPreview(2024)).story.summary).toMatchObject({ tripCount: 0 });
+    const published = await requestAsAdmin(app, '/api/year-review/2026/publish', {
+      method: 'POST'
+    });
+    const { shareId } = (await published.json()) as { shareId: string };
+    await createVisit(app, 'akasmannyn-kansallispuisto', {
+      tripId: tripIds[2]!,
+      visitedOn: '2026-10-01'
+    });
+    expect((await readPreview(2026)).story.summary).toMatchObject({ tripCount: 3 });
+    const share = yearReviewShareResponseSchema.parse(
+      await (await app.request(`/api/year-review/shares/${shareId}`)).json()
+    );
+    expect(share.story.summary).toMatchObject({ tripCount: 2 });
+  });
 
   it('builds an admin-only preview from existing visits and trips', async () => {
     const app = createAuthedApp();
