@@ -43,6 +43,7 @@ const createVisit = (
       slug: 'summer-escape'
     },
     tripStopOrder: null,
+    trails: [],
     visitedOn: '2026-06-10',
     ...overrides
   };
@@ -227,6 +228,7 @@ describe('date range review story builder', () => {
             name: 'Seitsemisen kansallispuisto',
             slug: 'seitsemisen-kansallispuisto'
           },
+          trails: [],
           visitedOn: '2026-06-12'
         },
         {
@@ -235,6 +237,7 @@ describe('date range review story builder', () => {
             name: 'Sallan kansallispuisto',
             slug: 'sallan-kansallispuisto'
           },
+          trails: [],
           visitedOn: '2026-07-01'
         }
       ]
@@ -250,6 +253,7 @@ describe('date range review story builder', () => {
           },
           previousVisitDate: '2026-06-05',
           revisitCount: 1,
+          trails: [],
           visitedOn: '2026-06-10'
         }
       ]
@@ -274,6 +278,7 @@ describe('date range review story builder', () => {
               typeLabel: 'Kansallispuisto',
               typeSlug: 'national-park'
             },
+            trails: [],
             visitedOn: '2026-06-10'
           },
           {
@@ -283,6 +288,7 @@ describe('date range review story builder', () => {
               typeLabel: 'Kansallispuisto',
               typeSlug: 'national-park'
             },
+            trails: [],
             visitedOn: '2026-06-12'
           }
         ],
@@ -309,6 +315,7 @@ describe('date range review story builder', () => {
               typeLabel: 'Kansallispuisto',
               typeSlug: 'national-park'
             },
+            trails: [],
             visitedOn: '2026-07-01'
           }
         ],
@@ -325,6 +332,7 @@ describe('date range review story builder', () => {
             typeLabel: 'Retkeilyalue',
             typeSlug: 'hiking-area'
           },
+          trails: [],
           visitedOn: '2026-06-20'
         }
       ]
@@ -404,6 +412,7 @@ describe('date range review story builder', () => {
             typeLabel: 'Kansallispuisto',
             typeSlug: 'national-park'
           },
+          trails: [],
           visitedOn: '2026-06-11'
         },
         {
@@ -413,6 +422,7 @@ describe('date range review story builder', () => {
             typeLabel: 'Kansallispuisto',
             typeSlug: 'national-park'
           },
+          trails: [],
           visitedOn: '2026-06-13'
         }
       ]
@@ -426,6 +436,7 @@ describe('date range review story builder', () => {
             name: 'Salamanperan kansallispuisto',
             slug: 'salamanperan-kansallispuisto'
           },
+          trails: [],
           visitedOn: '2026-06-12'
         }
       ]
@@ -441,6 +452,7 @@ describe('date range review story builder', () => {
           },
           previousVisitDate: '2026-05-15',
           revisitCount: 2,
+          trails: [],
           visitedOn: '2026-06-10'
         }
       ]
@@ -606,6 +618,7 @@ describe('date range review story builder', () => {
           },
           previousVisitDate: '2026-05-20',
           revisitCount: 1,
+          trails: [],
           visitedOn: '2026-06-10'
         }
       ]
@@ -642,6 +655,7 @@ describe('date range review story builder', () => {
                 typeLabel: 'Kansallispuisto',
                 typeSlug: 'national-park'
               },
+              trails: [],
               visitedOn: '2026-06-10'
             },
             {
@@ -651,6 +665,7 @@ describe('date range review story builder', () => {
                 typeLabel: 'Kansallispuisto',
                 typeSlug: 'national-park'
               },
+              trails: [],
               visitedOn: '2026-06-10'
             }
           ],
@@ -685,6 +700,7 @@ describe('date range review story builder', () => {
                 typeLabel: 'Kansallispuisto',
                 typeSlug: 'national-park'
               },
+              trails: [],
               visitedOn: '2026-06-10'
             },
             {
@@ -694,6 +710,7 @@ describe('date range review story builder', () => {
                 typeLabel: 'Kansallispuisto',
                 typeSlug: 'national-park'
               },
+              trails: [],
               visitedOn: '2026-06-10'
             }
           ],
@@ -772,6 +789,7 @@ describe('date range review story builder', () => {
             name: 'Evon retkeilyalue',
             slug: 'evon-retkeilyalue'
           },
+          trails: [],
           visitedOn: '2026-06-18'
         },
         {
@@ -780,6 +798,7 @@ describe('date range review story builder', () => {
             name: 'Sallan kansallispuisto',
             slug: 'sallan-kansallispuisto'
           },
+          trails: [],
           visitedOn: '2026-06-25'
         }
       ]

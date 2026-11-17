@@ -4593,6 +4593,11 @@ export const listVisitsTimeline = async (
 export const listYearReviewTimelineVisits = async (database: Database) => {
   const visitRows = sortTripAwareVisitRows(await listVisitTimelineRows(database));
 
+  const trailsByVisitId = await getVisitTrails(
+    database,
+    visitRows.map((visit) => visit.id)
+  );
+
   return visitRows.map((visit) => ({
     createdAt: visit.createdAt,
     id: visit.id,
@@ -4605,6 +4610,7 @@ export const listYearReviewTimelineVisits = async (database: Database) => {
       typeSlug: visit.typeSlug
     },
     route: visit.route,
+    trails: trailsByVisitId.get(visit.id) ?? [],
     trip:
       visit.tripId === null || !visit.tripName || !visit.tripSlug
         ? null

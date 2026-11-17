@@ -1,6 +1,6 @@
 import { z } from '@hono/zod-openapi';
 
-import { visitDateSchema } from './parks.js';
+import { visitDateSchema, visitTrailSchema } from './parks.js';
 
 const yearReviewSeasonSchema = z.enum(['autumn', 'spring', 'summer', 'winter']);
 
@@ -26,6 +26,7 @@ const yearReviewVisitReferenceSchema = z.object({
   }),
   route: z.string().nullable(),
   trip: yearReviewTripReferenceSchema.nullable(),
+  trails: z.array(visitTrailSchema).optional(),
   visitedOn: visitDateSchema
 });
 
@@ -51,6 +52,7 @@ const yearReviewSummarySchema = z.object({
   imageCount: z.number().int().nonnegative(),
   newParkCount: z.number().int().nonnegative(),
   revisitedParkCount: z.number().int().nonnegative(),
+  tripCount: z.number().int().nonnegative().optional(),
   visitCount: z.number().int().nonnegative(),
   visitsBySeason: yearReviewVisitsBySeasonSchema
 });
@@ -111,6 +113,7 @@ const yearReviewNewParkMomentSchema = z.object({
     name: z.string(),
     slug: z.string()
   }),
+  trails: z.array(visitTrailSchema).optional(),
   visitedOn: visitDateSchema
 });
 

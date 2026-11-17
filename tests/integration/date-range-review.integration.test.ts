@@ -1053,6 +1053,7 @@ describe('date range review routes', () => {
           typeLabel: 'Kansallispuisto',
           typeSlug: 'national-park'
         },
+        trails: [],
         visitedOn: '2026-06-10'
       },
       {
@@ -1062,6 +1063,7 @@ describe('date range review routes', () => {
           typeLabel: 'Kansallispuisto',
           typeSlug: 'national-park'
         },
+        trails: [],
         visitedOn: '2026-06-12'
       }
     ]);
@@ -1073,6 +1075,7 @@ describe('date range review routes', () => {
           typeLabel: 'Valtion retkeilyalue',
           typeSlug: 'hiking-area'
         },
+        trails: [],
         visitedOn: '2026-06-18'
       }
     ]);

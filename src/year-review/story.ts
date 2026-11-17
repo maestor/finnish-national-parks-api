@@ -1,3 +1,5 @@
+export type ReviewTrail = { id: number; name: string; slug: string };
+
 export type YearReviewSeason = 'autumn' | 'spring' | 'summer' | 'winter';
 
 export type YearReviewTimelineVisit = {
@@ -18,6 +20,7 @@ export type YearReviewTimelineVisit = {
     slug: string;
   } | null;
   tripStopOrder: number | null;
+  trails: ReviewTrail[];
   visitedOn: string;
 };
 
@@ -39,6 +42,7 @@ export type YearReviewSummary = {
   imageCount: number;
   newParkCount: number;
   revisitedParkCount: number;
+  tripCount?: number;
   visitCount: number;
   visitsBySeason: Record<YearReviewSeason, number>;
 };
@@ -56,6 +60,7 @@ export type YearReviewVisitReference = {
     name: string;
     slug: string;
   } | null;
+  trails?: ReviewTrail[];
   visitedOn: string;
 };
 
@@ -125,6 +130,7 @@ export type YearReviewCard =
           name: string;
           slug: string;
         };
+        trails?: ReviewTrail[];
         visitedOn: string;
       }>;
     }
@@ -198,6 +204,7 @@ const toVisitReference = (visit: YearReviewTimelineVisit): YearReviewVisitRefere
   },
   route: visit.route,
   trip: visit.trip,
+  trails: visit.trails,
   visitedOn: visit.visitedOn
 });
 
@@ -392,6 +399,7 @@ export const buildYearReviewStory = ({
     imageCount,
     newParkCount,
     revisitedParkCount: visitsByPark.size - newParkCount,
+    tripCount: visitsByTrip.size,
     visitCount: yearVisits.length,
     visitsBySeason
   };
@@ -466,6 +474,7 @@ export const buildYearReviewStory = ({
           name: visit.park.name,
           slug: visit.park.slug
         },
+        trails: visit.trails,
         visitedOn: visit.visitedOn
       }
     ];

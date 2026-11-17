@@ -1,4 +1,4 @@
-import type { YearReviewStoryImageAsset } from '../year-review/story.js';
+import type { ReviewTrail, YearReviewStoryImageAsset } from '../year-review/story.js';
 
 export type DateRangeReviewTimelineVisit = {
   createdAt: string;
@@ -18,6 +18,7 @@ export type DateRangeReviewTimelineVisit = {
     slug: string;
   } | null;
   tripStopOrder: number | null;
+  trails: ReviewTrail[];
   visitedOn: string;
 };
 
@@ -55,6 +56,7 @@ export type DateRangeReviewVisitReference = {
     name: string;
     slug: string;
   } | null;
+  trails?: ReviewTrail[];
   visitedOn: string;
 };
 
@@ -65,6 +67,7 @@ export type DateRangeReviewParkVisitSummary = {
     typeLabel: string;
     typeSlug: string;
   };
+  trails?: ReviewTrail[];
   visitedOn: string;
 };
 
@@ -96,6 +99,7 @@ export type DateRangeReviewCard =
           name: string;
           slug: string;
         };
+        trails?: ReviewTrail[];
         visitedOn: string;
       }>;
     }
@@ -109,6 +113,7 @@ export type DateRangeReviewCard =
         };
         previousVisitDate: string;
         revisitCount: number;
+        trails?: ReviewTrail[];
         visitedOn: string;
       }>;
     }
@@ -163,6 +168,7 @@ const toVisitReference = (visit: DateRangeReviewTimelineVisit): DateRangeReviewV
   },
   route: visit.route,
   trip: visit.trip,
+  trails: visit.trails,
   visitedOn: visit.visitedOn
 });
 
@@ -175,6 +181,7 @@ const toParkVisitSummary = (
     typeLabel: visit.park.typeLabel,
     typeSlug: visit.park.typeSlug
   },
+  trails: visit.trails,
   visitedOn: visit.visitedOn
 });
 
@@ -342,6 +349,7 @@ export const buildDateRangeReviewStory = ({
           slug: visit.park.slug
         },
         visitId: visit.id,
+        trails: visit.trails,
         visitedOn: visit.visitedOn
       }
     ];
@@ -371,6 +379,7 @@ export const buildDateRangeReviewStory = ({
         previousVisitDate,
         revisitCount,
         visitId: visit.id,
+        trails: visit.trails,
         visitedOn: visit.visitedOn
       }
     ];

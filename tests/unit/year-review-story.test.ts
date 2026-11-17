@@ -41,6 +41,7 @@ const createVisit = (overrides: Partial<YearReviewTimelineVisit> = {}): YearRevi
       slug: 'alpha-trip'
     },
     tripStopOrder: null,
+    trails: [],
     visitedOn: '2026-03-10',
     ...overrides
   };
@@ -95,6 +96,7 @@ describe('year review story builder', () => {
     const seasonalCard = story.cards.find((card) => card.kind === 'seasonal');
 
     expect(story.summary).toEqual({
+      tripCount: 0,
       activeMonthCount: 0,
       distinctParkCount: 0,
       imageCount: 0,
@@ -555,6 +557,7 @@ describe('year review story builder', () => {
                 name: 'Akasmännyn kansallispuisto',
                 slug: 'akasmannyn-kansallispuisto'
               },
+              trails: [],
               visitedOn: '2026-03-10'
             }),
             expect.objectContaining({
@@ -566,6 +569,7 @@ describe('year review story builder', () => {
                 name: 'Seitsemisen kansallispuisto',
                 slug: 'seitsemisen-kansallispuisto'
               },
+              trails: [],
               visitedOn: '2026-06-18'
             })
           ]
@@ -621,6 +625,7 @@ describe('year review story builder', () => {
             name: 'Akasmännyn kansallispuisto',
             slug: 'akasmannyn-kansallispuisto'
           },
+          trails: [],
           visitedOn: '2026-03-10'
         },
         {
@@ -629,6 +634,7 @@ describe('year review story builder', () => {
             name: 'Evon retkeilyalue',
             slug: 'evon-retkeilyalue'
           },
+          trails: [],
           visitedOn: '2026-04-12'
         }
       ]
