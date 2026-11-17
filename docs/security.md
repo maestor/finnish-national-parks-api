@@ -153,6 +153,10 @@ Normal reads use the owned database rather than live upstream catalog requests. 
 - The migration workflow artifact is not evidence of recurring backup or media recovery. Run the isolated local database drill in [docs/recovery.md](./recovery.md) and record the required Turso, R2, GitHub, and Vercel evidence before claiming recovery coverage.
 - After migrations `0030`–`0032`, ensure every existing admin is enrolled and promote the first independently confirmed super admin with the documented SQL procedure. Use direct SQL only for bootstrap or emergency recovery.
 
+## Dependency advisories
+
+As of 2026-11-17, [GHSA-fc5q-39xc-vjpf](https://github.com/advisories/GHSA-fc5q-39xc-vjpf) affects all published `picomatch` versions through `4.0.7`, with no patched release available. It is pulled in by the development-only Vitest/Vite/tinyglobby dependency tree. `npm audit --omit=dev` reports no production dependency vulnerabilities; the full `npm audit --audit-level=high` still fails on this advisory and its dependent packages. No request-supplied glob patterns were identified in application code. Avoid untrusted test/tooling glob configuration, retain the audit failure as a visible follow-up, and update when a compatible patch is published.
+
 ## Contributor checklist
 
 For changes to auth, routes, uploads, caching, storage, or external integrations:
