@@ -2147,7 +2147,7 @@ export const createApp = ({
       const etag = createPublicSummaryEtag({
         activeCount: catalogSeed.activeCount,
         kind: 'map',
-        responseVersion: 'v3',
+        responseVersion: 'v4',
         latestCatalogImportRunId: catalogSeed.latestImportRunId,
         latestCatalogUpdatedAt: catalogSeed.latestUpdatedAt,
         publicUpdatedAt: summary.updatedAt,

@@ -577,6 +577,7 @@ export const publicHomeSummaryResponseSchema = publicVisitVersionSchema.extend({
 });
 
 export const publicMapParkSchema = parkListItemSchema.extend({
+  lastVisitId: z.number().int().positive().nullable().optional(),
   visitedSummary: visitedSummarySchema
 });
 

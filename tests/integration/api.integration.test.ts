@@ -1942,10 +1942,22 @@ describe('API routes', () => {
     await createVisit(app, 'akasmannyn-kansallispuisto', {
       visitedOn: '2026-04-20'
     });
+    const latestVisit = await createVisit(app, 'akasmannyn-kansallispuisto', {
+      visitedOn: '2026-04-20'
+    });
+    await createVisit(app, 'akasmannyn-kansallispuisto', {
+      visitedOn: '2025-09-12'
+    });
+    const newerDraft = await createVisit(app, 'akasmannyn-kansallispuisto', {
+      visitedOn: '2026-05-01',
+      status: 'draft'
+    });
+    expect(newerDraft.response.status).toBe(201);
 
     const response = await app.request('/api/map-summary');
     const body = (await response.json()) as {
       parks: Array<{
+        lastVisitId: number | null;
         slug: string;
         visitedSummary: {
           lastVisitedOn: string | null;
@@ -1965,11 +1977,15 @@ describe('API routes', () => {
     expect(body.version).toBeGreaterThan(0);
     expect(body.updatedAt).toBeTruthy();
     expect(akasmanty).toBeDefined();
+    expect(akasmanty?.lastVisitId).toBe(latestVisit.body.id);
     expect(akasmanty?.visitedSummary).toEqual({
       lastVisitedOn: '2026-04-20',
-      visitCount: 1,
+      visitCount: 3,
       visited: true
     });
+    expect(body.parks.filter((park) => park !== akasmanty).map((park) => park.lastVisitId)).toEqual(
+      [null, null, null]
+    );
     expect(akasmanty).toHaveProperty('address', 'Puistotie 1, 00999 Testikylä');
     expect(akasmanty).toHaveProperty('hasMagnet', true);
     expect(akasmanty).toHaveProperty('locationLabel', 'Puistotie 1');
@@ -1981,12 +1997,12 @@ describe('API routes', () => {
     expect(akasmanty).not.toHaveProperty('note');
   });
 
-  it('returns 304 for matching map summary ETags', async () => {
+  it('returns 304 for matching map summary ETags and refreshes the previous response version', async () => {
     const app = createAuthedApp();
     const firstResponse = await app.request('/api/map-summary');
     const etag = firstResponse.headers.get('etag');
 
-    expect(etag).toBeTruthy();
+    expect(etag).toContain(':v4:map:');
 
     const cachedResponse = await app.request('/api/map-summary', {
       headers: {
@@ -1995,6 +2011,13 @@ describe('API routes', () => {
     });
 
     expect(cachedResponse.status).toBe(304);
+
+    const previousResponseVersion = await app.request('/api/map-summary', {
+      headers: {
+        'if-none-match': etag?.replace(':v4:map:', ':v3:map:') ?? ''
+      }
+    });
+    expect(previousResponseVersion.status).toBe(200);
   });
 
   it('returns 304 for matching home summary ETags and changes them when visit data changes', async () => {
