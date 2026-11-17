@@ -341,6 +341,7 @@ The API uses Zod schemas as the contract source of truth with OpenAPI exposed at
 Key route behavior:
 
 - `GET /api/parks` is optimized for map/list views and omits boundary geometry.
+- `GET /api/map-summary` pairs `lastVisitId` with `visitedSummary.lastVisitedOn`. Both are null without a published visit. Latest means greatest visit date, with the highest visit ID breaking same-day ties. The map-summary ETag uses response version `v4` so older clients receive the updated payload.
 - `GET /api/parks/search` returns a minimal visible-park payload for search and autocomplete flows.
 - `GET /api/admin/parks/:slug/areas` returns effective linked areas for a trail, including areas without public pages, as a private admin read; it does not expose excluded links. Deploy this endpoint before UI consumers.
 - `GET /api/admin/parks/visibility` returns lightweight visible and removed park arrays in one private admin response for admin visibility tooling.

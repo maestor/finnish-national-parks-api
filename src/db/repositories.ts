@@ -4526,10 +4526,15 @@ export const getPublicMapSummary = async (
 
   return {
     parks: await Promise.all(
-      parkRows.map(async (parkRow) => ({
-        ...(await toPublicPark(parkRow, getLogoPublicUrl, getMapPublicUrl)),
-        visitedSummary: toVisitedSummary(visitsByParkId.get(parkRow.parkId) ?? [])
-      }))
+      parkRows.map(async (parkRow) => {
+        const visits = visitsByParkId.get(parkRow.parkId) ?? [];
+        visits.sort((a, b) => b.visitedOn.localeCompare(a.visitedOn) || b.id - a.id);
+        return {
+          ...(await toPublicPark(parkRow, getLogoPublicUrl, getMapPublicUrl)),
+          lastVisitId: visits[0]?.id ?? null,
+          visitedSummary: toVisitedSummary(visits)
+        };
+      })
     ),
     updatedAt: version.updatedAt,
     version: version.version
