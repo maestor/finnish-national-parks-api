@@ -139,14 +139,16 @@ The implementation should provide these scripts:
 - `npm run test`
 - `npm run test:coverage`
 - `npm run lint`
+- `npm run lint:fix`
 - `npm run verify`
 
-`npm run verify` is the main local quality gate. It must run at least typecheck, lint (with apply safe fixes), and coverage tests.
 The lint step should fail on any Biome diagnostics, including info-level configuration notices and warning-level findings, rather than treating them as ignorable output.
 
 Coverage thresholds should start high from the beginning. Aim for 100 percent on first-party application code, excluding generated artifacts, migrations, config, and unavoidable runtime glue explicitly rather than letting them lower the target silently.
 
 ## Quality Gate
+
+`npm run verify` runs typecheck, lint, and coverage tests. The lint stage checks the submitted files without writing fixes. Run `npm run lint:fix` explicitly to apply supported fixes during development.
 
 `npm run verify` must pass before any task or pull request is considered ready. The only exception is changes that are entirely outside what `verify` validates — for example, pure documentation updates or repository configuration that does not affect code, tests, or types. In those cases, skip `verify` and note the exception in the PR description. User review and explicit acceptance are required before merging.
 
