@@ -1,11 +1,9 @@
 import {
-  buildLuontoonGeoJsonCollectionSourceUrl,
   buildMuseovirastoRkyAreaSourceUrl,
   buildSykeGeologicalRockAreaSourceUrl,
   buildSykePrivateProtectedSitesCompositeSourceUrl,
   extractGeoJsonAreaM2Metadata,
-  extractHikingAreaMetadata,
-  extractLuontoonDestinationMetadata
+  extractHikingAreaMetadata
 } from './builders.js';
 import type { SpecialParkConfig } from './types.js';
 
@@ -278,20 +276,17 @@ export const baseSpecialParkConfigs: SpecialParkConfig[] = [
   },
   {
     displayTypeName: null,
-    extractMetadata: extractLuontoonDestinationMetadata,
+    extractMetadata: extractGeoJsonAreaM2Metadata,
     locationLabel: 'Sonnasentie 948',
+    markerPoint: { lat: 61.288408942, lon: 26.4025897345 },
     parkUrl: 'https://www.luontoon.fi/fi/kohteet/paistjarvi',
     name: 'Paistjärvi',
     parkTypeSlug: 'outdoor-recreation-area',
     postalCode: '18300',
     postalOffice: 'Heinola',
-    responseShapeVersion: 'luontoon-destination-area-v1',
+    responseShapeVersion: 'open-destination-area-v1',
     slug: 'paistjarvi',
-    sourceParser: 'geojson',
-    sourceUrl: buildLuontoonGeoJsonCollectionSourceUrl({
-      collectionId: 'public.destinations_details_view',
-      filter: "slug='paistjarvi'"
-    }),
+    sourceUrl: 'special://paistjarvi',
     syntheticLipasId: 9_001_044
   },
   {
@@ -787,7 +782,7 @@ export const baseSpecialParkConfigs: SpecialParkConfig[] = [
   },
   {
     displayTypeName: null,
-    extractMetadata: extractLuontoonDestinationMetadata,
+    extractMetadata: extractGeoJsonAreaM2Metadata,
     locationLabel: 'Käsivarrentie 14145',
     markerPoint: {
       lat: 69.03868956629405,
@@ -798,9 +793,8 @@ export const baseSpecialParkConfigs: SpecialParkConfig[] = [
     parkTypeSlug: 'hiking-area',
     postalCode: '99490',
     postalOffice: 'Kilpisjärvi',
-    responseShapeVersion: 'luontoon-destination-area-v1',
+    responseShapeVersion: 'open-destination-area-v1',
     slug: 'saana-ja-kilpisjarvi',
-    sourceParser: 'geojson',
     sourceUrl: 'special://saana-ja-kilpisjarvi',
     syntheticLipasId: 9_002_052
   }

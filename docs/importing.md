@@ -309,7 +309,7 @@ This is a good fit when:
 - the destination polygon already matches the intended imported place
 - you want both official geometry and a Luontoon `parkUrl`
 
-See `Paistjärvi` in the importer for an example config.
+Peurajärvi and Unarinköngäs are the two remaining live destination-polygon imports.
 
 ### 3. Luontoon route lines
 
@@ -420,6 +420,45 @@ Examples include:
 - Helsinki local geometries such as `Uutelan ulkoilualue`, `Kallahden ulkoilualue`, and `Tullisaaren kartanopuisto`
 - island and boundary snapshots such as `Seurasaari`, `Mustikkamaa`, `Seili`, and `Vallisaari`
 - pragmatic local proxies such as `Kuhakoski`
+
+#### Open boundaries for 14 existing destinations
+
+The importer reads the reviewed 2026-11-19 snapshots by existing catalog ID.
+Each snapshot records the source URL, selected IDs, retrieval date, attribution,
+license and processing. Source markers are fixed at their previous positions.
+The import refreshes the source area from the EPSG:3067 geometry and supplies
+no establishment year. The normal catalog upsert preserves administrator edits.
+
+- **Luonnonsuojelu- ja erämaa-alueet / Lähde: Metsähallitus** provides the three complete state-reserve WFS features. [Dataset](https://ckan.ymparisto.fi/dataset/luonnonsuojelu-ja-eramaa-alueet)
+- **Valtion muut suojelualueet / Lähde: Metsähallitus** provides nine selections from Syke’s June 2026 ZIP. Select by `SATJ_tunnu` and verify every ID exists exactly once. Union the two Hepoköngäs features and the four Paistjärvi features in EPSG:3067 before transforming to WGS84. [Dataset](https://ckan.ymparisto.fi/dataset/valtion-muut-suojelualueet)
+- **Luonnonsuojeluohjelma-alueet / Lähde: Syke** provides the Saana landscape feature `MAO120156` for Saana ja Kilpisjärvi. [Dataset](https://ckan.ymparisto.fi/dataset/luonnonsuojeluohjelma-alueet)
+
+The three datasets above use [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
+Use all polygon parts and holes when refreshing snapshots. The Neitvuori snapshot
+uses compact coordinate arrays to keep the full feature within Biome’s file-size limit.
+
+Pukala uses the full OpenStreetMap way `958348897` version 5, including water
+inside the ring. The unmodified OSM coordinate ring is available as a
+[standalone snapshot](../src/importer/special-parks/data/pukala.json) under
+[ODbL 1.0](https://opendatacommons.org/licenses/odbl/1-0/).
+Credit © OpenStreetMap contributors on published maps and retain the attribution
+and ODbL notice with database distributions containing the OSM boundary.
+Review share-alike terms before distributing a bulk mixed-source geometry export.
+[OpenStreetMap attribution guidance](https://osmfoundation.org/wiki/Licence/Attribution_Guidelines)
+
+Run the batch first on an isolated catalog copy and compare park identity, visits,
+effective linked trails and standalone trail visibility across two imports.
+The CLI selects the configured slug `pukala` even when that record has a custom
+public slug such as `pukalan-virkistysmetsa`.
+
+```sh
+npm run import:special-parks -- litokairan-soidensuojelualue martimoaavan-soidensuojelualue neitvuori-ja-luonterin-luonnonsuojelualue auttikongas hepokongas iivaara koskeljarvi kurimonkoski paistjarvi paukanevan-soidensuojelualue pinkjarvi soiperoinen saana-ja-kilpisjarvi pukala
+```
+
+After reviewing the isolated import, follow the [backup workflow](recovery.md)
+for the intended catalog and run the same batch with the default trail conversion
+guard enabled. Immediately [expire the affected public park and map caches](#trailarea-reconciliation)
+using the catalog’s current public slugs.
 
 #### Torholan luola and Paavolan luontopolku
 

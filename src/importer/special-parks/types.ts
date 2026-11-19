@@ -46,7 +46,7 @@ export type SykeSpecialParkSeed = {
   syntheticLipasId: number;
 };
 
-export type LuontoonDestinationAreaSeed = {
+export type DestinationAreaSeed = {
   displayTypeName: string | null;
   locationLabel?: string;
   parkUrl: string | null;

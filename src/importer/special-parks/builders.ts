@@ -1,5 +1,5 @@
 import type {
-  LuontoonDestinationAreaSeed,
+  DestinationAreaSeed,
   MuseovirastoRkyAreaSeed,
   SpecialParkConfig,
   SykeProtectedSitesSourceType,
@@ -192,7 +192,7 @@ export const createLuontoonDestinationAreaConfig = ({
   postalOffice,
   slug,
   syntheticLipasId
-}: LuontoonDestinationAreaSeed): SpecialParkConfig => ({
+}: DestinationAreaSeed): SpecialParkConfig => ({
   displayTypeName: normalizeSpecialParkDisplayTypeName(name, displayTypeName),
   extractMetadata: extractLuontoonDestinationMetadata,
   locationLabel: locationLabel ?? name,

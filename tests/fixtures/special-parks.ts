@@ -20,8 +20,6 @@ const siikalahtiSourceUrl =
   "https://paikkatiedot.ymparisto.fi/geoserver/inspire_ps/wfs?service=WFS&request=GetFeature&version=2.0.0&typeNames=inspire_ps:PS.ProtectedSitesValtionOmistamaLuonnonsuojelualue&outputFormat=application/json&srsName=EPSG:4326&cql_filter=nimi='Siikalahden luonnonsuojelualue'";
 
 const napapiiriSourceUrl = 'special://napapiirin-retkeilyalue';
-const paistjarviSourceUrl =
-  'https://www.luontoon.fi/geo/features/collections/public.destinations_details_view/items?filter=slug%3D%27paistjarvi%27&filter-lang=cql-text&limit=1000';
 type SykeSourceType = 'private' | 'state';
 
 type GeneratedSykeSource = {
@@ -33,7 +31,6 @@ type GeneratedSykeSource = {
 type GeneratedLuontoonDestinationSource = {
   name: string;
   slug: string;
-  surfaceArea?: number;
 };
 
 const buildSykeProtectedSitesSourceUrl = (
@@ -172,23 +169,8 @@ const generatedMuseovirastoSources = [
 ];
 
 const generatedLuontoonDestinationSources: GeneratedLuontoonDestinationSource[] = [
-  { name: 'Litokairan soidensuojelualue', slug: 'litokairan-soidensuojelualue' },
-  { name: 'Martimoaavan soidensuojelualue', slug: 'martimoaavan-soidensuojelualue' },
-  { name: 'Paukanevan soidensuojelualue', slug: 'paukanevan-soidensuojelualue' },
-  {
-    name: 'Neitvuori ja Luonterin luonnonsuojelualue',
-    slug: 'neitvuori-ja-luonterin-luonnonsuojelualue'
-  },
-  { name: 'Koskeljärvi', slug: 'koskeljarvi' },
-  { name: 'Kurimonkoski', slug: 'kurimonkoski' },
-  { name: 'Pukala', slug: 'pukala' },
   { name: 'Peurajärvi', slug: 'peurajarvi' },
-  { name: 'Hepoköngäs', slug: 'hepokongas' },
-  { name: 'Auttiköngäs', slug: 'auttikongas' },
-  { name: 'Pinkjärvi', slug: 'pinkjarvi' },
-  { name: 'Soiperoinen', slug: 'soiperoinen' },
-  { name: 'Unarinköngäs', slug: 'unarinkongas' },
-  { name: 'Iivaara', slug: 'iivaara', surfaceArea: 25_675_776.79507149 }
+  { name: 'Unarinköngäs', slug: 'unarinkongas' }
 ];
 
 const createPolygonFeature = (
@@ -541,36 +523,6 @@ export const createSpecialParksSource = () => {
           ])
         ]
       }
-    ],
-    [
-      paistjarviSourceUrl,
-      {
-        type: 'FeatureCollection',
-        features: [
-          {
-            type: 'Feature',
-            geometry: {
-              type: 'MultiPolygon',
-              coordinates: [
-                [
-                  [
-                    [26.3364, 61.2622],
-                    [26.3364, 61.3146],
-                    [26.4688, 61.3146],
-                    [26.4688, 61.2622],
-                    [26.3364, 61.2622]
-                  ]
-                ]
-              ]
-            },
-            properties: {
-              name_fi: 'Paistjärvi',
-              slug: 'paistjarvi',
-              surfaceArea: 12_727_533.832729377
-            }
-          }
-        ]
-      }
     ]
   ]);
 
@@ -663,7 +615,7 @@ export const createSpecialParksSource = () => {
             properties: {
               name: entry.name,
               slug: entry.slug,
-              surfaceArea: entry.surfaceArea ?? 2_000_000 + index * 25_000
+              surfaceArea: 2_000_000 + index * 25_000
             }
           }
         ]
