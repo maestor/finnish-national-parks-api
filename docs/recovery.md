@@ -2,7 +2,7 @@
 
 This runbook separates what the repository can prove locally from the backup, retention, and media-recovery controls that must be verified by the operator in Turso, Cloudflare R2, GitHub, and Vercel. Do not point a restore command at production.
 
-## What exists today
+## Backup sources
 
 - The production migration workflow creates a Turso SQLite backup only when a schema migration is pending. GitHub retains that workflow artifact for 14 days.
 - `npm run db:backup` can create a fresh local SQLite copy of the remote Turso database before a high-risk import, migration, or bulk administrative change.
@@ -13,7 +13,7 @@ This runbook separates what the repository can prove locally from the backup, re
 Run this on a trusted machine with a downloaded backup file. The command accepts only a local SQLite file path; it does not read `DATABASE_URL`, does not connect to Turso, and does not use R2 credentials.
 
 ```sh
-npm run db:verify-backup -- data/backups/turso-backup-2026-09-13T10-00-00Z-before-production-migrate.db
+npm run db:verify-backup -- 'data/backups/<backup-file>.db'
 ```
 
 It copies the supplied backup into a new operating-system temporary directory, runs `PRAGMA quick_check`, applies the repository migrations only to that copy, then checks:
@@ -27,9 +27,9 @@ It prints `"status":"complete"` only when those checks pass, including record co
 
 Record the date, backup timestamp, command output, duration, result, and any recovery gap in the operations log. A current database backup may need migrations during the drill; that count is reported as `appliedMigrationCount` and is safe because it happens only in the temporary copy.
 
-## Operator evidence still required
+## Verify recovery controls
 
-Before M3 storage cleanup can begin, record dated evidence for all of these controls:
+Before deleting retained media sources, record dated evidence for these controls:
 
 1. Turso: backup/PITR retention, access roles, and the restore target that is separate from the production database URL.
 2. GitHub: who can download the 14-day migration artifacts and whether their retention meets the chosen recovery target.
@@ -37,7 +37,7 @@ Before M3 storage cleanup can begin, record dated evidence for all of these cont
 4. A disposable media recovery: copy a small approved media sample to a separate non-production bucket, compare the restored objects with the database references, and remove only that disposable copy afterward.
 5. Vercel: confirm the production migration check still runs before dependent deployment promotion.
 
-Initial targets proposed in the sustainability plan are at most 24 hours of visit-data loss and restoration within one working day. The project owner must approve or replace those targets and choose the backup-failure notification route before they are treated as operational commitments.
+Document the approved recovery point and recovery time objectives and the backup-failure notification route in the operations log.
 
 ## Never do this in a drill
 
