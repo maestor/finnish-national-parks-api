@@ -43,7 +43,11 @@
   },
   "overrides": [
     {
-      "includes": ["**/src/importer/data/**/*.json", "**/src/importer/selected-trails/*.json"],
+      "includes": [
+        "**/src/importer/data/**/*.json",
+        "**/src/importer/selected-trails/*.json",
+        "**/src/importer/special-parks/data/neitvuori-ja-luonterin-luonnonsuojelualue.json"
+      ],
       "formatter": {
         "enabled": false
       }

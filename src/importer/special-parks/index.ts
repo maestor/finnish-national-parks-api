@@ -14,6 +14,7 @@ import {
   sourceReadyFactoryVillageSeeds,
   sourceReadyHistoryRkyAreaSeeds
 } from './seeds/museovirasto-rky-areas.js';
+import { openDestinationAreaConfigs } from './seeds/open-destination-areas.js';
 import {
   sourceReadyDestinationAreaSeeds,
   sourceReadyReserveParkSeeds
@@ -23,6 +24,7 @@ export const specialParkConfigs = [
   ...baseSpecialParkConfigs,
   ...sourceReadyReserveParkSeeds.map(createSykeSpecialParkConfig),
   ...sourceReadyDestinationAreaSeeds.map(createSykeSpecialParkConfig),
+  ...openDestinationAreaConfigs,
   ...sourceReadyLuontoonDestinationAreaSeeds.map(createLuontoonDestinationAreaConfig),
   ...sourceReadyHistoryAreaSeeds.map(createMuseovirastoSpecialParkConfig),
   ...sourceReadyHistoryRkyAreaSeeds.map(createMuseovirastoRkyAreaConfig),

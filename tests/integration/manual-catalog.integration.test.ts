@@ -22,7 +22,7 @@ import {
 } from '../helpers/import-published-park-fixtures.js';
 import { createTestDatabase } from '../helpers/test-db.js';
 
-type ExpectedLuontoonDestinationImport = {
+type ExpectedDestinationImport = {
   displayTypeName?: string;
   lipasId: number;
   name: string;
@@ -46,8 +46,8 @@ const merenkurkkuSourceUrl =
 
 const kevoSourceUrl =
   "https://paikkatiedot.ymparisto.fi/geoserver/inspire_ps/wfs?service=WFS&request=GetFeature&version=2.0.0&typeNames=inspire_ps:PS.ProtectedSitesValtionOmistamaLuonnonsuojelualue&outputFormat=application/json&srsName=EPSG:4326&cql_filter=nimi='Kevon luonnonpuisto'";
-const paistjarviSourceUrl =
-  'https://www.luontoon.fi/geo/features/collections/public.destinations_details_view/items?filter=slug%3D%27paistjarvi%27&filter-lang=cql-text&limit=1000';
+const peurajarviSourceUrl =
+  'https://www.luontoon.fi/geo/features/collections/public.destinations_details_view/items?filter=slug%3D%27peurajarvi%27&filter-lang=cql-text&limit=1000';
 
 describe('manual catalog imports', () => {
   let testDatabase: Awaited<ReturnType<typeof createTestDatabase>>;
@@ -183,6 +183,102 @@ describe('manual catalog imports', () => {
     await expect(getParkBySlug(database, 'torholan-luolan-polku')).resolves.toBeNull();
   });
 
+  it('replaces the 14 approved area boundaries by catalog ID on repeat imports', async () => {
+    const database = testDatabase.database;
+    const destinations = {
+      paistjarvi: 9001044,
+      'litokairan-soidensuojelualue': 9001045,
+      'martimoaavan-soidensuojelualue': 9001046,
+      'paukanevan-soidensuojelualue': 9001047,
+      'neitvuori-ja-luonterin-luonnonsuojelualue': 9001048,
+      koskeljarvi: 9001049,
+      kurimonkoski: 9001050,
+      pukala: 9001051,
+      hepokongas: 9001053,
+      auttikongas: 9001054,
+      pinkjarvi: 9001055,
+      soiperoinen: 9001056,
+      iivaara: 9001091,
+      'saana-ja-kilpisjarvi': 9002052
+    };
+    const timestamp = '2026-11-19T10:00:00.000Z';
+    await syncParkTypes(database);
+    const runId = await createImportRun(database, {
+      activeCount: 1,
+      importedAt: timestamp,
+      responseShapeVersion: 'luontoon-destination-area-v1',
+      sourceUrl: 'https://www.luontoon.fi/'
+    });
+    const legacyBoundary = '{"type":"FeatureCollection","features":[]}';
+    const [paistjarvi] = await database
+      .insert(parks)
+      .values({
+        lipasId: 9001044,
+        managedByLipasImport: false,
+        typeId: 103,
+        slug: 'paistjarven-retkeilyalue',
+        importedSlug: 'paistjarvi',
+        name: 'Paistjärvi',
+        importedName: 'Paistjärvi',
+        locationLabel: 'Vierailijan sisäänkäynti',
+        importedLocationLabel: 'Sonnasentie 948',
+        areaKm2: 12.5,
+        importedAreaKm2: 12.73,
+        markerLat: 61.288408942,
+        markerLon: 26.4025897345,
+        importedMarkerLat: 61.288408942,
+        importedMarkerLon: 26.4025897345,
+        bboxMinLat: 61.26,
+        bboxMinLon: 26.33,
+        bboxMaxLat: 61.32,
+        bboxMaxLon: 26.47,
+        boundaryGeojson: legacyBoundary,
+        lastImportRunId: runId,
+        catalogStatus: 'active',
+        removed: false,
+        createdAt: timestamp,
+        updatedAt: timestamp
+      })
+      .returning({ id: parks.id });
+    await database.insert(parkVisits).values({
+      parkId: paistjarvi!.id,
+      visitedOn: '2026-06-01',
+      note: 'Retki Paistjärvelle',
+      status: 'published',
+      createdAt: timestamp,
+      updatedAt: timestamp
+    });
+
+    const fetch = vi.fn().mockRejectedValue(new Error('Boundary should load from the repository'));
+    vi.stubGlobal('fetch', fetch);
+    const options = { database, includeSlugs: Object.keys(destinations), now: () => timestamp };
+
+    for (const attempt of [1, 2]) {
+      const result = await importSpecialParks(options);
+      expect(result.results, `import ${attempt}`).toHaveLength(14);
+      const rows = await database.select().from(parks);
+      expect(
+        Object.fromEntries(rows.map(({ importedSlug, lipasId }) => [importedSlug, lipasId]))
+      ).toEqual(destinations);
+      const replacement = rows.find(({ lipasId }) => lipasId === 9001044);
+      expect(replacement).toMatchObject({
+        id: paistjarvi!.id,
+        slug: 'paistjarven-retkeilyalue',
+        removed: false,
+        locationLabel: 'Vierailijan sisäänkäynti',
+        importedAreaKm2: 12.46,
+        areaKm2: 12.5,
+        markerLat: 61.288408942,
+        markerLon: 26.4025897345
+      });
+      expect(replacement?.boundaryGeojson).not.toEqual(legacyBoundary);
+      expect(await database.select().from(parkVisits)).toMatchObject([
+        { parkId: paistjarvi!.id, note: 'Retki Paistjärvelle', status: 'published' }
+      ]);
+    }
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
   it('recomputes LIPAS links when a special area is imported', async () => {
     await importParks({
       database: testDatabase.database,
@@ -301,13 +397,18 @@ describe('manual catalog imports', () => {
   });
 
   it('imports all special parks with correct metadata', async () => {
+    const fetchSource = vi.fn(createSpecialParksSource());
     const result = await importPublishedSpecialParkFixtures({
       database: testDatabase.database,
-      fetchSource: createSpecialParksSource(),
+      fetchSource,
       now: () => '2026-05-27T08:00:00.000Z'
     });
 
     expect(result.results).toHaveLength(166);
+    const luontoonSources = fetchSource.mock.calls.flatMap(([url]) =>
+      url.startsWith('https://www.luontoon.fi/') ? [new URL(url).searchParams.get('filter')] : []
+    );
+    expect(luontoonSources.sort()).toEqual(["slug='peurajarvi'", "slug='unarinkongas'"]);
 
     const merenkurkku = await getParkBySlug(
       testDatabase.database,
@@ -615,13 +716,13 @@ describe('manual catalog imports', () => {
       postalOffice: 'Heinola',
       type: { slug: 'outdoor-recreation-area' }
     });
-    expect(paistjarvi?.boundaryGeoJson?.features).toHaveLength(1);
+    expect(paistjarvi?.boundaryGeoJson?.features).toHaveLength(22);
     expect(paistjarvi?.boundaryGeoJson?.features[0]?.geometry.type).toBe('Polygon');
 
     const iivaara = await getParkBySlug(testDatabase.database, 'iivaara');
     expect(iivaara).toMatchObject({
       address: 'Iivaara, 93700 Kuusamo',
-      areaKm2: 25.68,
+      areaKm2: 25.72,
       locationLabel: 'Iivaara',
       name: 'Iivaara',
       parkUrl: 'https://www.luontoon.fi/fi/kohteet/iivaara',
@@ -642,7 +743,7 @@ describe('manual catalog imports', () => {
       postalOffice: 'Kilpisjärvi',
       type: { slug: 'hiking-area' }
     });
-    expect(saanaJaKilpisjarvi?.areaKm2).toBe(34.15);
+    expect(saanaJaKilpisjarvi?.areaKm2).toBe(36.29);
     expect(saanaJaKilpisjarvi?.markerPoint).toEqual({
       lat: 69.03868956629405,
       lon: 20.84524850154123
@@ -1179,7 +1280,7 @@ describe('manual catalog imports', () => {
     expect(rosala?.boundaryGeoJson?.features).toHaveLength(1);
     expect(rosala?.boundaryGeoJson?.features[0]?.geometry.type).toBe('Polygon');
 
-    const expectedLuontoonDestinationImports: ExpectedLuontoonDestinationImport[] = [
+    const expectedDestinationImports: ExpectedDestinationImport[] = [
       {
         displayTypeName: 'Soidensuojelualue',
         lipasId: 9001045,
@@ -1263,7 +1364,7 @@ describe('manual catalog imports', () => {
       }
     ] as const;
 
-    for (const expectedPark of expectedLuontoonDestinationImports) {
+    for (const expectedPark of expectedDestinationImports) {
       const park = await getParkBySlug(testDatabase.database, expectedPark.slug);
 
       expect(park).toMatchObject({
@@ -2237,8 +2338,9 @@ describe('manual catalog imports', () => {
   it('keeps luontoon destination area null when surface area metadata is missing', async () => {
     await importPublishedSpecialParkFixtures({
       database: testDatabase.database,
+      includeSlugs: ['peurajarvi'],
       fetchSource: async (sourceUrl) => {
-        if (sourceUrl === paistjarviSourceUrl) {
+        if (sourceUrl === peurajarviSourceUrl) {
           return {
             type: 'FeatureCollection',
             features: [
@@ -2257,8 +2359,8 @@ describe('manual catalog imports', () => {
                   ]
                 },
                 properties: {
-                  name_fi: 'Paistjärvi',
-                  slug: 'paistjarvi'
+                  name_fi: 'Peurajärvi',
+                  slug: 'peurajarvi'
                 }
               }
             ]
@@ -2270,11 +2372,11 @@ describe('manual catalog imports', () => {
       now: () => '2026-05-27T08:00:00.000Z'
     });
 
-    const paistjarvi = await testDatabase.database.query.parks.findFirst({
-      where: eq(parks.slug, 'paistjarvi')
+    const peurajarvi = await testDatabase.database.query.parks.findFirst({
+      where: eq(parks.slug, 'peurajarvi')
     });
 
-    expect(paistjarvi?.areaKm2).toBeNull();
+    expect(peurajarvi?.areaKm2).toBeNull();
   });
 
   it('filters Laajalahti by ELY to pick the Espoo feature', async () => {

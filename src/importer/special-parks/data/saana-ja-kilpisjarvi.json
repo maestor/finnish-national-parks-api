@@ -4,20 +4,43 @@
     {
       "type": "Feature",
       "properties": {
-        "name": "Saana ja Kilpisjärvi",
-        "source": "Luontoon public.destinations_details_view",
-        "surfaceArea": 34149094.03054047
+        "retrieved_at": "2026-11-19",
+        "area_m2": 36288104.6,
+        "dataset": "Luonnonsuojeluohjelma-alueet",
+        "dataset_url": "https://ckan.ymparisto.fi/dataset/luonnonsuojeluohjelma-alueet",
+        "source_url": "https://paikkatiedot.ymparisto.fi/geoserver/syke_luonnonsuojeluohjelma_alueet/wfs?service=WFS&request=GetFeature&version=2.0.0&typeNames=syke_luonnonsuojeluohjelma_alueet%3ALuonnonsuojeluohjelmaalueet&outputFormat=application%2Fjson&srsName=EPSG%3A4326&cql_filter=lsoaluetunnus%3D%27MAO120156%27",
+        "source_wfs_feature_id": "Luonnonsuojeluohjelmaalueet.1483",
+        "source_id_field": "lsoaluetunnus",
+        "source_ids": ["MAO120156"],
+        "attribution": "Lähde: Syke",
+        "license": "CC BY 4.0",
+        "license_url": "https://creativecommons.org/licenses/by/4.0/",
+        "geometry_processing": "Full source feature in WGS84."
       },
       "geometry": {
         "type": "MultiPolygon",
         "coordinates": [
           [
             [
-              [20.87895025, 68.999621211],
-              [20.736343101, 69.050989986],
-              [20.811564733, 69.07777666],
-              [20.954174682, 69.026345249],
-              [20.87895025, 68.999621211]
+              [20.96635313, 69.00516521],
+              [20.92619104, 68.99599718],
+              [20.90748854, 69.00361202],
+              [20.89585538, 69.01092374],
+              [20.8899895, 69.01460839],
+              [20.8622177, 69.01852687],
+              [20.8432472, 69.02121951],
+              [20.80301755, 69.03783354],
+              [20.77127999, 69.05153536],
+              [20.77978465, 69.05932776],
+              [20.79542794, 69.07364575],
+              [20.8152627, 69.07680459],
+              [20.85728617, 69.07176535],
+              [20.88299077, 69.06639412],
+              [20.90199557, 69.05909693],
+              [20.932475, 69.04747982],
+              [20.95770372, 69.02161149],
+              [20.97173646, 69.00813717],
+              [20.96635313, 69.00516521]
             ]
           ]
         ]
