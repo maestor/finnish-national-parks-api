@@ -9,6 +9,34 @@ import type { SpecialParkConfig } from './types.js';
 
 export const baseSpecialParkConfigs: SpecialParkConfig[] = [
   {
+    displayTypeName: 'Natura 2000 -alue',
+    extractMetadata: extractGeoJsonAreaM2Metadata,
+    locationLabel: 'Lepsämäntie 12',
+    parkUrl: 'https://uuvi.fi/fi/kohde/isosuon-luontopolku/',
+    name: 'Klaukkalan Isosuo',
+    parkTypeSlug: 'nature-reserve-area',
+    postalCode: '01800',
+    postalOffice: 'Klaukkala',
+    responseShapeVersion: 'syke-natura-sac-boundary-v1',
+    slug: 'klaukkalan-isosuo',
+    sourceUrl: 'special://klaukkalan-isosuo',
+    syntheticLipasId: 9_002_059
+  },
+  {
+    displayTypeName: null,
+    extractMetadata: extractGeoJsonAreaM2Metadata,
+    locationLabel: 'Siippoontie 771',
+    parkUrl: 'https://uuvi.fi/fi/kohde/myllykoski/',
+    name: 'Myllykoski',
+    parkTypeSlug: 'nature-reserve-area',
+    postalCode: '01900',
+    postalOffice: 'Nurmijärvi',
+    responseShapeVersion: 'syke-protected-sites-boundary-v1',
+    slug: 'myllykoski',
+    sourceUrl: 'special://myllykoski',
+    syntheticLipasId: 9_002_060
+  },
+  {
     displayTypeName: null,
     extractMetadata: extractGeoJsonAreaM2Metadata,
     locationLabel: 'Maisalantie',

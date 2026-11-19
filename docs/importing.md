@@ -430,6 +430,30 @@ for the intended catalog and run the same batch with the default trail conversio
 guard enabled. Immediately [expire the affected public park and map caches](#trailarea-reconciliation)
 using the catalog’s current public slugs.
 
+#### Klaukkalan Isosuo and Myllykoski
+
+The checked-in boundary snapshots come from Syke (CC BY 4.0). Klaukkalan Isosuo uses
+Natura 2000 feature `FI0100038`. Myllykoski uses both polygon parts of protected
+site `YSA275961`. The catalog stores the UUVI visitor addresses and destination
+links. [Natura 2000 dataset](https://ckan.ymparisto.fi/fi/dataset/natura2000-alueet)
+· [Protected areas dataset](https://ckan.ymparisto.fi/dataset/luonnonsuojelu-ja-eramaa-alueet)
+
+On a catalog with visits at either standalone trail, check the target database
+and back it up, then import the new areas with trail reconciliation deferred.
+
+```sh
+npm run import:special-parks -- --defer-trail-links klaukkalan-isosuo myllykoski
+```
+
+This option requires explicit slugs. The import creates the areas disabled and
+skips trail reconciliation for this run. Enable the areas in admin and preview
+each visit transfer with `npm run park:move-visits -- --from <trail-slug> --to <area-slug> --dry-run`.
+Move visits from `isosuon-luontopolku` to `klaukkalan-isosuo` and from
+`myllykosken-luontopolku` to `myllykoski` after reviewing the previews. Include
+each trail in its area's **Reitit** tab and assign it to the relevant moved
+visits. Expire both areas, both trail URLs, and the shared visit and trip caches.
+Run subsequent imports without the defer flag so normal matching resumes.
+
 #### Torholan luola and Paavolan luontopolku
 
 The tracked Torhola area snapshot uses only the Syke `ESA300647` polygon
