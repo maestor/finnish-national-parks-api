@@ -21,7 +21,7 @@ sampling date. The Luontoon.fi sitemap supplies visitor links.
 
 ## Trail–area reconciliation
 
-Visits may reference an area's linked trails after migration `0050_visit_trails.sql`. Assigning a trail to a visit pins that membership with an inclusion override; imports still refresh geometry and automatic-match measurements but retain the membership even if overlap disappears. Draft visits protect membership too. The admin unlink endpoint reports blocking visits for review; direct deletion/exclusion of a used relationship fails at the database boundary. Remove the trail from every relevant visit before unlinking it. The park-visit move command likewise rejects a move to a park without all assigned trails; review and clear assignments first. Inactive source trails retain historical assignments but are omitted from public map choices.
+Visits may reference an area's linked trails. Assigning a trail to a visit pins that membership with an inclusion override; imports still refresh geometry and automatic-match measurements but retain the membership even if overlap disappears. Draft visits protect membership too. The admin unlink endpoint reports blocking visits for review; direct deletion/exclusion of a used relationship fails at the database boundary. Remove the trail from every relevant visit before unlinking it. The park-visit move command likewise rejects a move to a park without all assigned trails; review and clear assignments first. Inactive source trails retain historical assignments but are omitted from public map choices.
 
 Both import paths insert new records disabled and preserve existing visibility and editable fields. The LIPAS import retains supported source-active trails, then clips route lines against active stored area polygons in WGS84 and measures the resulting lengths in EPSG:3067. Each area covering at least 10% of measured route length qualifies independently, without a distance floor or buffer; comparison uses a 1e-7 ratio tolerance for projection and floating-point precision. Invalid polygons and wholly degenerate trails are reported without automatic matches. When a trail contains both usable and zero-length line parts, the usable parts are measured and the degenerate parts are flagged in the report and link metadata; no geometry is repaired. A trail without usable coordinates retains its last known bounds and marker; a new trail without usable coordinates uses a private zero-coordinate placeholder and cannot be enabled until coordinates exist. An area without usable coordinates fails the import. Both import paths fetch and validate their source batch before committing catalog or relationship changes. Special-import trails remain independent; special areas can be parents. An effective link hides a trail as a standalone destination, and removing the last match does not automatically republish it; an explicit enable restores independence only when no effective link remains. No visit records are moved or rewritten.
 
@@ -68,11 +68,36 @@ until explicitly reviewed/enabled or linked. No offline storage changes.
 
 To reduce traffic to remote libSQL, the main import upserts at most ten parks per statement, with a 1 MiB geometry budget per batch. Trail reconciliation loads geometry in groups of at most 50 records and 2 MiB. A single geometry larger than a budget is sent or read on its own. During lengthy geometry matching, periodic lightweight queries keep the remote transaction stream active. All catalog writes, reconciliation and notification queuing remain in one transaction; dry runs roll it back.
 
-Back up the target database before applying. Run `npm run import:parks -- --dry-run` first. The dry run rolls back catalog changes and reports new rows, automatic links, exclusions, deactivations, in-place source transfers and affected public slugs. A trail with visits that would newly become a member aborts the transaction for a separate preservation decision. After review, run `npm run import:parks` and immediately expire every reported slug through the UI's authenticated `POST /api/revalidate-public-cache` with `{ "parkSlugs": ["slug"] }` (maximum 500 per request). That endpoint also expires summary, map, planner and sitemap paths. API ETags do not invalidate the UI cache by themselves. Repeat the dry run to check stability before rollout.
+Back up the target database before applying. Run `npm run import:parks -- --dry-run` first. The dry run rolls back catalog changes and reports new rows, automatic links, exclusions, deactivations, in-place source transfers and affected public slugs. A trail with visits that would newly become a member aborts the transaction. See [the parent-area import workflow](#import-a-parent-area-for-a-trail-with-visits). After review, run `npm run import:parks` and immediately expire every reported slug through the UI's authenticated `POST /api/revalidate-public-cache` with `{ "parkSlugs": ["slug"] }` (maximum 500 per request). That endpoint also expires summary, map, planner and sitemap paths. API ETags do not invalidate the UI cache by themselves. Repeat the dry run to check stability before rollout.
 
 A scheduled import rolls back when it would newly hide an enabled trail, because it cannot perform the UI's authenticated expiry. Review the reported slugs and run the manual import. If an affected trail moves under a newly imported parent, enable the approved parent in the admin UI so its trail stays publicly accessible. Expire the affected parent and trail URLs immediately. Special-area imports have the same guard; after review a single area can be imported with `npm run import:special-parks -- --allow-public-trail-conversions <slug>`, followed immediately by expiry of every printed slug. The default special-import command refuses that conversion.
 
 Admin-session endpoints `GET /api/admin/parks/{slug}/trails` and `/trail-candidates` expose private link and candidate data; `PUT`/`DELETE /api/admin/parks/{slug}/trails/{trailId}` record durable inclusion/exclusion overrides. The candidate read accepts `q`, `limit` (1–100) and `offset`. An API key alone is insufficient. Callers making a manual change must immediately expire both the area slug and returned trail slug through the same UI endpoint. Public area detail requests with `includeBoundary=true` include effective linked trails, their names, available addresses and lengths, and stored geometry. Park detail caches revalidate after one hour to pick up scheduled imports; immediately expire affected area details after an import when prompt updates are required. No relation editor is included.
+
+### Import a parent area for a trail with visits
+
+Back up the target catalog and verify the conversion on an isolated copy. The
+default special import rolls back if it would convert an independent trail that
+still has visits. Import the new area by explicit slug with reconciliation
+deferred for that run.
+
+```sh
+npm run import:special-parks -- --defer-trail-links <area-slug>
+```
+
+1. Enable the new area in admin. New special areas start disabled.
+2. Preview the visit move with the command below. Check the reported visits and
+   photos, then repeat without `--dry-run`. Use `--visit-id <id>` in place of
+   `--from <trail-slug>` to move a single visit.
+3. Include the trail in the area's **Reitit** tab after moving its visits, then
+   assign it to the relevant moved visits.
+4. Verify the area and linked trail. Expire the area and former standalone trail
+   URLs and the shared visit and trip caches. Run subsequent imports without
+   the defer flag to resume normal matching.
+
+```sh
+npm run park:move-visits -- --from <trail-slug> --to <area-slug> --dry-run
+```
 
 ## Supplemental OpenStreetMap trails
 
@@ -122,7 +147,11 @@ publishing imported data.
 
 ### Selected linked trails
 
-Migration `0052_curated_trail_sources.sql` registers the approved November 2026 snapshot: 25 OSM way selections and two real OSM relations, across 11 existing parent areas. The tracked manifest and linework in `src/importer/selected-trails/` are the sole source; reads and this command never contact OSM. Geometry hashes, source identities and the manifest hash are checked before writes. The selection preserves branches and clipped lines. Nominal walking distance is separate from measured unique line length; networks without an agreed traversal retain a null displayed length.
+The selected-trail importer reads a tracked manifest and geometry from
+[src/importer/selected-trails/](../src/importer/selected-trails). It verifies source
+identities and hashes before writing. Nominal walking distance is separate
+from measured unique line length. Networks without an agreed traversal keep
+a null displayed length.
 
 Set the intended `DATABASE_URL` and optional `DATABASE_AUTH_TOKEN`, verify a backup and apply pending migrations through the normal deployment workflow. The command checks for pending migrations and never applies them:
 
@@ -137,13 +166,13 @@ The normal report groups trails by parent area and summarizes additions, updates
 DOTENV_CONFIG_QUIET=true npm run --silent import:selected-trails -- --selection visited-trails-2026-11 --dry-run --json > selected-trails-preview.json
 ```
 
-Review the preview's manifest hash, all 27 identities and hashes, 11 resolved parents, actions and affected slugs before applying the identical files. Missing/inactive parents, nearby same-name trails or same-name trails linked to the selected parent, changed snapshots, selected link exclusions, merged sources and independent trails with direct visits abort the batch. Name collisions use a conservative bounding-box margin of 0.1° latitude and 0.3° longitude; unrelated distant namesakes are listed in `distantNamesakes` and are never reused or changed. Only matching relation-owned rows can be reused; other ambiguous candidates need an explicit preservation decision. The transaction preserves visits, photos, existing unrelated links and administrator name/length edits. New rows are linked-only and hidden as standalone destinations. An unchanged rerun writes nothing and reports no affected slugs.
+Review the preview's manifest hash, source identities, geometry hashes, resolved parents, actions and affected cache slugs before applying the same files. Missing/inactive parents, nearby same-name trails or same-name trails linked to the selected parent, changed snapshots, selected link exclusions, merged sources and independent trails with direct visits abort the batch. Name collisions use a conservative bounding-box margin of 0.1° latitude and 0.3° longitude; unrelated distant namesakes are listed in `distantNamesakes` and are never reused or changed. Only matching relation-owned rows can be reused; other ambiguous candidates need an explicit preservation decision. The transaction preserves visits, photos, existing unrelated links and administrator name/length edits. New rows are linked-only and hidden as standalone destinations. An unchanged rerun writes nothing and reports no affected slugs.
 
-After applying, immediately expire every reported UI park cache through the authenticated cache-clear workflow; API version changes do not invalidate Next.js caches; offline storage behavior is unchanged. Retain the report and manifest hash as operator evidence. Regular LIPAS/special-area reconciliation preserves selected membership, and regular OSM discovery reports relation geometry drift while retaining the accepted snapshot. Revision of the accepted snapshot requires a separate reviewed implementation; selected snapshots cannot enter manual merges. Source attribution and ODbL links remain in the public contract. Deploy the migration and API first, followed by the generated UI consumer. Do not apply this batch to a target database without the operational preview and backup.
+After applying, immediately expire every reported UI park cache through the authenticated cache-clear workflow; API version changes do not invalidate Next.js caches. Retain the report and manifest hash as operator evidence. Regular LIPAS/special-area reconciliation preserves selected membership, and regular OSM discovery reports relation geometry drift while retaining the accepted snapshot. Revision of the accepted snapshot requires a separate reviewed implementation; selected snapshots cannot enter manual merges. Source attribution and ODbL links remain in the public contract.
 
 ### Merged OSM trail refresh
 
-Maintainers can [merge linked OSM trails manually](development.md#merge-linked-trails) after migration `0051_trail_merges.sql`. Original relation identities and raw component snapshots remain separate from the destination's combined geometry. The public linked-trail `source.relations` array lists every contributing relation ID and URL; existing singular `relationId`/`sourceUrl` fields still identify the destination's primary source.
+Maintainers can [merge linked OSM trails manually](development.md#merge-linked-trails). Original relation identities and raw component snapshots remain separate from the destination's combined geometry. The public linked-trail `source.relations` array lists every contributing relation ID and URL; existing singular `relationId`/`sourceUrl` fields still identify the destination's primary source.
 
 Known merge members refresh before duplicate/containment filtering. The importer rebuilds each changed destination once from current valid components, preserving its chosen name, slug, administrator length correction and manual memberships. Absorbed sources stay inactive and hidden; database guards also prevent re-enabling them. A missing or rejected member keeps its last valid component and is reported, while valid members can still refresh. Invalid combined geometry, a combined route over 100 km or concurrent edits abort the transaction instead of partly replacing snapshots. Normal reads remain local-first. An unchanged rerun writes nothing.
 
@@ -243,20 +272,7 @@ outputFormat=application/json
 srsName=EPSG:4326
 ```
 
-Typical Helsinki name filters:
-
-- `puiston_nimi LIKE '%Tullisaari%'`
-- `puiston_nimi LIKE '%Henrik Borgströmin puisto%'`
-- `alueen_nimi LIKE '%Tuurholmanpuisto%'`
-
-Practical Helsinki rule of thumb:
-
-- use `YLRE_Viheralue_alue` when it already expresses the park as one or more official area polygons
-- use `YLRE_Katu_ja_viherosat_eiliikenne_alue` only when the detailed sub-areas are genuinely the best published representation of the park
-
-Source names can differ from catalog names: `Tullisaaren kartanopuisto` uses
-`Henrik Borgströmin puisto` from `YLRE_Viheralue_alue`. Preserve the catalog name
-when storing the source geometry under `special://tullisaaren-kartanopuisto`.
+Filter the park layer by `puiston_nimi` and the sub-area layer by `alueen_nimi`. Prefer the park layer when it contains the full published boundary. The source name may differ from the catalog name.
 
 ## Vantaa municipal-plan workflow
 
@@ -265,12 +281,6 @@ Vantaa publishes open WMS/WFS interfaces, including coordinate-system guidance, 
 - confirm the landmark or address through Vantaa's WFS in `EPSG:4326`
 - use the published plan's marked `puistoalueen raja` as the source boundary
 - store a simplified, attributed WGS84 snapshot under `special://...`, including the source plan URL and its source coordinate system in the GeoJSON properties
-
-Example: `Vernissa`
-
-- source plan: `Vernissanranta ja Väritehtaanranta` (drawing 58022-1)
-- scope: Vernissa, Vernissanranta, Tikkurilankoski, Väritehtaanranta, and Maisemalampi
-- address metadata: `Tikkurilantie 36, 01300 Vantaa`
 
 ## Reusable Workflow Families
 
@@ -307,15 +317,6 @@ Use this for the smaller set of curated history places that live under the Museo
 - layer family: `muinaisjaannos_alue`
 - helper in code: `createMuseovirastoSpecialParkConfig`
 
-Examples include:
-
-- `Harola`
-- `Kajaanin linna`
-- `Kuusiston linna`
-- `Kärnäkosken linnoitus`
-
-This is usually the right fit when the history place is already available as one named protected-site polygon.
-
 ### 3. Museovirasto RKY area workflow
 
 Use this when the place should come from the RKY areas layer.
@@ -335,21 +336,7 @@ This workflow already supports the common edge cases:
 - `excludedSourceNames`
   - excludes known false-positive sibling features from a broader RKY match
 
-Use this when:
-
-- the user wants a specific public-facing end result name
-- the official RKY title differs from that final imported name
-- one RKY registry item returns more than one geometry candidate
-
-Examples include:
-
-- simple RKY additions like `Loviisan alakaupunki`, `Louhisaaren kartano`, `Sipoonlinna`, and `Iniön kirkonkylä`
-- factory-village rows such as `Fiskarsin ruukki`, `Kauttuan ruukki`, and `Högforsin ruukki`, where feature narrowing or exclusions may be needed
-
-Feature filters select whole published features; they cannot trim part of a
-polygon. For example, `Vihdin kirkonkylä` includes Vanhalan viljelymaisema in its
-combined RKY boundary. A narrower boundary requires a separately reviewed local
-geometry.
+Filters select whole published features. To use only part of a feature, store a reviewed local snapshot and record the clipping method.
 
 ### 4. World heritage WFS with feature ID filtering
 
@@ -358,22 +345,12 @@ Use this when the source is the Museovirasto world-heritage layer and the import
 - parser in code: `world-heritage-area`
 - filter field in code: `sourceFeatureId`
 
-This pattern is already used for:
-
-- `Merenkurkun maailmanperintöalue`
-- `Sammallahdenmäki`
-- `Suomenlinna`
-- `Vanha Rauma`
-
-This is useful when one shared WFS feed covers many world-heritage rows and the importer must select exactly one record.
-
 ### 5. Curated OpenStreetMap way selections
 
 Use tracked `special://` GeoJSON for a reviewed trail assembled from OSM
 ways. Specify the source way IDs and retrieval time in the config so the
 importer can register the selection and expose OSM attribution for linked
 trails. Record the way version and any clipping node IDs beside the geometry.
-This workflow covers Paavola, Torhola, and Santalahti.
 
 ### 6. Repo-local `special://` geometry
 
@@ -384,152 +361,18 @@ the source live.
 - the importer loads these files directly from the repo
 - `tests/fixtures/special-parks.ts` does not need an entry for local `special://` sources
 
-Record the source URL or identifier, retrieval date, attribution, license, and
-geometry scope in the GeoJSON properties. Make limited coverage explicit: for
-example, `special://nummelanharju` covers the northern MOBO area, not the entire
-recreation area. Do not copy LIPAS contact details or comments into snapshots.
+Record the source URL, feature IDs, retrieval date, attribution, license, and
+any clipping, simplification, or other processing alongside the GeoJSON. For
+municipal plans and visitor maps, record the mapped extent and any approximation
+introduced by georeferencing. Retain all polygon parts and holes within the
+chosen scope. Union overlapping selections in the source projected CRS before
+transforming to WGS84. Keep visitor markers and addresses separate from the
+geometry, and omit LIPAS contact details and comments.
 
-This workflow is already used for several different reasons:
-
-- copying a stable official geometry snapshot into the repo
-- creating a pragmatic proxy polygon when the official source only validates a point
-- storing a locally curated geometry that is easier to justify than a brittle remote endpoint
-
-Examples include:
-
-- Helsinki local geometries such as `Uutelan ulkoilualue`, `Kallahden ulkoilualue`, and `Tullisaaren kartanopuisto`
-- island and boundary snapshots such as `Seurasaari`, `Mustikkamaa`, `Seili`, and `Vallisaari`
-- pragmatic local proxies such as `Kuhakoski`
-
-#### Open boundaries for 14 existing destinations
-
-The importer reads the reviewed 2026-11-19 snapshots by existing catalog ID.
-Each snapshot records the source URL, selected IDs, retrieval date, attribution,
-license and processing. Source markers are fixed at their previous positions.
-The import refreshes the source area from the EPSG:3067 geometry and supplies
-no establishment year. The normal catalog upsert preserves administrator edits.
-
-- **Luonnonsuojelu- ja erämaa-alueet / Lähde: Metsähallitus** provides the three complete state-reserve WFS features. [Dataset](https://ckan.ymparisto.fi/dataset/luonnonsuojelu-ja-eramaa-alueet)
-- **Valtion muut suojelualueet / Lähde: Metsähallitus** provides nine selections from Syke’s June 2026 ZIP. Select by `SATJ_tunnu` and verify every ID exists exactly once. Union the two Hepoköngäs features and the four Paistjärvi features in EPSG:3067 before transforming to WGS84. [Dataset](https://ckan.ymparisto.fi/dataset/valtion-muut-suojelualueet)
-- **Luonnonsuojeluohjelma-alueet / Lähde: Syke** provides the Saana landscape feature `MAO120156` for Saana ja Kilpisjärvi. [Dataset](https://ckan.ymparisto.fi/dataset/luonnonsuojeluohjelma-alueet)
-- **Pohjois-Karjalan maakuntakaava 2040 (HAME) / Lähde: Pohjois-Karjalan maakuntaliitto** provides Peurajärvi's recreation-area reservation `m11005al256` from the October 2025 compilation. Keep the complete feature and its interior ring. [Dataset license metadata](https://avoindata.suomi.fi/data/api/3/action/package_show?id=pohjois-karjalan-maakuntakaava-2040-yhtenaisessa-tietomallissa-hame)
-
-These datasets use [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
-Use all polygon parts and holes when refreshing snapshots. The Neitvuori snapshot
-uses compact coordinate arrays to keep the full feature within Biome’s file-size limit.
-
-Run the batch first on an isolated catalog copy and compare park identity, visits,
-effective linked trails and standalone trail visibility across two imports.
-
-```sh
-npm run import:special-parks -- litokairan-soidensuojelualue martimoaavan-soidensuojelualue neitvuori-ja-luonterin-luonnonsuojelualue auttikongas hepokongas iivaara koskeljarvi kurimonkoski paistjarvi paukanevan-soidensuojelualue pinkjarvi soiperoinen saana-ja-kilpisjarvi peurajarvi
-```
-
-After reviewing the isolated import, follow the [backup workflow](recovery.md)
-for the intended catalog and run the same batch with the default trail conversion
-guard enabled. Immediately [expire the affected public park and map caches](#trailarea-reconciliation)
-using the catalog’s current public slugs.
-
-#### Klaukkalan Isosuo and Myllykoski
-
-The checked-in boundary snapshots come from Syke (CC BY 4.0). Klaukkalan Isosuo uses
-Natura 2000 feature `FI0100038`. Myllykoski uses both polygon parts of protected
-site `YSA275961`. The catalog stores the UUVI visitor addresses and destination
-links. [Natura 2000 dataset](https://ckan.ymparisto.fi/fi/dataset/natura2000-alueet)
-· [Protected areas dataset](https://ckan.ymparisto.fi/dataset/luonnonsuojelu-ja-eramaa-alueet)
-
-On a catalog with visits at either standalone trail, check the target database
-and back it up, then import the new areas with trail reconciliation deferred.
-
-```sh
-npm run import:special-parks -- --defer-trail-links klaukkalan-isosuo myllykoski
-```
-
-This option requires explicit slugs. The import creates the areas disabled and
-skips trail reconciliation for this run. Enable the areas in admin and preview
-each visit transfer with `npm run park:move-visits -- --from <trail-slug> --to <area-slug> --dry-run`.
-Move visits from `isosuon-luontopolku` to `klaukkalan-isosuo` and from
-`myllykosken-luontopolku` to `myllykoski` after reviewing the previews. Include
-each trail in its area's **Reitit** tab and assign it to the relevant moved
-visits. Expire both areas, both trail URLs, and the shared visit and trip caches.
-Run subsequent imports without the defer flag so normal matching resumes.
-
-#### Torholan luola and Paavolan luontopolku
-
-The tracked Torhola area snapshot uses only the Syke `ESA300647` polygon
-containing the cave entrances, under CC BY 4.0. Its public slug is
-`torholan-luola` and its type is `nature-reserve-area`. The separate
-`torholan-luolan-polku` trail preserves catalog identity `9004406` and uses
-two OpenStreetMap ways for the approach and cave loop. Paavola retains its
-existing identity and slug. Its snapshot includes the oak branch, the
-southern spur, the return footpath, and the section of way `374925037` between
-OSM nodes `8648605275` and `3783079451`. Both trails are attributed to
-OpenStreetMap contributors under ODbL 1.0. The importer reads these snapshots from the repository.
-
-After checking the intended database and backup, import the three records in
-one batch. On an existing catalog, the importer first updates the trail in
-place, freeing the old slug for the area. If an administrator previously
-overrode the trail name or slug, review that edit before importing.
-
-```sh
-npm run import:special-parks -- torholan-luolan-polku torholan-luola paavolan-luontopolku
-```
-
-Enable the new Torhola area in the admin editor. Preview the existing visit
-transfer, check the reported visit ID, then repeat the command without
-`--dry-run` to transfer the same visit and preserve its photos and trip
-association.
-
-```sh
-npm run park:move-visits -- --from torholan-luolan-polku --to torholan-luola --dry-run
-```
-
-In the area's **Reitit** tab, include **Torholan luolan polku**. Do this after
-moving the visit, because the existing link guard rejects conversion while a
-standalone trail still holds visits. Verify the area page and verify the trail
-is visible there. Immediately clear the public UI cache for both Torhola
-slugs and Paavola, including the shared visit and trip caches after the move.
-Subsequent imports preserve the visit, visibility settings, and manual link.
-
-#### Santalahden luontopolku
-
-The OSM snapshot preserves both the coastal and forest loops as one connected
-network. It uses 26 named ways and four connecting ways, including the clipped
-sections of Kipparitie and Niinilahdentie recorded in the snapshot. The import
-preserves catalog identity `9004405`, the standalone URL, and existing visits.
-The source is © OpenStreetMap contributors under ODbL 1.0. Kotka's destination
-page is the visitor information link.
-
-```sh
-npm run import:special-parks -- santalahden-luontopolku
-```
-
-Expire the Santalahti public park cache after importing.
-
-#### Ruotsinkylän tutkimusmetsä
-
-Import the Tuusula outdoor recreation area with:
-
-```sh
-npm run import:special-parks -- ruotsinkylan-tutkimusmetsa
-```
-
-The local snapshot uses the blue `Tutkimusmetsä (465 ha)` outlines in
-[Luke's visitor map](https://www.luke.fi/fi/documents/ruotsinkylan-tutkimusmetsan-kartta),
-retrieved on 2026-10-17. It contains five simplified polygons and the central
-built-area exclusion. The raster PDF has no embedded georeferencing: its outlines
-were manually digitized and registered in ETRS-TM35FIN using OpenStreetMap road
-junctions. Source links, attribution, license notes, map dimensions and control
-points are recorded in the snapshot's collection-level `properties`.
-
-This is approximate map-display geometry, not a surveyed boundary. It covers
-the Tuusula visitor-map area, not the roughly 1,000 hectares of research land
-across five municipalities described on
-[Luke's destination page](https://www.luke.fi/fi/tietoa-lukesta/vierailukohteet/ruotsinkylan-tutkimusmetsa).
-The catalog area is the map's published 465 hectares, counted once; the digitized
-polygons total approximately 470 hectares. The marker is at Professorin pytinki
-near the Maisalantie entrance. Address metadata is `Maisalantie, 04360 Tuusula`.
-No new environment variables or remote runtime requests are needed.
+Inspect the [checked-in snapshots](../src/importer/special-parks/data) and their
+[configurations](../src/importer/special-parks) before refreshing an existing
+boundary. Preserve catalog IDs and slugs, and compare visits, linked trails,
+and standalone visibility on an isolated database copy before applying.
 
 ### 7. Geological SYKE GeoJSON workflow
 
@@ -538,12 +381,6 @@ Use this when the geometry comes from a non-protected-sites SYKE layer rather th
 - builder in code: `buildSykeGeologicalRockAreaSourceUrl`
 - source parser: `geojson`
 - metadata source: `area_m2` when the layer exposes it in GeoJSON properties
-
-Current example:
-
-- `Rokokallio`
-
-This is a good fit when the right official source is still SYKE, but it lives in a more specialized thematic layer.
 
 ## Geometry And Metadata Notes
 
