@@ -14,6 +14,11 @@ before either mode; the scheduled command below never applies migrations.
 
 Use this guide when you need to reproduce or extend the curated special import workflow.
 
+See the [catalog data source](../README.md#data-source) for supported LIPAS types.
+Attribute LIPAS data to Jyväskylän yliopisto, Lipas Liikuntapaikat.fi, with the
+sampling date. The Luontoon.fi sitemap supplies visitor links.
+[LIPAS CC BY 4.0 terms](https://www.jyu.fi/fi/liikunta/yhteistyo/lipas-liikunnan-paikkatietojarjestelma/avoimet-rajapinnat-ja-ladattavat-lipas-aineistot)
+
 ## Trail–area reconciliation
 
 Visits may reference an area's linked trails after migration `0050_visit_trails.sql`. Assigning a trail to a visit pins that membership with an inclusion override; imports still refresh geometry and automatic-match measurements but retain the membership even if overlap disappears. Draft visits protect membership too. The admin unlink endpoint reports blocking visits for review; direct deletion/exclusion of a used relationship fails at the database boundary. Remove the trail from every relevant visit before unlinking it. The park-visit move command likewise rejects a move to a park without all assigned trails; review and clear assignments first. Inactive source trails retain historical assignments but are omitted from public map choices.
@@ -63,9 +68,9 @@ until explicitly reviewed/enabled or linked. No offline storage changes.
 
 To reduce traffic to remote libSQL, the main import upserts at most ten parks per statement, with a 1 MiB geometry budget per batch. Trail reconciliation loads geometry in groups of at most 50 records and 2 MiB. A single geometry larger than a budget is sent or read on its own. During lengthy geometry matching, periodic lightweight queries keep the remote transaction stream active. All catalog writes, reconciliation and notification queuing remain in one transaction; dry runs roll it back.
 
-Back up the target database before applying. Run `npm run import:parks -- --dry-run` first; it rolls back catalog changes and reports new rows, automatic links, exclusions, unresolved geometry, deactivations and affected public slugs. A trail with visits that would newly become a member aborts the transaction for a separate preservation decision. After review, run `npm run import:parks` and immediately expire every reported slug through the UI's authenticated `POST /api/revalidate-public-cache` with `{ "parkSlugs": ["slug"] }` (maximum 500 per request). That endpoint also expires summary, map, planner and sitemap paths. API ETags do not invalidate the UI cache by themselves. Repeat the dry run to check stability before rollout.
+Back up the target database before applying. Run `npm run import:parks -- --dry-run` first. The dry run rolls back catalog changes and reports new rows, automatic links, exclusions, deactivations, in-place source transfers and affected public slugs. A trail with visits that would newly become a member aborts the transaction for a separate preservation decision. After review, run `npm run import:parks` and immediately expire every reported slug through the UI's authenticated `POST /api/revalidate-public-cache` with `{ "parkSlugs": ["slug"] }` (maximum 500 per request). That endpoint also expires summary, map, planner and sitemap paths. API ETags do not invalidate the UI cache by themselves. Repeat the dry run to check stability before rollout.
 
-A scheduled import rolls back when it would newly hide an enabled trail, because it cannot perform the UI's authenticated expiry. Review the reported slugs, run the manual import and expire those URLs immediately. Special-area imports have the same guard; after review a single area can be imported with `npm run import:special-parks -- --allow-public-trail-conversions <slug>`, followed immediately by expiry of every printed slug. The default special-import command refuses that conversion.
+A scheduled import rolls back when it would newly hide an enabled trail, because it cannot perform the UI's authenticated expiry. Review the reported slugs and run the manual import. If an affected trail moves under a newly imported parent, enable the approved parent in the admin UI so its trail stays publicly accessible. Expire the affected parent and trail URLs immediately. Special-area imports have the same guard; after review a single area can be imported with `npm run import:special-parks -- --allow-public-trail-conversions <slug>`, followed immediately by expiry of every printed slug. The default special-import command refuses that conversion.
 
 Admin-session endpoints `GET /api/admin/parks/{slug}/trails` and `/trail-candidates` expose private link and candidate data; `PUT`/`DELETE /api/admin/parks/{slug}/trails/{trailId}` record durable inclusion/exclusion overrides. The candidate read accepts `q`, `limit` (1–100) and `offset`. An API key alone is insufficient. Callers making a manual change must immediately expire both the area slug and returned trail slug through the same UI endpoint. Public area detail requests with `includeBoundary=true` include effective linked trails, their names, available addresses and lengths, and stored geometry. Park detail caches revalidate after one hour to pick up scheduled imports; immediately expire affected area details after an import when prompt updates are required. No relation editor is included.
 
@@ -294,32 +299,7 @@ Use the composite variant when one park should be assembled from several officia
 - example pattern: `Sanginjoki`
 - use this when the final imported row is one place, but the official SYKE coverage is split across multiple named source features
 
-### 2. Luontoon destination polygons
-
-Use this when Luontoon already exposes the place as a destination polygon.
-
-- builder in code: `buildLuontoonGeoJsonCollectionSourceUrl`
-- collection: `public.destinations_details_view`
-- helper in code: `createLuontoonDestinationAreaConfig`
-- metadata source: `surfaceArea`
-
-This is a good fit when:
-
-- the place has a clear Luontoon destination page
-- the destination polygon already matches the intended imported place
-- you want both official geometry and a Luontoon `parkUrl`
-
-Peurajärvi and Unarinköngäs are the two remaining live destination-polygon imports.
-
-### 3. Luontoon route lines
-
-Use this when the place should be imported as a route or nature trail and Luontoon has the route geometry.
-
-- collection: `public.all_lines_details_view`
-- source parser: `geojson`
-- geometry note: `MultiLineString` is already normalized into several `LineString` features by the importer
-
-### 4. Museovirasto protected sites WFS
+### 2. Museovirasto protected sites WFS
 
 Use this for the smaller set of curated history places that live under the Museovirasto protected-sites layer instead of RKY area polygons.
 
@@ -336,7 +316,7 @@ Examples include:
 
 This is usually the right fit when the history place is already available as one named protected-site polygon.
 
-### 5. Museovirasto RKY area workflow
+### 3. Museovirasto RKY area workflow
 
 Use this when the place should come from the RKY areas layer.
 
@@ -371,7 +351,7 @@ polygon. For example, `Vihdin kirkonkylä` includes Vanhalan viljelymaisema in i
 combined RKY boundary. A narrower boundary requires a separately reviewed local
 geometry.
 
-### 6. World heritage WFS with feature ID filtering
+### 4. World heritage WFS with feature ID filtering
 
 Use this when the source is the Museovirasto world-heritage layer and the importer needs one exact feature from a broader dataset.
 
@@ -387,7 +367,7 @@ This pattern is already used for:
 
 This is useful when one shared WFS feed covers many world-heritage rows and the importer must select exactly one record.
 
-### 7. Curated OpenStreetMap way selections
+### 5. Curated OpenStreetMap way selections
 
 Use tracked `special://` GeoJSON for a reviewed trail assembled from OSM
 ways. Specify the source way IDs and retrieval time in the config so the
@@ -395,7 +375,7 @@ importer can register the selection and expose OSM attribution for linked
 trails. Record the way version and any clipping node IDs beside the geometry.
 This workflow covers Paavola, Torhola, and Santalahti.
 
-### 8. Repo-local `special://` geometry
+### 6. Repo-local `special://` geometry
 
 Use this when imports should load a stored geometry snapshot instead of fetching
 the source live.
@@ -432,27 +412,17 @@ no establishment year. The normal catalog upsert preserves administrator edits.
 - **Luonnonsuojelu- ja erämaa-alueet / Lähde: Metsähallitus** provides the three complete state-reserve WFS features. [Dataset](https://ckan.ymparisto.fi/dataset/luonnonsuojelu-ja-eramaa-alueet)
 - **Valtion muut suojelualueet / Lähde: Metsähallitus** provides nine selections from Syke’s June 2026 ZIP. Select by `SATJ_tunnu` and verify every ID exists exactly once. Union the two Hepoköngäs features and the four Paistjärvi features in EPSG:3067 before transforming to WGS84. [Dataset](https://ckan.ymparisto.fi/dataset/valtion-muut-suojelualueet)
 - **Luonnonsuojeluohjelma-alueet / Lähde: Syke** provides the Saana landscape feature `MAO120156` for Saana ja Kilpisjärvi. [Dataset](https://ckan.ymparisto.fi/dataset/luonnonsuojeluohjelma-alueet)
+- **Pohjois-Karjalan maakuntakaava 2040 (HAME) / Lähde: Pohjois-Karjalan maakuntaliitto** provides Peurajärvi's recreation-area reservation `m11005al256` from the October 2025 compilation. Keep the complete feature and its interior ring. [Dataset license metadata](https://avoindata.suomi.fi/data/api/3/action/package_show?id=pohjois-karjalan-maakuntakaava-2040-yhtenaisessa-tietomallissa-hame)
 
-The three datasets above use [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
+These datasets use [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
 Use all polygon parts and holes when refreshing snapshots. The Neitvuori snapshot
 uses compact coordinate arrays to keep the full feature within Biome’s file-size limit.
 
-Pukala uses the full OpenStreetMap way `958348897` version 5, including water
-inside the ring. The unmodified OSM coordinate ring is available as a
-[standalone snapshot](../src/importer/special-parks/data/pukala.json) under
-[ODbL 1.0](https://opendatacommons.org/licenses/odbl/1-0/).
-Credit © OpenStreetMap contributors on published maps and retain the attribution
-and ODbL notice with database distributions containing the OSM boundary.
-Review share-alike terms before distributing a bulk mixed-source geometry export.
-[OpenStreetMap attribution guidance](https://osmfoundation.org/wiki/Licence/Attribution_Guidelines)
-
 Run the batch first on an isolated catalog copy and compare park identity, visits,
 effective linked trails and standalone trail visibility across two imports.
-The CLI selects the configured slug `pukala` even when that record has a custom
-public slug such as `pukalan-virkistysmetsa`.
 
 ```sh
-npm run import:special-parks -- litokairan-soidensuojelualue martimoaavan-soidensuojelualue neitvuori-ja-luonterin-luonnonsuojelualue auttikongas hepokongas iivaara koskeljarvi kurimonkoski paistjarvi paukanevan-soidensuojelualue pinkjarvi soiperoinen saana-ja-kilpisjarvi pukala
+npm run import:special-parks -- litokairan-soidensuojelualue martimoaavan-soidensuojelualue neitvuori-ja-luonterin-luonnonsuojelualue auttikongas hepokongas iivaara koskeljarvi kurimonkoski paistjarvi paukanevan-soidensuojelualue pinkjarvi soiperoinen saana-ja-kilpisjarvi peurajarvi
 ```
 
 After reviewing the isolated import, follow the [backup workflow](recovery.md)
@@ -537,7 +507,7 @@ polygons total approximately 470 hectares. The marker is at Professorin pytinki
 near the Maisalantie entrance. Address metadata is `Maisalantie, 04360 Tuusula`.
 No new environment variables or remote runtime requests are needed.
 
-### 9. Geological SYKE GeoJSON workflow
+### 7. Geological SYKE GeoJSON workflow
 
 Use this when the geometry comes from a non-protected-sites SYKE layer rather than the standard protected-sites WFS.
 
@@ -557,8 +527,6 @@ The importer already supports a few reusable metadata paths:
 
 - `extractHikingAreaMetadata`
   - use when the source exposes `shape_area`
-- `extractLuontoonDestinationMetadata`
-  - use when the source exposes `surfaceArea`
 - `extractGeoJsonAreaM2Metadata`
   - use when a local or remote GeoJSON source exposes `area_m2`
 

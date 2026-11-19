@@ -46,8 +46,6 @@ const merenkurkkuSourceUrl =
 
 const kevoSourceUrl =
   "https://paikkatiedot.ymparisto.fi/geoserver/inspire_ps/wfs?service=WFS&request=GetFeature&version=2.0.0&typeNames=inspire_ps:PS.ProtectedSitesValtionOmistamaLuonnonsuojelualue&outputFormat=application/json&srsName=EPSG:4326&cql_filter=nimi='Kevon luonnonpuisto'";
-const peurajarviSourceUrl =
-  'https://www.luontoon.fi/geo/features/collections/public.destinations_details_view/items?filter=slug%3D%27peurajarvi%27&filter-lang=cql-text&limit=1000';
 
 describe('manual catalog imports', () => {
   let testDatabase: Awaited<ReturnType<typeof createTestDatabase>>;
@@ -183,7 +181,7 @@ describe('manual catalog imports', () => {
     await expect(getParkBySlug(database, 'torholan-luolan-polku')).resolves.toBeNull();
   });
 
-  it('replaces the 14 approved area boundaries by catalog ID on repeat imports', async () => {
+  it('imports the open area boundaries by catalog ID on repeat imports', async () => {
     const database = testDatabase.database;
     const destinations = {
       paistjarvi: 9001044,
@@ -193,7 +191,7 @@ describe('manual catalog imports', () => {
       'neitvuori-ja-luonterin-luonnonsuojelualue': 9001048,
       koskeljarvi: 9001049,
       kurimonkoski: 9001050,
-      pukala: 9001051,
+      peurajarvi: 9001052,
       hepokongas: 9001053,
       auttikongas: 9001054,
       pinkjarvi: 9001055,
@@ -397,18 +395,13 @@ describe('manual catalog imports', () => {
   });
 
   it('imports all special parks with correct metadata', async () => {
-    const fetchSource = vi.fn(createSpecialParksSource());
     const result = await importPublishedSpecialParkFixtures({
       database: testDatabase.database,
-      fetchSource,
+      fetchSource: createSpecialParksSource(),
       now: () => '2026-05-27T08:00:00.000Z'
     });
 
-    expect(result.results).toHaveLength(166);
-    const luontoonSources = fetchSource.mock.calls.flatMap(([url]) =>
-      url.startsWith('https://www.luontoon.fi/') ? [new URL(url).searchParams.get('filter')] : []
-    );
-    expect(luontoonSources.sort()).toEqual(["slug='peurajarvi'", "slug='unarinkongas'"]);
+    expect(result.results).toHaveLength(164);
 
     const merenkurkku = await getParkBySlug(
       testDatabase.database,
@@ -1321,12 +1314,6 @@ describe('manual catalog imports', () => {
         typeSlug: 'outdoor-recreation-area'
       },
       {
-        lipasId: 9001051,
-        name: 'Pukala',
-        slug: 'pukala',
-        typeSlug: 'outdoor-recreation-area'
-      },
-      {
         lipasId: 9001052,
         name: 'Peurajärvi',
         slug: 'peurajarvi',
@@ -1354,12 +1341,6 @@ describe('manual catalog imports', () => {
         lipasId: 9001056,
         name: 'Soiperoinen',
         slug: 'soiperoinen',
-        typeSlug: 'outdoor-recreation-area'
-      },
-      {
-        lipasId: 9001057,
-        name: 'Unarinköngäs',
-        slug: 'unarinkongas',
         typeSlug: 'outdoor-recreation-area'
       }
     ] as const;
@@ -1831,7 +1812,7 @@ describe('manual catalog imports', () => {
     );
     const kevo = await getParkBySlug(testDatabase.database, 'kevon-luonnonpuisto');
 
-    expect(allParks).toHaveLength(166);
+    expect(allParks).toHaveLength(164);
     expect(merenkurkku).toMatchObject({ catalogStatus: 'active' });
     expect(kevo).toMatchObject({ catalogStatus: 'active' });
   });
@@ -1908,7 +1889,7 @@ describe('manual catalog imports', () => {
       database: testDatabase.database
     });
 
-    expect(result.results).toHaveLength(166);
+    expect(result.results).toHaveLength(164);
 
     const merenkurkku = await getParkBySlug(
       testDatabase.database,
@@ -2299,7 +2280,7 @@ describe('manual catalog imports', () => {
       now: () => '2026-05-27T08:00:00.000Z'
     });
 
-    expect(result.results).toHaveLength(166);
+    expect(result.results).toHaveLength(164);
   });
 
   it('fails clearly when a selected special-park slug is unknown', async () => {
@@ -2335,48 +2316,19 @@ describe('manual catalog imports', () => {
     expect(liminganlahti?.establishmentYear).toBe(1998);
   });
 
-  it('keeps luontoon destination area null when surface area metadata is missing', async () => {
-    await importPublishedSpecialParkFixtures({
-      database: testDatabase.database,
-      includeSlugs: ['peurajarvi'],
-      fetchSource: async (sourceUrl) => {
-        if (sourceUrl === peurajarviSourceUrl) {
-          return {
-            type: 'FeatureCollection',
-            features: [
-              {
-                type: 'Feature',
-                geometry: {
-                  type: 'Polygon',
-                  coordinates: [
-                    [
-                      [26.3364, 61.2622],
-                      [26.3364, 61.3146],
-                      [26.4688, 61.3146],
-                      [26.4688, 61.2622],
-                      [26.3364, 61.2622]
-                    ]
-                  ]
-                },
-                properties: {
-                  name_fi: 'Peurajärvi',
-                  slug: 'peurajarvi'
-                }
-              }
-            ]
-          };
-        }
-
-        return createSpecialParksSource()(sourceUrl);
-      },
-      now: () => '2026-05-27T08:00:00.000Z'
+  it('preserves the hole in the Peurajärvi regional plan boundary', async () => {
+    const database = testDatabase.database;
+    await importPublishedSpecialParkFixtures({ database, includeSlugs: ['peurajarvi'] });
+    const park = await getParkBySlug(database, 'peurajarvi');
+    expect(park).toMatchObject({
+      lipasId: 9001052,
+      areaKm2: 9.22,
+      markerPoint: { lat: 63.8194402085, lon: 29.1736336055 },
+      parkUrl: 'https://www.luontoon.fi/fi/kohteet/peurajarvi'
     });
-
-    const peurajarvi = await testDatabase.database.query.parks.findFirst({
-      where: eq(parks.slug, 'peurajarvi')
-    });
-
-    expect(peurajarvi?.areaKm2).toBeNull();
+    const geometry = park?.boundaryGeoJson?.features[0]?.geometry;
+    expect(geometry?.type).toBe('Polygon');
+    expect(geometry?.coordinates).toHaveLength(2);
   });
 
   it('filters Laajalahti by ELY to pick the Espoo feature', async () => {

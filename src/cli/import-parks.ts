@@ -47,6 +47,15 @@ if (result.dryRun) {
   );
 }
 
+for (const park of result.adoptedParks)
+  console.log(
+    `${result.dryRun ? 'Would adopt' : 'Adopted'} ${park.slug} in place [LIPAS ${park.lipasId}].`
+  );
+if (!result.dryRun && result.adoptedParks.length)
+  console.log(
+    `Expire these public park URLs immediately: ${result.adoptedParks.map((park) => park.slug).join(', ')}`
+  );
+
 if (result.newParks.length === 0) {
   console.log(
     result.dryRun
@@ -66,17 +75,13 @@ if (result.newParks.length === 0) {
 }
 
 if (result.trailAreaResult) {
-  const { automaticLinks, manualExclusions, newlyHidden, newlyHiddenPublicSlugs, unresolved } =
+  const { automaticLinks, manualExclusions, newlyHidden, newlyHiddenPublicSlugs } =
     result.trailAreaResult;
   console.log(
-    `Trail–area matches: ${automaticLinks}; newly classified trails: ${newlyHidden}; manual exclusions: ${manualExclusions}; unresolved geometry cases: ${unresolved.length}.`
+    `Trail–area matches: ${automaticLinks}; newly classified trails: ${newlyHidden}; manual exclusions: ${manualExclusions}.`
   );
   if (newlyHiddenPublicSlugs.length)
     console.log(`Expire these public park URLs immediately: ${newlyHiddenPublicSlugs.join(', ')}`);
-  for (const issue of unresolved)
-    console.log(
-      `Unresolved geometry: trail ${issue.trailId}, area ${issue.areaId ?? 'none'}, ${issue.status}`
-    );
 }
 
 console.log(`Source deactivations: ${result.deactivatedParks.length}.`);

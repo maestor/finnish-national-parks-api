@@ -29,10 +29,6 @@ if (result.publicTrailSlugs.length)
 
 for (const { areaSlug, report } of result.trailAreaReports) {
   console.log(
-    `${areaSlug}: ${report.automaticLinks} automatic trail links; ${report.manualExclusions} manual exclusions; ${report.unresolved.length} unresolved geometry cases.`
+    `${areaSlug}: ${report.automaticLinks} automatic trail links; ${report.manualExclusions} manual exclusions.`
   );
-  for (const issue of report.unresolved)
-    console.log(
-      `Unresolved geometry: trail ${issue.trailId}, area ${issue.areaId ?? 'none'}, ${issue.status}`
-    );
 }

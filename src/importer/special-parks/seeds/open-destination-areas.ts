@@ -63,12 +63,12 @@ const seeds: OpenDestinationAreaSeed[] = [
   },
   {
     displayTypeName: null,
-    markerPoint: { lat: 61.6874234715, lon: 24.156644518 },
-    parkUrl: 'https://www.luontoon.fi/fi/kohteet/pukala',
-    name: 'Pukala',
+    markerPoint: { lat: 63.8194402085, lon: 29.1736336055 },
+    parkUrl: 'https://www.luontoon.fi/fi/kohteet/peurajarvi',
+    name: 'Peurajärvi',
     parkTypeSlug: 'outdoor-recreation-area',
-    slug: 'pukala',
-    syntheticLipasId: 9_001_051
+    slug: 'peurajarvi',
+    syntheticLipasId: 9_001_052
   },
   {
     displayTypeName: null,

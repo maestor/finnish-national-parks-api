@@ -107,6 +107,8 @@ export type MappedPark = {
   };
 };
 
+export const multiUseAreaLipasTypeCode = 106;
+
 const shouldPromoteToHikingArea = (park: LipasPark) => {
   const normalizedName = park.name.trim().toLowerCase();
   const typeCode = park.type['type-code'];
@@ -119,7 +121,9 @@ export const mapLipasPark = (source: unknown, existingSlug?: string): MappedPark
   const sourceTypeCode = park.type['type-code'];
   const parkType = shouldPromoteToHikingArea(park)
     ? getSupportedParkTypeBySlug('hiking-area')
-    : getSupportedParkTypeByCode(sourceTypeCode);
+    : getSupportedParkTypeByCode(
+        sourceTypeCode === multiUseAreaLipasTypeCode ? 103 : sourceTypeCode
+      );
   const sourceGeometry = park.location.geometries;
   const hasMultipart = sourceGeometry.features.some(
     ({ geometry }) => geometry.type === 'MultiLineString' || geometry.type === 'MultiPolygon'

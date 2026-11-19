@@ -1,11 +1,9 @@
 import {
-  createLuontoonDestinationAreaConfig,
   createMuseovirastoRkyAreaConfig,
   createMuseovirastoSpecialParkConfig,
   createSykeSpecialParkConfig
 } from './builders.js';
 import { baseSpecialParkConfigs } from './direct-configs.js';
-import { sourceReadyLuontoonDestinationAreaSeeds } from './seeds/luontoon-destination-areas.js';
 import {
   sourceReadyFactoryVillageProtectedSiteSeeds,
   sourceReadyHistoryAreaSeeds
@@ -25,7 +23,6 @@ export const specialParkConfigs = [
   ...sourceReadyReserveParkSeeds.map(createSykeSpecialParkConfig),
   ...sourceReadyDestinationAreaSeeds.map(createSykeSpecialParkConfig),
   ...openDestinationAreaConfigs,
-  ...sourceReadyLuontoonDestinationAreaSeeds.map(createLuontoonDestinationAreaConfig),
   ...sourceReadyHistoryAreaSeeds.map(createMuseovirastoSpecialParkConfig),
   ...sourceReadyHistoryRkyAreaSeeds.map(createMuseovirastoRkyAreaConfig),
   ...sourceReadyFactoryVillageProtectedSiteSeeds.map(createMuseovirastoSpecialParkConfig),

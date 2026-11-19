@@ -256,7 +256,7 @@ Catalog endpoints stay cache-friendly and database-backed:
 The catalog importer should use:
 
 ```text
-https://api.lipas.fi/v2/sports-sites?type-codes=103,109,110,111,112,4403,4404,4405&page-size=100&page=1
+https://api.lipas.fi/v2/sports-sites?type-codes=103,106,109,110,111,112,4403,4404,4405&page-size=100&page=1
 ```
 
 Importer expectations:
@@ -268,6 +268,7 @@ Importer expectations:
 - Print the newly added catalog rows after each import run so operator review does not block the sync itself.
 - Import these supported LIPAS catalog types:
   - `103` Ulkoilu-/virkistysalue
+  - `106` Monikäyttöalue, stored as Ulkoilu-/virkistysalue
   - `109` Valtion retkeilyalue
   - `110` Erämaa-alue
   - `111` Kansallispuisto
