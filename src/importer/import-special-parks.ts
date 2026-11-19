@@ -200,6 +200,7 @@ type ImportSpecialParksOptions = {
   fetchSource?: (sourceUrl: string) => Promise<unknown>;
   includeSlugs?: string[];
   allowPublicTrailConversions?: boolean;
+  deferTrailLinks?: boolean;
   now?: () => string;
 };
 
@@ -208,6 +209,7 @@ export const importSpecialParks = async ({
   fetchSource = defaultFetchSource,
   includeSlugs,
   allowPublicTrailConversions = false,
+  deferTrailLinks = false,
   now = () => new Date().toISOString()
 }: ImportSpecialParksOptions) => {
   const importedAt = now();
@@ -420,7 +422,7 @@ export const importSpecialParks = async ({
       results.push({ featureCount, importRunId, name: config.name, slug: config.slug });
     }
     const areas = prepared.filter(({ parkType }) => !isTrailTypeCode(parkType.code));
-    if (areas.length) {
+    if (areas.length && !deferTrailLinks) {
       const report = await reconcileTrailAreas(tx, importedAt);
       if (!allowPublicTrailConversions && report.newlyHiddenPublicSlugs.length) {
         throw new Error(

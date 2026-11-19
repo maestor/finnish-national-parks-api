@@ -277,6 +277,110 @@ describe('manual catalog imports', () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
+  it('imports the Nurmijärvi areas while leaving a visited trail available for transfer', async () => {
+    const { database } = testDatabase;
+    const timestamp = '2026-11-19T10:00:00.000Z';
+    const trailSlug = 'myllykosken-luontopolku';
+    await importParks({
+      database,
+      sourceUrl: 'https://example.test',
+      fetchSource: async () => ({
+        items: [
+          createLipasTrail({
+            'lipas-id': 528637,
+            name: 'Myllykosken luontopolku',
+            location: {
+              geometries: {
+                type: 'FeatureCollection',
+                features: [
+                  {
+                    type: 'Feature',
+                    geometry: {
+                      type: 'LineString',
+                      coordinates: [
+                        [24.8529299750738, 60.4559385101326],
+                        [24.8525356394163, 60.4562644866984]
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          })
+        ]
+      })
+    });
+    await updateParkRemoved(database, trailSlug, false);
+    const trail = await database.query.parks.findFirst({ where: eq(parks.slug, trailSlug) });
+    const [visit] = await database
+      .insert(parkVisits)
+      .values({
+        parkId: trail!.id,
+        visitedOn: '2026-06-01',
+        status: 'published',
+        createdAt: timestamp,
+        updatedAt: timestamp
+      })
+      .returning({ id: parkVisits.id });
+
+    const options = { database, includeSlugs: ['klaukkalan-isosuo', 'myllykoski'] };
+    await importSpecialParks({ ...options, deferTrailLinks: true });
+    await expect(getParkBySlug(database, trailSlug)).resolves.toMatchObject({ slug: trailSlug });
+    expect(await database.select().from(trailAreaLinks)).toEqual([]);
+    expect(
+      await database.query.parkVisits.findFirst({ where: eq(parkVisits.id, visit!.id) })
+    ).toMatchObject({ parkId: trail!.id });
+
+    for (const [slug, name, locationLabel, postalCode, postalOffice, areaKm2, parkUrl] of [
+      [
+        'klaukkalan-isosuo',
+        'Klaukkalan Isosuo',
+        'Lepsämäntie 12',
+        '01800',
+        'Klaukkala',
+        1.48,
+        'https://uuvi.fi/fi/kohde/isosuon-luontopolku/'
+      ],
+      [
+        'myllykoski',
+        'Myllykoski',
+        'Siippoontie 771',
+        '01900',
+        'Nurmijärvi',
+        0.1,
+        'https://uuvi.fi/fi/kohde/myllykoski/'
+      ]
+    ] as const) {
+      await expect(getParkBySlug(database, slug)).resolves.toBeNull();
+      await updateParkRemoved(database, slug, false);
+      await expect(getParkBySlug(database, slug)).resolves.toMatchObject({
+        name,
+        areaKm2,
+        locationLabel,
+        postalCode,
+        postalOffice,
+        parkUrl,
+        type: { slug: 'nature-reserve-area' },
+        boundaryGeoJson: {
+          features: expect.arrayContaining([
+            expect.objectContaining({ geometry: expect.objectContaining({ type: 'Polygon' }) })
+          ])
+        }
+      });
+    }
+    await expect(importSpecialParks(options)).rejects.toThrow(
+      'Trail myllykosken-luontopolku has visits'
+    );
+    await reassignParkVisits(database, { visitId: visit!.id, toSlug: 'myllykoski' });
+    await setAreaTrailOverride(database, 'myllykoski', trail!.id, 'include');
+    await importSpecialParks(options);
+    const area = await database.query.parks.findFirst({ where: eq(parks.slug, 'myllykoski') });
+    expect(await listPublicAreaTrails(database, area!.id)).toMatchObject([{ slug: trailSlug }]);
+    expect(
+      await database.query.parkVisits.findFirst({ where: eq(parkVisits.id, visit!.id) })
+    ).toMatchObject({ parkId: area!.id });
+  });
+
   it('recomputes LIPAS links when a special area is imported', async () => {
     await importParks({
       database: testDatabase.database,
@@ -401,7 +505,7 @@ describe('manual catalog imports', () => {
       now: () => '2026-05-27T08:00:00.000Z'
     });
 
-    expect(result.results).toHaveLength(164);
+    expect(result.results).toHaveLength(166);
 
     const merenkurkku = await getParkBySlug(
       testDatabase.database,
@@ -1812,7 +1916,7 @@ describe('manual catalog imports', () => {
     );
     const kevo = await getParkBySlug(testDatabase.database, 'kevon-luonnonpuisto');
 
-    expect(allParks).toHaveLength(164);
+    expect(allParks).toHaveLength(166);
     expect(merenkurkku).toMatchObject({ catalogStatus: 'active' });
     expect(kevo).toMatchObject({ catalogStatus: 'active' });
   });
@@ -1889,7 +1993,7 @@ describe('manual catalog imports', () => {
       database: testDatabase.database
     });
 
-    expect(result.results).toHaveLength(164);
+    expect(result.results).toHaveLength(166);
 
     const merenkurkku = await getParkBySlug(
       testDatabase.database,
@@ -2280,7 +2384,7 @@ describe('manual catalog imports', () => {
       now: () => '2026-05-27T08:00:00.000Z'
     });
 
-    expect(result.results).toHaveLength(164);
+    expect(result.results).toHaveLength(166);
   });
 
   it('fails clearly when a selected special-park slug is unknown', async () => {
