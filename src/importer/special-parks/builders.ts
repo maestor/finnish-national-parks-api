@@ -1,5 +1,4 @@
 import type {
-  DestinationAreaSeed,
   MuseovirastoRkyAreaSeed,
   SpecialParkConfig,
   SykeProtectedSitesSourceType,
@@ -13,22 +12,6 @@ export const extractHikingAreaMetadata = (
 ) => {
   const totalAreaM2 = features.reduce(
     (sum, f) => sum + ((f.properties?.shape_area as number | undefined) ?? 0),
-    0
-  );
-
-  return {
-    areaKm2: totalAreaM2 > 0 ? Math.round((totalAreaM2 / 1_000_000) * 100) / 100 : null,
-    establishmentYear: null
-  };
-};
-
-export const extractLuontoonDestinationMetadata = (
-  features: Array<{
-    properties?: Record<string, unknown> | undefined;
-  }>
-) => {
-  const totalAreaM2 = features.reduce(
-    (sum, f) => sum + ((f.properties?.surfaceArea as number | undefined) ?? 0),
     0
   );
 
@@ -88,24 +71,6 @@ export const buildMuseovirastoProtectedSitesSourceUrl = (sourceName: string) => 
 
 export const buildSykeGeologicalRockAreaSourceUrl = (sourceName: string) => {
   return `https://paikkatiedot.ymparisto.fi/geoserver/syke_geologisetmuodostumat/wfs?service=WFS&request=GetFeature&version=2.0.0&typeNames=syke_geologisetmuodostumat:Arvokkaat_kallioalueet&outputFormat=application/json&srsName=EPSG:4326&cql_filter=nimi='${sourceName}'`;
-};
-
-export const buildLuontoonGeoJsonCollectionSourceUrl = ({
-  collectionId,
-  filter,
-  limit = 1000
-}: {
-  collectionId: string;
-  filter: string;
-  limit?: number;
-}) => {
-  const params = new URLSearchParams({
-    filter,
-    'filter-lang': 'cql-text',
-    limit: String(limit)
-  });
-
-  return `https://www.luontoon.fi/geo/features/collections/${collectionId}/items?${params.toString()}`;
 };
 
 export const buildMuseovirastoRkyAreaSourceUrl = ({
@@ -179,35 +144,6 @@ export const createMuseovirastoSpecialParkConfig = ({
   slug,
   sourceParser: 'geojson',
   sourceUrl: buildMuseovirastoProtectedSitesSourceUrl(sourceName),
-  syntheticLipasId
-});
-
-export const createLuontoonDestinationAreaConfig = ({
-  displayTypeName,
-  locationLabel,
-  parkUrl,
-  name,
-  parkTypeSlug,
-  postalCode,
-  postalOffice,
-  slug,
-  syntheticLipasId
-}: DestinationAreaSeed): SpecialParkConfig => ({
-  displayTypeName: normalizeSpecialParkDisplayTypeName(name, displayTypeName),
-  extractMetadata: extractLuontoonDestinationMetadata,
-  locationLabel: locationLabel ?? name,
-  parkUrl,
-  name,
-  parkTypeSlug,
-  postalCode: postalCode ?? null,
-  postalOffice: postalOffice ?? null,
-  responseShapeVersion: 'luontoon-destination-area-v1',
-  slug,
-  sourceParser: 'geojson',
-  sourceUrl: buildLuontoonGeoJsonCollectionSourceUrl({
-    collectionId: 'public.destinations_details_view',
-    filter: `slug='${slug}'`
-  }),
   syntheticLipasId
 });
 

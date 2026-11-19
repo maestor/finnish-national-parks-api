@@ -8,7 +8,7 @@ import {
   updateParkRemoved
 } from '../../src/db/repositories.js';
 import { importRuns, parks, trailAreaLinks } from '../../src/db/schema.js';
-import { importParks } from '../../src/importer/import-parks.js';
+import { defaultLipasCatalogSourceUrl, importParks } from '../../src/importer/import-parks.js';
 import { reconcileTrailAreas } from '../../src/importer/reconcile-trail-areas.js';
 import {
   createLipasHikingTrail,
@@ -32,6 +32,193 @@ describe('importParks', () => {
 
   afterEach(async () => {
     await testDatabase.dispose();
+  });
+
+  it('adopts former special parks in place and imports new LIPAS type 106 areas disabled', async () => {
+    const { database } = testDatabase;
+    const sourceUrl = defaultLipasCatalogSourceUrl;
+    expect(new URL(sourceUrl).searchParams.get('type-codes')?.split(',')).toContain('106');
+    const before = await importPublishedParkFixtures({
+      database,
+      sourceUrl,
+      fetchSource: async () => ({
+        items: [
+          createLipasPark({
+            'lipas-id': 9001051,
+            name: 'Pukala',
+            type: { 'type-code': 103 },
+            www: 'https://www.luontoon.fi/fi/kohteet/pukala'
+          }),
+          createLipasPark({
+            'lipas-id': 9001057,
+            name: 'Unarinköngäs',
+            type: { 'type-code': 103 },
+            www: 'https://www.luontoon.fi/fi/kohteet/unarinkongas'
+          })
+        ]
+      })
+    });
+    expect(before.newParks).toHaveLength(2);
+    await database.update(parks).set({ managedByLipasImport: false });
+    await database
+      .update(parks)
+      .set({ name: 'Pukalan virkistysmetsä', slug: 'pukalan-virkistysmetsa', areaKm2: 15 })
+      .where(eq(parks.lipasId, 9001051));
+    await database.update(parks).set({ importedSlug: null }).where(eq(parks.lipasId, 9001057));
+    const originalRows = await database.select().from(parks);
+    const oldPukala = originalRows.find(({ lipasId }) => lipasId === 9001051)!;
+    const oldUnari = originalRows.find(({ lipasId }) => lipasId === 9001057)!;
+    await createVisit(database, oldPukala.slug, {
+      author: 'Alice',
+      note: 'Pukalan käynti',
+      route: 'Kierros',
+      status: 'published',
+      visitedOn: '2026-04-10'
+    });
+
+    const items = [
+      createLipasPark({
+        'lipas-id': 606696,
+        'event-date': '2026-11-19T09:10:00.000Z',
+        name: 'Pukalan virkistysmetsä',
+        type: { 'type-code': 106 },
+        properties: { 'area-km2': 11.98 }
+      }),
+      createLipasPark({
+        'lipas-id': 606731,
+        name: 'Unarinkönkään virkistysmetsä',
+        type: { 'type-code': 106 },
+        properties: { 'area-km2': 0.65 },
+        location: {
+          geometries: {
+            type: 'FeatureCollection',
+            features: [
+              {
+                type: 'Feature',
+                geometry: {
+                  type: 'Polygon',
+                  coordinates: [
+                    [
+                      [25.8, 67.08],
+                      [25.82, 67.08],
+                      [25.82, 67.09],
+                      [25.8, 67.08]
+                    ]
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      }),
+      createLipasPark({
+        'lipas-id': 604040,
+        name: 'Riuttaskorven virkistysmetsä',
+        type: { 'type-code': 106 }
+      })
+    ];
+    const options = { database, sourceUrl, fetchSource: async () => ({ items }) };
+    const preview = await importParks({ ...options, dryRun: true });
+    expect(preview.newParks.map(({ lipasId }) => lipasId)).toEqual([604040]);
+    expect(preview.adoptedParks).toEqual([
+      { lipasId: 606696, slug: 'pukalan-virkistysmetsa' },
+      { lipasId: 606731, slug: 'unarinkongas' }
+    ]);
+    expect(await database.select().from(parks)).toEqual(originalRows);
+
+    const first = await importParks(options);
+    expect(first.adoptedParks).toEqual(preview.adoptedParks);
+    expect(first.newParks.map(({ lipasId }) => lipasId)).toEqual([604040]);
+    const [pukalaSource, unariSource, newSource] = items;
+    const second = await importParks({
+      ...options,
+      fetchSource: async () => ({
+        items: [
+          pukalaSource,
+          {
+            ...unariSource,
+            name: 'Unarinkönkään monikäyttöalue',
+            properties: { 'area-km2': 0.67 }
+          },
+          newSource
+        ]
+      })
+    });
+    expect(second.adoptedParks).toEqual([]);
+    expect(second.newParks).toEqual([]);
+
+    const rows = await database.select().from(parks);
+    expect(rows).toHaveLength(3);
+    expect(rows.find(({ lipasId }) => lipasId === 606696)).toMatchObject({
+      id: oldPukala.id,
+      name: oldPukala.name,
+      slug: oldPukala.slug,
+      areaKm2: 15,
+      importedAreaKm2: 11.98,
+      parkUrl: oldPukala.parkUrl,
+      managedByLipasImport: true,
+      removed: false,
+      sourceEventDate: '2026-11-19T09:10:00.000Z'
+    });
+    const unari = rows.find(({ lipasId }) => lipasId === 606731);
+    expect(unari).toMatchObject({
+      id: oldUnari.id,
+      name: oldUnari.name,
+      importedName: 'Unarinkönkään monikäyttöalue',
+      slug: oldUnari.slug,
+      markerLat: oldUnari.markerLat,
+      markerLon: oldUnari.markerLon,
+      areaKm2: 0.67,
+      parkUrl: oldUnari.parkUrl,
+      typeId: 103,
+      managedByLipasImport: true,
+      removed: false
+    });
+    expect(unari?.boundaryGeojson).not.toEqual(oldUnari.boundaryGeojson);
+    expect(rows.find(({ lipasId }) => lipasId === 604040)).toMatchObject({
+      typeId: 103,
+      removed: true
+    });
+    expect(await getParkVisitsBySlug(database, oldPukala.slug, async (key) => key)).toMatchObject({
+      visits: [{ note: 'Pukalan käynti' }]
+    });
+  });
+
+  it('rolls back a source transfer when the native and former special park IDs already exist', async () => {
+    const { database } = testDatabase;
+    const sourceUrl = 'https://example.test/lipas';
+    const source = createLipasPark({
+      'lipas-id': 606731,
+      name: 'Unarinkönkään virkistysmetsä',
+      type: { 'type-code': 106 }
+    });
+    await importParks({
+      database,
+      sourceUrl,
+      fetchSource: async () => ({
+        items: [createLipasPark({ 'lipas-id': 9001057, name: 'Unarinköngäs' })]
+      })
+    });
+    const [existing] = await database.select().from(parks);
+    const { id: _parkId, ...legacy } = existing!;
+    await database.insert(parks).values({
+      ...legacy,
+      lipasId: source['lipas-id'],
+      slug: 'unarinkonkaan-virkistysmetsa',
+      importedSlug: 'unarinkonkaan-virkistysmetsa'
+    });
+    await database
+      .update(parks)
+      .set({ managedByLipasImport: false })
+      .where(eq(parks.lipasId, 9001057));
+    const before = await database.select().from(parks);
+    const runs = await database.select().from(importRuns);
+
+    await expect(
+      importParks({ database, sourceUrl, fetchSource: async () => ({ items: [source] }) })
+    ).rejects.toThrow();
+    expect(await database.select().from(parks)).toEqual(before);
+    expect(await database.select().from(importRuns)).toEqual(runs);
   });
 
   it('imports a catalog in bounded writes without sending each geometry twice', async () => {

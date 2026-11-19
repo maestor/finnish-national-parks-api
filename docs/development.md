@@ -197,13 +197,13 @@ The local SQLite/libSQL file and `.env` itself should not be committed.
 
 The importer should:
 
-- Fetch LIPAS sports sites with type codes `103,109,110,111,112,4403,4404,4405`.
+- Fetch LIPAS sports sites with type codes `103,106,109,110,111,112,4403,4404,4405`.
 - Keep only records where `status` is `active`.
 - Import new matching LIPAS rows automatically when they appear upstream.
 - Import newly discovered parks as removed by default so they stay hidden until an admin explicitly enables them.
 - Support `npm run import:parks -- --dry-run` for no-write previews of what the next import would add.
 - Print the newly added catalog rows after each import run so changes stay visible without halting the sync.
-- Upsert catalog rows by `lipasId`.
+- Upsert catalog rows by `lipasId`. When a configured special park transfers to its active LIPAS source, replace the source ID in the same transaction while keeping the catalog row and its public name, slug and marker. The import rolls back if both source IDs already exist.
 - Upsert normalized catalog types in a dedicated `park_types` table.
 - Retain source-active supported trails only when neither measured unique geometry nor effective reported length exceeds 100 km, and link each area covering at least 10% of measured route length; never infer membership from address. Honor local reported-length overrides before evaluating incoming LIPAS values. Unmeasurable trails with no oversized reported length follow the existing private/unresolved workflow. Special-import trails remain independent and reject oversized geometry or stored reported length. See [maximum trail length and existing-row retirement](./importing.md#maximum-trail-length).
 - Keep effective or formerly linked trails out of standalone public destinations. Manual inclusion/exclusion overrides survive recomputation, and existing visit history requires an explicit preservation decision before a new conversion.

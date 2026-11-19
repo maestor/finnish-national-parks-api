@@ -19,7 +19,7 @@ import {
   isTrailTypeCode
 } from '../parks/park-types.js';
 import { createLuontoonUrlResolver } from './luontoon-sitemap.js';
-import { mapLipasPark } from './map-lipas-park.js';
+import { mapLipasPark, multiUseAreaLipasTypeCode } from './map-lipas-park.js';
 import { reconcileTrailAreas } from './reconcile-trail-areas.js';
 import { exceedsTrailLengthLimit, measureTrailLengthKm } from './trail-area-geometry.js';
 
@@ -52,7 +52,22 @@ const RESPONSE_SHAPE_VERSION = 'catalog-v2';
 const IMPORT_BATCH_SIZE = 10;
 const IMPORT_BATCH_GEOMETRY_BYTES = 1024 * 1024;
 const LUONTOON_SITEMAP_URL = 'https://www.luontoon.fi/resources/sitemap/fi.xml';
-const SUPPORTED_LIPAS_TYPE_CODES = [103, 109, 110, 111, 112, 4403, 4404, 4405] as const;
+const SUPPORTED_LIPAS_TYPE_CODES = [
+  103,
+  multiUseAreaLipasTypeCode,
+  109,
+  110,
+  111,
+  112,
+  4403,
+  4404,
+  4405
+] as const;
+
+const formerSpecialParks = new Map([
+  [606696, { legacyLipasId: 9001051, parkUrl: 'https://www.luontoon.fi/fi/kohteet/pukala' }],
+  [606731, { legacyLipasId: 9001057, parkUrl: 'https://www.luontoon.fi/fi/kohteet/unarinkongas' }]
+]);
 
 class ImportDryRunRollbackError extends Error {
   constructor() {
@@ -215,7 +230,7 @@ export const importParks = async ({
   const existingImportedSlugByLipasId = new Map(
     existingParks.map((park) => [park.lipasId, park.importedSlug ?? park.slug])
   );
-  const newParks = importedParks
+  let newParks = importedParks
     .filter((park) => !existingLipasIds.has(park.lipasId))
     .map((park) => ({
       lipasId: park.lipasId,
@@ -238,12 +253,40 @@ export const importParks = async ({
   const trailAreaResult: { value: Awaited<ReturnType<typeof reconcileTrailAreas>> | null } = {
     value: null
   };
+  const adoptedParks: { lipasId: number; slug: string }[] = [];
   const deactivatedParks: { lipasId: number; slug: string }[] = [];
   const affectedLongTrailSlugs = new Set<string>();
 
   try {
     await database.transaction(async (tx) => {
       await syncParkTypes(tx);
+
+      for (const [lipasId, { legacyLipasId }] of formerSpecialParks) {
+        const incoming = parksByLipasId.get(lipasId);
+        if (!incoming) continue;
+
+        // Changing the source ID in place preserves foreign keys. Keep the existing
+        // public name and marker as local edits if they differ from the LIPAS values.
+        const [adopted] = await tx
+          .update(parks)
+          .set({
+            lipasId,
+            importedName: incoming.name,
+            importedMarkerLat: incoming.markerPoint.lat,
+            importedMarkerLon: incoming.markerPoint.lon
+          })
+          .where(eq(parks.lipasId, legacyLipasId))
+          .returning({
+            slug: parks.slug,
+            importedSlug: parks.importedSlug
+          });
+
+        if (adopted) {
+          existingImportedSlugByLipasId.set(lipasId, adopted.importedSlug ?? adopted.slug);
+          adoptedParks.push({ lipasId, slug: adopted.slug });
+        }
+      }
+      newParks = newParks.filter(({ lipasId }) => !existingImportedSlugByLipasId.has(lipasId));
 
       importRunId = await createImportRun(tx, {
         activeCount: importedParks.length,
@@ -269,7 +312,8 @@ export const importParks = async ({
         }
 
         const mapped = mapLipasPark(item, existingImportedSlugByLipasId.get(lipasId));
-        const resolvedParkUrl = resolveParkUrl(mapped) ?? mapped.parkUrl;
+        const resolvedParkUrl =
+          resolveParkUrl(mapped) ?? formerSpecialParks.get(lipasId)?.parkUrl ?? mapped.parkUrl;
         const slug =
           existingImportedSlugByLipasId.get(lipasId) ??
           ensureUniqueSlug(mapped.slug, lipasId, takenSlugs);
@@ -415,6 +459,7 @@ export const importParks = async ({
     deactivatedParks,
     dryRun,
     newParks,
+    adoptedParks,
     sourceActiveCount: activeItems.length,
     excludedLongTrails,
     affectedLongTrailSlugs: [...affectedLongTrailSlugs],
