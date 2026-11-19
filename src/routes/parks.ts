@@ -35,6 +35,7 @@ import {
   visitTimelineResponseSchema,
   visitWithParkSchema
 } from '../contracts/parks.js';
+import { parkWeatherSchema } from '../contracts/weather.js';
 import { supportedParkCategorySlugs, supportedParkTypeSlugs } from '../parks/park-types.js';
 
 export const listParksRoute = createRoute({
@@ -95,6 +96,25 @@ export const getParkRoute = createRoute({
           schema: errorSchema
         }
       }
+    }
+  }
+});
+
+export const getParkWeatherRoute = createRoute({
+  method: 'get',
+  path: '/api/parks/{slug}/weather',
+  tags: ['Catalog'],
+  security: [{ bearerAuth: [] }],
+  request: { params: z.object({ slug: z.string() }) },
+  responses: {
+    200: {
+      description:
+        'Available park weather. Precipitation is millimetres over the hour ending at the reported time. Observed -1 is dry and observed 0 is trace. Forecast 0 is dry.',
+      content: { 'application/json': { schema: parkWeatherSchema } }
+    },
+    404: {
+      description: 'Park was not found',
+      content: { 'application/json': { schema: errorSchema } }
     }
   }
 });
