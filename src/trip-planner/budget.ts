@@ -1,6 +1,7 @@
-import { lt, sql } from 'drizzle-orm';
+import { lt } from 'drizzle-orm';
 
-import type { Database, Transaction } from '../db/database.js';
+import type { Database } from '../db/database.js';
+import { reserveRequestWindow } from '../db/request-budget.js';
 import { tripPlannerBudgetWindows } from '../db/schema.js';
 
 const MINUTE_MS = 60_000;
@@ -93,33 +94,6 @@ const getRetryAfterSeconds = (now: number, windowMs: number) => {
   return Math.max(1, Math.ceil((windowEnd - now) / 1000));
 };
 
-const reserveWindow = async (
-  transaction: Transaction,
-  key: string,
-  windowStartedAt: number,
-  cost: number,
-  limit: number
-) => {
-  if (cost > limit) {
-    return false;
-  }
-
-  const rows = await transaction
-    .insert(tripPlannerBudgetWindows)
-    .values({ key, requestCount: cost, windowStartedAt })
-    .onConflictDoUpdate({
-      set: {
-        requestCount: sql`CASE WHEN ${tripPlannerBudgetWindows.windowStartedAt} = ${windowStartedAt} THEN ${tripPlannerBudgetWindows.requestCount} + ${cost} ELSE ${cost} END`,
-        windowStartedAt: sql`CASE WHEN ${tripPlannerBudgetWindows.windowStartedAt} = ${windowStartedAt} THEN ${tripPlannerBudgetWindows.windowStartedAt} ELSE ${windowStartedAt} END`
-      },
-      target: tripPlannerBudgetWindows.key,
-      where: sql`${tripPlannerBudgetWindows.windowStartedAt} <> ${windowStartedAt} OR ${tripPlannerBudgetWindows.requestCount} + ${cost} <= ${limit}`
-    })
-    .returning({ requestCount: tripPlannerBudgetWindows.requestCount });
-
-  return rows.length > 0;
-};
-
 class BudgetExceededError extends Error {
   constructor(public readonly retryAfterSeconds: number) {
     super('Trip planner budget exceeded.');
@@ -210,7 +184,7 @@ export const createTripPlannerBudget = ({
                 lt(tripPlannerBudgetWindows.windowStartedAt, requestedAt - BUDGET_RETENTION_MS)
               );
 
-            const providerAllowed = await reserveWindow(
+            const providerAllowed = await reserveRequestWindow(
               transaction,
               `provider:${dayWindow}`,
               dayWindow,
@@ -222,7 +196,7 @@ export const createTripPlannerBudget = ({
               throw new BudgetExceededError(getRetryAfterSeconds(requestedAt, DAY_MS));
             }
 
-            const operationAllowed = await reserveWindow(
+            const operationAllowed = await reserveRequestWindow(
               transaction,
               `operation:${operation}:${minuteWindow}`,
               minuteWindow,
@@ -236,7 +210,7 @@ export const createTripPlannerBudget = ({
               throw new BudgetExceededError(getRetryAfterSeconds(requestedAt, MINUTE_MS));
             }
 
-            const clientAllowed = await reserveWindow(
+            const clientAllowed = await reserveRequestWindow(
               transaction,
               `client:${clientId}:${operation}`,
               minuteWindow,
@@ -294,7 +268,7 @@ export const createTripPlannerBudget = ({
                 lt(tripPlannerBudgetWindows.windowStartedAt, requestedAt - BUDGET_RETENTION_MS)
               );
 
-            const operationAllowed = await reserveWindow(
+            const operationAllowed = await reserveRequestWindow(
               transaction,
               `operation:${operation}:${minuteWindow}`,
               minuteWindow,
@@ -306,7 +280,7 @@ export const createTripPlannerBudget = ({
               throw new BudgetExceededError(getRetryAfterSeconds(requestedAt, MINUTE_MS));
             }
 
-            const clientAllowed = await reserveWindow(
+            const clientAllowed = await reserveRequestWindow(
               transaction,
               `client:${clientId}:${operation}`,
               minuteWindow,
@@ -363,7 +337,7 @@ export const createTripPlannerBudget = ({
             .delete(tripPlannerBudgetWindows)
             .where(lt(tripPlannerBudgetWindows.windowStartedAt, requestedAt - BUDGET_RETENTION_MS));
 
-          const providerAllowed = await reserveWindow(
+          const providerAllowed = await reserveRequestWindow(
             transaction,
             `provider:${dayWindow}`,
             dayWindow,

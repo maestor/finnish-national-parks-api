@@ -54,6 +54,7 @@ import {
   getParkBySlug,
   getParkBySlugIncludingRemoved,
   getParkFeaturedImage,
+  getParkMarkerBySlug,
   getParkVisitsBySlug,
   getPublicHomeSummary,
   getPublicMapSummary,
@@ -206,6 +207,7 @@ import {
   getAdminVisitRoute,
   getParkRoute,
   getParkVisitsRoute,
+  getParkWeatherRoute,
   getPublicHomeSummaryRoute,
   getPublicMapSummaryRoute,
   getVisitRoute,
@@ -290,6 +292,7 @@ import {
 } from './trip-planner/budget.js';
 import { TripPlannerError } from './trip-planner/search.js';
 import type { TripPlannerService } from './trip-planner/types.js';
+import { createWeatherReader } from './weather/park-weather.js';
 import {
   buildYearReviewStory,
   createYearReviewSharePath,
@@ -1935,6 +1938,17 @@ export const createApp = ({
         { featuredImage: await getParkFeaturedImage(database, park.id, getImagePublicUrl) },
         200
       );
+    });
+
+    const readParkWeather = createWeatherReader(database);
+    app.openapi(getParkWeatherRoute, async (context) => {
+      context.header('Cache-Control', PRIVATE_CACHE_CONTROL);
+      const { slug } = context.req.valid('param');
+      const session = await getAuthenticatedSession(context, auth);
+      const marker = await getParkMarkerBySlug(database, slug, session !== null);
+
+      if (!marker) return context.json(jsonNotFound('Park not found.'), 404);
+      return context.json(await readParkWeather(marker), 200);
     });
 
     app.openapi(getParkRoute, async (context) => {

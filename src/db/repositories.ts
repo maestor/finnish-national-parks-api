@@ -978,7 +978,9 @@ const toBoundingBox = (row: typeof parks.$inferSelect): BoundingBox => {
   };
 };
 
-const toMarkerPoint = (row: typeof parks.$inferSelect): MarkerPoint => {
+const toMarkerPoint = (
+  row: Pick<typeof parks.$inferSelect, 'markerLat' | 'markerLon'>
+): MarkerPoint => {
   return {
     lat: row.markerLat,
     lon: row.markerLon
@@ -1530,6 +1532,18 @@ const getParkRecordBySlug = async (database: Database, slug: string) => {
   return database.query.parks.findFirst({
     where: visibleParkBySlugWhere(slug)
   });
+};
+
+export const getParkMarkerBySlug = async (
+  database: Database,
+  slug: string,
+  includeHidden: boolean
+) => {
+  const park = await database.query.parks.findFirst({
+    columns: { markerLat: true, markerLon: true },
+    where: includeHidden ? eq(parks.slug, slug) : visibleParkBySlugWhere(slug)
+  });
+  return park ? toMarkerPoint(park) : null;
 };
 
 const getTripRecordById = async (database: DbClient, tripId: number) => {
