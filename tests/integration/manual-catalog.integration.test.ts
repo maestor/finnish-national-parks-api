@@ -1,8 +1,16 @@
 import { eq } from 'drizzle-orm';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { getParkBySlug, listParks } from '../../src/db/repositories.js';
-import { parks, trailAreaLinks } from '../../src/db/schema.js';
+import {
+  createImportRun,
+  getParkBySlug,
+  listParks,
+  reassignParkVisits,
+  syncParkTypes,
+  updateParkRemoved
+} from '../../src/db/repositories.js';
+import { parks, parkVisits, trailAreaLinks } from '../../src/db/schema.js';
+import { listPublicAreaTrails, setAreaTrailOverride } from '../../src/db/trail-areas.js';
 import { isFullyInsideArea } from '../../src/importer/geometry.js';
 import { importParks } from '../../src/importer/import-parks.js';
 import { importSpecialParks } from '../../src/importer/import-special-parks.js';
@@ -56,18 +64,123 @@ describe('manual catalog imports', () => {
   it('inserts special trails disabled and pins them independent', async () => {
     await importSpecialParks({
       database: testDatabase.database,
-      includeSlugs: ['torholan-luola'],
+      includeSlugs: ['torholan-luolan-polku'],
       fetchSource: createSpecialParksSource()
     });
     const trail = await testDatabase.database.query.parks.findFirst({
-      where: eq(parks.slug, 'torholan-luola')
+      where: eq(parks.slug, 'torholan-luolan-polku')
     });
     expect(trail).toMatchObject({
       removed: true,
       managedByLipasImport: false,
       trailPublicationRole: 'independent'
     });
-    await expect(getParkBySlug(testDatabase.database, 'torholan-luola')).resolves.toBeNull();
+    await expect(getParkBySlug(testDatabase.database, 'torholan-luolan-polku')).resolves.toBeNull();
+  });
+
+  it('reuses the old Torhola trail, moves its visit and links the OSM route under the cave area', async () => {
+    const database = testDatabase.database;
+    const timestamp = '2026-11-19T10:00:00.000Z';
+    await syncParkTypes(database);
+    const runId = await createImportRun(database, {
+      activeCount: 1,
+      importedAt: timestamp,
+      responseShapeVersion: 'luontoon-torholan-route-v1',
+      sourceUrl: 'https://www.luontoon.fi/'
+    });
+    const bounds = {
+      bboxMinLon: 23.8566,
+      bboxMaxLon: 23.8573,
+      bboxMinLat: 60.2529,
+      bboxMaxLat: 60.2547
+    };
+    const [legacyTrail] = await database
+      .insert(parks)
+      .values({
+        ...bounds,
+        lipasId: 9004406,
+        managedByLipasImport: false,
+        typeId: 4405,
+        slug: 'torholan-luola',
+        importedSlug: 'torholan-luola',
+        name: 'Torholan luola',
+        importedName: 'Torholan luola',
+        locationLabel: 'Torholan luola',
+        importedLocationLabel: 'Torholan luola',
+        markerLon: 23.857,
+        markerLat: 60.2538,
+        importedMarkerLon: 23.857,
+        importedMarkerLat: 60.2538,
+        boundaryGeojson: '{"type":"FeatureCollection","features":[]}',
+        lastImportRunId: runId,
+        catalogStatus: 'active',
+        createdAt: timestamp,
+        updatedAt: timestamp
+      })
+      .returning({ id: parks.id });
+    const [visit] = await database
+      .insert(parkVisits)
+      .values({
+        parkId: legacyTrail!.id,
+        visitedOn: '2026-06-01',
+        note: 'Luolakäynti',
+        status: 'published',
+        createdAt: timestamp,
+        updatedAt: timestamp
+      })
+      .returning({ id: parkVisits.id });
+
+    const options = {
+      database,
+      includeSlugs: ['torholan-luolan-polku', 'torholan-luola', 'paavolan-luontopolku']
+    };
+    await importSpecialParks(options);
+    const trail = await database.query.parks.findFirst({
+      where: eq(parks.slug, 'torholan-luolan-polku')
+    });
+    expect(trail).toMatchObject({ id: legacyTrail!.id, name: 'Torholan luolan polku' });
+    await updateParkRemoved(database, 'torholan-luola', false);
+    await expect(
+      setAreaTrailOverride(database, 'torholan-luola', trail!.id, 'include')
+    ).rejects.toThrow('Trail has visits');
+    await expect(
+      reassignParkVisits(database, {
+        visitId: visit!.id,
+        toSlug: 'torholan-luola'
+      })
+    ).resolves.toMatchObject({ movedVisitIds: [visit!.id] });
+    await setAreaTrailOverride(database, 'torholan-luola', trail!.id, 'include');
+    await importSpecialParks(options);
+
+    const area = await getParkBySlug(database, 'torholan-luola');
+    expect(area).toMatchObject({
+      name: 'Torholan luola',
+      type: { slug: 'nature-reserve-area' },
+      boundaryGeoJson: { features: [{ geometry: { type: 'Polygon' } }] }
+    });
+    const areaRecord = await database.query.parks.findFirst({
+      where: eq(parks.slug, 'torholan-luola')
+    });
+    expect(await listPublicAreaTrails(database, areaRecord!.id)).toMatchObject([
+      {
+        name: 'Torholan luolan polku',
+        slug: 'torholan-luolan-polku',
+        source: {
+          type: 'openstreetmap-curated',
+          sourceUrls: [
+            'https://www.openstreetmap.org/way/1375865890',
+            'https://www.openstreetmap.org/way/41109913'
+          ]
+        },
+        boundaryGeoJson: {
+          features: [{ geometry: { type: 'LineString' } }, { geometry: { type: 'LineString' } }]
+        }
+      }
+    ]);
+    expect(
+      await database.query.parkVisits.findFirst({ where: eq(parkVisits.id, visit!.id) })
+    ).toMatchObject({ parkId: areaRecord!.id, note: 'Luolakäynti', status: 'published' });
+    await expect(getParkBySlug(database, 'torholan-luolan-polku')).resolves.toBeNull();
   });
 
   it('recomputes LIPAS links when a special area is imported', async () => {
@@ -194,7 +307,7 @@ describe('manual catalog imports', () => {
       now: () => '2026-05-27T08:00:00.000Z'
     });
 
-    expect(result.results).toHaveLength(165);
+    expect(result.results).toHaveLength(166);
 
     const merenkurkku = await getParkBySlug(
       testDatabase.database,
@@ -335,56 +448,101 @@ describe('manual catalog imports', () => {
       postalOffice: 'Lohja',
       type: { slug: 'nature-trail' }
     });
-    expect(paavola?.boundaryGeoJson?.features).toHaveLength(4);
+    expect(paavola?.boundaryGeoJson?.features).toHaveLength(5);
     expect(
       paavola?.boundaryGeoJson?.features.every((feature) => feature.geometry.type === 'LineString')
     ).toBe(true);
-    expect(paavola?.boundingBox.minLon).toBeCloseTo(23.8836126343924);
-    expect(paavola?.boundingBox.maxLon).toBeCloseTo(23.890603352384);
-    expect(paavola?.boundingBox.minLat).toBeCloseTo(60.2254776367656);
-    expect(paavola?.boundingBox.maxLat).toBeCloseTo(60.2277589357966);
+    expect(paavola?.boundingBox.minLon).toBeCloseTo(23.883545);
+    expect(paavola?.boundingBox.maxLon).toBeCloseTo(23.8910535);
+    expect(paavola?.boundingBox.minLat).toBeCloseTo(60.2255034);
+    expect(paavola?.boundingBox.maxLat).toBeCloseTo(60.2278691);
+
+    expect(paavola?.boundaryGeoJson?.features.slice(-2)).toMatchObject([
+      {
+        geometry: {
+          coordinates: expect.arrayContaining([
+            [23.8850462, 60.2266849],
+            [23.8850235, 60.2274901]
+          ])
+        }
+      },
+      {
+        geometry: {
+          coordinates: [
+            [23.8850462, 60.2266849],
+            expect.any(Array),
+            expect.any(Array),
+            [23.886115, 60.2262672]
+          ]
+        }
+      }
+    ]);
 
     const santalahti = await getParkBySlug(testDatabase.database, 'santalahden-luontopolku');
     expect(santalahti).toMatchObject({
       address: 'Kipparitie 4, 48310 Kotka',
       lipasId: 9004405,
       locationLabel: 'Kipparitie 4',
-      parkUrl: null,
+      parkUrl:
+        'https://www.kotka.fi/asuminen-ja-ymparisto/puistot-ja-viheralueet/santalahden-luontopolku/',
       name: 'Santalahden luontopolku',
       postalCode: '48310',
       postalOffice: 'Kotka',
       type: { slug: 'nature-trail' }
     });
-    expect(santalahti?.boundaryGeoJson?.features).toHaveLength(7);
+    expect(santalahti?.boundaryGeoJson?.features).toHaveLength(30);
     expect(
       santalahti?.boundaryGeoJson?.features.every(
         (feature) => feature.geometry.type === 'LineString'
       )
     ).toBe(true);
-    expect(santalahti?.boundingBox.minLon).toBeCloseTo(26.8507921028238);
-    expect(santalahti?.boundingBox.maxLon).toBeCloseTo(26.8592556232422);
-    expect(santalahti?.boundingBox.minLat).toBeCloseTo(60.4309110325505);
-    expect(santalahti?.boundingBox.maxLat).toBeCloseTo(60.4433449987787);
+    const santalahtiLines = santalahti!.boundaryGeoJson!.features.flatMap(({ geometry }) =>
+      geometry.type === 'LineString' ? [geometry.coordinates] : []
+    );
+    const adjacency = new Map<string, Set<string>>();
+    for (const line of santalahtiLines) {
+      for (let index = 1; index < line.length; index++) {
+        const a = JSON.stringify(line[index - 1]);
+        const b = JSON.stringify(line[index]);
+        if (!adjacency.has(a)) adjacency.set(a, new Set());
+        if (!adjacency.has(b)) adjacency.set(b, new Set());
+        adjacency.get(a)!.add(b);
+        adjacency.get(b)!.add(a);
+      }
+    }
+    const pending = [[...adjacency.keys()][0]!];
+    const reachable = new Set<string>();
+    while (pending.length > 0) {
+      const node = pending.pop()!;
+      if (reachable.has(node)) continue;
+      reachable.add(node);
+      pending.push(...adjacency.get(node)!);
+    }
+    expect(reachable.size).toBe(adjacency.size);
+    const degrees = [...adjacency.values()].map((neighbours) => neighbours.size);
+    expect(Math.min(...degrees)).toBe(2);
+    expect(degrees.reduce((sum, degree) => sum + degree, 0) / 2 - reachable.size + 1).toBe(2);
+    expect(santalahti?.boundingBox.minLon).toBeCloseTo(26.8493899);
+    expect(santalahti?.boundingBox.maxLon).toBeCloseTo(26.8592228);
+    expect(santalahti?.boundingBox.minLat).toBeCloseTo(60.4302727);
+    expect(santalahti?.boundingBox.maxLat).toBeCloseTo(60.443672);
 
     const torholan = await getParkBySlug(testDatabase.database, 'torholan-luola');
     expect(torholan).toMatchObject({
-      address: 'Torholan luola, Lohja',
-      lipasId: 9004406,
-      locationLabel: 'Torholan luola',
-      parkUrl: 'https://www.luontoon.fi/fi/reitit/torholan-luolan-polku-lohja-194240',
       name: 'Torholan luola',
-      postalCode: null,
-      postalOffice: 'Lohja',
-      type: { slug: 'nature-trail' }
+      lipasId: 9002058,
+      type: { slug: 'nature-reserve-area' },
+      areaKm2: 0.03,
+      boundaryGeoJson: { features: [{ geometry: { type: 'Polygon' } }] }
     });
-    expect(torholan?.boundaryGeoJson?.features).toHaveLength(1);
-    expect(
-      torholan?.boundaryGeoJson?.features.every((feature) => feature.geometry.type === 'LineString')
-    ).toBe(true);
-    expect(torholan?.boundingBox.minLon).toBeCloseTo(23.85665818);
-    expect(torholan?.boundingBox.maxLon).toBeCloseTo(23.8572344);
-    expect(torholan?.boundingBox.minLat).toBeCloseTo(60.252980562);
-    expect(torholan?.boundingBox.maxLat).toBeCloseTo(60.254699132);
+    expect(await getParkBySlug(testDatabase.database, 'torholan-luolan-polku')).toMatchObject({
+      name: 'Torholan luolan polku',
+      lipasId: 9004406,
+      type: { slug: 'nature-trail' },
+      boundaryGeoJson: {
+        features: [{ geometry: { type: 'LineString' } }, { geometry: { type: 'LineString' } }]
+      }
+    });
 
     const seili = await getParkBySlug(testDatabase.database, 'seili');
     expect(seili).toMatchObject({
@@ -1572,7 +1730,7 @@ describe('manual catalog imports', () => {
     );
     const kevo = await getParkBySlug(testDatabase.database, 'kevon-luonnonpuisto');
 
-    expect(allParks).toHaveLength(165);
+    expect(allParks).toHaveLength(166);
     expect(merenkurkku).toMatchObject({ catalogStatus: 'active' });
     expect(kevo).toMatchObject({ catalogStatus: 'active' });
   });
@@ -1649,7 +1807,7 @@ describe('manual catalog imports', () => {
       database: testDatabase.database
     });
 
-    expect(result.results).toHaveLength(165);
+    expect(result.results).toHaveLength(166);
 
     const merenkurkku = await getParkBySlug(
       testDatabase.database,
@@ -2040,7 +2198,7 @@ describe('manual catalog imports', () => {
       now: () => '2026-05-27T08:00:00.000Z'
     });
 
-    expect(result.results).toHaveLength(165);
+    expect(result.results).toHaveLength(166);
   });
 
   it('fails clearly when a selected special-park slug is unknown', async () => {

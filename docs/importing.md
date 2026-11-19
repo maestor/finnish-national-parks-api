@@ -319,12 +319,6 @@ Use this when the place should be imported as a route or nature trail and Luonto
 - source parser: `geojson`
 - geometry note: `MultiLineString` is already normalized into several `LineString` features by the importer
 
-Example pattern:
-
-- `Torholan luola`
-
-This is the cleanest option when the route already exists in Luontoon and the destination page itself is not the main geometry source.
-
 ### 4. Museovirasto protected sites WFS
 
 Use this for the smaller set of curated history places that live under the Museovirasto protected-sites layer instead of RKY area polygons.
@@ -393,23 +387,13 @@ This pattern is already used for:
 
 This is useful when one shared WFS feed covers many world-heritage rows and the importer must select exactly one record.
 
-### 7. Municipal ArcGIS route workflow
+### 7. Curated OpenStreetMap way selections
 
-Use this when a municipality exposes a trail in ArcGIS FeatureServer form and Luontoon does not provide the right route geometry.
-
-- builder in code: `buildArcGisGeoJsonQuerySourceUrl`
-- source parser: `geojson`
-- optional bounding envelope support is already built in
-
-Examples include:
-
-- `Paavolan luontopolku`
-- `Santalahden luontopolku`
-
-Use the envelope filter when:
-
-- the service has many unrelated features
-- the trail is easiest to isolate by a small bounding box instead of by attribute query alone
+Use tracked `special://` GeoJSON for a reviewed trail assembled from OSM
+ways. Specify the source way IDs and retrieval time in the config so the
+importer can register the selection and expose OSM attribution for linked
+trails. Record the way version and any clipping node IDs beside the geometry.
+This workflow covers Paavola, Torhola, and Santalahti.
 
 ### 8. Repo-local `special://` geometry
 
@@ -436,6 +420,58 @@ Examples include:
 - Helsinki local geometries such as `Uutelan ulkoilualue`, `Kallahden ulkoilualue`, and `Tullisaaren kartanopuisto`
 - island and boundary snapshots such as `Seurasaari`, `Mustikkamaa`, `Seili`, and `Vallisaari`
 - pragmatic local proxies such as `Kuhakoski`
+
+#### Torholan luola and Paavolan luontopolku
+
+The tracked Torhola area snapshot uses only the Syke `ESA300647` polygon
+containing the cave entrances, under CC BY 4.0. Its public slug is
+`torholan-luola` and its type is `nature-reserve-area`. The separate
+`torholan-luolan-polku` trail preserves catalog identity `9004406` and uses
+two OpenStreetMap ways for the approach and cave loop. Paavola retains its
+existing identity and slug. Its snapshot includes the oak branch, the
+southern spur, the return footpath, and the section of way `374925037` between
+OSM nodes `8648605275` and `3783079451`. Both trails are attributed to
+OpenStreetMap contributors under ODbL 1.0. The importer reads these snapshots from the repository.
+
+After checking the intended database and backup, import the three records in
+one batch. On an existing catalog, the importer first updates the trail in
+place, freeing the old slug for the area. If an administrator previously
+overrode the trail name or slug, review that edit before importing.
+
+```sh
+npm run import:special-parks -- torholan-luolan-polku torholan-luola paavolan-luontopolku
+```
+
+Enable the new Torhola area in the admin editor. Preview the existing visit
+transfer, check the reported visit ID, then repeat the command without
+`--dry-run` to transfer the same visit and preserve its photos and trip
+association.
+
+```sh
+npm run park:move-visits -- --from torholan-luolan-polku --to torholan-luola --dry-run
+```
+
+In the area's **Reitit** tab, include **Torholan luolan polku**. Do this after
+moving the visit, because the existing link guard rejects conversion while a
+standalone trail still holds visits. Verify the area page and verify the trail
+is visible there. Immediately clear the public UI cache for both Torhola
+slugs and Paavola, including the shared visit and trip caches after the move.
+Subsequent imports preserve the visit, visibility settings, and manual link.
+
+#### Santalahden luontopolku
+
+The OSM snapshot preserves both the coastal and forest loops as one connected
+network. It uses 26 named ways and four connecting ways, including the clipped
+sections of Kipparitie and Niinilahdentie recorded in the snapshot. The import
+preserves catalog identity `9004405`, the standalone URL, and existing visits.
+The source is © OpenStreetMap contributors under ODbL 1.0. Kotka's destination
+page is the visitor information link.
+
+```sh
+npm run import:special-parks -- santalahden-luontopolku
+```
+
+Expire the Santalahti public park cache after importing.
 
 #### Ruotsinkylän tutkimusmetsä
 

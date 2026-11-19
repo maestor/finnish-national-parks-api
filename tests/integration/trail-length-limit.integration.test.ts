@@ -337,14 +337,28 @@ describe('100 km trail limit', () => {
   });
 
   it('rejects oversized special trails before any write, while accepting exactly 100 km', async () => {
-    const options = { database: db.database, includeSlugs: ['torholan-luola'] };
+    const options = { database: db.database, includeSlugs: ['santalahden-luontopolku'] };
     await expect(
       importSpecialParks({ ...options, fetchSource: async () => route(100001) })
     ).rejects.toThrow('exceeds the 100 km length limit');
     expect(await db.database.select().from(parks)).toEqual([]);
-    await importSpecialParks({ ...options, fetchSource: async () => route(100000) });
+    await importSpecialParks({
+      ...options,
+      fetchSource: async () => ({
+        type: 'FeatureCollection',
+        features: [
+          {
+            type: 'Feature',
+            geometry: {
+              type: 'MultiLineString',
+              coordinates: [route(100000).features[0]!.geometry.coordinates]
+            }
+          }
+        ]
+      })
+    });
     expect((await db.database.select().from(parks))[0]).toMatchObject({
-      slug: 'torholan-luola',
+      slug: 'santalahden-luontopolku',
       catalogStatus: 'active'
     });
     await db.database.update(parks).set({ lengthKm: 110 });

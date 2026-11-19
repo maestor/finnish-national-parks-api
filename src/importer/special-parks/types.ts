@@ -6,6 +6,7 @@ export type SpecialParkMetadata = {
 };
 
 export type SpecialParkConfig = {
+  curatedOsmWays?: { ids: number[]; retrievedAt: string };
   displayTypeName: string | null;
   extractMetadata?: (
     features: Array<{ properties?: Record<string, unknown> | undefined }>

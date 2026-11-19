@@ -1,11 +1,12 @@
+import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
-import { inArray } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 import { z } from 'zod';
 
 import type { Database } from '../db/database.js';
 import { createImportRun, syncParkTypes, upsertCatalogPark } from '../db/repositories.js';
-import { parks } from '../db/schema.js';
+import { curatedTrailSources, parks } from '../db/schema.js';
 import {
   getSupportedParkTypeBySlug,
   hasMagnetByDefaultForTypeSlug,
@@ -386,6 +387,36 @@ export const importSpecialParks = async ({
         typeId: parkType.id,
         updatedAt: importedAt
       });
+      if (config.curatedOsmWays) {
+        const [trail] = await tx
+          .select({ id: parks.id })
+          .from(parks)
+          .where(eq(parks.lipasId, config.syntheticLipasId));
+        const sourceUrls = config.curatedOsmWays.ids.map(
+          (id) => `https://www.openstreetmap.org/way/${id}`
+        );
+        const provenanceJson = JSON.stringify({
+          ...config.curatedOsmWays,
+          sourceUrl: config.sourceUrl,
+          responseShapeVersion: config.responseShapeVersion
+        });
+        const source = {
+          geometryHash: createHash('sha256').update(JSON.stringify(boundaryGeoJson)).digest('hex'),
+          manifestHash: createHash('sha256').update(provenanceJson).digest('hex'),
+          provenanceJson,
+          sourceTimestamp: config.curatedOsmWays.retrievedAt,
+          sourceUrlsJson: JSON.stringify(sourceUrls)
+        };
+        await tx
+          .insert(curatedTrailSources)
+          .values({
+            selectionKey: `special-${config.syntheticLipasId}`,
+            trailId: trail!.id,
+            sourceKind: 'osm-way-selection',
+            ...source
+          })
+          .onConflictDoUpdate({ target: curatedTrailSources.selectionKey, set: source });
+      }
       results.push({ featureCount, importRunId, name: config.name, slug: config.slug });
     }
     const areas = prepared.filter(({ parkType }) => !isTrailTypeCode(parkType.code));
