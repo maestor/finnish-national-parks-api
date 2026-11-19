@@ -90,32 +90,6 @@ export const buildSykeGeologicalRockAreaSourceUrl = (sourceName: string) => {
   return `https://paikkatiedot.ymparisto.fi/geoserver/syke_geologisetmuodostumat/wfs?service=WFS&request=GetFeature&version=2.0.0&typeNames=syke_geologisetmuodostumat:Arvokkaat_kallioalueet&outputFormat=application/json&srsName=EPSG:4326&cql_filter=nimi='${sourceName}'`;
 };
 
-export const buildArcGisGeoJsonQuerySourceUrl = ({
-  geometry,
-  outFields,
-  serviceUrl
-}: {
-  geometry?: [number, number, number, number];
-  outFields: string[];
-  serviceUrl: string;
-}) => {
-  const params = new URLSearchParams({
-    f: 'geojson',
-    outFields: outFields.join(','),
-    returnGeometry: 'true',
-    where: '1=1'
-  });
-
-  if (geometry) {
-    params.set('geometry', geometry.join(','));
-    params.set('geometryType', 'esriGeometryEnvelope');
-    params.set('inSR', '4326');
-    params.set('spatialRel', 'esriSpatialRelIntersects');
-  }
-
-  return `${serviceUrl}/query?${params.toString()}`;
-};
-
 export const buildLuontoonGeoJsonCollectionSourceUrl = ({
   collectionId,
   filter,

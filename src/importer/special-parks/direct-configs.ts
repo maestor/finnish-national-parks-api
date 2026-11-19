@@ -1,5 +1,4 @@
 import {
-  buildArcGisGeoJsonQuerySourceUrl,
   buildLuontoonGeoJsonCollectionSourceUrl,
   buildMuseovirastoRkyAreaSourceUrl,
   buildSykeGeologicalRockAreaSourceUrl,
@@ -211,51 +210,71 @@ export const baseSpecialParkConfigs: SpecialParkConfig[] = [
     parkTypeSlug: 'nature-trail',
     postalCode: '08800',
     postalOffice: 'Lohja',
-    responseShapeVersion: 'lohja-paavolan-arcgis-route-v1',
+    curatedOsmWays: {
+      retrievedAt: '2026-11-19T16:26:16Z',
+      ids: [374926007, 374926009, 374926010, 933021771, 374925037]
+    },
+    responseShapeVersion: 'osm-paavola-way-selection-v1',
     slug: 'paavolan-luontopolku',
-    sourceParser: 'geojson',
-    sourceUrl: buildArcGisGeoJsonQuerySourceUrl({
-      geometry: [23.882, 60.225, 23.891, 60.228],
-      outFields: ['FID', 'REITTI', 'LISATIETO'],
-      serviceUrl:
-        'https://services2.arcgis.com/RrgTAfcgVcTLi0XF/arcgis/rest/services/Paavolan_reitti/FeatureServer/0'
-    }),
+    sourceUrl: 'special://paavolan-luontopolku',
     syntheticLipasId: 9_004_404
   },
   {
     displayTypeName: null,
     locationLabel: 'Kipparitie 4',
-    parkUrl: null,
+    parkUrl:
+      'https://www.kotka.fi/asuminen-ja-ymparisto/puistot-ja-viheralueet/santalahden-luontopolku/',
     name: 'Santalahden luontopolku',
     parkTypeSlug: 'nature-trail',
     postalCode: '48310',
     postalOffice: 'Kotka',
-    responseShapeVersion: 'kotka-santalahden-arcgis-route-v1',
+    curatedOsmWays: {
+      retrievedAt: '2026-11-19T17:11:09Z',
+      ids: [
+        40389019, 40389021, 72509684, 72509688, 75863757, 836763403, 836763405, 840911915,
+        840911919, 849422434, 849422435, 853762644, 853762645, 853762646, 853762647, 853762648,
+        853762649, 853762650, 853762652, 853762653, 853762654, 853762655, 853762656, 853762657,
+        853762659, 853762660, 853762661, 853762663, 853762666, 853762667
+      ]
+    },
+    responseShapeVersion: 'osm-santalahti-way-selection-v1',
     slug: 'santalahden-luontopolku',
-    sourceParser: 'geojson',
-    sourceUrl: buildArcGisGeoJsonQuerySourceUrl({
-      outFields: ['FID', 'Layer', 'Nimi', 'Linkki'],
-      serviceUrl:
-        'https://services-eu1.arcgis.com/zIF5LKWARhpLFEt3/arcgis/rest/services/Santalahden_reitti/FeatureServer/0'
-    }),
+    sourceUrl: 'special://santalahden-luontopolku',
     syntheticLipasId: 9_004_405
   },
   {
     displayTypeName: null,
-    locationLabel: 'Torholan luola',
-    parkUrl: 'https://www.luontoon.fi/fi/reitit/torholan-luolan-polku-lohja-194240',
-    name: 'Torholan luola',
+    locationLabel: 'Karkalintie 759',
+    parkUrl:
+      'https://www.lohja.fi/kulttuuri-vapaa-aika-liikunta/liikunta/retkeily-ja-ulkoilu/luontopolut/torholan-luolan-luontopolku/',
+    name: 'Torholan luolan polku',
     parkTypeSlug: 'nature-trail',
-    postalCode: null,
+    postalCode: '08100',
     postalOffice: 'Lohja',
-    responseShapeVersion: 'luontoon-torholan-route-v1',
-    slug: 'torholan-luola',
-    sourceParser: 'geojson',
-    sourceUrl: buildLuontoonGeoJsonCollectionSourceUrl({
-      collectionId: 'public.all_lines_details_view',
-      filter: "slug='torholan-luolan-polku-lohja-194240'"
-    }),
+    curatedOsmWays: {
+      retrievedAt: '2026-11-19T16:26:15Z',
+      ids: [1375865890, 41109913]
+    },
+    responseShapeVersion: 'osm-torhola-way-selection-v1',
+    slug: 'torholan-luolan-polku',
+    sourceUrl: 'special://torholan-luolan-polku',
     syntheticLipasId: 9_004_406
+  },
+  {
+    displayTypeName: null,
+    extractMetadata: extractGeoJsonAreaM2Metadata,
+    locationLabel: 'Karkalintie 759',
+    markerPoint: { lat: 60.2524074, lon: 23.8572252 },
+    parkUrl:
+      'https://www.lohja.fi/kulttuuri-vapaa-aika-liikunta/liikunta/retkeily-ja-ulkoilu/luontopolut/torholan-luolan-luontopolku/',
+    name: 'Torholan luola',
+    parkTypeSlug: 'nature-reserve-area',
+    postalCode: '08100',
+    postalOffice: 'Lohja',
+    responseShapeVersion: 'syke-torhola-cave-polygon-v1',
+    slug: 'torholan-luola',
+    sourceUrl: 'special://torholan-luola',
+    syntheticLipasId: 9_002_058
   },
   {
     displayTypeName: null,
