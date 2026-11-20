@@ -279,7 +279,7 @@ Importer expectations:
 - Store catalog fields needed for a map app.
 - Persist postal fields; address matches do not establish trail membership.
 - Retain supported source-active LIPAS trails at any length. Local reported-length edits survive reimports. Each active area intersecting at least 10% of the measured trail length becomes a parent. Special-import trails remain independent.
-- Keep new records disabled. Linked trails are unavailable as standalone public destinations even if an old visibility flag is enabled; admin reads remain private. Manual link inclusions and exclusions survive imports.
+- Keep new LIPAS records disabled and publish new manual special-park records on import. Linked trails are unavailable as standalone public destinations even if an old visibility flag is enabled; admin reads remain private. Manual link inclusions and exclusions survive imports.
 - Exclude LIPAS contact email, phone number, and comment text.
 - Refresh imported `parkUrl` values from Luontoon's official Finnish sitemap when a matching destination exists, instead of trusting LIPAS `www` blindly.
 - Preserve personal notes and visit history across imports.

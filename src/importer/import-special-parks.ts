@@ -353,7 +353,7 @@ export const importSpecialParks = async ({
         locationLabel: config.locationLabel,
         parkUrl: config.parkUrl,
         managedByLipasImport: false,
-        removed: true,
+        removed: false,
         markerLat: config.markerPoint?.lat ?? (boundingBox.minLat + boundingBox.maxLat) / 2,
         markerLon: config.markerPoint?.lon ?? (boundingBox.minLon + boundingBox.maxLon) / 2,
         municipalityCode: null,

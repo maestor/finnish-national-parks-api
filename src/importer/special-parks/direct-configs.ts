@@ -9,6 +9,22 @@ import type { SpecialParkConfig } from './types.js';
 
 export const baseSpecialParkConfigs: SpecialParkConfig[] = [
   {
+    displayTypeName: null,
+    extractMetadata: extractGeoJsonAreaM2Metadata,
+    locationLabel: 'Pillisuontie 90',
+    markerPoint: { lat: 60.9150308, lon: 24.377007 },
+    parkUrl:
+      'https://www.hameenlinna.fi/kaupunki-ja-paatoksenteko/tietoa-hameenlinnasta/pitajat/renko/paivaretki-renkoon/',
+    name: 'Heinisuo',
+    parkTypeSlug: 'nature-reserve-area',
+    postalCode: '14300',
+    postalOffice: 'Hämeenlinna',
+    responseShapeVersion: 'osm-bog-polygons-v1',
+    slug: 'heinisuo',
+    sourceUrl: 'special://heinisuo',
+    syntheticLipasId: 9_002_061
+  },
+  {
     displayTypeName: 'Natura 2000 -alue',
     extractMetadata: extractGeoJsonAreaM2Metadata,
     locationLabel: 'Lepsämäntie 12',
