@@ -74,6 +74,35 @@ A scheduled import rolls back when it would newly hide an enabled trail, because
 
 Admin-session endpoints `GET /api/admin/parks/{slug}/trails` and `/trail-candidates` expose private link and candidate data; `PUT`/`DELETE /api/admin/parks/{slug}/trails/{trailId}` record durable inclusion/exclusion overrides. The candidate read accepts `q`, `limit` (1–100) and `offset`. An API key alone is insufficient. Callers making a manual change must immediately expire both the area slug and returned trail slug through the same UI endpoint. Public area detail requests with `includeBoundary=true` include effective linked trails, their names, available addresses and lengths, and stored geometry. Park detail caches revalidate after one hour to pick up scheduled imports; immediately expire affected area details after an import when prompt updates are required. No relation editor is included.
 
+### Seitsemän veljeksen vaellusreitti
+
+The LIPAS import consolidates records `524135`, `528635`, `528636`, `601262`,
+`602277` and `602303` into the existing trail for `524135`. The combined map
+includes both Vantaa branches and the connecting trails. The six individual
+source records are still checked against the 100 km limit. This specific
+combined record can exceed 100 km and is exempt from retirement and the admin
+visibility length check. Its displayed source length is the unique mapped line
+length. Existing administrator edits on the canonical record survive refresh.
+
+Preview and apply the first merge through the manual LIPAS workflow above
+when it affects public trails. The scheduled import then requires manual
+application so the affected UI caches can be expired immediately. Once merged,
+absorbed IDs stay inactive and are omitted from admin visibility and area trail
+lists. Later imports rebuild the combined route when all six components are
+usable. If a component is missing or invalid, the importer logs a warning and
+retains the last complete combined route.
+
+The standard 10% calculation uses the full combined geometry for each area.
+Automatic matches from individual components are recalculated. Explicit
+inclusions and visit assignments carry over to the canonical trail. Direct
+visits on an absorbed record or a conflicting canonical exclusion stop the
+first merge for operator review. To resolve a reported exclusion and preserve
+the existing area membership, open **Reitit → Alueen reitit** for the reported
+area. Search by trail name, choose **Lisää**, and confirm the canonical slug
+shown by the import error. Keep existing visit assignments and rerun the dry
+run. A new trail with no effective area link follows the usual admin visibility
+workflow.
+
 ### Import a parent area for a trail with visits
 
 Back up the target catalog and verify the conversion on an isolated copy. The

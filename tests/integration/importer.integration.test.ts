@@ -4,12 +4,16 @@ import {
   createVisit,
   getParkBySlug,
   getParkVisitsBySlug,
+  listAdminParkVisibility,
   listParks,
   updateParkRemoved
 } from '../../src/db/repositories.js';
-import { importRuns, parks, trailAreaLinks } from '../../src/db/schema.js';
+import { importRuns, parks, parkVisits, trailAreaLinks, visitTrails } from '../../src/db/schema.js';
+import { listAreaTrails, setAreaTrailOverride } from '../../src/db/trail-areas.js';
+import { importOsmTrails } from '../../src/importer/import-osm-trails.js';
 import { defaultLipasCatalogSourceUrl, importParks } from '../../src/importer/import-parks.js';
 import { reconcileTrailAreas } from '../../src/importer/reconcile-trail-areas.js';
+import { retireLongTrails } from '../../src/importer/retire-long-trails.js';
 import {
   createLipasHikingTrail,
   createLipasPark,
@@ -23,6 +27,35 @@ import { createTestDatabase } from '../helpers/test-db.js';
 const emptyLuontoonSitemap = async () =>
   '<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"></urlset>';
 
+const canonicalId = 524135;
+const componentIds = [canonicalId, 528635, 528636, 601262, 602277, 602303];
+const pieces = componentIds.map((id, index) => {
+  const component = createLipasHikingTrail({
+    'lipas-id': id,
+    name: 'Seitsemän veljeksen vaellusreitti',
+    properties: { 'route-length-km': 20 },
+    location: {
+      geometries: {
+        type: 'FeatureCollection',
+        features: [
+          {
+            type: 'Feature',
+            geometry: {
+              type: 'LineString',
+              coordinates: [
+                [24.5 + index * 0.4, 60.6],
+                [24.9 + index * 0.4, 60.6]
+              ]
+            }
+          }
+        ]
+      }
+    }
+  });
+  if (index === 1) delete component['event-date'];
+  return component;
+});
+
 describe('importParks', () => {
   let testDatabase: Awaited<ReturnType<typeof createTestDatabase>>;
 
@@ -32,6 +65,258 @@ describe('importParks', () => {
 
   afterEach(async () => {
     await testDatabase.dispose();
+  });
+
+  it('consolidates the six Seitsemän veljeksen records and retains the combined trail on reimport', async () => {
+    const { database } = testDatabase;
+    const area = createLipasPark();
+    const pinnedArea = createLipasPark({
+      'lipas-id': 89223,
+      name: 'Pieni vierailukohde',
+      location: {
+        geometries: {
+          type: 'FeatureCollection',
+          features: [
+            {
+              type: 'Feature',
+              geometry: {
+                type: 'Polygon',
+                coordinates: [
+                  [
+                    [24.95, 60.5],
+                    [25.07, 60.5],
+                    [25.07, 60.7],
+                    [24.95, 60.7],
+                    [24.95, 60.5]
+                  ]
+                ]
+              }
+            }
+          ]
+        }
+      }
+    });
+    const secondArea = createLipasPark({ 'lipas-id': 89224, name: 'Toinen puisto' });
+    const catalogAreas = [area, pinnedArea, secondArea];
+    let items = [...catalogAreas, ...pieces.slice(0, 2)];
+    const options = {
+      database,
+      sourceUrl: 'https://example.test/lipas',
+      fetchSource: async () => ({ items })
+    };
+    await importParks(options);
+    const before = await database.query.parks.findFirst({ where: eq(parks.lipasId, canonicalId) });
+    const source = await database.query.parks.findFirst({
+      where: eq(parks.lipasId, componentIds[1]!)
+    });
+    await updateParkRemoved(database, 'pieni-vierailukohde', false);
+    await createVisit(database, 'pieni-vierailukohde', {
+      visitedOn: '2026-04-10',
+      trailIds: [source!.id]
+    });
+
+    items = [...catalogAreas, ...pieces.toReversed()];
+    await expect(
+      importParks({ ...options, requireNoPublicTrailConversions: true })
+    ).rejects.toThrow('Public trail conversion requires immediate frontend cache expiry');
+    expect(await database.select().from(visitTrails)).toEqual([
+      expect.objectContaining({ trailId: source!.id })
+    ]);
+    const preview = await importParks({ ...options, dryRun: true });
+    expect(preview.affectedMergedTrailSlugs).toContain('pieni-vierailukohde');
+    expect(await database.select().from(visitTrails)).toEqual([
+      expect.objectContaining({ trailId: source!.id })
+    ]);
+
+    await importParks(options);
+    const after = await database.query.parks.findFirst({ where: eq(parks.lipasId, canonicalId) });
+    expect(after).toMatchObject({
+      id: before?.id,
+      slug: 'seitseman-veljeksen-vaellusreitti',
+      name: 'Seitsemän veljeksen vaellusreitti',
+      catalogStatus: 'active'
+    });
+    expect(after?.lengthKm).toBeGreaterThan(100);
+    expect(JSON.parse(after!.boundaryGeojson).features).toHaveLength(6);
+    const components = (await database.select().from(parks)).filter((row) =>
+      componentIds.includes(row.lipasId)
+    );
+    expect(
+      components.filter((row) => row.catalogStatus === 'active').map((row) => row.lipasId)
+    ).toEqual([canonicalId]);
+    expect(
+      (await database.select().from(trailAreaLinks)).filter((link) => link.automaticMatch)
+    ).toEqual([
+      expect.objectContaining({ trailId: after?.id, override: null }),
+      expect.objectContaining({ trailId: after?.id, override: null })
+    ]);
+    expect(await database.select().from(visitTrails)).toEqual([
+      expect.objectContaining({ trailId: after?.id })
+    ]);
+    const areaRow = await database.query.parks.findFirst({
+      where: eq(parks.lipasId, pinnedArea['lipas-id'])
+    });
+    expect(await listAreaTrails(database, areaRow!.id)).toMatchObject([
+      { trailId: after!.id, effective: true, automaticMatch: false, override: 'include' }
+    ]);
+    expect(
+      (await listAdminParkVisibility(database)).removedParks
+        .filter((park) => park.name === 'Seitsemän veljeksen vaellusreitti')
+        .map((park) => park.slug)
+    ).toEqual([after!.slug]);
+    const osmResult = await importOsmTrails({
+      database,
+      snapshot: { timestamp: '2026-11-19T12:00:00Z', routes: [] }
+    });
+    expect(osmResult.mergedWarnings).toEqual([]);
+    expect((await retireLongTrails({ database, dryRun: true })).retiredTrails).toEqual([]);
+    expect((await importParks(options)).affectedMergedTrailSlugs).toEqual([]);
+
+    items = [...catalogAreas, ...pieces.slice(1)];
+    expect((await importParks(options)).mergeWarnings.join()).toContain(
+      'retaining the previous route'
+    );
+    const refreshed = await database.query.parks.findFirst({
+      where: eq(parks.lipasId, canonicalId)
+    });
+    expect(refreshed).toMatchObject({
+      catalogStatus: 'active',
+      boundaryGeojson: after?.boundaryGeojson
+    });
+    expect(
+      (await database.select().from(parks)).filter(
+        (row) => componentIds.includes(row.lipasId) && row.catalogStatus === 'active'
+      )
+    ).toHaveLength(1);
+  });
+
+  it('imports a fresh combined trail under the canonical slug and can enable it over 100 km', async () => {
+    const { database } = testDatabase;
+    let items = pieces.toReversed();
+    const options = {
+      database,
+      sourceUrl: 'https://example.test/lipas',
+      fetchSource: async () => ({ items })
+    };
+    const report = await importParks({ ...options, requireNoPublicTrailConversions: true });
+    expect(report.newParks).toEqual([
+      expect.objectContaining({ lipasId: canonicalId, slug: 'seitseman-veljeksen-vaellusreitti' })
+    ]);
+    const slug = 'seitseman-veljeksen-vaellusreitti';
+    await expect(updateParkRemoved(database, slug, false)).resolves.toBe(true);
+    await expect(getParkBySlug(database, slug)).resolves.toMatchObject({ slug });
+
+    const [branch, ...rest] = pieces;
+    const modified = createLipasHikingTrail({
+      ...branch!,
+      name: 'Muuttunut lähdenimi',
+      location: {
+        geometries: {
+          type: 'FeatureCollection',
+          features: [
+            {
+              type: 'Feature',
+              geometry: {
+                type: 'LineString',
+                coordinates: [
+                  [24.5, 60.6],
+                  [24.9, 60.65]
+                ]
+              }
+            }
+          ]
+        }
+      }
+    });
+    await database.update(parks).set({ lengthKm: 102 }).where(eq(parks.lipasId, canonicalId));
+    items = [modified, ...rest];
+    const refresh = await importParks(options);
+    expect(refresh.affectedMergedTrailSlugs).toContain(slug);
+    const refreshed = await database.query.parks.findFirst({
+      where: eq(parks.lipasId, canonicalId)
+    });
+    expect(refreshed).toMatchObject({
+      name: 'Seitsemän veljeksen vaellusreitti',
+      lengthKm: 102,
+      catalogStatus: 'active',
+      removed: false
+    });
+    expect(JSON.parse(refreshed!.boundaryGeojson).features[0].geometry).toEqual(
+      modified.location.geometries.features[0]!.geometry
+    );
+
+    items = [
+      {
+        ...modified,
+        location: {
+          ...modified.location,
+          geometries: {
+            type: 'FeatureCollection',
+            features: []
+          }
+        }
+      },
+      ...rest
+    ];
+    const invalid = await importParks(options);
+    expect(invalid.mergeWarnings.join()).toContain('no line geometry');
+    expect(
+      (await database.query.parks.findFirst({ where: eq(parks.lipasId, canonicalId) }))
+        ?.boundaryGeojson
+    ).toBe(refreshed?.boundaryGeojson);
+
+    items = [{ ...modified, properties: { 'route-length-km': 150 } }, ...rest];
+    const oversized = await importParks(options);
+    expect(oversized.excludedLongTrails).toEqual([
+      expect.objectContaining({ lipasId: canonicalId, reportedLengthKm: 150 })
+    ]);
+    expect(
+      await database.query.parks.findFirst({ where: eq(parks.lipasId, canonicalId) })
+    ).toMatchObject({
+      catalogStatus: 'active',
+      removed: false,
+      boundaryGeojson: refreshed?.boundaryGeojson
+    });
+  });
+
+  it('rolls back the consolidation when absorbing a trail with a direct visit or an override conflict', async () => {
+    const { database } = testDatabase;
+    const area = createLipasPark();
+    const [canonical, source] = pieces;
+    let items = [canonical!, source!];
+    const options = {
+      database,
+      sourceUrl: 'https://example.test/lipas',
+      fetchSource: async () => ({ items })
+    };
+    await importParks(options);
+    const sourceRow = await database.query.parks.findFirst({
+      where: eq(parks.lipasId, source!['lipas-id'])
+    });
+    await updateParkRemoved(database, sourceRow!.slug, false);
+    const visit = await createVisit(database, sourceRow!.slug, { visitedOn: '2026-04-10' });
+    items = [area, ...pieces];
+    await expect(importParks(options)).rejects.toThrow('Review direct visits');
+    expect(await getParkBySlug(database, sourceRow!.slug)).toMatchObject({ slug: sourceRow!.slug });
+
+    await database.delete(parkVisits).where(eq(parkVisits.id, visit.id));
+    items = [area, canonical!, source!];
+    await importParks(options);
+    const areaRow = await database.query.parks.findFirst({
+      where: eq(parks.lipasId, area['lipas-id'])
+    });
+    const canonicalRow = await database.query.parks.findFirst({
+      where: eq(parks.lipasId, canonicalId)
+    });
+    await setAreaTrailOverride(database, areaRow!.slug, sourceRow!.id, 'include');
+    await setAreaTrailOverride(database, areaRow!.slug, canonicalRow!.id, 'exclude');
+    items = [area, ...pieces];
+    await expect(importParks(options)).rejects.toThrow(
+      `In the admin UI, open Reitit → Alueen reitit for ${areaRow!.slug} and search for Seitsemän veljeksen vaellusreitti. Use Lisää and confirm the slug is ${canonicalRow!.slug}.`
+    );
+    expect(
+      await database.query.parks.findFirst({ where: eq(parks.id, sourceRow!.id) })
+    ).toMatchObject({ catalogStatus: 'active' });
   });
 
   it('adopts former special parks in place and imports new LIPAS type 106 areas disabled', async () => {

@@ -1,7 +1,8 @@
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray, isNull } from 'drizzle-orm';
 import type { Database } from '../db/database.js';
-import { parks, trailAreaLinks } from '../db/schema.js';
+import { parks, trailAreaLinks, trailMergeGroups } from '../db/schema.js';
 import type { GeoJsonFeatureCollection } from './geometry.js';
+import { seitsemansVeljestaTrail } from './seitsemans-veljesta-trail.js';
 import { exceedsTrailLengthLimit, measureTrailLengthKm } from './trail-area-geometry.js';
 
 export const retireLongTrails = async ({
@@ -22,7 +23,20 @@ export const retireLongTrails = async ({
       reportedLengthKm: parks.lengthKm
     })
     .from(parks)
-    .where(and(eq(parks.catalogStatus, 'active'), inArray(parks.typeId, [4403, 4404, 4405])));
+    .leftJoin(
+      trailMergeGroups,
+      and(
+        eq(trailMergeGroups.trailId, parks.id),
+        eq(parks.lipasId, seitsemansVeljestaTrail.canonicalId)
+      )
+    )
+    .where(
+      and(
+        eq(parks.catalogStatus, 'active'),
+        inArray(parks.typeId, [4403, 4404, 4405]),
+        isNull(trailMergeGroups.trailId)
+      )
+    );
   const measured = rows.map(({ geometry, ...row }) => ({
     ...row,
     measuredLengthKm: measureTrailLengthKm(JSON.parse(geometry) as GeoJsonFeatureCollection)

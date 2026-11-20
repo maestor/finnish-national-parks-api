@@ -33,7 +33,13 @@ export type MergeTrailsInput = {
   dryRun?: boolean;
 };
 
-export const combineTrailGeometry = (geometries: string[]) => {
+export const unabsorbedTrailWhere = () => sql`not exists (
+  select 1 from ${trailMergeMembers}
+  where ${trailMergeMembers.trailId} = ${parks.id}
+    and ${trailMergeMembers.canonicalTrailId} <> ${parks.id}
+)`;
+
+export const combineTrailGeometry = (geometries: string[], { allowLong = false } = {}) => {
   const seen = new Set<string>();
   const geometry: GeoJsonFeatureCollection = { type: 'FeatureCollection', features: [] };
   for (const text of geometries) {
@@ -57,7 +63,7 @@ export const combineTrailGeometry = (geometries: string[]) => {
     }
   }
   const lengthKm = measureTrailLengthKm(geometry);
-  if (lengthKm === null || exceedsTrailLengthLimit(lengthKm))
+  if (lengthKm === null || (!allowLong && exceedsTrailLengthLimit(lengthKm)))
     throw new Error('Combined trail geometry must be measurable and at most 100 km.');
   const bounds = deriveBoundingBox(geometry);
   const first = geometry.features[0]!.geometry.coordinates[0] as [number, number];
