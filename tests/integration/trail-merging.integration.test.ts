@@ -17,7 +17,6 @@ import { type MergeTrailsInput, mergeTrails } from '../../src/db/trail-merges.js
 import type { GeoJsonFeatureCollection } from '../../src/importer/geometry.js';
 import { importOsmTrails, type OsmSnapshot } from '../../src/importer/import-osm-trails.js';
 import { importParks } from '../../src/importer/import-parks.js';
-import { retireLongTrails } from '../../src/importer/retire-long-trails.js';
 import { measureTrailLengthKm } from '../../src/importer/trail-area-geometry.js';
 import { createLipasPark } from '../fixtures/lipas.js';
 import { createTestDatabase } from '../helpers/test-db.js';
@@ -247,7 +246,6 @@ describe('manual linked trail merging', () => {
       fetchSource: async () => ({ items: [createLipasPark()] }),
       sourceUrl: 'https://example.test'
     });
-    await retireLongTrails({ database: db.database });
     expect(await listPublicAreaTrails(db.database, area.id)).toHaveLength(1);
     expect((await db.database.select().from(parks).where(eq(parks.id, from.id)))[0]).toMatchObject({
       catalogStatus: 'inactive',
@@ -399,16 +397,16 @@ describe('manual linked trail merging', () => {
       ]
     },
     line([
-      [24, 61],
-      [26, 61]
+      [117, 0],
+      [118, 0]
     ])
-  ])('rolls back invalid or oversized source geometry %j', async (geometry) => {
+  ])('rolls back invalid source geometry %j', async (geometry) => {
     await db.database
       .update(parks)
       .set({ boundaryGeojson: JSON.stringify(geometry) })
       .where(eq(parks.id, from.id));
     const before = await stored();
-    await expect(merge()).rejects.toThrow(/geometry|100 km/);
+    await expect(merge()).rejects.toThrow('geometry');
     expect(await stored()).toEqual(before);
   });
 
@@ -498,27 +496,23 @@ describe('manual linked trail merging', () => {
     });
     expect(empty.mergedWarnings).toHaveLength(2);
     expect(await stored()).toEqual(before);
-    for (const invalid of [
-      { ...snapshot.routes[0]!, reportedLengthKm: 101 },
-      {
-        ...snapshot.routes[0]!,
-        geometry: line([
-          [25, 61],
-          [25, 61]
-        ])
-      }
-    ]) {
-      const changed = {
-        ...snapshot,
-        timestamp: '2026-11-14T10:00:00Z',
-        routes: [invalid, snapshot.routes[1]!]
-      };
-      const report = await importOsmTrails({ database: db.database, snapshot: changed });
-      expect(report.mergedWarnings[0]).toContain('rejected');
-      expect(
-        (await listPublicAreaTrails(db.database, area.id))[0]!.boundaryGeoJson.features
-      ).toEqual(expect.arrayContaining(snapshot.routes.flatMap((r) => r.geometry.features)));
-    }
+    const invalid = {
+      ...snapshot.routes[0]!,
+      geometry: line([
+        [25, 61],
+        [25, 61]
+      ])
+    };
+    const changed = {
+      ...snapshot,
+      timestamp: '2026-11-14T10:00:00Z',
+      routes: [invalid, snapshot.routes[1]!]
+    };
+    const report = await importOsmTrails({ database: db.database, snapshot: changed });
+    expect(report.mergedWarnings[0]).toContain('rejected');
+    expect((await listPublicAreaTrails(db.database, area.id))[0]!.boundaryGeoJson.features).toEqual(
+      expect.arrayContaining(snapshot.routes.flatMap((r) => r.geometry.features))
+    );
   });
 
   it('updates one component in preview without writes and rejects concurrent canonical changes', async () => {
@@ -570,40 +564,47 @@ describe('manual linked trail merging', () => {
     );
   });
 
-  it('rejects a combined refresh exceeding the length limit without replacing any snapshots', async () => {
-    await merge();
-    const before = await stored();
-    const changed: OsmSnapshot = {
-      ...snapshot,
-      timestamp: '2026-11-14T10:00:00Z',
-      routes: [
-        {
-          ...snapshot.routes[0]!,
-          geometry: line([
-            [24, 61],
-            [25.3, 61]
-          ])
-        },
-        {
-          ...snapshot.routes[1]!,
-          geometry: line([
-            [24, 61.1],
-            [25.3, 61.1]
-          ])
-        }
-      ]
+  it('merges long geometry and refreshes long OSM components without losing length edits', async () => {
+    const initial = line([
+      [24, 61],
+      [26, 61]
+    ]);
+    await db.database
+      .update(parks)
+      .set({ boundaryGeojson: JSON.stringify(initial) })
+      .where(eq(parks.id, from.id));
+    const firstMerge = await merge();
+    expect(firstMerge).toMatchObject({ measuredLengthKm: expect.any(Number) });
+    if (firstMerge.alreadyMerged) throw new Error('Expected a new merge');
+    expect(firstMerge.measuredLengthKm).toBeGreaterThan(100);
+    await db.database.update(parks).set({ lengthKm: 150 }).where(eq(parks.id, to.id));
+
+    const route = {
+      ...snapshot.routes[0]!,
+      geometry: line([
+        [24, 61],
+        [27, 61]
+      ]),
+      reportedLengthKm: 160
     };
-    await expect(importOsmTrails({ database: db.database, snapshot: changed })).rejects.toThrow(
-      '100 km'
+    const result = await importOsmTrails({
+      database: db.database,
+      snapshot: { ...snapshot, routes: [route, snapshot.routes[1]!] }
+    });
+    expect(result.mergedWarnings).toEqual([]);
+    expect(result.mergedTrails).toEqual([
+      expect.objectContaining({ slug: to.slug, lengthKm: 150 })
+    ]);
+    expect((await stored()).members).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          trailId: from.id,
+          sourceGeometry: JSON.stringify(route.geometry),
+          sourceLengthKm: 160
+        })
+      ])
     );
-    expect(await stored()).toEqual(before);
-    await db.database.update(parks).set({ lengthKm: 101 }).where(eq(parks.id, to.id));
-    await expect(
-      importOsmTrails({
-        database: db.database,
-        snapshot: { ...snapshot, timestamp: changed.timestamp }
-      })
-    ).rejects.toThrow('100 km');
+
     const third = {
       id: 3,
       name: 'Kolmas',
@@ -615,8 +616,8 @@ describe('manual linked trail merging', () => {
     };
     await importOsmTrails({ database: db.database, snapshot: { ...snapshot, routes: [third] } });
     await expect(
-      mergeTrails(db.database, { fromSlug: 'osm-relation-3', toSlug: to.slug, dryRun: true })
-    ).rejects.toThrow('100 km');
+      mergeTrails(db.database, { fromSlug: 'osm-relation-3', toSlug: to.slug })
+    ).resolves.toMatchObject({ lengthKm: 150 });
   });
 
   it('recomputes memberships for new, remote, inactive and invalid parent geometry without losing pinned visits', async () => {

@@ -503,6 +503,7 @@ describe('selected trail batch', () => {
           osmWayIds: number[];
           sourceUrls: string[];
           featureCount: number;
+          geometrySha256: string;
           initialDisplayLengthKm: number | null;
         }>;
       }) => void
@@ -542,7 +543,29 @@ describe('selected trail batch', () => {
         }),
         geometryText
       )
-    ).toThrow('Invalid selected trail length');
+    ).toThrow('manifest hash mismatch');
+    const degenerate = JSON.parse(geometryText) as {
+      features: Array<{
+        properties: { selectionKey: string };
+        geometry: { type: 'LineString'; coordinates: [number, number][] };
+      }>;
+    };
+    const degenerateManifest = mutate((d) => {
+      const selection = d.selections[0]!;
+      const features = degenerate.features.filter(
+        (feature) => feature.properties.selectionKey === selection.selectionKey
+      );
+      const geometries = features.map(({ geometry }) => {
+        geometry.coordinates = [geometry.coordinates[0]!, geometry.coordinates[0]!];
+        return { coordinates: geometry.coordinates, type: geometry.type };
+      });
+      selection.geometrySha256 = createHash('sha256')
+        .update(JSON.stringify(geometries))
+        .digest('hex');
+    });
+    expect(() => parseSelectedTrails(degenerateManifest, JSON.stringify(degenerate))).toThrow(
+      'Invalid selected trail length'
+    );
     const geometry = JSON.parse(geometryText) as {
       features: Array<{ properties: { selectionKey: string; routeName: string } }>;
     };

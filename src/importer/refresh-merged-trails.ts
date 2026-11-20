@@ -14,7 +14,6 @@ import {
   planMergedMemberships
 } from '../db/trail-merges.js';
 import type { OsmRoute, OsmSnapshot } from './import-osm-trails.js';
-import { exceedsTrailLengthLimit } from './trail-area-geometry.js';
 
 export const prepareMergedTrailRefresh = async (database: DbClient, snapshot: OsmSnapshot) => {
   const memberRows = await database
@@ -54,8 +53,6 @@ export const prepareMergedTrailRefresh = async (database: DbClient, snapshot: Os
       }
       try {
         combineTrailGeometry([JSON.stringify(route.geometry)]);
-        if (exceedsTrailLengthLimit(null, route.reportedLengthKm))
-          throw new Error('Reported source length exceeds 100 km.');
       } catch (error) {
         warnings.push(
           `${canonical.slug}: OSM ${source.relationId} rejected; retaining last valid component. ${String(error)}`
@@ -85,8 +82,6 @@ export const prepareMergedTrailRefresh = async (database: DbClient, snapshot: Os
     );
     const lengthKm =
       canonical.lengthKm === group.measuredLengthKm ? combined.lengthKm : canonical.lengthKm;
-    if (exceedsTrailLengthLimit(null, lengthKm))
-      throw new Error(`Merged trail ${canonical.slug} exceeds the 100 km length limit.`);
     const links = await database
       .select()
       .from(trailAreaLinks)

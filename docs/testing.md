@@ -62,7 +62,7 @@ If an upload limit exists, at least one test should cover the real stored-object
 Use the owning integration suite to find endpoint and fixture details. Keep
 these invariants covered when changing the corresponding workflows.
 
-- **Catalog imports** preserve catalog identity, admin edits, visits and manual trail overrides. Verify supported-source filtering, geometry normalization and measurements, the 10% overlap and 100 km length limits, bounded writes, rollback, visibility, and exclusion of contact fields. Manual imports use the same persistence guarantees and survive LIPAS refreshes.
+- **Catalog imports** preserve catalog identity, admin edits, visits and manual trail overrides. Verify supported-source filtering, geometry normalization and measurements, the 10% overlap rule and reimport of long trails, bounded writes, rollback, visibility, and exclusion of contact fields. Manual imports use the same persistence guarantees and survive LIPAS refreshes.
 - **Access and publication** protect admin reads and mutations, enforce independent trip and visit status, and keep hidden parents, draft relationships, and private waypoints out of public projections. Verify OAuth return validation, invitation enrollment, and super-admin permissions with real temporary databases.
 - **Caching** covers conditional ETags, data-version changes, and private/no-store responses. Published review shares stay frozen until explicitly refreshed or unpublished.
 - **Trips and visits** cover CRUD, shared itinerary ordering, published-only assignment rules, trail memberships, and route cache isolation between public and admin-preview geometry.

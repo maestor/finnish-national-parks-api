@@ -17,7 +17,6 @@ import {
 import { publicTripRouteSchema } from '../contracts/parks.js';
 import type { DateRangeReviewStory } from '../date-range-review/story.js';
 import type { GeoJsonFeatureCollection } from '../importer/geometry.js';
-import { seitsemansVeljestaTrail } from '../importer/seitsemans-veljesta-trail.js';
 import { deriveDisplayNameFromLabel } from '../location-display.js';
 import { createParkSlug, createSlug, normalizeParkUrl } from '../parks/park-normalization.js';
 import type { SupportedParkCategorySlug, SupportedParkTypeSlug } from '../parks/park-types.js';
@@ -25,7 +24,6 @@ import {
   getParkCategoryByTypeSlug,
   getSupportedParkTypeSlugsByCategorySlug,
   isHikingAndWildernessAreaTypeSlug,
-  isTrailTypeCode,
   isTrailTypeSlug,
   supportedParkTypes
 } from '../parks/park-types.js';
@@ -47,7 +45,6 @@ import {
   parkVisits,
   publicDataVersions,
   trailAreaLinks,
-  trailMergeGroups,
   tripFeaturedImages,
   tripRoutes,
   tripRouteWaypoints,
@@ -5111,28 +5108,6 @@ export const updateParkRemoved = async (database: Database, slug: string, remove
   database.transaction(async (tx) => {
     const park = await findParkRecordBySlugIncludingRemoved(tx, slug);
     if (!park) return false;
-
-    if (!removed && isTrailTypeCode(park.typeId)) {
-      const { exceedsTrailLengthLimit, measureTrailLengthKm } = await import(
-        '../importer/trail-area-geometry.js'
-      );
-      if (
-        exceedsTrailLengthLimit(
-          measureTrailLengthKm(JSON.parse(park.boundaryGeojson) as GeoJsonFeatureCollection),
-          park.lengthKm
-        )
-      ) {
-        const [curatedMerge] =
-          park.lipasId === seitsemansVeljestaTrail.canonicalId
-            ? await tx
-                .select({ id: trailMergeGroups.trailId })
-                .from(trailMergeGroups)
-                .where(eq(trailMergeGroups.trailId, park.id))
-            : [];
-        if (!curatedMerge)
-          throw new RepositoryValidationError('A trail over 100 km cannot be enabled.');
-      }
-    }
 
     if (
       !removed &&

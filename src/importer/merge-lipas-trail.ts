@@ -34,8 +34,7 @@ export const prepareLipasTrailMerge = (
     return {
       components,
       combined: combineTrailGeometry(
-        components.map((component) => JSON.stringify(component.boundaryGeoJson)),
-        { allowLong: true }
+        components.map((component) => JSON.stringify(component.boundaryGeoJson))
       )
     };
   } catch (error) {

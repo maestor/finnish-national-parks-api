@@ -1,7 +1,6 @@
 import { and, asc, eq, inArray, sql } from 'drizzle-orm';
 import { deriveBoundingBox, type GeoJsonFeatureCollection } from '../importer/geometry.js';
 import {
-  exceedsTrailLengthLimit,
   hasUsableLineLength,
   isValidWgs84Coordinate,
   measureTrailAreaOverlap,
@@ -39,7 +38,7 @@ export const unabsorbedTrailWhere = () => sql`not exists (
     and ${trailMergeMembers.canonicalTrailId} <> ${parks.id}
 )`;
 
-export const combineTrailGeometry = (geometries: string[], { allowLong = false } = {}) => {
+export const combineTrailGeometry = (geometries: string[]) => {
   const seen = new Set<string>();
   const geometry: GeoJsonFeatureCollection = { type: 'FeatureCollection', features: [] };
   for (const text of geometries) {
@@ -63,8 +62,7 @@ export const combineTrailGeometry = (geometries: string[], { allowLong = false }
     }
   }
   const lengthKm = measureTrailLengthKm(geometry);
-  if (lengthKm === null || (!allowLong && exceedsTrailLengthLimit(lengthKm)))
-    throw new Error('Combined trail geometry must be measurable and at most 100 km.');
+  if (lengthKm === null) throw new Error('Combined trail geometry must be measurable.');
   const bounds = deriveBoundingBox(geometry);
   const first = geometry.features[0]!.geometry.coordinates[0] as [number, number];
   return {
@@ -370,8 +368,6 @@ export const mergeTrails = async (database: Database, input: MergeTrailsInput) =
       !group || destination.lengthKm === group.measuredLengthKm
         ? combined.lengthKm
         : destination.lengthKm;
-    if (exceedsTrailLengthLimit(null, lengthKm))
-      throw new Error('Destination length exceeds 100 km.');
     const affectedSlugs = [
       ...new Set([
         ...membershipPlan.map((row) => row.areaSlug),

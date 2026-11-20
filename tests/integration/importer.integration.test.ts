@@ -13,7 +13,6 @@ import { listAreaTrails, setAreaTrailOverride } from '../../src/db/trail-areas.j
 import { importOsmTrails } from '../../src/importer/import-osm-trails.js';
 import { defaultLipasCatalogSourceUrl, importParks } from '../../src/importer/import-parks.js';
 import { reconcileTrailAreas } from '../../src/importer/reconcile-trail-areas.js';
-import { retireLongTrails } from '../../src/importer/retire-long-trails.js';
 import {
   createLipasHikingTrail,
   createLipasPark,
@@ -169,7 +168,6 @@ describe('importParks', () => {
       snapshot: { timestamp: '2026-11-19T12:00:00Z', routes: [] }
     });
     expect(osmResult.mergedWarnings).toEqual([]);
-    expect((await retireLongTrails({ database, dryRun: true })).retiredTrails).toEqual([]);
     expect((await importParks(options)).affectedMergedTrailSlugs).toEqual([]);
 
     items = [...catalogAreas, ...pieces.slice(1)];
@@ -266,10 +264,8 @@ describe('importParks', () => {
     ).toBe(refreshed?.boundaryGeojson);
 
     items = [{ ...modified, properties: { 'route-length-km': 150 } }, ...rest];
-    const oversized = await importParks(options);
-    expect(oversized.excludedLongTrails).toEqual([
-      expect.objectContaining({ lipasId: canonicalId, reportedLengthKm: 150 })
-    ]);
+    const longSource = await importParks(options);
+    expect(longSource.mergeWarnings).toEqual([]);
     expect(
       await database.query.parks.findFirst({ where: eq(parks.lipasId, canonicalId) })
     ).toMatchObject({

@@ -110,20 +110,14 @@ globalThis.fetch=async (_url,options)=>Response.json({osm3s,elements:String(opti
     expect(preview).not.toContain('Already up to date');
     expect(preview).toContain('Äkäsmännyn kansallispuisto (manually excluded)');
   });
-  it('reports retirements because they change the catalog', async () => {
+  it('keeps an unchanged trail with an administrator length above 100 km', async () => {
     await run();
     await database.update(parks).set({ lengthKm: 101 }).where(eq(parks.name, 'Testipolku'));
-    const preview = await run('--dry-run');
-    expect(preview).toContain('Would retire 1 trails');
-    expect(preview).toContain('Testipolku');
-    expect(preview).not.toContain('Not imported');
+    expect(await run('--dry-run')).toContain('would import or update 0 trails');
+    expect(await run()).toContain('Imported or updated 0 trails');
     expect(
-      (await database.select().from(parks).where(eq(parks.name, 'Testipolku')))[0]?.catalogStatus
-    ).toBe('active');
-    expect(await run()).toContain('Retired 1 trails');
-    expect(
-      (await database.select().from(parks).where(eq(parks.name, 'Testipolku')))[0]?.catalogStatus
-    ).toBe('inactive');
+      (await database.select().from(parks).where(eq(parks.name, 'Testipolku')))[0]
+    ).toMatchObject({ catalogStatus: 'active', lengthKm: 101 });
   });
   it('omits unchanged trails from the preview', async () => {
     await run();

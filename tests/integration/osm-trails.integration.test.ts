@@ -93,7 +93,7 @@ describe('OSM linked trail import', () => {
     await reconcileTrailAreas(db.database, new Date().toISOString());
     expect(await db.database.select().from(trailAreaLinks)).toHaveLength(1);
   });
-  it('reports long routes and named subparts of existing trails', async () => {
+  it('reports named subparts of existing trails', async () => {
     const duplicate = {
       ...snapshot.routes[0]!,
       id: 12346,
@@ -114,10 +114,9 @@ describe('OSM linked trail import', () => {
         ]
       }
     };
-    const tooLong = { ...snapshot.routes[0]!, id: 12347, name: 'Pitkä', reportedLengthKm: 101 };
     const result = await importOsmTrails({
       database: db.database,
-      snapshot: { ...snapshot, routes: [duplicate, tooLong, snapshot.routes[0]!] },
+      snapshot: { ...snapshot, routes: [duplicate, snapshot.routes[0]!] },
       dryRun: true
     });
     expect(result.imported.map((r) => r.id)).toEqual([12345]);
@@ -127,12 +126,11 @@ describe('OSM linked trail import', () => {
           id: 12346,
           reason: 'duplicate-or-contained',
           containingTrails: ['Testipolku']
-        }),
-        expect.objectContaining({ id: 12347, reason: 'over-100km' })
+        })
       ])
     );
   });
-  it('preserves local reported-length corrections on source refresh and refuses oversized corrections', async () => {
+  it('preserves local reported-length corrections above 100 km on source refresh', async () => {
     await importOsmTrails({ database: db.database, snapshot });
     const trail = (await db.database.select().from(parks).where(eq(parks.name, 'Testipolku')))[0]!;
     await db.database.update(parks).set({ lengthKm: 2 }).where(eq(parks.id, trail.id));
@@ -144,26 +142,18 @@ describe('OSM linked trail import', () => {
       (await db.database.select().from(parks).where(eq(parks.id, trail.id)))[0]?.lengthKm
     ).toBe(2);
     await db.database.update(parks).set({ lengthKm: 101 }).where(eq(parks.id, trail.id));
-    const preview = await importOsmTrails({ database: db.database, snapshot, dryRun: true });
-    expect(preview.excluded).toContainEqual(
-      expect.objectContaining({ id: 12345, reason: 'over-100km' })
-    );
     await importOsmTrails({ database: db.database, snapshot });
     expect((await db.database.select().from(parks).where(eq(parks.id, trail.id)))[0]).toMatchObject(
-      { catalogStatus: 'inactive', removed: true, lengthKm: 101 }
+      { catalogStatus: 'active', removed: true, lengthKm: 101 }
     );
     expect(await db.database.select().from(trailAreaLinks)).toHaveLength(1);
-    await db.database.update(parks).set({ lengthKm: 2 }).where(eq(parks.id, trail.id));
-    await importOsmTrails({ database: db.database, snapshot });
-    expect((await db.database.select().from(parks).where(eq(parks.id, trail.id)))[0]).toMatchObject(
-      { catalogStatus: 'active', removed: true, lengthKm: 2 }
-    );
   });
-  it('reports invalid, oversized geometry and routes outside existing areas', async () => {
+  it('imports long geometry with an area match and excludes invalid or unlinked routes', async () => {
     const route = snapshot.routes[0]!;
     const withCoords = (id: number, coordinates: [number, number][]) => ({
       ...route,
       id,
+      reportedLengthKm: 120,
       geometry: {
         type: 'FeatureCollection' as const,
         features: [
@@ -189,13 +179,18 @@ describe('OSM linked trail import', () => {
             [18.01, 61]
           ])
         ]
-      },
-      dryRun: true
+      }
     });
+    expect(result.imported).toEqual([
+      expect.objectContaining({ id: 2, length: expect.any(Number) })
+    ]);
+    expect(result.imported[0]!.length).toBeGreaterThan(100);
+    expect(
+      await db.database.query.parks.findFirst({ where: eq(parks.slug, 'osm-relation-2') })
+    ).toMatchObject({ catalogStatus: 'active', lengthKm: 120 });
     expect(result.excluded).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ id: 1, reason: 'invalid-geometry' }),
-        expect.objectContaining({ id: 2, reason: 'over-100km' }),
         expect.objectContaining({ id: 3, reason: 'no-area' })
       ])
     );
@@ -346,23 +341,6 @@ describe('OSM linked trail import', () => {
     );
     const result = await importOsmTrails({ database: db.database, snapshot, dryRun: true });
     expect(result.imported[0]?.areas).toContain(area.slug);
-  });
-  it('aborts retirement when an administrator corrects the trail during matching', async () => {
-    await importOsmTrails({ database: db.database, snapshot });
-    const trail = (await db.database.select().from(parks).where(eq(parks.name, 'Testipolku')))[0]!;
-    await db.database.update(parks).set({ lengthKm: 101 }).where(eq(parks.id, trail.id));
-    await expect(
-      importOsmTrails({
-        database: db.database,
-        snapshot,
-        beforeApply: async () => {
-          await db.database.update(parks).set({ lengthKm: 2 }).where(eq(parks.id, trail.id));
-        }
-      })
-    ).rejects.toThrow('changed during import');
-    expect((await db.database.select().from(parks).where(eq(parks.id, trail.id)))[0]).toMatchObject(
-      { catalogStatus: 'active', lengthKm: 2 }
-    );
   });
   it('lists national park candidates ahead of other areas', async () => {
     const area = (

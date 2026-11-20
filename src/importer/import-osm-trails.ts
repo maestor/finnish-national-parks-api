@@ -13,7 +13,6 @@ import { isTrailTypeCode } from '../parks/park-types.js';
 import { deriveBoundingBox, type GeoJsonFeatureCollection } from './geometry.js';
 import { applyMergedTrailRefresh, prepareMergedTrailRefresh } from './refresh-merged-trails.js';
 import {
-  exceedsTrailLengthLimit,
   measureTrailAreaOverlap,
   measureTrailLengthKm,
   qualifiesTrailAreaOverlap
@@ -188,15 +187,7 @@ export const importOsmTrails = async ({
       }
     }));
   const stored = records
-    .filter(
-      (p) =>
-        p.catalogStatus === 'active' &&
-        isTrailTypeCode(p.typeId) &&
-        !exceedsTrailLengthLimit(
-          measureTrailLengthKm(JSON.parse(p.boundaryGeojson) as GeoJsonFeatureCollection),
-          p.lengthKm
-        )
-    )
+    .filter((p) => p.catalogStatus === 'active' && isTrailTypeCode(p.typeId))
     .map((p) => ({
       park: p,
       geometry: JSON.parse(p.boundaryGeojson) as GeoJsonFeatureCollection,
@@ -208,7 +199,6 @@ export const importOsmTrails = async ({
       }
     }));
   const excluded: { id: number; name: string; reason: string; containingTrails: string[] }[] = [];
-  const retire: (typeof records)[number][] = [];
   const imported: {
     id: number;
     name: string;
@@ -230,15 +220,8 @@ export const importOsmTrails = async ({
   for (const { route, length, bounds } of prepared) {
     const prior = byRelation.get(route.id);
     if (prior && mergedRefresh.memberIds.includes(prior.id)) continue;
-    const effective =
-      prior && prior.lengthKm !== prior.importedLengthKm ? prior.lengthKm : route.reportedLengthKm;
     const reject = (reason: string, containingTrails: string[] = []) =>
       excluded.push({ id: route.id, name: route.name, reason, containingTrails });
-    if (exceedsTrailLengthLimit(length, effective)) {
-      if (prior?.catalogStatus === 'active') retire.push(prior);
-      reject('over-100km');
-      continue;
-    }
     if (length === null) {
       reject('invalid-geometry');
       continue;
@@ -327,7 +310,7 @@ export const importOsmTrails = async ({
       );
     });
   });
-  if (!dryRun && (changed.length || retire.length || mergedRefresh.plans.length)) {
+  if (!dryRun && (changed.length || mergedRefresh.plans.length)) {
     await beforeApply();
     await database.transaction(async (tx) => {
       const currentSelected = await tx
@@ -349,29 +332,12 @@ export const importOsmTrails = async ({
           .insert(importRuns)
           .values({
             sourceUrl: 'https://www.openstreetmap.org/',
-            activeCount: changed.length + retire.length + mergedRefresh.plans.length,
+            activeCount: changed.length + mergedRefresh.plans.length,
             importedAt: timestamp,
             responseShapeVersion: 'osm-linked-trails-v1'
           })
           .returning({ id: importRuns.id })
       )[0]!;
-      for (const prior of retire) {
-        const updated = await tx
-          .update(parks)
-          .set({ catalogStatus: 'inactive', removed: true, updatedAt: timestamp })
-          .where(
-            and(
-              eq(parks.id, prior.id),
-              sql`${parks.lengthKm} IS ${prior.lengthKm}`,
-              sql`${parks.importedLengthKm} IS ${prior.importedLengthKm}`,
-              sql`${parks.boundaryGeojson} IS ${prior.boundaryGeojson}`,
-              eq(parks.catalogStatus, prior.catalogStatus)
-            )
-          )
-          .returning({ id: parks.id });
-        if (!updated.length)
-          throw new Error(`Trail ${prior.slug} changed during import; retry the dry run.`);
-      }
       let nextId = Math.min(0, ...records.map((p) => p.lipasId)) - 1;
       for (const item of changed) {
         const prior = byRelation.get(item.id);
@@ -516,15 +482,7 @@ export const importOsmTrails = async ({
               return [area.slug];
             })
         ];
-      }),
-      ...retire.flatMap((trail) =>
-        links
-          .filter((link) => link.trailId === trail.id)
-          .flatMap((link) => {
-            const area = records.find((record) => record.id === link.areaId)!;
-            return [area.slug];
-          })
-      )
+      })
     ])
   ];
   return {
@@ -537,9 +495,6 @@ export const importOsmTrails = async ({
     imported,
     excluded,
     affectedSlugs,
-    changedIds: changed.map((item) => item.id),
-    retiredIds: retire.flatMap((trail) =>
-      sources.filter((source) => source.trailId === trail.id).map((source) => source.relationId)
-    )
+    changedIds: changed.map((item) => item.id)
   };
 };

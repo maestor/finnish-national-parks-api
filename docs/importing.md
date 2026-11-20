@@ -27,44 +27,19 @@ Both import paths insert new records disabled and preserve existing visibility a
 
 The LIPAS `route-length-km` property is stored as nullable `lengthKm` independently of the geometry measurements used for matching. Re-imports refresh the source value while preserving administrator edits, as with area. Existing rows receive their source length on the next LIPAS import after migration `0048_trail_length.sql`; missing values remain null.
 
-### Maximum trail length
+### Long trails
 
-Trails whose **measured geometry or effective reported length exceeds 100 km**
-are outside the catalog scope.
-The measurement unions mapped line segments and measures their unique length in
-EPSG:3067, independently of area clipping; repeated or retraced segments are not
-counted twice. Exactly 100 km is allowed, with a `1e-7` km numerical tolerance.
-The limit applies to trails, not area perimeters. The retirement command evaluates
-the current editable `lengthKm` alongside measured geometry: either value over
-the limit retires the trail, even when geometry is short or unmeasurable. Correct
-obvious reported-length unit errors before applying retirement. An admin override
-(`lengthKm` different from `importedLengthKm`) takes precedence over the incoming
-LIPAS reported length, matching the existing edit-preservation rules. Otherwise,
-the incoming source length is used. Unmeasurable geometry with no oversized
-reported length follows the existing private/unresolved import rules.
+Catalog admission and admin visibility do not use a maximum trail length.
+Length edits survive reimport, and automatic area matching still uses the full
+unique mapped line length. A supported, source-active trail previously retired
+for length is restored in place on reimport, with its existing visits, manual
+links and visibility intact. New and previously hidden standalone trails still
+need an explicit enable to appear as standalone destinations.
 
-The LIPAS import skips new oversized trails and retires existing ones as inactive
-and hidden. Special-trail imports reject an oversized source batch before writes.
-Oversized trails cannot be enabled from admin visibility management. A scheduled
-import rolls back if this would newly hide an enabled trail, requiring the manual
-import/cache-expiry procedure instead. Manual and scheduled import logs report
-excluded trails with both measured and effective reported lengths.
-
-To retire existing trails without reimporting source data, back up the database,
-then run `npm run trails:retire-long -- --dry-run`. It only reads the current
-catalog and reports every trail oversized by either length with both length
-values. Unresolved geometry stays in the result for diagnostics but is not printed.
-After correcting unit errors and reviewing the preview, run
-`npm run trails:retire-long`, then use the UI's full cache clear to refresh park
-details and their summary/list caches together. The CLI prints a short park-cache
-reminder instead of a URL list. The
-command refuses pending migrations and never applies them. It sets
-oversized trails inactive and hidden while preserving their IDs, visit records
-and durable manual link overrides; inactive trails no longer appear as linked
-public routes. Subsequent LIPAS imports keep oversized geometry excluded. A later
-source/edited length reduced to the limit may reactivate the row when geometry is
-also within the limit, but it stays hidden
-until explicitly reviewed/enabled or linked. No offline storage changes.
+To restore LIPAS trails, preview and apply the regular import below and clear
+the UI's public park caches after applying. Existing trail and area IDs stay
+the same. Formerly retired OSM trails can return through the regular OSM import
+when they meet its area match and duplicate checks.
 
 To reduce traffic to remote libSQL, the main import upserts at most ten parks per statement, with a 1 MiB geometry budget per batch. Trail reconciliation loads geometry in groups of at most 50 records and 2 MiB. A single geometry larger than a budget is sent or read on its own. During lengthy geometry matching, periodic lightweight queries keep the remote transaction stream active. All catalog writes, reconciliation and notification queuing remain in one transaction; dry runs roll it back.
 
@@ -78,11 +53,9 @@ Admin-session endpoints `GET /api/admin/parks/{slug}/trails` and `/trail-candida
 
 The LIPAS import consolidates records `524135`, `528635`, `528636`, `601262`,
 `602277` and `602303` into the existing trail for `524135`. The combined map
-includes both Vantaa branches and the connecting trails. The six individual
-source records are still checked against the 100 km limit. This specific
-combined record can exceed 100 km and is exempt from retirement and the admin
-visibility length check. Its displayed source length is the unique mapped line
-length. Existing administrator edits on the canonical record survive refresh.
+includes both Vantaa branches and the connecting trails. The displayed source
+length is the unique mapped line length. Existing administrator edits on the
+canonical record survive refresh.
 
 Preview and apply the first merge through the manual LIPAS workflow above
 when it affects public trails. The scheduled import then requires manual
@@ -154,10 +127,8 @@ bounds change, the next run fetches a fresh snapshot. National-park results
 appear first, followed by other areas.
 
 The dry run lists trails that would be added or updated, their matched area names,
-OSM relation IDs, measured lengths and review flags. It also lists existing trails
-that would be retired for exceeding the length limit.
-It rejects routes over 100 km by measured geometry or effective reported length,
-nearby same-name matches, and routes whose sampled geometry is at least 90%
+OSM relation IDs, measured lengths and review flags. It rejects nearby same-name
+matches and routes whose sampled geometry is at least 90%
 within 25 m of a stored trail or a longer selected OSM route. The geometric
 screen is approximate and the report requires review. Local length and name
 edits and manual link overrides survive refreshes. Missing source relations and
@@ -203,7 +174,7 @@ After applying, immediately expire every reported UI park cache through the auth
 
 Maintainers can [merge linked OSM trails manually](development.md#merge-linked-trails). Original relation identities and raw component snapshots remain separate from the destination's combined geometry. The public linked-trail `source.relations` array lists every contributing relation ID and URL; existing singular `relationId`/`sourceUrl` fields still identify the destination's primary source.
 
-Known merge members refresh before duplicate/containment filtering. The importer rebuilds each changed destination once from current valid components, preserving its chosen name, slug, administrator length correction and manual memberships. Absorbed sources stay inactive and hidden; database guards also prevent re-enabling them. A missing or rejected member keeps its last valid component and is reported, while valid members can still refresh. Invalid combined geometry, a combined route over 100 km or concurrent edits abort the transaction instead of partly replacing snapshots. Normal reads remain local-first. An unchanged rerun writes nothing.
+Known merge members refresh before duplicate/containment filtering. The importer rebuilds each changed destination once from current valid components, preserving its chosen name, slug, administrator length correction and manual memberships. Absorbed sources stay inactive and hidden; database guards also prevent re-enabling them. A missing or rejected member keeps its last valid component and is reported, while valid members can still refresh. Invalid combined geometry or concurrent edits abort the transaction instead of partly replacing snapshots. Normal reads remain local-first. An unchanged rerun writes nothing.
 
 New automatic area matches use combined geometry and are included in the affected cache slugs. Previously pinned memberships survive geometry changes. After import, immediately clear the UI's public caches as above; API data-version updates do not expire them. LIPAS area imports and long-trail retirement retain source identities and merge membership. Source snapshots cannot be treated as a reversible edit history: there is no automatic unmerge.
 
@@ -228,7 +199,7 @@ one Finnish review issue with their names, types and LIPAS IDs, mentioning only
 `@maestor`. With no additions, it creates no issue. Existing parks are refreshed
 using the same import and preservation rules as the manual command; missing
 LIPAS-managed parks become inactive. Normal API reads remain local-first, and
-the frontend cache must be immediately expired for any retired public trail pages as described below.
+public trail conversions requiring immediate cache expiry use the manual workflow above.
 
 Notification reports are queued in the same database transaction as the import.
 Failed notifications remain queued for the next workflow run, which retries
