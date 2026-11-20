@@ -111,7 +111,6 @@ try {
       .map((link) => `${link.trailId}:${link.areaId}`)
   );
   const changedIds = new Set(report.changedIds);
-  const retiredIds = new Set(report.retiredIds);
   const changed = report.imported.filter((trail) => changedIds.has(trail.id));
   const printTrail = (trail: (typeof report.imported)[number]) => {
     const flags = [
@@ -141,11 +140,6 @@ try {
       `- ${trail.name} [${trail.slug}]: ${dryRun ? 'would refresh' : 'refreshed'} merged source geometry (${trail.lengthKm?.toFixed(3) ?? 'unknown'} km).`
     );
   for (const warning of report.mergedWarnings) console.error(warning);
-  const retired = report.excluded.filter((trail) => retiredIds.has(trail.id));
-  if (retired.length) {
-    console.log(`\n${dryRun ? 'Would retire' : 'Retired'} ${retired.length} trails over 100 km:`);
-    for (const trail of retired) console.log(`- ${trail.name} (OSM ${trail.id})`);
-  }
   if (report.affectedSlugs.length)
     console.error(
       dryRun ? 'Expire affected area caches after applying.' : 'Expire affected area caches now.'

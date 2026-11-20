@@ -15,7 +15,7 @@ import {
 } from '../db/schema.js';
 import { isTrailTypeCode } from '../parks/park-types.js';
 import { deriveBoundingBox, type GeoJsonFeatureCollection } from './geometry.js';
-import { exceedsTrailLengthLimit, measureTrailLengthKm } from './trail-area-geometry.js';
+import { measureTrailLengthKm } from './trail-area-geometry.js';
 
 const selectionSchema = z
   .object({
@@ -100,7 +100,7 @@ export const parseSelectedTrails = (manifestText: string, geoText: string) => {
       features: geometries.map((g) => ({ type: 'Feature', geometry: g }))
     };
     const length = measureTrailLengthKm(geometry);
-    if (length === null || exceedsTrailLengthLimit(length, selection.initialDisplayLengthKm))
+    if (length === null)
       throw new Error(`Invalid selected trail length: ${selection.selectionKey}`);
     return {
       selection,

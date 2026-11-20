@@ -1,4 +1,4 @@
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { z } from 'zod';
 
 import type { Database } from '../db/database.js';
@@ -11,7 +11,7 @@ import {
   type UpsertCatalogParkInput,
   upsertCatalogParks
 } from '../db/repositories.js';
-import { parkImportNotifications, parks, trailAreaLinks } from '../db/schema.js';
+import { parkImportNotifications, parks } from '../db/schema.js';
 import { mergedTrailSlugs } from '../db/trail-merges.js';
 import {
   getSupportedParkTypeByCode,
@@ -28,7 +28,6 @@ import {
 } from './merge-lipas-trail.js';
 import { reconcileTrailAreas } from './reconcile-trail-areas.js';
 import { seitsemansVeljestaTrail as mergedTrail } from './seitsemans-veljesta-trail.js';
-import { exceedsTrailLengthLimit, measureTrailLengthKm } from './trail-area-geometry.js';
 
 const lipasResponseSchema = z.object({
   items: z.array(z.unknown()),
@@ -207,38 +206,11 @@ export const importParks = async ({
     mappedActiveParks.map((park) => park.lipasId)
   );
   const existingByLipasId = new Map(existingParks.map((park) => [park.lipasId, park]));
-  const excludedLongTrails: Array<{
-    lipasId: number;
-    name: string;
-    reportedLengthKm: number | null;
-    measuredLengthKm: number | null;
-  }> = [];
-  const importedParks = mappedActiveParks.filter((park) => {
-    if (!isTrailTypeCode(park.type.code)) return true;
-    const measuredLengthKm = measureTrailLengthKm(park.boundaryGeoJson);
-    const previous = existingByLipasId.get(park.lipasId);
-    const reportedLengthKm =
-      park.lipasId !== mergedTrail.canonicalId &&
-      previous &&
-      previous.lengthKm !== previous.importedLengthKm
-        ? previous.lengthKm
-        : park.lengthKm;
-    if (exceedsTrailLengthLimit(measuredLengthKm, reportedLengthKm)) {
-      excludedLongTrails.push({
-        lipasId: park.lipasId,
-        name: park.name,
-        reportedLengthKm,
-        measuredLengthKm
-      });
-      return false;
-    }
-    return true;
-  });
   const existingLipasIds = new Set(existingParks.map((park) => park.lipasId));
   const existingImportedSlugByLipasId = new Map(
     existingParks.map((park) => [park.lipasId, park.importedSlug ?? park.slug])
   );
-  let newParks = importedParks
+  let newParks = mappedActiveParks
     .filter((park) => !existingLipasIds.has(park.lipasId))
     .map((park) => ({
       lipasId: park.lipasId,
@@ -252,7 +224,7 @@ export const importParks = async ({
     (await listParkRecordsIncludingRemoved(database)).map((park) => park.slug)
   );
   const importedAt = now();
-  const parksByLipasId = new Map(importedParks.map((park) => [park.lipasId, park]));
+  const parksByLipasId = new Map(mappedActiveParks.map((park) => [park.lipasId, park]));
   const mergePlan = prepareLipasTrailMerge(parksByLipasId);
   const readyMerge = mergePlan && 'combined' in mergePlan ? mergePlan : undefined;
   const mergeWarnings: string[] = [];
@@ -265,7 +237,6 @@ export const importParks = async ({
   };
   const adoptedParks: { lipasId: number; slug: string }[] = [];
   const deactivatedParks: { lipasId: number; slug: string }[] = [];
-  const affectedLongTrailSlugs = new Set<string>();
   let affectedMergedTrailSlugs: string[] = [];
   let activeCount = 0;
 
@@ -308,19 +279,19 @@ export const importParks = async ({
         );
       const activeLipasIds = maintainMerge
         ? [
-            ...importedParks
+            ...mappedActiveParks
               .filter((park) => !mergedTrail.componentIds.includes(park.lipasId))
               .map((park) => park.lipasId),
             mergedTrail.canonicalId
           ]
-        : importedParks.map((park) => park.lipasId);
-      const importableItems = activeItems.filter((item) => {
-        const id = (item as { 'lipas-id': number })['lipas-id'];
-        return (
-          parksByLipasId.has(id) &&
-          (readyMerge || !maintainMerge || !mergedTrail.componentIds.includes(id))
-        );
-      });
+        : mappedActiveParks.map((park) => park.lipasId);
+      const importableItems =
+        maintainMerge && !readyMerge
+          ? activeItems.filter(
+              (item) =>
+                !mergedTrail.componentIds.includes((item as { 'lipas-id': number })['lipas-id'])
+            )
+          : activeItems;
       const canonicalSlug = readyMerge
         ? (existingImportedSlugByLipasId.get(mergedTrail.canonicalId) ??
           ensureUniqueSlug(mergedTrail.slug, mergedTrail.canonicalId, takenSlugs))
@@ -457,35 +428,6 @@ export const importParks = async ({
       const appliedMerge = readyMerge
         ? await applyLipasTrailMerge(tx, readyMerge, previousMerge, importedAt)
         : undefined;
-      const newlyHiddenLongTrailSlugs: string[] = [];
-      if (excludedLongTrails.length) {
-        const excludedIds = excludedLongTrails
-          .map((trail) => trail.lipasId)
-          .filter((id) => !maintainMerge || !mergedTrail.componentIds.includes(id));
-        const excludedExisting = await tx
-          .select({ id: parks.id, slug: parks.slug, removed: parks.removed })
-          .from(parks)
-          .where(inArray(parks.lipasId, excludedIds));
-        for (const trail of excludedExisting) {
-          affectedLongTrailSlugs.add(trail.slug);
-          if (!trail.removed) newlyHiddenLongTrailSlugs.push(trail.slug);
-        }
-        if (excludedExisting.length) {
-          const linkedAreas = await tx
-            .select({ slug: parks.slug })
-            .from(trailAreaLinks)
-            .innerJoin(parks, eq(parks.id, trailAreaLinks.areaId))
-            .where(
-              inArray(
-                trailAreaLinks.trailId,
-                excludedExisting.map((trail) => trail.id)
-              )
-            );
-          for (const area of linkedAreas) affectedLongTrailSlugs.add(area.slug);
-        }
-        await tx.update(parks).set({ removed: true }).where(inArray(parks.lipasId, excludedIds));
-      }
-
       const activeIds = new Set(activeLipasIds);
       const previouslyActive = await tx
         .select({ lipasId: parks.lipasId, slug: parks.slug })
@@ -504,8 +446,7 @@ export const importParks = async ({
       }
       const manualExpirySlugs = [
         ...(appliedMerge?.needsImmediateExpiry ? affectedMergedTrailSlugs : []),
-        ...trailAreaResult.value.newlyHiddenPublicSlugs,
-        ...newlyHiddenLongTrailSlugs
+        ...trailAreaResult.value.newlyHiddenPublicSlugs
       ];
       if (requireNoPublicTrailConversions && manualExpirySlugs.length) {
         throw new Error(
@@ -548,8 +489,6 @@ export const importParks = async ({
     newParks,
     adoptedParks,
     sourceActiveCount: activeItems.length,
-    excludedLongTrails,
-    affectedLongTrailSlugs: [...affectedLongTrailSlugs],
     importRunId,
     importedAt
   };

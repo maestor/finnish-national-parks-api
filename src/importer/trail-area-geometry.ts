@@ -28,14 +28,6 @@ const project = (coordinate: GeoJsonCoordinate) => {
 };
 const reader = new GeoJSONReader(new GeometryFactory());
 
-export const MAX_TRAIL_LENGTH_KM = 100;
-export const exceedsTrailLengthLimit = (
-  lengthKm: number | null,
-  reportedLengthKm: number | null = null
-) =>
-  (lengthKm !== null && lengthKm - MAX_TRAIL_LENGTH_KM > 1e-7) ||
-  (reportedLengthKm !== null && reportedLengthKm - MAX_TRAIL_LENGTH_KM > 1e-7);
-
 const projectedLength = (geometry: Geometry) => {
   const projected = geometry.copy() as Geometry & {
     apply: (filter: {
