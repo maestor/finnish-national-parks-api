@@ -19,7 +19,7 @@ import { measureTrailLengthKm } from './trail-area-geometry.js';
 
 const selectionSchema = z
   .object({
-    selectionKey: z.string().regex(/^visited-trails-2026-\d{2}$/),
+    selectionKey: z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
     name: z.string().min(1),
     parentSlug: z.string().min(1),
     sourceKind: z.enum(['osm-relation', 'osm-way-selection']),
@@ -32,15 +32,19 @@ const selectionSchema = z
     requestedLengthKm: z.number().nonnegative().nullable(),
     measuredUniqueLengthKm: z.number().nonnegative(),
     walkLengthKm: z.number().nonnegative().nullable(),
-    initialDisplayLengthKm: z.number().nonnegative().nullable()
+    initialDisplayLengthKm: z.number().nonnegative().nullable(),
+    referenceUrl: z
+      .string()
+      .regex(/^https:\/\/www\.luontoon\.fi\/fi\/reitit\/[a-z0-9-]+-\d+$/)
+      .optional()
   })
   .passthrough();
-const manifestSchema = z.object({ selections: z.array(selectionSchema).length(27) });
 const coordinate = z
   .tuple([z.number().min(-180).max(180), z.number().min(-90).max(90)])
   .rest(z.number());
-const geometrySchema = z.object({
+const catalogSchema = z.object({
   type: z.literal('FeatureCollection'),
+  selections: z.array(selectionSchema).min(1),
   features: z.array(
     z
       .object({
@@ -55,22 +59,21 @@ const geometrySchema = z.object({
   )
 });
 const hash = (value: string) => createHash('sha256').update(value).digest('hex');
-const datasetUrl = new URL('./selected-trails/', import.meta.url);
+const catalogUrl = new URL('./osm-linked-trails.geojson', import.meta.url);
 
-export const parseSelectedTrails = (manifestText: string, geoText: string) => {
-  const manifest = manifestSchema.parse(JSON.parse(manifestText));
-  const geo = geometrySchema.parse(JSON.parse(geoText));
-  const keys = new Set(manifest.selections.map((s) => s.selectionKey));
-  const relations = manifest.selections.filter((s) => s.sourceKind === 'osm-relation');
+export const parseSelectedTrails = (catalogText: string) => {
+  const catalog = catalogSchema.parse(JSON.parse(catalogText));
+  const keys = new Set(catalog.selections.map((s) => s.selectionKey));
+  const relations = catalog.selections.flatMap((s) =>
+    s.osmRelationId === null ? [] : [s.osmRelationId]
+  );
   if (
-    keys.size !== 27 ||
-    new Set(manifest.selections.map((s) => s.parentSlug)).size !== 11 ||
-    relations.length !== 2 ||
-    new Set(relations.map((s) => s.osmRelationId)).size !== 2 ||
-    geo.features.some((f) => !keys.has(f.properties.selectionKey))
+    keys.size !== catalog.selections.length ||
+    new Set(relations).size !== relations.length ||
+    catalog.features.some((f) => !keys.has(f.properties.selectionKey))
   )
-    throw new Error('Invalid selected trail identities or parents.');
-  const selections = manifest.selections.map((selection) => {
+    throw new Error('Invalid selected trail identities.');
+  const selections = catalog.selections.map((selection) => {
     const expectedUrls =
       selection.sourceKind === 'osm-relation'
         ? [`https://www.openstreetmap.org/relation/${selection.osmRelationId}`]
@@ -83,7 +86,7 @@ export const parseSelectedTrails = (manifestText: string, geoText: string) => {
       new Set(selection.osmWayIds).size !== selection.osmWayIds.length
     )
       throw new Error(`Invalid source identity: ${selection.selectionKey}`);
-    const features = geo.features.filter(
+    const features = catalog.features.filter(
       (f) => f.properties.selectionKey === selection.selectionKey
     );
     const geometries = features.map((f) => ({
@@ -109,21 +112,15 @@ export const parseSelectedTrails = (manifestText: string, geoText: string) => {
       bounds: deriveBoundingBox(geometry)
     };
   });
-  if (hash(manifestText) !== '1e7245517fab2b653583a8a56fd5ad11d3bf016e4039a49b906e730a395a62ac')
-    throw new Error('Selected trail manifest hash mismatch.');
-  const snapshotHash = hash(geoText);
-  if (snapshotHash !== 'bfd5bf293e6aec1e2ca8a8eea139a2e58f49a2947bb563006a67ed3c270ebfed')
-    throw new Error('Selected trail snapshot hash mismatch.');
-  return { manifestHash: hash(manifestText), snapshotHash, selections };
+  return {
+    manifestHash: hash(JSON.stringify(catalog.selections)),
+    snapshotHash: hash(catalogText),
+    selections
+  };
 };
 
-export const loadSelectedTrails = async () => {
-  const [manifestText, geoText] = await Promise.all([
-    readFile(new URL('selected-trails-27.json', datasetUrl), 'utf8'),
-    readFile(new URL('selected-trails-27.geojson', datasetUrl), 'utf8')
-  ]);
-  return parseSelectedTrails(manifestText, geoText);
-};
+export const loadSelectedTrails = async () =>
+  parseSelectedTrails(await readFile(catalogUrl, 'utf8'));
 
 type Dataset = Awaited<ReturnType<typeof loadSelectedTrails>>;
 const prepare = async (database: DbClient, dataset: Dataset) => {
@@ -137,7 +134,11 @@ const prepare = async (database: DbClient, dataset: Dataset) => {
     )
   );
   const priorIds = new Set([
-    ...curated.map((source) => source.trailId),
+    ...curated
+      .filter((source) =>
+        dataset.selections.some(({ selection }) => selection.selectionKey === source.selectionKey)
+      )
+      .map((source) => source.trailId),
     ...sources
       .filter((source) => selectedRelationIds.has(source.relationId))
       .map((source) => source.trailId)
@@ -172,7 +173,6 @@ const prepare = async (database: DbClient, dataset: Dataset) => {
       owner &&
       (owner.sourceKind !== selection.sourceKind ||
         owner.geometryHash !== selection.geometrySha256 ||
-        owner.manifestHash !== dataset.manifestHash ||
         owner.sourceTimestamp !== selection.sourceTimestamp ||
         owner.sourceUrlsJson !== JSON.stringify(selection.sourceUrls) ||
         owner.provenanceJson !== JSON.stringify({ ...selection, features: item.provenance }) ||
@@ -234,7 +234,12 @@ const prepare = async (database: DbClient, dataset: Dataset) => {
     const distantNamesakes = namesakes
       .filter((park) => !couldBeSameTrail(park))
       .map((park) => ({ id: park.id, slug: park.slug }));
-    const slug = prior?.slug ?? `selected-${selection.selectionKey}`;
+    const relationSlug = `osm-relation-${selection.osmRelationId}`;
+    const slug =
+      prior?.slug ??
+      (selection.selectionKey === relationSlug
+        ? relationSlug
+        : `selected-${selection.selectionKey}`);
     if (!prior && records.some((p) => p.slug === slug))
       throw new Error(`Conflicting trail slug: ${slug}`);
     const link = prior && links.find((l) => l.trailId === prior.id && l.areaId === area.id);
@@ -313,6 +318,8 @@ export const importSelectedTrails = async ({
                 lengthKm: selection.initialDisplayLengthKm,
                 importedLengthKm: selection.initialDisplayLengthKm,
                 locationLabel: selection.name,
+                parkUrl: selection.referenceUrl,
+                importedParkUrl: selection.referenceUrl,
                 boundaryGeojson: JSON.stringify(item.geometry),
                 bboxMinLon: bounds.minLon,
                 bboxMinLat: bounds.minLat,
@@ -341,6 +348,12 @@ export const importSelectedTrails = async ({
                   ? selection.initialDisplayLengthKm
                   : prior.lengthKm,
               importedLengthKm: selection.initialDisplayLengthKm,
+              ...(selection.referenceUrl && {
+                parkUrl:
+                  prior.parkUrl === prior.importedParkUrl ? selection.referenceUrl : prior.parkUrl,
+                importedParkUrl: selection.referenceUrl,
+                lastImportRunId: run.id
+              }),
               boundaryGeojson: JSON.stringify(item.geometry),
               bboxMinLon: bounds.minLon,
               bboxMinLat: bounds.minLat,
@@ -416,6 +429,7 @@ export const importSelectedTrails = async ({
       existingOverride: a.link?.override ?? null,
       sourceKind: a.selection.sourceKind,
       sourceUrls: a.selection.sourceUrls,
+      referenceUrl: a.selection.referenceUrl,
       geometryHash: a.selection.geometrySha256,
       distantNamesakes: a.distantNamesakes,
       trail: a.slug,
