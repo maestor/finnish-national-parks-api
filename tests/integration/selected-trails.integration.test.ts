@@ -87,11 +87,13 @@ describe('selected trail batch', () => {
   it('previews without writes, publishes all selected lines under their parents, and reruns without writes', async () => {
     const before = await db.database.select().from(parks);
     const preview = await importSelectedTrails({ database: db.database, dryRun: true });
-    expect(preview.selections).toHaveLength(32);
+    expect(preview.selections).toHaveLength(manifest.selections.length);
     expect(await db.database.select().from(parks)).toEqual(before);
     expect(await db.database.select().from(trailAreaLinks)).toHaveLength(0);
     await importSelectedTrails({ database: db.database });
-    expect(await db.database.select().from(trailAreaLinks)).toHaveLength(32);
+    expect(await db.database.select().from(trailAreaLinks)).toHaveLength(
+      manifest.selections.length
+    );
     for (const slug of new Set(manifest.selections.map((s) => s.parentSlug))) {
       const response = await createApp({ database: db.database }).request(
         `/api/parks/${slug}?includeBoundary=true`
@@ -106,7 +108,7 @@ describe('selected trail batch', () => {
       );
     }
     const sources = await db.database.select().from(curatedTrailSources);
-    expect(sources).toHaveLength(32);
+    expect(sources).toHaveLength(manifest.selections.length);
     const token = await createSessionToken(
       { email: 'admin@example.com', name: 'Admin', picture: '', role: 'admin', sub: 'admin' },
       new TextEncoder().encode(auth.jwtSecret)
@@ -568,7 +570,7 @@ describe('selected trail batch', () => {
         );
       })
     );
-    expect(expanded.selections).toHaveLength(33);
+    expect(expanded.selections).toHaveLength(manifest.selections.length + 1);
   });
 
   it('adopts existing OSM identities, keeps edited reference links and accepts earlier catalog hashes', async () => {
@@ -821,7 +823,9 @@ describe('selected trail batch', () => {
         }
       })
     ).rejects.toThrow('Selected trail ownership changed during import');
-    expect(await db.database.select().from(curatedTrailSources)).toHaveLength(32);
+    expect(await db.database.select().from(curatedTrailSources)).toHaveLength(
+      manifest.selections.length
+    );
     expect(
       await db.database.select().from(osmTrailSources).where(eq(osmTrailSources.relationId, 12345))
     ).toEqual([]);
@@ -914,6 +918,8 @@ describe('selected trail batch', () => {
       }
     });
     expect(result.changedIds).toContain(12345);
-    expect(await db.database.select().from(curatedTrailSources)).toHaveLength(32);
+    expect(await db.database.select().from(curatedTrailSources)).toHaveLength(
+      manifest.selections.length
+    );
   });
 });

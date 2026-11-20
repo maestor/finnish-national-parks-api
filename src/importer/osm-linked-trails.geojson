@@ -1455,6 +1455,256 @@
       "relationVersion": 13,
       "selectionPolicy": "Use the named OSM relation member ways.",
       "displayLengthBasis": "Measured OSM geometry"
+    },
+    {
+      "selectionKey": "ruunaa-koskikierros",
+      "name": "Koskikierros",
+      "parentName": "Ruunaan retkeilyalue",
+      "parentSlug": "ruunaan-retkeilyalue",
+      "sourceKind": "osm-way-selection",
+      "osmRelationId": null,
+      "osmWayIds": [
+        14170408,
+        14172253,
+        41990049,
+        41990050,
+        41990052,
+        41998731,
+        122993554,
+        125728744,
+        125729782,
+        125729784,
+        125729786,
+        125729789,
+        125729793,
+        125729898,
+        126357445,
+        126357446,
+        179394407,
+        223687199,
+        233366995,
+        233366996,
+        233366999,
+        233369701,
+        233369702,
+        233369708,
+        233369718,
+        478381731,
+        478381732,
+        617287031,
+        617287032,
+        617651437,
+        617651442,
+        628055033,
+        628055034,
+        628056880,
+        628056881,
+        628057014,
+        628057015,
+        704785196,
+        704950451,
+        911651072,
+        911651078,
+        911868050,
+        911868051,
+        911868103,
+        911868104,
+        911868107,
+        912125340,
+        912125353,
+        912125354,
+        912125365,
+        912125366,
+        912125367,
+        912125368,
+        912125372,
+        912125373,
+        912125376,
+        912125377,
+        912125378,
+        912125379,
+        912125387,
+        912125388,
+        912146843,
+        912146844,
+        912161812,
+        912161813,
+        912174939,
+        912461902,
+        912540615,
+        912544124,
+        912544125,
+        912544126,
+        1072202795,
+        1072202796,
+        1106490725,
+        1106490726,
+        1106490727,
+        1106490728,
+        1145131156,
+        1146025976,
+        1146025977,
+        1146025978,
+        1146025979,
+        1146025980,
+        1146025981,
+        1187642899,
+        1187642901,
+        1187642902,
+        1187646050,
+        1187646051,
+        1187646052,
+        1187646053,
+        1187648979,
+        1187648980,
+        1415494593,
+        1415494594,
+        1434151042,
+        1434151043,
+        1434151044,
+        1434151045,
+        1434151048,
+        1434151050,
+        1434151051,
+        1434151052,
+        1434151053,
+        1434151054,
+        1434151055,
+        1434151056
+      ],
+      "sourceUrls": [
+        "https://www.openstreetmap.org/way/14170408",
+        "https://www.openstreetmap.org/way/14172253",
+        "https://www.openstreetmap.org/way/41990049",
+        "https://www.openstreetmap.org/way/41990050",
+        "https://www.openstreetmap.org/way/41990052",
+        "https://www.openstreetmap.org/way/41998731",
+        "https://www.openstreetmap.org/way/122993554",
+        "https://www.openstreetmap.org/way/125728744",
+        "https://www.openstreetmap.org/way/125729782",
+        "https://www.openstreetmap.org/way/125729784",
+        "https://www.openstreetmap.org/way/125729786",
+        "https://www.openstreetmap.org/way/125729789",
+        "https://www.openstreetmap.org/way/125729793",
+        "https://www.openstreetmap.org/way/125729898",
+        "https://www.openstreetmap.org/way/126357445",
+        "https://www.openstreetmap.org/way/126357446",
+        "https://www.openstreetmap.org/way/179394407",
+        "https://www.openstreetmap.org/way/223687199",
+        "https://www.openstreetmap.org/way/233366995",
+        "https://www.openstreetmap.org/way/233366996",
+        "https://www.openstreetmap.org/way/233366999",
+        "https://www.openstreetmap.org/way/233369701",
+        "https://www.openstreetmap.org/way/233369702",
+        "https://www.openstreetmap.org/way/233369708",
+        "https://www.openstreetmap.org/way/233369718",
+        "https://www.openstreetmap.org/way/478381731",
+        "https://www.openstreetmap.org/way/478381732",
+        "https://www.openstreetmap.org/way/617287031",
+        "https://www.openstreetmap.org/way/617287032",
+        "https://www.openstreetmap.org/way/617651437",
+        "https://www.openstreetmap.org/way/617651442",
+        "https://www.openstreetmap.org/way/628055033",
+        "https://www.openstreetmap.org/way/628055034",
+        "https://www.openstreetmap.org/way/628056880",
+        "https://www.openstreetmap.org/way/628056881",
+        "https://www.openstreetmap.org/way/628057014",
+        "https://www.openstreetmap.org/way/628057015",
+        "https://www.openstreetmap.org/way/704785196",
+        "https://www.openstreetmap.org/way/704950451",
+        "https://www.openstreetmap.org/way/911651072",
+        "https://www.openstreetmap.org/way/911651078",
+        "https://www.openstreetmap.org/way/911868050",
+        "https://www.openstreetmap.org/way/911868051",
+        "https://www.openstreetmap.org/way/911868103",
+        "https://www.openstreetmap.org/way/911868104",
+        "https://www.openstreetmap.org/way/911868107",
+        "https://www.openstreetmap.org/way/912125340",
+        "https://www.openstreetmap.org/way/912125353",
+        "https://www.openstreetmap.org/way/912125354",
+        "https://www.openstreetmap.org/way/912125365",
+        "https://www.openstreetmap.org/way/912125366",
+        "https://www.openstreetmap.org/way/912125367",
+        "https://www.openstreetmap.org/way/912125368",
+        "https://www.openstreetmap.org/way/912125372",
+        "https://www.openstreetmap.org/way/912125373",
+        "https://www.openstreetmap.org/way/912125376",
+        "https://www.openstreetmap.org/way/912125377",
+        "https://www.openstreetmap.org/way/912125378",
+        "https://www.openstreetmap.org/way/912125379",
+        "https://www.openstreetmap.org/way/912125387",
+        "https://www.openstreetmap.org/way/912125388",
+        "https://www.openstreetmap.org/way/912146843",
+        "https://www.openstreetmap.org/way/912146844",
+        "https://www.openstreetmap.org/way/912161812",
+        "https://www.openstreetmap.org/way/912161813",
+        "https://www.openstreetmap.org/way/912174939",
+        "https://www.openstreetmap.org/way/912461902",
+        "https://www.openstreetmap.org/way/912540615",
+        "https://www.openstreetmap.org/way/912544124",
+        "https://www.openstreetmap.org/way/912544125",
+        "https://www.openstreetmap.org/way/912544126",
+        "https://www.openstreetmap.org/way/1072202795",
+        "https://www.openstreetmap.org/way/1072202796",
+        "https://www.openstreetmap.org/way/1106490725",
+        "https://www.openstreetmap.org/way/1106490726",
+        "https://www.openstreetmap.org/way/1106490727",
+        "https://www.openstreetmap.org/way/1106490728",
+        "https://www.openstreetmap.org/way/1145131156",
+        "https://www.openstreetmap.org/way/1146025976",
+        "https://www.openstreetmap.org/way/1146025977",
+        "https://www.openstreetmap.org/way/1146025978",
+        "https://www.openstreetmap.org/way/1146025979",
+        "https://www.openstreetmap.org/way/1146025980",
+        "https://www.openstreetmap.org/way/1146025981",
+        "https://www.openstreetmap.org/way/1187642899",
+        "https://www.openstreetmap.org/way/1187642901",
+        "https://www.openstreetmap.org/way/1187642902",
+        "https://www.openstreetmap.org/way/1187646050",
+        "https://www.openstreetmap.org/way/1187646051",
+        "https://www.openstreetmap.org/way/1187646052",
+        "https://www.openstreetmap.org/way/1187646053",
+        "https://www.openstreetmap.org/way/1187648979",
+        "https://www.openstreetmap.org/way/1187648980",
+        "https://www.openstreetmap.org/way/1415494593",
+        "https://www.openstreetmap.org/way/1415494594",
+        "https://www.openstreetmap.org/way/1434151042",
+        "https://www.openstreetmap.org/way/1434151043",
+        "https://www.openstreetmap.org/way/1434151044",
+        "https://www.openstreetmap.org/way/1434151045",
+        "https://www.openstreetmap.org/way/1434151048",
+        "https://www.openstreetmap.org/way/1434151050",
+        "https://www.openstreetmap.org/way/1434151051",
+        "https://www.openstreetmap.org/way/1434151052",
+        "https://www.openstreetmap.org/way/1434151053",
+        "https://www.openstreetmap.org/way/1434151054",
+        "https://www.openstreetmap.org/way/1434151055",
+        "https://www.openstreetmap.org/way/1434151056"
+      ],
+      "sourceTimestamp": "2026-11-19T21:22:20Z",
+      "geometrySha256": "39e95f4b5fba1d618aa4bba85eb216bcaf2be369467fcda847ce81249c2f8b6d",
+      "featureCount": 111,
+      "requestedLengthKm": null,
+      "measuredUniqueLengthKm": 33.397882857571204,
+      "walkLengthKm": 33.8,
+      "initialDisplayLengthKm": 33.8,
+      "displayLengthBasis": "Published walking length from Visit Karelia.",
+      "referenceUrl": "https://www.luontoon.fi/fi/reitit/koskikierros-lieksa-21333",
+      "alignmentReferenceUrl": "https://www.visitkarelia.fi/luonto/ulkoilu-ja-vaellusreitit/koskikierros-rengasreitti-ruunaan-jarvien-ja-koskien-aarella",
+      "detourReferenceUrl": "https://www.metsa.fi/tiedotteet/ruunaan-kehittamishankkeen-viimeinen-vuosi-parantaa-alueen-esteettomyytta-ja-opastusta/",
+      "selectionPolicy": "Trace the two-bridge loop using OSM ways. Use the Visit Karelia track to check alignment, leaving both gaps on the Neitipuro detour unconnected.",
+      "unmappedConnections": [
+        {
+          "fromNodeId": 5833175089,
+          "toNodeId": 135423777,
+          "approximateGapMetres": 10
+        },
+        {
+          "fromNodeId": 135423826,
+          "toNodeId": 2417671292,
+          "approximateGapMetres": 364
+        }
+      ]
     }
   ],
   "features": [
@@ -106838,6 +107088,6700 @@
           [
             23.730246,
             68.3393535
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Koskikierros",
+        "selectionKey": "ruunaa-koskikierros",
+        "parentSlug": "ruunaan-retkeilyalue",
+        "osmWayId": 478381732,
+        "osmWayVersion": 6,
+        "startNodeId": 1323562758,
+        "endNodeId": 266351986,
+        "sourceUrl": "https://www.openstreetmap.org/way/478381732"
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            30.4566531,
+            63.3892322
+          ],
+          [
+            30.4574673,
+            63.3889855
+          ],
+          [
+            30.4589321,
+            63.3885418
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Koskikierros",
+        "selectionKey": "ruunaa-koskikierros",
+        "parentSlug": "ruunaan-retkeilyalue",
+        "osmWayId": 41998731,
+        "osmWayVersion": 11,
+        "startNodeId": 266351986,
+        "endNodeId": 1372745459,
+        "sourceUrl": "https://www.openstreetmap.org/way/41998731"
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            30.4589321,
+            63.3885418
+          ],
+          [
+            30.4593136,
+            63.3885633
+          ],
+          [
+            30.4595491,
+            63.3885735
+          ],
+          [
+            30.45982,
+            63.3885987
+          ],
+          [
+            30.4600306,
+            63.3886282
+          ],
+          [
+            30.4602581,
+            63.3886654
+          ],
+          [
+            30.4604396,
+            63.3887027
+          ],
+          [
+            30.4606394,
+            63.3887517
+          ],
+          [
+            30.4608044,
+            63.3887958
+          ],
+          [
+            30.460965,
+            63.3888296
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Koskikierros",
+        "selectionKey": "ruunaa-koskikierros",
+        "parentSlug": "ruunaan-retkeilyalue",
+        "osmWayId": 911868050,
+        "osmWayVersion": 2,
+        "startNodeId": 1372745459,
+        "endNodeId": 1372746930,
+        "sourceUrl": "https://www.openstreetmap.org/way/911868050"
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            30.460965,
+            63.3888296
+          ],
+          [
+            30.4612105,
+            63.3886793
+          ],
+          [
+            30.4615576,
+            63.3885659
+          ],
+          [
+            30.4622156,
+            63.3884059
+          ],
+          [
+            30.4631068,
+            63.388229
+          ],
+          [
+            30.4633922,
+            63.3880724
+          ],
+          [
+            30.4638058,
+            63.3878881
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Koskikierros",
+        "selectionKey": "ruunaa-koskikierros",
+        "parentSlug": "ruunaan-retkeilyalue",
+        "osmWayId": 911868051,
+        "osmWayVersion": 2,
+        "startNodeId": 1372746930,
+        "endNodeId": 8467796361,
+        "sourceUrl": "https://www.openstreetmap.org/way/911868051"
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            30.4638058,
+            63.3878881
+          ],
+          [
+            30.4647504,
+            63.3874068
+          ],
+          [
+            30.465349,
+            63.3872243
+          ],
+          [
+            30.4658856,
+            63.3871099
+          ],
+          [
+            30.4661349,
+            63.3870894
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Koskikierros",
+        "selectionKey": "ruunaa-koskikierros",
+        "parentSlug": "ruunaan-retkeilyalue",
+        "osmWayId": 1415494594,
+        "osmWayVersion": 1,
+        "startNodeId": 8467796361,
+        "endNodeId": 1372746241,
+        "sourceUrl": "https://www.openstreetmap.org/way/1415494594"
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            30.4661349,
+            63.3870894
+          ],
+          [
+            30.466627,
+            63.3870488
+          ],
+          [
+            30.4671979,
+            63.3869924
+          ],
+          [
+            30.467755,
+            63.3869765
+          ],
+          [
+            30.4682473,
+            63.3868974
+          ],
+          [
+            30.4689676,
+            63.3868414
+          ],
+          [
+            30.4694896,
+            63.3867905
+          ],
+          [
+            30.4700708,
+            63.3868347
+          ],
+          [
+            30.4706404,
+            63.3869232
+          ],
+          [
+            30.4711243,
+            63.3870545
+          ],
+          [
+            30.4721521,
+            63.3873874
+          ],
+          [
+            30.4724325,
+            63.3874418
+          ],
+          [
+            30.4727086,
+            63.387491
+          ],
+          [
+            30.473166,
+            63.3875631
+          ],
+          [
+            30.4736006,
+            63.3875571
+          ],
+          [
+            30.473972,
+            63.3875134
+          ],
+          [
+            30.4743486,
+            63.3874307
+          ],
+          [
+            30.4748935,
+            63.3872254
+          ],
+          [
+            30.4752718,
+            63.3871376
+          ],
+          [
+            30.4759523,
+            63.3869797
+          ],
+          [
+            30.476548,
+            63.3868849
+          ],
+          [
+            30.4779255,
+            63.3868352
+          ],
+          [
+            30.4793592,
+            63.3866734
+          ],
+          [
+            30.4798769,
+            63.3866139
+          ],
+          [
+            30.4803091,
+            63.3865003
+          ],
+          [
+            30.4813216,
+            63.3862661
+          ],
+          [
+            30.481884,
+            63.3861496
+          ],
+          [
+            30.4824298,
+            63.3861632
+          ],
+          [
+            30.4826565,
+            63.3861269
+          ],
+          [
+            30.4833724,
+            63.385929
+          ],
+          [
+            30.484013,
+            63.3857929
+          ],
+          [
+            30.4851419,
+            63.3854991
+          ],
+          [
+            30.4860108,
+            63.3852102
+          ],
+          [
+            30.4865483,
+            63.3850763
+          ],
+          [
+            30.4868983,
+            63.3850579
+          ],
+          [
+            30.4878137,
+            63.3851174
+          ],
+          [
+            30.4880334,
+            63.3851757
+          ],
+          [
+            30.4883255,
+            63.3852145
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Koskikierros",
+        "selectionKey": "ruunaa-koskikierros",
+        "parentSlug": "ruunaan-retkeilyalue",
+        "osmWayId": 122993554,
+        "osmWayVersion": 8,
+        "startNodeId": 1372746241,
+        "endNodeId": 8467796664,
+        "sourceUrl": "https://www.openstreetmap.org/way/122993554"
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            30.4883255,
+            63.3852145
+          ],
+          [
+            30.4885804,
+            63.3853103
+          ],
+          [
+            30.4889105,
+            63.3853668
+          ],
+          [
+            30.4898955,
+            63.3853753
+          ],
+          [
+            30.4906661,
+            63.3854369
+          ],
+          [
+            30.4910482,
+            63.3854403
+          ],
+          [
+            30.4918608,
+            63.3853988
+          ],
+          [
+            30.4929793,
+            63.3853488
+          ],
+          [
+            30.4947523,
+            63.3851793
+          ],
+          [
+            30.4955559,
+            63.3850974
+          ],
+          [
+            30.4963451,
+            63.385148
+          ],
+          [
+            30.4970662,
+            63.3852615
+          ],
+          [
+            30.4973621,
+            63.3852633
+          ],
+          [
+            30.4982248,
+            63.3851458
+          ],
+          [
+            30.499283,
+            63.3849923
+          ],
+          [
+            30.4997959,
+            63.384891
+          ],
+          [
+            30.5007713,
+            63.3846904
+          ],
+          [
+            30.5012571,
+            63.3845376
+          ],
+          [
+            30.502132,
+            63.3844282
+          ],
+          [
+            30.5030802,
+            63.3842243
+          ],
+          [
+            30.5037535,
+            63.3840608
+          ],
+          [
+            30.5052817,
+            63.3838511
+          ],
+          [
+            30.5067089,
+            63.3837554
+          ],
+          [
+            30.5072559,
+            63.3837146
+          ],
+          [
+            30.5083532,
+            63.3834117
+          ],
+          [
+            30.5090455,
+            63.3831467
+          ],
+          [
+            30.5097249,
+            63.3829952
+          ],
+          [
+            30.5103858,
+            63.3829438
+          ],
+          [
+            30.5110117,
+            63.3829186
+          ],
+          [
+            30.5117678,
+            63.382782
+          ],
+          [
+            30.5127076,
+            63.3827349
+          ],
+          [
+            30.5130428,
+            63.3827457
+          ],
+          [
+            30.5133773,
+            63.3828387
+          ],
+          [
+            30.5135448,
+            63.3829532
+          ],
+          [
+            30.5138334,
+            63.3832423
+          ],
+          [
+            30.5139623,
+            63.3833128
+          ],
+          [
+            30.5144701,
+            63.3833479
+          ],
+          [
+            30.5150621,
+            63.3833076
+          ],
+          [
+            30.5151869,
+            63.3834488
+          ],
+          [
+            30.5155003,
+            63.3837507
+          ],
+          [
+            30.5155723,
+            63.3838531
+          ],
+          [
+            30.5156443,
+            63.3839768
+          ],
+          [
+            30.5158121,
+            63.3840962
+          ],
+          [
+            30.5159311,
+            63.3842634
+          ],
+          [
+            30.5160269,
+            63.3844673
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Koskikierros",
+        "selectionKey": "ruunaa-koskikierros",
+        "parentSlug": "ruunaan-retkeilyalue",
+        "osmWayId": 911868104,
+        "osmWayVersion": 1,
+        "startNodeId": 8467796664,
+        "endNodeId": 1372745625,
+        "sourceUrl": "https://www.openstreetmap.org/way/911868104"
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            30.5160269,
+            63.3844673
+          ],
+          [
+            30.516112,
+            63.3846735
+          ],
+          [
+            30.5163595,
+            63.3849244
+          ],
+          [
+            30.5168777,
+            63.3853846
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Koskikierros",
+        "selectionKey": "ruunaa-koskikierros",
+        "parentSlug": "ruunaan-retkeilyalue",
+        "osmWayId": 911868103,
+        "osmWayVersion": 4,
+        "startNodeId": 1372745625,
+        "endNodeId": 1372746000,
+        "sourceUrl": "https://www.openstreetmap.org/way/911868103"
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            30.5168777,
+            63.3853846
+          ],
+          [
+            30.5170367,
+            63.3855464
+          ],
+          [
+            30.5173027,
+            63.3857873
+          ],
+          [
+            30.5174151,
+            63.3858335
+          ],
+          [
+            30.5177878,
+            63.3858631
+          ],
+          [
+            30.5179968,
+            63.3859436
+          ],
+          [
+            30.5181396,
+            63.3861483
+          ],
+          [
+            30.5180444,
+            63.3863317
+          ],
+          [
+            30.5178539,
+            63.3865203
+          ],
+          [
+            30.5177183,
+            63.3866509
+          ],
+          [
+            30.5175208,
+            63.3867879
+          ],
+          [
+            30.517102,
+            63.3869884
+          ],
+          [
+            30.5169211,
+            63.3870672
+          ],
+          [
+            30.5166867,
+            63.3871497
+          ],
+          [
+            30.5164379,
+            63.3872106
+          ],
+          [
+            30.5162925,
+            63.3872607
+          ],
+          [
+            30.5162167,
+            63.3872868
+          ],
+          [
+            30.5158931,
+            63.3874489
+          ],
+          [
+            30.5157122,
+            63.3876152
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Koskikierros",
+        "selectionKey": "ruunaa-koskikierros",
+        "parentSlug": "ruunaan-retkeilyalue",
+        "osmWayId": 1146025981,
+        "osmWayVersion": 1,
+        "startNodeId": 1372746000,
+        "endNodeId": 1372746864,
+        "sourceUrl": "https://www.openstreetmap.org/way/1146025981"
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            30.5157122,
+            63.3876152
+          ],
+          [
+            30.5156456,
+            63.3877175
+          ],
+          [
+            30.5155076,
+            63.3878231
+          ],
+          [
+            30.5154606,
+            63.3879902
+          ],
+          [
+            30.515379,
+            63.3881525
+          ],
+          [
+            30.5155313,
+            63.388404
+          ],
+          [
+            30.5157788,
+            63.3886002
+          ],
+          [
+            30.5161501,
+            63.3888475
+          ],
+          [
+            30.5164642,
+            63.3889754
+          ],
+          [
+            30.51667,
+            63.3890763
+          ],
+          [
+            30.5169883,
+            63.3891677
+          ],
+          [
+            30.5172044,
+            63.389224
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Koskikierros",
+        "selectionKey": "ruunaa-koskikierros",
+        "parentSlug": "ruunaan-retkeilyalue",
+        "osmWayId": 704950451,
+        "osmWayVersion": 3,
+        "startNodeId": 1372746864,
+        "endNodeId": 1372744818,
+        "sourceUrl": "https://www.openstreetmap.org/way/704950451"
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            30.5172044,
+            63.389224
+          ],
+          [
+            30.5175208,
+            63.3893677
+          ],
+          [
+            30.5176446,
+            63.3895297
+          ],
+          [
+            30.5179111,
+            63.3897855
+          ],
+          [
+            30.5179111,
+            63.3899433
+          ],
+          [
+            30.5179968,
+            63.3900925
+          ],
+          [
+            30.5179587,
+            63.3902673
+          ],
+          [
+            30.5178826,
+            63.3904763
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Koskikierros",
+        "selectionKey": "ruunaa-koskikierros",
+        "parentSlug": "ruunaan-retkeilyalue",
+        "osmWayId": 1146025980,
+        "osmWayVersion": 2,
+        "startNodeId": 1372744818,
+        "endNodeId": 1372746762,
+        "sourceUrl": "https://www.openstreetmap.org/way/1146025980"
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            30.5178826,
+            63.3904763
+          ],
+          [
+            30.5177302,
+            63.3905999
+          ],
+          [
+            30.5175303,
+            63.3907278
+          ],
+          [
+            30.5173114,
+            63.3908174
+          ],
+          [
+            30.5171496,
+            63.3909154
+          ],
+          [
+            30.5169973,
+            63.3909623
+          ],
+          [
+            30.516864,
+            63.3910348
+          ],
+          [
+            30.5167117,
+            63.3911755
+          ],
+          [
+            30.5163214,
+            63.3912608
+          ],
+          [
+            30.5159026,
+            63.3913588
+          ],
+          [
+            30.5156265,
+            63.3915038
+          ],
+          [
+            30.5154552,
+            63.3916402
+          ],
+          [
+            30.515141,
+            63.3917553
+          ],
+          [
+            30.5150078,
+            63.3918918
+          ],
+          [
+            30.5148555,
+            63.3919984
+          ],
+          [
+            30.5145413,
+            63.3920964
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Koskikierros",
+        "selectionKey": "ruunaa-koskikierros",
+        "parentSlug": "ruunaan-retkeilyalue",
+        "osmWayId": 1146025977,
+        "osmWayVersion": 2,
+        "startNodeId": 1372746762,
+        "endNodeId": 1372744878,
+        "sourceUrl": "https://www.openstreetmap.org/way/1146025977"
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            30.5145413,
+            63.3920964
+          ],
+          [
+            30.5142843,
+            63.3922115
+          ],
+          [
+            30.5139892,
+            63.392348
+          ],
+          [
+            30.513361,
+            63.3925313
+          ],
+          [
+            30.5130659,
+            63.3926421
+          ],
+          [
+            30.5128374,
+            63.3928382
+          ],
+          [
+            30.512647,
+            63.3929406
+          ],
+          [
+            30.5124986,
+            63.3931036
+          ],
+          [
+            30.5123703,
+            63.3932702
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Koskikierros",
+        "selectionKey": "ruunaa-koskikierros",
+        "parentSlug": "ruunaan-retkeilyalue",
+        "osmWayId": 1146025976,
+        "osmWayVersion": 2,
+        "startNodeId": 1372744878,
+        "endNodeId": 1372746829,
+        "sourceUrl": "https://www.openstreetmap.org/way/1146025976"
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            30.5123703,
+            63.3932702
+          ],
+          [
+            30.5122187,
+            63.3933839
+          ],
+          [
+            30.5119331,
+            63.3935587
+          ],
+          [
+            30.5115904,
+            63.3937762
+          ],
+          [
+            30.5112382,
+            63.3941257
+          ],
+          [
+            30.5109241,
+            63.3942963
+          ],
+          [
+            30.5106195,
+            63.3944412
+          ],
+          [
+            30.5104767,
+            63.3945606
+          ],
+          [
+            30.5102577,
+            63.3946501
+          ],
+          [
+            30.5099246,
+            63.3946629
+          ],
+          [
+            30.5093915,
+            63.3945776
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Koskikierros",
+        "selectionKey": "ruunaa-koskikierros",
+        "parentSlug": "ruunaan-retkeilyalue",
+        "osmWayId": 912461902,
+        "osmWayVersion": 3,
+        "startNodeId": 1372746829,
+        "endNodeId": 1372747072,
+        "sourceUrl": "https://www.openstreetmap.org/way/912461902"
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            30.5093915,
+            63.3945776
+          ],
+          [
+            30.5088299,
+            63.3945478
+          ],
+          [
+            30.5084015,
+            63.394535
+          ],
+          [
+            30.5072211,
+            63.3947055
+          ],
+          [
+            30.5063644,
+            63.3948718
+          ],
+          [
+            30.5059837,
+            63.3949869
+          ],
+          [
+            30.505679,
+            63.3951574
+          ],
+          [
+            30.5051365,
+            63.3953194
+          ],
+          [
+            30.5044225,
+            63.3956093
+          ],
+          [
+            30.5039275,
+            63.3958139
+          ],
+          [
+            30.5035848,
+            63.3959333
+          ],
+          [
+            30.5033373,
+            63.3960611
+          ],
+          [
+            30.5030327,
+            63.3962317
+          ],
+          [
+            30.5025663,
+            63.3964746
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Koskikierros",
+        "selectionKey": "ruunaa-koskikierros",
+        "parentSlug": "ruunaan-retkeilyalue",
+        "osmWayId": 1415494593,
+        "osmWayVersion": 1,
+        "startNodeId": 1372747072,
+        "endNodeId": 1372745572,
+        "sourceUrl": "https://www.openstreetmap.org/way/1415494593"
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            30.5025663,
+            63.3964746
+          ],
+          [
+            30.502176,
+            63.3966196
+          ],
+          [
+            30.5018904,
+            63.3967602
+          ],
+          [
+            30.5014665,
+            63.397041
+          ],
+          [
+            30.501337,
+            63.3971876
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Koskikierros",
+        "selectionKey": "ruunaa-koskikierros",
+        "parentSlug": "ruunaan-retkeilyalue",
+        "osmWayId": 704950451,
+        "osmWayVersion": 3,
+        "startNodeId": 1372745572,
+        "endNodeId": 520604320,
+        "sourceUrl": "https://www.openstreetmap.org/way/704950451"
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            30.501337,
+            63.3971876
+          ],
+          [
+            30.5012304,
+            63.3973376
+          ],
+          [
+            30.5011923,
+            63.3975832
+          ],
+          [
+            30.5012837,
+            63.397798
+          ],
+          [
+            30.5012837,
+            63.3979276
+          ],
+          [
+            30.5012903,
+            63.3981877
+          ],
+          [
+            30.5012433,
+            63.3983088
+          ],
+          [
+            30.5012895,
+            63.3983629
+          ],
+          [
+            30.5012634,
+            63.3984525
+          ],
+          [
+            30.5011984,
+            63.398541
+          ],
+          [
+            30.5012131,
+            63.3986407
+          ],
+          [
+            30.5012496,
+            63.3986945
+          ],
+          [
+            30.5013323,
+            63.3988127
+          ],
+          [
+            30.5013911,
+            63.3989354
+          ],
+          [
+            30.5014516,
+            63.3990475
+          ],
+          [
+            30.5015903,
+            63.3991297
+          ],
+          [
+            30.5016512,
+            63.3992371
+          ],
+          [
+            30.5017875,
+            63.3994896
+          ],
+          [
+            30.501555,
+            63.3997149
+          ],
+          [
+            30.5016226,
+            63.3998728
+          ],
+          [
+            30.5016108,
+            63.3999545
+          ],
+          [
+            30.5016285,
+            63.3999808
+          ],
+          [
+            30.5016285,
+            63.4000335
+          ],
+          [
+            30.5017843,
+            63.4003099
+          ],
+          [
+            30.5018078,
+            63.4003823
+          ],
+          [
+            30.5018754,
+            63.4004205
+          ],
+          [
+            30.5018692,
+            63.4005042
+          ],
+          [
+            30.5018729,
+            63.4005991
+          ],
+          [
+            30.5019225,
+            63.4007088
+          ],
+          [
+            30.5019019,
+            63.400751
+          ],
+          [
+            30.5019019,
+            63.4008734
+          ],
+          [
+            30.5020821,
+            63.4010499
+          ],
+          [
+            30.5021039,
+            63.401217
+          ],
+          [
+            30.5022211,
+            63.4013274
+          ],
+          [
+            30.5022312,
+            63.4014961
+          ],
+          [
+            30.5022465,
+            63.40151
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Koskikierros",
+        "selectionKey": "ruunaa-koskikierros",
+        "parentSlug": "ruunaan-retkeilyalue",
+        "osmWayId": 41990049,
+        "osmWayVersion": 3,
+        "startNodeId": 520604320,
+        "endNodeId": 520612859,
+        "sourceUrl": "https://www.openstreetmap.org/way/41990049"
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            30.5022465,
+            63.40151
+          ],
+          [
+            30.5024843,
+            63.4015058
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Koskikierros",
+        "selectionKey": "ruunaa-koskikierros",
+        "parentSlug": "ruunaan-retkeilyalue",
+        "osmWayId": 41990050,
+        "osmWayVersion": 5,
+        "startNodeId": 520612859,
+        "endNodeId": 520612861,
+        "sourceUrl": "https://www.openstreetmap.org/way/41990050"
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            30.5024843,
+            63.4015058
+          ],
+          [
+            30.5033783,
+            63.4015409
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Koskikierros",
+        "selectionKey": "ruunaa-koskikierros",
+        "parentSlug": "ruunaan-retkeilyalue",
+        "osmWayId": 41990052,
+        "osmWayVersion": 9,
+        "startNodeId": 520612861,
+        "endNodeId": 8476444612,
+        "sourceUrl": "https://www.openstreetmap.org/way/41990052"
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            30.5033783,
+            63.4015409
+          ],
+          [
+            30.5039549,
+            63.401573
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Koskikierros",
+        "selectionKey": "ruunaa-koskikierros",
+        "parentSlug": "ruunaan-retkeilyalue",
+        "osmWayId": 233369702,
+        "osmWayVersion": 6,
+        "startNodeId": 8476444612,
+        "endNodeId": 2417671364,
+        "sourceUrl": "https://www.openstreetmap.org/way/233369702"
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            30.5039549,
+            63.401573
+          ],
+          [
+            30.5039237,
+            63.4014719
+          ],
+          [
+            30.5036812,
+            63.4013311
+          ],
+          [
+            30.5036737,
+            63.4012366
+          ],
+          [
+            30.5035723,
+            63.401001
+          ],
+          [
+            30.5037151,
+            63.4005185
+          ],
+          [
+            30.5037237,
+            63.4003011
+          ],
+          [
+            30.5035005,
+            63.399915
+          ],
+          [
+            30.5035876,
+            63.3993881
+          ],
+          [
+            30.5035079,
+            63.3990761
+          ],
+          [
+            30.5035732,
+            63.3988289
+          ],
+          [
+            30.5037654,
+            63.3985249
+          ],
+          [
+            30.504117,
+            63.3982664
+          ],
+          [
+            30.5041135,
+            63.3981085
+          ],
+          [
+            30.5042694,
+            63.3978467
+          ],
+          [
+            30.5043182,
+            63.397309
+          ],
+          [
+            30.5044684,
+            63.3969272
+          ],
+          [
+            30.5047284,
+            63.3966795
+          ],
+          [
+            30.5050753,
+            63.3964318
+          ],
+          [
+            30.5054077,
+            63.3962263
+          ],
+          [
+            30.506146,
+            63.3960403
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Koskikierros",
+        "selectionKey": "ruunaa-koskikierros",
+        "parentSlug": "ruunaan-retkeilyalue",
+        "osmWayId": 1434151056,
+        "osmWayVersion": 1,
+        "startNodeId": 2417671364,
+        "endNodeId": 13181232200,
+        "sourceUrl": "https://www.openstreetmap.org/way/1434151056"
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            30.506146,
+            63.3960403
+          ],
+          [
+            30.5068006,
+            63.3960112
+          ],
+          [
+            30.5074293,
+            63.3960986
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Koskikierros",
+        "selectionKey": "ruunaa-koskikierros",
+        "parentSlug": "ruunaan-retkeilyalue",
+        "osmWayId": 1434151055,
+        "osmWayVersion": 1,
+        "startNodeId": 13181232200,
+        "endNodeId": 10665141614,
+        "sourceUrl": "https://www.openstreetmap.org/way/1434151055"
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            30.5074293,
+            63.3960986
+          ],
+          [
+            30.5078125,
+            63.3961303
+          ],
+          [
+            30.5084218,
+            63.3961028
+          ],
+          [
+            30.5090395,
+            63.3961746
+          ],
+          [
+            30.5094297,
+            63.3961838
+          ],
+          [
+            30.5096307,
+            63.3961886
+          ],
+          [
+            30.510133,
+            63.3960755
+          ],
+          [
+            30.5110266,
+            63.3957189
+          ],
+          [
+            30.5122114,
+            63.3951952
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Koskikierros",
+        "selectionKey": "ruunaa-koskikierros",
+        "parentSlug": "ruunaan-retkeilyalue",
+        "osmWayId": 1146025979,
+        "osmWayVersion": 1,
+        "startNodeId": 10665141614,
+        "endNodeId": 10665141613,
+        "sourceUrl": "https://www.openstreetmap.org/way/1146025979"
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            30.5122114,
+            63.3951952
+          ],
+          [
+            30.5127413,
+            63.394961
+          ],
+          [
+            30.5135588,
+            63.3945935
+          ],
+          [
+            30.5141298,
+            63.394161
+          ],
+          [
+            30.5143694,
+            63.3938766
+          ],
+          [
+            30.5147757,
+            63.3935988
+          ],
+          [
+            30.5156897,
+            63.3932639
+          ],
+          [
+            30.5163727,
+            63.3928213
+          ],
+          [
+            30.5175557,
+            63.3922293
+          ],
+          [
+            30.5182404,
+            63.3919891
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Koskikierros",
+        "selectionKey": "ruunaa-koskikierros",
+        "parentSlug": "ruunaan-retkeilyalue",
+        "osmWayId": 1146025978,
+        "osmWayVersion": 1,
+        "startNodeId": 10665141613,
+        "endNodeId": 8473665459,
+        "sourceUrl": "https://www.openstreetmap.org/way/1146025978"
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            30.5182404,
+            63.3919891
+          ],
+          [
+            30.5185213,
+            63.3918906
+          ],
+          [
+            30.5188017,
+            63.391722
+          ],
+          [
+            30.5190676,
+            63.3915081
+          ],
+          [
+            30.5193675,
+            63.3908821
+          ],
+          [
+            30.5196788,
+            63.3905123
+          ],
+          [
+            30.5198106,
+            63.3904033
+          ],
+          [
+            30.5206382,
+            63.3900346
+          ],
+          [
+            30.5207831,
+            63.3899625
+          ],
+          [
+            30.5206382,
+            63.3900346
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Koskikierros",
+        "selectionKey": "ruunaa-koskikierros",
+        "parentSlug": "ruunaan-retkeilyalue",
+        "osmWayId": 912174939,
+        "osmWayVersion": 1,
+        "startNodeId": 8473665459,
+        "endNodeId": 8467796718,
+        "sourceUrl": "https://www.openstreetmap.org/way/912174939"
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            30.5206382,
+            63.3900346
+          ],
+          [
+            30.5208542,
+            63.3901182
+          ],
+          [
+            30.5211587,
+            63.3902026
+          ],
+          [
+            30.5215747,
+            63.3902589
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Koskikierros",
+        "selectionKey": "ruunaa-koskikierros",
+        "parentSlug": "ruunaan-retkeilyalue",
+        "osmWayId": 911868107,
+        "osmWayVersion": 1,
+        "startNodeId": 8467796718,
+        "endNodeId": 8467796722,
+        "sourceUrl": "https://www.openstreetmap.org/way/911868107"
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            30.5215747,
+            63.3902589
+          ],
+          [
+            30.5221683,
+            63.3903072
+          ],
+          [
+            30.522681,
+            63.3903133
+          ],
+          [
+            30.5230723,
+            63.3902891
+          ],
+          [
+            30.5233343,
+            63.3902658
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Koskikierros",
+        "selectionKey": "ruunaa-koskikierros",
+        "parentSlug": "ruunaan-retkeilyalue",
+        "osmWayId": 14170408,
+        "osmWayVersion": 16,
+        "startNodeId": 8467796722,
+        "endNodeId": 135417814,
+        "sourceUrl": "https://www.openstreetmap.org/way/14170408"
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            30.5233343,
+            63.3902658
+          ],
+          [
+            30.5233568,
+            63.3902132
+          ],
+          [
+            30.523543,
+            63.3898858
+          ],
+          [
+            30.5236797,
+            63.3897398
+          ],
+          [
+            30.5252438,
+            63.3887413
+          ],
+          [
+            30.5256408,
+            63.3884584
+          ],
+          [
+            30.5258493,
+            63.3883509
+          ],
+          [
+            30.5267306,
+            63.3880549
+          ],
+          [
+            30.5270332,
+            63.3879374
+          ],
+          [
+            30.5272488,
+            63.3878361
+          ],
+          [
+            30.527377,
+            63.3877314
+          ],
+          [
+            30.527813,
+            63.3871094
+          ],
+          [
+            30.5280632,
+            63.3869175
+          ],
+          [
+            30.5282988,
+            63.3867971
+          ],
+          [
+            30.5286384,
+            63.3866886
+          ],
+          [
+            30.5301298,
+            63.3862643
+          ],
+          [
+            30.5309529,
+            63.3860301
+          ],
+          [
+            30.5317753,
+            63.3858293
+          ],
+          [
+            30.5323948,
+            63.385661
+          ],
+          [
+            30.5332016,
+            63.3854187
+          ],
+          [
+            30.5339262,
+            63.3851353
+          ],
+          [
+            30.5353215,
+            63.3846119
+          ],
+          [
+            30.5355019,
+            63.3845214
+          ],
+          [
+            30.535588,
+            63.3844447
+          ],
+          [
+            30.5356306,
+            63.3843421
+          ],
+          [
+            30.5356011,
+            63.3842201
+          ],
+          [
+            30.5354847,
+            63.3841306
+          ],
+          [
+            30.5350298,
+            63.383823
+          ],
+          [
+            30.5348785,
+            63.3836977
+          ],
+          [
+            30.5346693,
+            63.3834231
+          ],
+          [
+            30.5340685,
+            63.3827309
+          ],
+          [
+            30.5335707,
+            63.3821348
+          ],
+          [
+            30.5335278,
+            63.3817887
+          ],
+          [
+            30.5337853,
+            63.3813657
+          ],
+          [
+            30.5342831,
+            63.3809696
+          ],
+          [
+            30.5349697,
+            63.3805389
+          ],
+          [
+            30.5355705,
+            63.3801736
+          ],
+          [
+            30.5360855,
+            63.379839
+          ],
+          [
+            30.5365834,
+            63.3796082
+          ],
+          [
+            30.5375876,
+            63.3792005
+          ],
+          [
+            30.5383644,
+            63.3788697
+          ],
+          [
+            30.5384778,
+            63.3788358
+          ],
+          [
+            30.5387688,
+            63.3787488
+          ],
+          [
+            30.5395356,
+            63.3785433
+          ],
+          [
+            30.5402437,
+            63.3783623
+          ],
+          [
+            30.5413317,
+            63.3780736
+          ],
+          [
+            30.5424317,
+            63.3777462
+          ],
+          [
+            30.5427313,
+            63.3776532
+          ],
+          [
+            30.5429222,
+            63.3775666
+          ],
+          [
+            30.5431832,
+            63.3773997
+          ],
+          [
+            30.5433136,
+            63.3772977
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Koskikierros",
+        "selectionKey": "ruunaa-koskikierros",
+        "parentSlug": "ruunaan-retkeilyalue",
+        "osmWayId": 1145131156,
+        "osmWayVersion": 3,
+        "startNodeId": 135417814,
+        "endNodeId": 13181232196,
+        "sourceUrl": "https://www.openstreetmap.org/way/1145131156"
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            30.5433136,
+            63.3772977
+          ],
+          [
+            30.5434489,
+            63.3772067
+          ],
+          [
+            30.5438017,
+            63.3769467
+          ],
+          [
+            30.5443768,
+            63.3766006
+          ],
+          [
+            30.5449776,
+            63.3763544
+          ],
+          [
+            30.5453896,
+            63.376189
+          ],
+          [
+            30.5459475,
+            63.375939
+          ],
+          [
+            30.5465225,
+            63.3756505
+          ],
+          [
+            30.5472092,
+            63.3752774
+          ],
+          [
+            30.5479645,
+            63.3750005
+          ],
+          [
+            30.5485825,
+            63.3748659
+          ],
+          [
+            30.549724,
+            63.3747697
+          ],
+          [
+            30.5508999,
+            63.3747505
+          ],
+          [
+            30.5524706,
+            63.3748082
+          ],
+          [
+            30.5539297,
+            63.3748774
+          ],
+          [
+            30.5541926,
+            63.3748976
+          ],
+          [
+            30.5552584,
+            63.3750683
+          ],
+          [
+            30.5556178,
+            63.3751537
+          ],
+          [
+            30.5559007,
+            63.3752205
+          ],
+          [
+            30.5562052,
+            63.3752991
+          ],
+          [
+            30.5564493,
+            63.3753592
+          ],
+          [
+            30.5568309,
+            63.3754365
+          ],
+          [
+            30.5571628,
+            63.3754926
+          ],
+          [
+            30.5574417,
+            63.3755323
+          ],
+          [
+            30.5579793,
+            63.3755931
+          ],
+          [
+            30.5581713,
+            63.3756164
+          ],
+          [
+            30.5584046,
+            63.3756381
+          ],
+          [
+            30.5586467,
+            63.3756441
+          ],
+          [
+            30.5595001,
+            63.3756621
+          ],
+          [
+            30.5597694,
+            63.3756825
+          ],
+          [
+            30.5600542,
+            63.3757559
+          ],
+          [
+            30.5601868,
+            63.3758352
+          ],
+          [
+            30.560307,
+            63.3760006
+          ],
+          [
+            30.5603549,
+            63.3760937
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Koskikierros",
+        "selectionKey": "ruunaa-koskikierros",
+        "parentSlug": "ruunaan-retkeilyalue",
+        "osmWayId": 1434151054,
+        "osmWayVersion": 1,
+        "startNodeId": 13181232196,
+        "endNodeId": 13181232176,
+        "sourceUrl": "https://www.openstreetmap.org/way/1434151054"
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            30.5603549,
+            63.3760937
+          ],
+          [
+            30.561052,
+            63.3761116
+          ],
+          [
+            30.5616206,
+            63.3760996
+          ],
+          [
+            30.5618405,
+            63.3760636
+          ],
+          [
+            30.5621409,
+            63.3760876
+          ],
+          [
+            30.5627954,
+            63.3760684
+          ],
+          [
+            30.5631548,
+            63.3761717
+          ],
+          [
+            30.5637556,
+            63.3762198
+          ],
+          [
+            30.5647695,
+            63.3762367
+          ],
+          [
+            30.5656385,
+            63.3761934
+          ],
+          [
+            30.5662823,
+            63.3761862
+          ],
+          [
+            30.5664968,
+            63.3761573
+          ],
+          [
+            30.5667919,
+            63.3760395
+          ],
+          [
+            30.5669796,
+            63.3757775
+          ],
+          [
+            30.5673605,
+            63.3756741
+          ],
+          [
+            30.5689162,
+            63.3753688
+          ],
+          [
+            30.5692756,
+            63.3752198
+          ],
+          [
+            30.5696511,
+            63.3751909
+          ],
+          [
+            30.5704021,
+            63.3752366
+          ],
+          [
+            30.5713838,
+            63.3752702
+          ],
+          [
+            30.5718344,
+            63.3752318
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Koskikierros",
+        "selectionKey": "ruunaa-koskikierros",
+        "parentSlug": "ruunaan-retkeilyalue",
+        "osmWayId": 1434151053,
+        "osmWayVersion": 1,
+        "startNodeId": 13181232176,
+        "endNodeId": 13181232173,
+        "sourceUrl": "https://www.openstreetmap.org/way/1434151053"
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            30.5718344,
+            63.3752318
+          ],
+          [
+            30.5721992,
+            63.37515
+          ],
+          [
+            30.5723441,
+            63.3750899
+          ],
+          [
+            30.5723333,
+            63.3748279
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Koskikierros",
+        "selectionKey": "ruunaa-koskikierros",
+        "parentSlug": "ruunaan-retkeilyalue",
+        "osmWayId": 1434151052,
+        "osmWayVersion": 1,
+        "startNodeId": 13181232173,
+        "endNodeId": 5833175089,
+        "sourceUrl": "https://www.openstreetmap.org/way/1434151052"
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            30.5723333,
+            63.3748279
+          ],
+          [
+            30.5721509,
+            63.3747846
+          ],
+          [
+            30.5714858,
+            63.3747197
+          ],
+          [
+            30.5712712,
+            63.3746163
+          ],
+          [
+            30.570724,
+            63.3744432
+          ],
+          [
+            30.5706382,
+            63.3743783
+          ],
+          [
+            30.570665,
+            63.374323
+          ],
+          [
+            30.5711853,
+            63.3741548
+          ],
+          [
+            30.5717164,
+            63.3740995
+          ],
+          [
+            30.5718988,
+            63.3740586
+          ],
+          [
+            30.5728215,
+            63.3737244
+          ],
+          [
+            30.5730629,
+            63.3736282
+          ],
+          [
+            30.5731487,
+            63.3735754
+          ],
+          [
+            30.5731338,
+            63.3735166
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Koskikierros",
+        "selectionKey": "ruunaa-koskikierros",
+        "parentSlug": "ruunaan-retkeilyalue",
+        "osmWayId": 14172253,
+        "osmWayVersion": 4,
+        "startNodeId": 135423777,
+        "endNodeId": 135423826,
+        "sourceUrl": "https://www.openstreetmap.org/way/14172253"
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            30.5729584,
+            63.3734772
+          ],
+          [
+            30.5725807,
+            63.3732887
+          ],
+          [
+            30.5722031,
+            63.3731002
+          ],
+          [
+            30.5720228,
+            63.3729156
+          ],
+          [
+            30.5718769,
+            63.3724271
+          ],
+          [
+            30.5717482,
+            63.3720308
+          ],
+          [
+            30.5716967,
+            63.3718616
+          ],
+          [
+            30.5716194,
+            63.3717423
+          ],
+          [
+            30.5714134,
+            63.3716308
+          ],
+          [
+            30.5710701,
+            63.3715307
+          ],
+          [
+            30.5701775,
+            63.3714076
+          ],
+          [
+            30.5693106,
+            63.3713153
+          ],
+          [
+            30.5685295,
+            63.3712153
+          ],
+          [
+            30.5681004,
+            63.3711576
+          ],
+          [
+            30.5677742,
+            63.3710883
+          ],
+          [
+            30.5670876,
+            63.3708998
+          ],
+          [
+            30.5664353,
+            63.3707536
+          ],
+          [
+            30.5657143,
+            63.3706498
+          ],
+          [
+            30.5651135,
+            63.3706113
+          ],
+          [
+            30.5645642,
+            63.3706074
+          ],
+          [
+            30.5637659,
+            63.3706728
+          ],
+          [
+            30.5630707,
+            63.3707382
+          ],
+          [
+            30.5624785,
+            63.3707613
+          ],
+          [
+            30.561912,
+            63.3707267
+          ],
+          [
+            30.5615086,
+            63.3706228
+          ],
+          [
+            30.5610451,
+            63.3704382
+          ],
+          [
+            30.5605902,
+            63.370215
+          ],
+          [
+            30.5602984,
+            63.3700111
+          ],
+          [
+            30.5599465,
+            63.3696803
+          ],
+          [
+            30.5596289,
+            63.3693263
+          ],
+          [
+            30.5593886,
+            63.3690493
+          ],
+          [
+            30.5591912,
+            63.368857
+          ],
+          [
+            30.5589079,
+            63.3688147
+          ],
+          [
+            30.5585989,
+            63.3687339
+          ],
+          [
+            30.5585732,
+            63.3686261
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Koskikierros",
+        "selectionKey": "ruunaa-koskikierros",
+        "parentSlug": "ruunaan-retkeilyalue",
+        "osmWayId": 1187646053,
+        "osmWayVersion": 1,
+        "startNodeId": 2417671292,
+        "endNodeId": 2417671284,
+        "sourceUrl": "https://www.openstreetmap.org/way/1187646053"
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            30.5516765,
+            63.3697236
+          ],
+          [
+            30.5509954,
+            63.3695672
+          ],
+          [
+            30.5507652,
+            63.3694748
+          ],
+          [
+            30.5506175,
+            63.3692941
+          ],
+          [
+            30.5504238,
+            63.369134
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Koskikierros",
+        "selectionKey": "ruunaa-koskikierros",
+        "parentSlug": "ruunaan-retkeilyalue",
+        "osmWayId": 1187646052,
+        "osmWayVersion": 1,
+        "startNodeId": 2417671284,
+        "endNodeId": 2417671217,
+        "sourceUrl": "https://www.openstreetmap.org/way/1187646052"
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            30.5504238,
+            63.369134
+          ],
+          [
+            30.5500971,
+            63.3690712
+          ],
+          [
+            30.5497039,
+            63.3689441
+          ],
+          [
+            30.5495492,
+            63.3688389
+          ],
+          [
+            30.5493643,
+            63.3688489
+          ],
+          [
+            30.549202,
+            63.3686973
+          ],
+          [
+            30.5489772,
+            63.3685595
+          ],
+          [
+            30.5487318,
+            63.3686547
+          ],
+          [
+            30.5485374,
+            63.3685638
+          ],
+          [
+            30.5483928,
+            63.3683027
+          ],
+          [
+            30.5484384,
+            63.3681999
+          ],
+          [
+            30.5484492,
+            63.3680945
+          ],
+          [
+            30.5483781,
+            63.367958
+          ],
+          [
+            30.5486294,
+            63.3677723
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Koskikierros",
+        "selectionKey": "ruunaa-koskikierros",
+        "parentSlug": "ruunaan-retkeilyalue",
+        "osmWayId": 1187646051,
+        "osmWayVersion": 1,
+        "startNodeId": 2417671217,
+        "endNodeId": 2417671134,
+        "sourceUrl": "https://www.openstreetmap.org/way/1187646051"
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            30.5486294,
+            63.3677723
+          ],
+          [
+            30.5487943,
+            63.3674858
+          ],
+          [
+            30.5491329,
+            63.3673468
+          ],
+          [
+            30.5494757,
+            63.3672526
+          ],
+          [
+            30.5496837,
+            63.367165
+          ],
+          [
+            30.5499087,
+            63.3669385
+          ],
+          [
+            30.5499603,
+            63.3668852
+          ],
+          [
+            30.5500449,
+            63.3668009
+          ],
+          [
+            30.5502258,
+            63.3666986
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Koskikierros",
+        "selectionKey": "ruunaa-koskikierros",
+        "parentSlug": "ruunaan-retkeilyalue",
+        "osmWayId": 628056881,
+        "osmWayVersion": 3,
+        "startNodeId": 2417671134,
+        "endNodeId": 2417642912,
+        "sourceUrl": "https://www.openstreetmap.org/way/628056881"
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            30.5502258,
+            63.3666986
+          ],
+          [
+            30.5502156,
+            63.3666529
+          ],
+          [
+            30.5502523,
+            63.3664778
+          ],
+          [
+            30.5504079,
+            63.366282
+          ],
+          [
+            30.5505001,
+            63.366126
+          ],
+          [
+            30.5506511,
+            63.3660075
+          ],
+          [
+            30.5506804,
+            63.3659042
+          ],
+          [
+            30.5506343,
+            63.36575
+          ],
+          [
+            30.5506086,
+            63.3656759
+          ],
+          [
+            30.5504561,
+            63.3655318
+          ],
+          [
+            30.5502017,
+            63.3654304
+          ],
+          [
+            30.5500699,
+            63.3653864
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Koskikierros",
+        "selectionKey": "ruunaa-koskikierros",
+        "parentSlug": "ruunaan-retkeilyalue",
+        "osmWayId": 233366999,
+        "osmWayVersion": 5,
+        "startNodeId": 2417642912,
+        "endNodeId": 2417642910,
+        "sourceUrl": "https://www.openstreetmap.org/way/233366999"
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            30.5500699,
+            63.3653864
+          ],
+          [
+            30.5494197,
+            63.3651487
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Koskikierros",
+        "selectionKey": "ruunaa-koskikierros",
+        "parentSlug": "ruunaan-retkeilyalue",
+        "osmWayId": 628056880,
+        "osmWayVersion": 1,
+        "startNodeId": 2417642910,
+        "endNodeId": 2417671062,
+        "sourceUrl": "https://www.openstreetmap.org/way/628056880"
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            30.5494197,
+            63.3651487
+          ],
+          [
+            30.5492967,
+            63.3651126
+          ],
+          [
+            30.5491463,
+            63.365077
+          ],
+          [
+            30.548902,
+            63.3650843
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Koskikierros",
+        "selectionKey": "ruunaa-koskikierros",
+        "parentSlug": "ruunaan-retkeilyalue",
+        "osmWayId": 1187646050,
+        "osmWayVersion": 1,
+        "startNodeId": 2417671062,
+        "endNodeId": 8483473871,
+        "sourceUrl": "https://www.openstreetmap.org/way/1187646050"
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            30.548902,
+            63.3650843
+          ],
+          [
+            30.5486491,
+            63.365137
+          ],
+          [
+            30.5481611,
+            63.3651513
+          ],
+          [
+            30.5479119,
+            63.3652492
+          ],
+          [
+            30.5474356,
+            63.3653932
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Koskikierros",
+        "selectionKey": "ruunaa-koskikierros",
+        "parentSlug": "ruunaan-retkeilyalue",
+        "osmWayId": 628057015,
+        "osmWayVersion": 3,
+        "startNodeId": 8483473871,
+        "endNodeId": 2417671094,
+        "sourceUrl": "https://www.openstreetmap.org/way/628057015"
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            30.5474356,
+            63.3653932
+          ],
+          [
+            30.5472294,
+            63.3654104
+          ],
+          [
+            30.5469836,
+            63.3654507
+          ],
+          [
+            30.5466088,
+            63.365498
+          ],
+          [
+            30.5461113,
+            63.3655529
+          ],
+          [
+            30.5457972,
+            63.3655919
+          ],
+          [
+            30.5454865,
+            63.3655965
+          ],
+          [
+            30.5452084,
+            63.3655069
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Koskikierros",
+        "selectionKey": "ruunaa-koskikierros",
+        "parentSlug": "ruunaan-retkeilyalue",
+        "osmWayId": 628055033,
+        "osmWayVersion": 2,
+        "startNodeId": 2417671094,
+        "endNodeId": 2417671110,
+        "sourceUrl": "https://www.openstreetmap.org/way/628055033"
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            30.5452084,
+            63.3655069
+          ],
+          [
+            30.5451442,
+            63.3656778
+          ],
+          [
+            30.544967,
+            63.3658256
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Koskikierros",
+        "selectionKey": "ruunaa-koskikierros",
+        "parentSlug": "ruunaan-retkeilyalue",
+        "osmWayId": 233369718,
+        "osmWayVersion": 5,
+        "startNodeId": 2417671110,
+        "endNodeId": 2629118545,
+        "sourceUrl": "https://www.openstreetmap.org/way/233369718"
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            30.544967,
+            63.3658256
+          ],
+          [
+            30.5444373,
+            63.3660721
+          ],
+          [
+            30.544097,
+            63.3663643
+          ],
+          [
+            30.5437604,
+            63.3666784
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Koskikierros",
+        "selectionKey": "ruunaa-koskikierros",
+        "parentSlug": "ruunaan-retkeilyalue",
+        "osmWayId": 628055034,
+        "osmWayVersion": 1,
+        "startNodeId": 2629118545,
+        "endNodeId": 2629118545,
+        "sourceUrl": "https://www.openstreetmap.org/way/628055034"
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            30.5437604,
+            63.3666784
+          ],
+          [
+            30.5434443,
+            63.3668969
+          ],
+          [
+            30.5437604,
+            63.3666784
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Koskikierros",
+        "selectionKey": "ruunaa-koskikierros",
+        "parentSlug": "ruunaan-retkeilyalue",
+        "osmWayId": 233369718,
+        "osmWayVersion": 5,
+        "startNodeId": 2629118545,
+        "endNodeId": 2417671110,
+        "sourceUrl": "https://www.openstreetmap.org/way/233369718"
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            30.5437604,
+            63.3666784
+          ],
+          [
+            30.544097,
+            63.3663643
+          ],
+          [
+            30.5444373,
+            63.3660721
+          ],
+          [
+            30.544967,
+            63.3658256
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Koskikierros",
+        "selectionKey": "ruunaa-koskikierros",
+        "parentSlug": "ruunaan-retkeilyalue",
+        "osmWayId": 628055033,
+        "osmWayVersion": 2,
+        "startNodeId": 2417671110,
+        "endNodeId": 2417671094,
+        "sourceUrl": "https://www.openstreetmap.org/way/628055033"
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            30.544967,
+            63.3658256
+          ],
+          [
+            30.5451442,
+            63.3656778
+          ],
+          [
+            30.5452084,
+            63.3655069
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Koskikierros",
+        "selectionKey": "ruunaa-koskikierros",
+        "parentSlug": "ruunaan-retkeilyalue",
+        "osmWayId": 628057015,
+        "osmWayVersion": 3,
+        "startNodeId": 2417671094,
+        "endNodeId": 2417671079,
+        "sourceUrl": "https://www.openstreetmap.org/way/628057015"
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            30.5452084,
+            63.3655069
+          ],
+          [
+            30.5451154,
+            63.3653982
+          ],
+          [
+            30.5448387,
+            63.3652459
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Koskikierros",
+        "selectionKey": "ruunaa-koskikierros",
+        "parentSlug": "ruunaan-retkeilyalue",
+        "osmWayId": 233369708,
+        "osmWayVersion": 8,
+        "startNodeId": 2417671079,
+        "endNodeId": 11028065860,
+        "sourceUrl": "https://www.openstreetmap.org/way/233369708"
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            30.5448387,
+            63.3652459
+          ],
+          [
+            30.5440881,
+            63.3649245
+          ],
+          [
+            30.543384,
+            63.3646992
+          ],
+          [
+            30.5427079,
+            63.3646309
+          ],
+          [
+            30.5422728,
+            63.3645785
+          ],
+          [
+            30.5418255,
+            63.364548
+          ],
+          [
+            30.5411053,
+            63.3645726
+          ],
+          [
+            30.5403833,
+            63.3647152
+          ],
+          [
+            30.5392581,
+            63.3648387
+          ],
+          [
+            30.5385059,
+            63.3648593
+          ],
+          [
+            30.5379936,
+            63.3648906
+          ],
+          [
+            30.5372142,
+            63.3650143
+          ],
+          [
+            30.5367969,
+            63.3651052
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Koskikierros",
+        "selectionKey": "ruunaa-koskikierros",
+        "parentSlug": "ruunaan-retkeilyalue",
+        "osmWayId": 628057014,
+        "osmWayVersion": 4,
+        "startNodeId": 11028065860,
+        "endNodeId": 2417671088,
+        "sourceUrl": "https://www.openstreetmap.org/way/628057014"
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            30.5367969,
+            63.3651052
+          ],
+          [
+            30.5365126,
+            63.3651166
+          ],
+          [
+            30.5363012,
+            63.3651117
+          ],
+          [
+            30.535927,
+            63.3651999
+          ],
+          [
+            30.5357105,
+            63.3653086
+          ],
+          [
+            30.5354927,
+            63.3652976
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Koskikierros",
+        "selectionKey": "ruunaa-koskikierros",
+        "parentSlug": "ruunaan-retkeilyalue",
+        "osmWayId": 1434151050,
+        "osmWayVersion": 1,
+        "startNodeId": 2417671088,
+        "endNodeId": 8473218598,
+        "sourceUrl": "https://www.openstreetmap.org/way/1434151050"
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            30.5354927,
+            63.3652976
+          ],
+          [
+            30.5345249,
+            63.3654673
+          ],
+          [
+            30.5333049,
+            63.3655221
+          ],
+          [
+            30.5325485,
+            63.365731
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Koskikierros",
+        "selectionKey": "ruunaa-koskikierros",
+        "parentSlug": "ruunaan-retkeilyalue",
+        "osmWayId": 1434151051,
+        "osmWayVersion": 1,
+        "startNodeId": 8473218598,
+        "endNodeId": 8473218601,
+        "sourceUrl": "https://www.openstreetmap.org/way/1434151051"
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            30.5325485,
+            63.365731
+          ],
+          [
+            30.5322013,
+            63.3657792
+          ],
+          [
+            30.5309183,
+            63.3659197
+          ],
+          [
+            30.5299705,
+            63.3659074
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Koskikierros",
+        "selectionKey": "ruunaa-koskikierros",
+        "parentSlug": "ruunaan-retkeilyalue",
+        "osmWayId": 912125387,
+        "osmWayVersion": 3,
+        "startNodeId": 8473218601,
+        "endNodeId": 2417671300,
+        "sourceUrl": "https://www.openstreetmap.org/way/912125387"
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            30.5299705,
+            63.3659074
+          ],
+          [
+            30.5295145,
+            63.3659242
+          ],
+          [
+            30.5287367,
+            63.3660565
+          ],
+          [
+            30.5267698,
+            63.3663823
+          ],
+          [
+            30.5260369,
+            63.3666307
+          ],
+          [
+            30.5251242,
+            63.3669026
+          ],
+          [
+            30.5235354,
+            63.3671512
+          ],
+          [
+            30.522809,
+            63.3672276
+          ],
+          [
+            30.5221933,
+            63.367354
+          ],
+          [
+            30.5213286,
+            63.3676827
+          ],
+          [
+            30.5198794,
+            63.3680456
+          ],
+          [
+            30.5192515,
+            63.3685409
+          ],
+          [
+            30.5189443,
+            63.3686912
+          ],
+          [
+            30.5184199,
+            63.369049
+          ],
+          [
+            30.5180271,
+            63.3692273
+          ],
+          [
+            30.5172595,
+            63.3695638
+          ],
+          [
+            30.515695,
+            63.370181
+          ],
+          [
+            30.5151926,
+            63.3704036
+          ],
+          [
+            30.5150735,
+            63.3705219
+          ],
+          [
+            30.5145907,
+            63.3706854
+          ],
+          [
+            30.5142185,
+            63.3707685
+          ],
+          [
+            30.5138845,
+            63.370826
+          ],
+          [
+            30.513644,
+            63.3708258
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Koskikierros",
+        "selectionKey": "ruunaa-koskikierros",
+        "parentSlug": "ruunaan-retkeilyalue",
+        "osmWayId": 912125388,
+        "osmWayVersion": 2,
+        "startNodeId": 2417671300,
+        "endNodeId": 8473218574,
+        "sourceUrl": "https://www.openstreetmap.org/way/912125388"
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            30.513644,
+            63.3708258
+          ],
+          [
+            30.5132558,
+            63.3706992
+          ],
+          [
+            30.512063,
+            63.3699792
+          ],
+          [
+            30.511506,
+            63.3697479
+          ],
+          [
+            30.5107604,
+            63.3694636
+          ],
+          [
+            30.5103227,
+            63.3693505
+          ],
+          [
+            30.5095709,
+            63.3692509
+          ],
+          [
+            30.5084039,
+            63.369163
+          ],
+          [
+            30.5076789,
+            63.3691967
+          ],
+          [
+            30.506992,
+            63.3692486
+          ],
+          [
+            30.5062272,
+            63.3693704
+          ],
+          [
+            30.5034209,
+            63.3698086
+          ],
+          [
+            30.5012375,
+            63.3700722
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Koskikierros",
+        "selectionKey": "ruunaa-koskikierros",
+        "parentSlug": "ruunaan-retkeilyalue",
+        "osmWayId": 1434151048,
+        "osmWayVersion": 1,
+        "startNodeId": 8473218574,
+        "endNodeId": 2417671264,
+        "sourceUrl": "https://www.openstreetmap.org/way/1434151048"
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            30.5012375,
+            63.3700722
+          ],
+          [
+            30.5010666,
+            63.3700963
+          ],
+          [
+            30.5007154,
+            63.3701288
+          ],
+          [
+            30.5003121,
+            63.3701114
+          ],
+          [
+            30.4997731,
+            63.3700299
+          ],
+          [
+            30.4992893,
+            63.3699136
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Koskikierros",
+        "selectionKey": "ruunaa-koskikierros",
+        "parentSlug": "ruunaan-retkeilyalue",
+        "osmWayId": 912125379,
+        "osmWayVersion": 2,
+        "startNodeId": 2417671264,
+        "endNodeId": 8473218539,
+        "sourceUrl": "https://www.openstreetmap.org/way/912125379"
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            30.4992893,
+            63.3699136
+          ],
+          [
+            30.4989572,
+            63.369828
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Koskikierros",
+        "selectionKey": "ruunaa-koskikierros",
+        "parentSlug": "ruunaan-retkeilyalue",
+        "osmWayId": 233369701,
+        "osmWayVersion": 5,
+        "startNodeId": 8473218539,
+        "endNodeId": 8473218537,
+        "sourceUrl": "https://www.openstreetmap.org/way/233369701"
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            30.4989572,
+            63.369828
+          ],
+          [
+            30.4980083,
+            63.3694327
+          ],
+          [
+            30.4966278,
+            63.3690384
+          ],
+          [
+            30.4958576,
+            63.368886
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Koskikierros",
+        "selectionKey": "ruunaa-koskikierros",
+        "parentSlug": "ruunaan-retkeilyalue",
+        "osmWayId": 912125378,
+        "osmWayVersion": 1,
+        "startNodeId": 8473218537,
+        "endNodeId": 8473218535,
+        "sourceUrl": "https://www.openstreetmap.org/way/912125378"
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            30.4958576,
+            63.368886
+          ],
+          [
+            30.4945079,
+            63.3685672
+          ],
+          [
+            30.493599,
+            63.3684087
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Koskikierros",
+        "selectionKey": "ruunaa-koskikierros",
+        "parentSlug": "ruunaan-retkeilyalue",
+        "osmWayId": 912125377,
+        "osmWayVersion": 1,
+        "startNodeId": 8473218535,
+        "endNodeId": 8473218538,
+        "sourceUrl": "https://www.openstreetmap.org/way/912125377"
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            30.493599,
+            63.3684087
+          ],
+          [
+            30.4916418,
+            63.367942
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Koskikierros",
+        "selectionKey": "ruunaa-koskikierros",
+        "parentSlug": "ruunaan-retkeilyalue",
+        "osmWayId": 912125376,
+        "osmWayVersion": 1,
+        "startNodeId": 8473218538,
+        "endNodeId": 6618678466,
+        "sourceUrl": "https://www.openstreetmap.org/way/912125376"
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            30.4916418,
+            63.367942
+          ],
+          [
+            30.490903,
+            63.3677417
+          ],
+          [
+            30.4903565,
+            63.3675444
+          ],
+          [
+            30.4898321,
+            63.3673552
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Koskikierros",
+        "selectionKey": "ruunaa-koskikierros",
+        "parentSlug": "ruunaan-retkeilyalue",
+        "osmWayId": 912125372,
+        "osmWayVersion": 1,
+        "startNodeId": 6618678466,
+        "endNodeId": 8473218521,
+        "sourceUrl": "https://www.openstreetmap.org/way/912125372"
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            30.4898321,
+            63.3673552
+          ],
+          [
+            30.4895751,
+            63.3672286
+          ],
+          [
+            30.4893837,
+            63.3670962
+          ],
+          [
+            30.4892186,
+            63.3668961
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Koskikierros",
+        "selectionKey": "ruunaa-koskikierros",
+        "parentSlug": "ruunaan-retkeilyalue",
+        "osmWayId": 912125373,
+        "osmWayVersion": 1,
+        "startNodeId": 8473218521,
+        "endNodeId": 8473218524,
+        "sourceUrl": "https://www.openstreetmap.org/way/912125373"
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            30.4892186,
+            63.3668961
+          ],
+          [
+            30.489106,
+            63.3667902
+          ],
+          [
+            30.4888676,
+            63.3665665
+          ],
+          [
+            30.4885373,
+            63.3664017
+          ],
+          [
+            30.4880483,
+            63.3661879
+          ],
+          [
+            30.4876774,
+            63.3660859
+          ],
+          [
+            30.4867707,
+            63.3658358
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Koskikierros",
+        "selectionKey": "ruunaa-koskikierros",
+        "parentSlug": "ruunaan-retkeilyalue",
+        "osmWayId": 912125365,
+        "osmWayVersion": 1,
+        "startNodeId": 8473218524,
+        "endNodeId": 8473218495,
+        "sourceUrl": "https://www.openstreetmap.org/way/912125365"
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            30.4867707,
+            63.3658358
+          ],
+          [
+            30.4865071,
+            63.365721
+          ],
+          [
+            30.485876,
+            63.3654443
+          ],
+          [
+            30.485455,
+            63.3653207
+          ],
+          [
+            30.4849458,
+            63.3651997
+          ],
+          [
+            30.483465,
+            63.3646159
+          ],
+          [
+            30.4832061,
+            63.3645476
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Koskikierros",
+        "selectionKey": "ruunaa-koskikierros",
+        "parentSlug": "ruunaan-retkeilyalue",
+        "osmWayId": 912125367,
+        "osmWayVersion": 1,
+        "startNodeId": 8473218495,
+        "endNodeId": 8473218494,
+        "sourceUrl": "https://www.openstreetmap.org/way/912125367"
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            30.4832061,
+            63.3645476
+          ],
+          [
+            30.4818293,
+            63.364113
+          ],
+          [
+            30.4802741,
+            63.3635051
+          ],
+          [
+            30.4779899,
+            63.3624356
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Koskikierros",
+        "selectionKey": "ruunaa-koskikierros",
+        "parentSlug": "ruunaan-retkeilyalue",
+        "osmWayId": 912125368,
+        "osmWayVersion": 1,
+        "startNodeId": 8473218494,
+        "endNodeId": 8473218493,
+        "sourceUrl": "https://www.openstreetmap.org/way/912125368"
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            30.4779899,
+            63.3624356
+          ],
+          [
+            30.4778188,
+            63.3623554
+          ],
+          [
+            30.4776332,
+            63.3622141
+          ],
+          [
+            30.4774587,
+            63.3621534
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Koskikierros",
+        "selectionKey": "ruunaa-koskikierros",
+        "parentSlug": "ruunaan-retkeilyalue",
+        "osmWayId": 912125366,
+        "osmWayVersion": 1,
+        "startNodeId": 8473218493,
+        "endNodeId": 8473218485,
+        "sourceUrl": "https://www.openstreetmap.org/way/912125366"
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            30.4774587,
+            63.3621534
+          ],
+          [
+            30.4773733,
+            63.3621261
+          ],
+          [
+            30.477283,
+            63.362108
+          ],
+          [
+            30.4757661,
+            63.3619699
+          ],
+          [
+            30.4746726,
+            63.3619218
+          ],
+          [
+            30.4742374,
+            63.3619378
+          ],
+          [
+            30.4739529,
+            63.3619057
+          ],
+          [
+            30.4736684,
+            63.3618271
+          ],
+          [
+            30.4732178,
+            63.3616721
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Koskikierros",
+        "selectionKey": "ruunaa-koskikierros",
+        "parentSlug": "ruunaan-retkeilyalue",
+        "osmWayId": 1187642899,
+        "osmWayVersion": 1,
+        "startNodeId": 8473218485,
+        "endNodeId": 1395806236,
+        "sourceUrl": "https://www.openstreetmap.org/way/1187642899"
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            30.4732178,
+            63.3616721
+          ],
+          [
+            30.4721452,
+            63.3610804
+          ],
+          [
+            30.4712315,
+            63.3606935
+          ],
+          [
+            30.4708089,
+            63.3605218
+          ],
+          [
+            30.4701155,
+            63.3602401
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Koskikierros",
+        "selectionKey": "ruunaa-koskikierros",
+        "parentSlug": "ruunaan-retkeilyalue",
+        "osmWayId": 704785196,
+        "osmWayVersion": 5,
+        "startNodeId": 1395806236,
+        "endNodeId": 1395806236,
+        "sourceUrl": "https://www.openstreetmap.org/way/704785196"
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            30.4701155,
+            63.3602401
+          ],
+          [
+            30.4698819,
+            63.3610034
+          ],
+          [
+            30.4701155,
+            63.3602401
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Koskikierros",
+        "selectionKey": "ruunaa-koskikierros",
+        "parentSlug": "ruunaan-retkeilyalue",
+        "osmWayId": 1187642902,
+        "osmWayVersion": 1,
+        "startNodeId": 1395806236,
+        "endNodeId": 11028070413,
+        "sourceUrl": "https://www.openstreetmap.org/way/1187642902"
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            30.4701155,
+            63.3602401
+          ],
+          [
+            30.4702646,
+            63.3601878
+          ],
+          [
+            30.4704093,
+            63.3600768
+          ],
+          [
+            30.4704657,
+            63.3595667
+          ],
+          [
+            30.4702612,
+            63.3592179
+          ],
+          [
+            30.4702959,
+            63.3588342
+          ],
+          [
+            30.4703694,
+            63.3586802
+          ],
+          [
+            30.4705867,
+            63.3580754
+          ],
+          [
+            30.4705855,
+            63.3578354
+          ],
+          [
+            30.4708179,
+            63.357656
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Koskikierros",
+        "selectionKey": "ruunaa-koskikierros",
+        "parentSlug": "ruunaan-retkeilyalue",
+        "osmWayId": 125729898,
+        "osmWayVersion": 6,
+        "startNodeId": 11028070413,
+        "endNodeId": 11028070419,
+        "sourceUrl": "https://www.openstreetmap.org/way/125729898"
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            30.4708179,
+            63.357656
+          ],
+          [
+            30.4710046,
+            63.3574139
+          ],
+          [
+            30.4711035,
+            63.357214
+          ],
+          [
+            30.4710074,
+            63.3571068
+          ],
+          [
+            30.4711371,
+            63.3568168
+          ],
+          [
+            30.4712751,
+            63.3565726
+          ],
+          [
+            30.4715308,
+            63.3562412
+          ],
+          [
+            30.4715191,
+            63.3560885
+          ],
+          [
+            30.4713217,
+            63.355881
+          ],
+          [
+            30.4715973,
+            63.3554053
+          ],
+          [
+            30.4718365,
+            63.3551823
+          ],
+          [
+            30.4719312,
+            63.354939
+          ],
+          [
+            30.4723346,
+            63.3546917
+          ],
+          [
+            30.4732739,
+            63.3540351
+          ],
+          [
+            30.4739047,
+            63.353714
+          ],
+          [
+            30.4743733,
+            63.353489
+          ],
+          [
+            30.4752045,
+            63.3530971
+          ],
+          [
+            30.4758085,
+            63.3529162
+          ],
+          [
+            30.4770124,
+            63.3524123
+          ],
+          [
+            30.477698,
+            63.3520856
+          ],
+          [
+            30.4778321,
+            63.3518404
+          ],
+          [
+            30.4778273,
+            63.3517204
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Koskikierros",
+        "selectionKey": "ruunaa-koskikierros",
+        "parentSlug": "ruunaan-retkeilyalue",
+        "osmWayId": 1187642901,
+        "osmWayVersion": 1,
+        "startNodeId": 11028070419,
+        "endNodeId": 8473218375,
+        "sourceUrl": "https://www.openstreetmap.org/way/1187642901"
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            30.4778273,
+            63.3517204
+          ],
+          [
+            30.4778229,
+            63.3516113
+          ],
+          [
+            30.4778862,
+            63.3513022
+          ],
+          [
+            30.4787105,
+            63.350772
+          ],
+          [
+            30.4794544,
+            63.3501363
+          ],
+          [
+            30.4797115,
+            63.3499933
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Koskikierros",
+        "selectionKey": "ruunaa-koskikierros",
+        "parentSlug": "ruunaan-retkeilyalue",
+        "osmWayId": 912125354,
+        "osmWayVersion": 1,
+        "startNodeId": 8473218375,
+        "endNodeId": 1395806248,
+        "sourceUrl": "https://www.openstreetmap.org/way/912125354"
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            30.4797115,
+            63.3499933
+          ],
+          [
+            30.4799403,
+            63.3498583
+          ],
+          [
+            30.4800363,
+            63.3497106
+          ],
+          [
+            30.4797711,
+            63.3493181
+          ],
+          [
+            30.4796892,
+            63.3490626
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Koskikierros",
+        "selectionKey": "ruunaa-koskikierros",
+        "parentSlug": "ruunaan-retkeilyalue",
+        "osmWayId": 912125353,
+        "osmWayVersion": 1,
+        "startNodeId": 1395806248,
+        "endNodeId": 8473218233,
+        "sourceUrl": "https://www.openstreetmap.org/way/912125353"
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            30.4796892,
+            63.3490626
+          ],
+          [
+            30.4794913,
+            63.3487573
+          ],
+          [
+            30.4792912,
+            63.3482859
+          ],
+          [
+            30.4789975,
+            63.3477827
+          ],
+          [
+            30.478934,
+            63.3475659
+          ],
+          [
+            30.4790612,
+            63.3473597
+          ],
+          [
+            30.4792052,
+            63.347236
+          ],
+          [
+            30.4793611,
+            63.3470161
+          ],
+          [
+            30.479649,
+            63.3464052
+          ],
+          [
+            30.4798905,
+            63.3463023
+          ],
+          [
+            30.4800321,
+            63.3461722
+          ],
+          [
+            30.4802008,
+            63.3459785
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Koskikierros",
+        "selectionKey": "ruunaa-koskikierros",
+        "parentSlug": "ruunaan-retkeilyalue",
+        "osmWayId": 912125340,
+        "osmWayVersion": 1,
+        "startNodeId": 8473218233,
+        "endNodeId": 8473218230,
+        "sourceUrl": "https://www.openstreetmap.org/way/912125340"
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            30.4802008,
+            63.3459785
+          ],
+          [
+            30.4801468,
+            63.3457576
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Koskikierros",
+        "selectionKey": "ruunaa-koskikierros",
+        "parentSlug": "ruunaan-retkeilyalue",
+        "osmWayId": 223687199,
+        "osmWayVersion": 2,
+        "startNodeId": 8473218230,
+        "endNodeId": 1400972143,
+        "sourceUrl": "https://www.openstreetmap.org/way/223687199"
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            30.4801468,
+            63.3457576
+          ],
+          [
+            30.4799242,
+            63.3456759
+          ],
+          [
+            30.4797083,
+            63.3456002
+          ],
+          [
+            30.4793373,
+            63.3455397
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Koskikierros",
+        "selectionKey": "ruunaa-koskikierros",
+        "parentSlug": "ruunaan-retkeilyalue",
+        "osmWayId": 126357446,
+        "osmWayVersion": 5,
+        "startNodeId": 1400972143,
+        "endNodeId": 1400972180,
+        "sourceUrl": "https://www.openstreetmap.org/way/126357446"
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            30.4793373,
+            63.3455397
+          ],
+          [
+            30.4789678,
+            63.3450072
+          ],
+          [
+            30.478923,
+            63.3448598
+          ],
+          [
+            30.4790423,
+            63.344668
+          ],
+          [
+            30.4796473,
+            63.3440314
+          ],
+          [
+            30.4801169,
+            63.3433789
+          ],
+          [
+            30.4802753,
+            63.3432368
+          ],
+          [
+            30.4805417,
+            63.3430705
+          ],
+          [
+            30.4809426,
+            63.342987
+          ],
+          [
+            30.4820788,
+            63.3427311
+          ],
+          [
+            30.4823997,
+            63.3426277
+          ],
+          [
+            30.4826869,
+            63.3425848
+          ],
+          [
+            30.4827559,
+            63.3423805
+          ],
+          [
+            30.4825348,
+            63.3420005
+          ],
+          [
+            30.4823251,
+            63.3416779
+          ],
+          [
+            30.4820614,
+            63.3414793
+          ],
+          [
+            30.4810514,
+            63.3412299
+          ],
+          [
+            30.4803314,
+            63.3410139
+          ],
+          [
+            30.4795104,
+            63.3407523
+          ],
+          [
+            30.4791954,
+            63.3406547
+          ],
+          [
+            30.4778549,
+            63.3404057
+          ],
+          [
+            30.4762999,
+            63.3400297
+          ],
+          [
+            30.475201,
+            63.339599
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Koskikierros",
+        "selectionKey": "ruunaa-koskikierros",
+        "parentSlug": "ruunaan-retkeilyalue",
+        "osmWayId": 179394407,
+        "osmWayVersion": 6,
+        "startNodeId": 1400972180,
+        "endNodeId": 8477062891,
+        "sourceUrl": "https://www.openstreetmap.org/way/179394407"
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            30.475201,
+            63.339599
+          ],
+          [
+            30.475237,
+            63.3394538
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Koskikierros",
+        "selectionKey": "ruunaa-koskikierros",
+        "parentSlug": "ruunaan-retkeilyalue",
+        "osmWayId": 912540615,
+        "osmWayVersion": 1,
+        "startNodeId": 8477062891,
+        "endNodeId": 1400972153,
+        "sourceUrl": "https://www.openstreetmap.org/way/912540615"
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            30.475237,
+            63.3394538
+          ],
+          [
+            30.4745246,
+            63.3396061
+          ],
+          [
+            30.474147,
+            63.339734
+          ],
+          [
+            30.4737031,
+            63.3400038
+          ],
+          [
+            30.4736462,
+            63.3400384
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Koskikierros",
+        "selectionKey": "ruunaa-koskikierros",
+        "parentSlug": "ruunaan-retkeilyalue",
+        "osmWayId": 126357445,
+        "osmWayVersion": 8,
+        "startNodeId": 1400972153,
+        "endNodeId": 1204276456,
+        "sourceUrl": "https://www.openstreetmap.org/way/126357445"
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            30.4736462,
+            63.3400384
+          ],
+          [
+            30.4729846,
+            63.3404023
+          ],
+          [
+            30.4727345,
+            63.340534
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Koskikierros",
+        "selectionKey": "ruunaa-koskikierros",
+        "parentSlug": "ruunaan-retkeilyalue",
+        "osmWayId": 617287031,
+        "osmWayVersion": 4,
+        "startNodeId": 1204276456,
+        "endNodeId": 5835387229,
+        "sourceUrl": "https://www.openstreetmap.org/way/617287031"
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            30.4727345,
+            63.340534
+          ],
+          [
+            30.4728787,
+            63.3405912
+          ],
+          [
+            30.4729138,
+            63.3406547
+          ],
+          [
+            30.4728658,
+            63.3407362
+          ],
+          [
+            30.4726207,
+            63.3409172
+          ],
+          [
+            30.472589,
+            63.341002
+          ],
+          [
+            30.4726241,
+            63.3410834
+          ],
+          [
+            30.4728136,
+            63.3412069
+          ],
+          [
+            30.4730194,
+            63.341312
+          ],
+          [
+            30.4733408,
+            63.3414191
+          ],
+          [
+            30.4736205,
+            63.3414721
+          ],
+          [
+            30.4743229,
+            63.3415252
+          ],
+          [
+            30.4746033,
+            63.3415952
+          ],
+          [
+            30.4749299,
+            63.3417367
+          ],
+          [
+            30.4756583,
+            63.3422099
+          ],
+          [
+            30.4761023,
+            63.3424286
+          ],
+          [
+            30.4761059,
+            63.3425646
+          ],
+          [
+            30.475633,
+            63.3428137
+          ],
+          [
+            30.4753728,
+            63.3430033
+          ],
+          [
+            30.4753232,
+            63.3432325
+          ],
+          [
+            30.4749859,
+            63.3436017
+          ],
+          [
+            30.4750084,
+            63.3438066
+          ],
+          [
+            30.4750228,
+            63.3438227
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Koskikierros",
+        "selectionKey": "ruunaa-koskikierros",
+        "parentSlug": "ruunaan-retkeilyalue",
+        "osmWayId": 617287032,
+        "osmWayVersion": 2,
+        "startNodeId": 5835387229,
+        "endNodeId": 5835387228,
+        "sourceUrl": "https://www.openstreetmap.org/way/617287032"
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            30.4750228,
+            63.3438227
+          ],
+          [
+            30.4754054,
+            63.3441172
+          ],
+          [
+            30.4755836,
+            63.3443815
+          ],
+          [
+            30.4756566,
+            63.3445346
+          ],
+          [
+            30.475806,
+            63.3447155
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Koskikierros",
+        "selectionKey": "ruunaa-koskikierros",
+        "parentSlug": "ruunaan-retkeilyalue",
+        "osmWayId": 233366996,
+        "osmWayVersion": 10,
+        "startNodeId": 5835387228,
+        "endNodeId": 10125308061,
+        "sourceUrl": "https://www.openstreetmap.org/way/233366996"
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            30.475806,
+            63.3447155
+          ],
+          [
+            30.4758732,
+            63.3448334
+          ],
+          [
+            30.475979,
+            63.344925
+          ],
+          [
+            30.4760316,
+            63.3449774
+          ],
+          [
+            30.476276,
+            63.3451129
+          ],
+          [
+            30.4765924,
+            63.3452649
+          ],
+          [
+            30.4768762,
+            63.3454127
+          ],
+          [
+            30.4770839,
+            63.3455442
+          ],
+          [
+            30.4771646,
+            63.3456517
+          ],
+          [
+            30.4773102,
+            63.3459655
+          ],
+          [
+            30.4773841,
+            63.3462268
+          ],
+          [
+            30.4773138,
+            63.346434
+          ],
+          [
+            30.4772183,
+            63.3465398
+          ],
+          [
+            30.4769927,
+            63.346704
+          ],
+          [
+            30.4767674,
+            63.3468501
+          ],
+          [
+            30.4765234,
+            63.3470754
+          ],
+          [
+            30.476222,
+            63.3477755
+          ],
+          [
+            30.4761741,
+            63.3479923
+          ],
+          [
+            30.4760521,
+            63.3481009
+          ],
+          [
+            30.4758562,
+            63.3481948
+          ],
+          [
+            30.4755629,
+            63.3482796
+          ],
+          [
+            30.4751048,
+            63.3484918
+          ],
+          [
+            30.474741,
+            63.3486846
+          ],
+          [
+            30.4744624,
+            63.3489586
+          ],
+          [
+            30.4743287,
+            63.3490376
+          ],
+          [
+            30.474125,
+            63.349097
+          ],
+          [
+            30.4736095,
+            63.3491825
+          ],
+          [
+            30.4733161,
+            63.3491768
+          ],
+          [
+            30.4729209,
+            63.3491357
+          ],
+          [
+            30.4726563,
+            63.3491371
+          ],
+          [
+            30.4719207,
+            63.3492233
+          ],
+          [
+            30.4713076,
+            63.3492696
+          ],
+          [
+            30.4709902,
+            63.3491893
+          ],
+          [
+            30.4705812,
+            63.3490662
+          ],
+          [
+            30.4702871,
+            63.348934
+          ],
+          [
+            30.4700986,
+            63.3487789
+          ],
+          [
+            30.4699675,
+            63.3485391
+          ],
+          [
+            30.469771,
+            63.3482472
+          ],
+          [
+            30.4676466,
+            63.3480643
+          ],
+          [
+            30.4669814,
+            63.3479199
+          ],
+          [
+            30.4656264,
+            63.348145
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Koskikierros",
+        "selectionKey": "ruunaa-koskikierros",
+        "parentSlug": "ruunaan-retkeilyalue",
+        "osmWayId": 1106490728,
+        "osmWayVersion": 1,
+        "startNodeId": 10125308061,
+        "endNodeId": 10125308062,
+        "sourceUrl": "https://www.openstreetmap.org/way/1106490728"
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            30.4656264,
+            63.348145
+          ],
+          [
+            30.4655228,
+            63.3481622
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Koskikierros",
+        "selectionKey": "ruunaa-koskikierros",
+        "parentSlug": "ruunaan-retkeilyalue",
+        "osmWayId": 1106490727,
+        "osmWayVersion": 1,
+        "startNodeId": 10125308062,
+        "endNodeId": 9838018586,
+        "sourceUrl": "https://www.openstreetmap.org/way/1106490727"
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            30.4655228,
+            63.3481622
+          ],
+          [
+            30.4654261,
+            63.3481783
+          ],
+          [
+            30.4641705,
+            63.3488246
+          ],
+          [
+            30.4635482,
+            63.3490075
+          ],
+          [
+            30.4630338,
+            63.349164
+          ],
+          [
+            30.4628295,
+            63.3492396
+          ],
+          [
+            30.4626766,
+            63.3493182
+          ],
+          [
+            30.4623426,
+            63.3496454
+          ],
+          [
+            30.4621576,
+            63.3497802
+          ],
+          [
+            30.4614336,
+            63.3499776
+          ],
+          [
+            30.461027,
+            63.3501659
+          ],
+          [
+            30.4606548,
+            63.3503556
+          ],
+          [
+            30.4600864,
+            63.3507405
+          ],
+          [
+            30.4599577,
+            63.3508068
+          ],
+          [
+            30.4597972,
+            63.3508499
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Koskikierros",
+        "selectionKey": "ruunaa-koskikierros",
+        "parentSlug": "ruunaan-retkeilyalue",
+        "osmWayId": 1072202795,
+        "osmWayVersion": 1,
+        "startNodeId": 9838018586,
+        "endNodeId": 1395804312,
+        "sourceUrl": "https://www.openstreetmap.org/way/1072202795"
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            30.4597972,
+            63.3508499
+          ],
+          [
+            30.4596896,
+            63.3508607
+          ],
+          [
+            30.4594378,
+            63.3508433
+          ],
+          [
+            30.4592586,
+            63.3508418
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Koskikierros",
+        "selectionKey": "ruunaa-koskikierros",
+        "parentSlug": "ruunaan-retkeilyalue",
+        "osmWayId": 1072202796,
+        "osmWayVersion": 3,
+        "startNodeId": 1395804312,
+        "endNodeId": 10125308059,
+        "sourceUrl": "https://www.openstreetmap.org/way/1072202796"
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            30.4592586,
+            63.3508418
+          ],
+          [
+            30.458265,
+            63.3510128
+          ],
+          [
+            30.4574213,
+            63.3511135
+          ],
+          [
+            30.4569473,
+            63.3513098
+          ],
+          [
+            30.4562886,
+            63.3518913
+          ],
+          [
+            30.4557209,
+            63.3523897
+          ],
+          [
+            30.4556132,
+            63.3526225
+          ],
+          [
+            30.455639,
+            63.3527032
+          ],
+          [
+            30.455901,
+            63.3530233
+          ],
+          [
+            30.4558284,
+            63.3531652
+          ],
+          [
+            30.4554747,
+            63.3534424
+          ],
+          [
+            30.4539551,
+            63.3541532
+          ],
+          [
+            30.4535523,
+            63.3543881
+          ],
+          [
+            30.4533201,
+            63.3547633
+          ],
+          [
+            30.453246,
+            63.355506
+          ],
+          [
+            30.4525724,
+            63.3558361
+          ],
+          [
+            30.4521246,
+            63.356237
+          ],
+          [
+            30.4518433,
+            63.3564673
+          ],
+          [
+            30.4516906,
+            63.3567932
+          ],
+          [
+            30.4514894,
+            63.3572161
+          ],
+          [
+            30.451292,
+            63.3575525
+          ],
+          [
+            30.4510565,
+            63.3577257
+          ],
+          [
+            30.4503525,
+            63.3579553
+          ],
+          [
+            30.4490801,
+            63.3582446
+          ],
+          [
+            30.4481333,
+            63.3584117
+          ],
+          [
+            30.4473944,
+            63.3585333
+          ],
+          [
+            30.4467498,
+            63.3587228
+          ],
+          [
+            30.4457645,
+            63.358895
+          ],
+          [
+            30.445101,
+            63.3590148
+          ],
+          [
+            30.4443249,
+            63.3591376
+          ],
+          [
+            30.4433121,
+            63.3593042
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Koskikierros",
+        "selectionKey": "ruunaa-koskikierros",
+        "parentSlug": "ruunaan-retkeilyalue",
+        "osmWayId": 1106490726,
+        "osmWayVersion": 1,
+        "startNodeId": 10125308059,
+        "endNodeId": 10125308060,
+        "sourceUrl": "https://www.openstreetmap.org/way/1106490726"
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            30.4433121,
+            63.3593042
+          ],
+          [
+            30.4432084,
+            63.3593213
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Koskikierros",
+        "selectionKey": "ruunaa-koskikierros",
+        "parentSlug": "ruunaan-retkeilyalue",
+        "osmWayId": 1106490725,
+        "osmWayVersion": 3,
+        "startNodeId": 10125308060,
+        "endNodeId": 1395804270,
+        "sourceUrl": "https://www.openstreetmap.org/way/1106490725"
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            30.4432084,
+            63.3593213
+          ],
+          [
+            30.4428781,
+            63.3593808
+          ],
+          [
+            30.4425911,
+            63.3595569
+          ],
+          [
+            30.4415252,
+            63.3598502
+          ],
+          [
+            30.4409749,
+            63.359898
+          ],
+          [
+            30.4404387,
+            63.359908
+          ],
+          [
+            30.4396498,
+            63.3600828
+          ],
+          [
+            30.4386357,
+            63.3602191
+          ],
+          [
+            30.43761,
+            63.360439
+          ],
+          [
+            30.4371995,
+            63.3605537
+          ],
+          [
+            30.4368263,
+            63.3606713
+          ],
+          [
+            30.4364691,
+            63.3607505
+          ],
+          [
+            30.4355249,
+            63.3609316
+          ],
+          [
+            30.4348556,
+            63.3611
+          ],
+          [
+            30.4341278,
+            63.3612792
+          ],
+          [
+            30.4335564,
+            63.3614669
+          ],
+          [
+            30.4330902,
+            63.3616053
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Koskikierros",
+        "selectionKey": "ruunaa-koskikierros",
+        "parentSlug": "ruunaan-retkeilyalue",
+        "osmWayId": 617651442,
+        "osmWayVersion": 2,
+        "startNodeId": 1395804270,
+        "endNodeId": 2417642909,
+        "sourceUrl": "https://www.openstreetmap.org/way/617651442"
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            30.4330902,
+            63.3616053
+          ],
+          [
+            30.4339647,
+            63.3623661
+          ],
+          [
+            30.4340393,
+            63.3624404
+          ],
+          [
+            30.4341636,
+            63.3625182
+          ],
+          [
+            30.4342621,
+            63.3625462
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Koskikierros",
+        "selectionKey": "ruunaa-koskikierros",
+        "parentSlug": "ruunaan-retkeilyalue",
+        "osmWayId": 233366995,
+        "osmWayVersion": 1,
+        "startNodeId": 2417642909,
+        "endNodeId": 1395804193,
+        "sourceUrl": "https://www.openstreetmap.org/way/233366995"
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            30.4342621,
+            63.3625462
+          ],
+          [
+            30.4344131,
+            63.3625736
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Koskikierros",
+        "selectionKey": "ruunaa-koskikierros",
+        "parentSlug": "ruunaan-retkeilyalue",
+        "osmWayId": 125729793,
+        "osmWayVersion": 10,
+        "startNodeId": 1395804193,
+        "endNodeId": 1395804359,
+        "sourceUrl": "https://www.openstreetmap.org/way/125729793"
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            30.4344131,
+            63.3625736
+          ],
+          [
+            30.4346877,
+            63.362614
+          ],
+          [
+            30.4360442,
+            63.3628248
+          ],
+          [
+            30.4367225,
+            63.3630075
+          ],
+          [
+            30.4375617,
+            63.3633036
+          ],
+          [
+            30.4381063,
+            63.3633667
+          ],
+          [
+            30.4383806,
+            63.3633387
+          ],
+          [
+            30.4390162,
+            63.3630725
+          ],
+          [
+            30.4393529,
+            63.3630075
+          ],
+          [
+            30.440645,
+            63.3631383
+          ],
+          [
+            30.4418206,
+            63.3631346
+          ],
+          [
+            30.4436631,
+            63.362971
+          ],
+          [
+            30.4460489,
+            63.3627344
+          ],
+          [
+            30.44671,
+            63.3625545
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Koskikierros",
+        "selectionKey": "ruunaa-koskikierros",
+        "parentSlug": "ruunaan-retkeilyalue",
+        "osmWayId": 912544126,
+        "osmWayVersion": 2,
+        "startNodeId": 1395804359,
+        "endNodeId": 1395804295,
+        "sourceUrl": "https://www.openstreetmap.org/way/912544126"
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            30.44671,
+            63.3625545
+          ],
+          [
+            30.4477272,
+            63.3627225
+          ],
+          [
+            30.4491238,
+            63.362953
+          ],
+          [
+            30.450285,
+            63.3631872
+          ],
+          [
+            30.4509073,
+            63.3632965
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Koskikierros",
+        "selectionKey": "ruunaa-koskikierros",
+        "parentSlug": "ruunaan-retkeilyalue",
+        "osmWayId": 912544124,
+        "osmWayVersion": 2,
+        "startNodeId": 1395804295,
+        "endNodeId": 8477089280,
+        "sourceUrl": "https://www.openstreetmap.org/way/912544124"
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            30.4509073,
+            63.3632965
+          ],
+          [
+            30.4511212,
+            63.3634651
+          ],
+          [
+            30.4515391,
+            63.3636989
+          ],
+          [
+            30.4517195,
+            63.3638618
+          ],
+          [
+            30.4517925,
+            63.3639978
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Koskikierros",
+        "selectionKey": "ruunaa-koskikierros",
+        "parentSlug": "ruunaan-retkeilyalue",
+        "osmWayId": 912544125,
+        "osmWayVersion": 1,
+        "startNodeId": 8477089280,
+        "endNodeId": 8468018919,
+        "sourceUrl": "https://www.openstreetmap.org/way/912544125"
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            30.4517925,
+            63.3639978
+          ],
+          [
+            30.4518455,
+            63.3640891
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Koskikierros",
+        "selectionKey": "ruunaa-koskikierros",
+        "parentSlug": "ruunaan-retkeilyalue",
+        "osmWayId": 125729782,
+        "osmWayVersion": 7,
+        "startNodeId": 8468018919,
+        "endNodeId": 1395804279,
+        "sourceUrl": "https://www.openstreetmap.org/way/125729782"
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            30.4518455,
+            63.3640891
+          ],
+          [
+            30.4520794,
+            63.3643155
+          ],
+          [
+            30.4521983,
+            63.3644978
+          ],
+          [
+            30.4523108,
+            63.3648717
+          ],
+          [
+            30.4522675,
+            63.3652317
+          ],
+          [
+            30.452272,
+            63.3654934
+          ],
+          [
+            30.4521237,
+            63.3658493
+          ],
+          [
+            30.4518702,
+            63.3663563
+          ],
+          [
+            30.4515374,
+            63.3669342
+          ],
+          [
+            30.4513394,
+            63.367122
+          ],
+          [
+            30.4505935,
+            63.3675199
+          ],
+          [
+            30.4505961,
+            63.3676572
+          ],
+          [
+            30.4506297,
+            63.367726
+          ],
+          [
+            30.4508491,
+            63.3681098
+          ],
+          [
+            30.4509521,
+            63.3682267
+          ],
+          [
+            30.4512517,
+            63.3686147
+          ],
+          [
+            30.4516053,
+            63.3688175
+          ],
+          [
+            30.4516829,
+            63.3689538
+          ],
+          [
+            30.4515823,
+            63.3691549
+          ],
+          [
+            30.4514541,
+            63.3692635
+          ],
+          [
+            30.4513559,
+            63.3694709
+          ],
+          [
+            30.4507503,
+            63.3700337
+          ],
+          [
+            30.450163,
+            63.3703226
+          ],
+          [
+            30.4491618,
+            63.3706772
+          ],
+          [
+            30.4485157,
+            63.3709217
+          ],
+          [
+            30.447579,
+            63.3711578
+          ],
+          [
+            30.4467958,
+            63.3713981
+          ],
+          [
+            30.4462543,
+            63.3716737
+          ],
+          [
+            30.4455501,
+            63.3721091
+          ],
+          [
+            30.4450296,
+            63.3723406
+          ],
+          [
+            30.4441247,
+            63.3726973
+          ],
+          [
+            30.4434586,
+            63.3728805
+          ],
+          [
+            30.442584,
+            63.3730357
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Koskikierros",
+        "selectionKey": "ruunaa-koskikierros",
+        "parentSlug": "ruunaan-retkeilyalue",
+        "osmWayId": 125729789,
+        "osmWayVersion": 8,
+        "startNodeId": 1395804279,
+        "endNodeId": 688698044,
+        "sourceUrl": "https://www.openstreetmap.org/way/125729789"
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            30.442584,
+            63.3730357
+          ],
+          [
+            30.4422696,
+            63.3730922
+          ],
+          [
+            30.4418259,
+            63.3730983
+          ],
+          [
+            30.439429,
+            63.3735118
+          ],
+          [
+            30.4390077,
+            63.3735684
+          ],
+          [
+            30.4386647,
+            63.3735987
+          ],
+          [
+            30.4380136,
+            63.3736464
+          ],
+          [
+            30.4375845,
+            63.373656
+          ],
+          [
+            30.4373349,
+            63.3736927
+          ],
+          [
+            30.4369086,
+            63.3737426
+          ],
+          [
+            30.436493,
+            63.3737696
+          ],
+          [
+            30.4358785,
+            63.3737138
+          ],
+          [
+            30.4355245,
+            63.3737041
+          ],
+          [
+            30.4351923,
+            63.3736642
+          ],
+          [
+            30.4346447,
+            63.3736945
+          ],
+          [
+            30.4335098,
+            63.3738417
+          ],
+          [
+            30.4321985,
+            63.3742348
+          ],
+          [
+            30.4307549,
+            63.3748708
+          ],
+          [
+            30.4298009,
+            63.375147
+          ],
+          [
+            30.4290947,
+            63.3753617
+          ],
+          [
+            30.4283297,
+            63.3755281
+          ],
+          [
+            30.4273894,
+            63.3758422
+          ],
+          [
+            30.4269191,
+            63.3760554
+          ],
+          [
+            30.4266018,
+            63.3763438
+          ],
+          [
+            30.4252317,
+            63.3767288
+          ],
+          [
+            30.4237708,
+            63.3771124
+          ],
+          [
+            30.4234009,
+            63.3772522
+          ],
+          [
+            30.4230506,
+            63.3773306
+          ],
+          [
+            30.4226928,
+            63.3774736
+          ],
+          [
+            30.4220276,
+            63.3776467
+          ],
+          [
+            30.4218213,
+            63.3777212
+          ],
+          [
+            30.4212552,
+            63.3780602
+          ],
+          [
+            30.4208428,
+            63.3786053
+          ],
+          [
+            30.4206443,
+            63.3786831
+          ],
+          [
+            30.4204565,
+            63.3787567
+          ],
+          [
+            30.4198035,
+            63.3789476
+          ],
+          [
+            30.4175644,
+            63.3801754
+          ],
+          [
+            30.4166847,
+            63.3804351
+          ],
+          [
+            30.4159749,
+            63.380622
+          ],
+          [
+            30.4154959,
+            63.380727
+          ],
+          [
+            30.4148137,
+            63.380796
+          ],
+          [
+            30.4143509,
+            63.3809283
+          ],
+          [
+            30.4140474,
+            63.3811052
+          ],
+          [
+            30.4132021,
+            63.3813683
+          ],
+          [
+            30.4125262,
+            63.3816092
+          ],
+          [
+            30.4117906,
+            63.3819202
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Koskikierros",
+        "selectionKey": "ruunaa-koskikierros",
+        "parentSlug": "ruunaan-retkeilyalue",
+        "osmWayId": 1187648980,
+        "osmWayVersion": 1,
+        "startNodeId": 688698044,
+        "endNodeId": 1395804288,
+        "sourceUrl": "https://www.openstreetmap.org/way/1187648980"
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            30.4117906,
+            63.3819202
+          ],
+          [
+            30.4124211,
+            63.3820886
+          ],
+          [
+            30.4128668,
+            63.3822073
+          ],
+          [
+            30.4132686,
+            63.382716
+          ],
+          [
+            30.4133126,
+            63.3827716
+          ],
+          [
+            30.4131605,
+            63.3831681
+          ],
+          [
+            30.4128878,
+            63.383415
+          ],
+          [
+            30.4126038,
+            63.3835946
+          ],
+          [
+            30.4121707,
+            63.3837176
+          ],
+          [
+            30.4115851,
+            63.3838861
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Koskikierros",
+        "selectionKey": "ruunaa-koskikierros",
+        "parentSlug": "ruunaan-retkeilyalue",
+        "osmWayId": 1187648979,
+        "osmWayVersion": 1,
+        "startNodeId": 1395804288,
+        "endNodeId": 1395804195,
+        "sourceUrl": "https://www.openstreetmap.org/way/1187648979"
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            30.4115851,
+            63.3838861
+          ],
+          [
+            30.410875,
+            63.3842781
+          ],
+          [
+            30.4106658,
+            63.384456
+          ],
+          [
+            30.4104528,
+            63.3846115
+          ],
+          [
+            30.4102765,
+            63.384814
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Koskikierros",
+        "selectionKey": "ruunaa-koskikierros",
+        "parentSlug": "ruunaan-retkeilyalue",
+        "osmWayId": 617651437,
+        "osmWayVersion": 5,
+        "startNodeId": 1395804195,
+        "endNodeId": 5833252183,
+        "sourceUrl": "https://www.openstreetmap.org/way/617651437"
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            30.4102765,
+            63.384814
+          ],
+          [
+            30.4101455,
+            63.3853414
+          ],
+          [
+            30.4102743,
+            63.3856106
+          ],
+          [
+            30.4106069,
+            63.3858437
+          ],
+          [
+            30.4110172,
+            63.3861211
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Koskikierros",
+        "selectionKey": "ruunaa-koskikierros",
+        "parentSlug": "ruunaan-retkeilyalue",
+        "osmWayId": 125729784,
+        "osmWayVersion": 6,
+        "startNodeId": 5833252183,
+        "endNodeId": 1395804347,
+        "sourceUrl": "https://www.openstreetmap.org/way/125729784"
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            30.4110172,
+            63.3861211
+          ],
+          [
+            30.4124615,
+            63.3866018
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Koskikierros",
+        "selectionKey": "ruunaa-koskikierros",
+        "parentSlug": "ruunaan-retkeilyalue",
+        "osmWayId": 125729786,
+        "osmWayVersion": 8,
+        "startNodeId": 1395804347,
+        "endNodeId": 1395804241,
+        "sourceUrl": "https://www.openstreetmap.org/way/125729786"
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            30.4124615,
+            63.3866018
+          ],
+          [
+            30.4129994,
+            63.3867125
+          ],
+          [
+            30.4135788,
+            63.3867221
+          ],
+          [
+            30.4140615,
+            63.3866501
+          ],
+          [
+            30.4153812,
+            63.3865395
+          ],
+          [
+            30.4159712,
+            63.3865731
+          ],
+          [
+            30.4162931,
+            63.3866789
+          ],
+          [
+            30.4166794,
+            63.3868038
+          ],
+          [
+            30.4173016,
+            63.3870874
+          ],
+          [
+            30.4176556,
+            63.3872701
+          ],
+          [
+            30.4181921,
+            63.3874383
+          ],
+          [
+            30.4183508,
+            63.3874972
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Koskikierros",
+        "selectionKey": "ruunaa-koskikierros",
+        "parentSlug": "ruunaan-retkeilyalue",
+        "osmWayId": 912146844,
+        "osmWayVersion": 3,
+        "startNodeId": 1395804241,
+        "endNodeId": 8473270359,
+        "sourceUrl": "https://www.openstreetmap.org/way/912146844"
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            30.4183508,
+            63.3874972
+          ],
+          [
+            30.4180865,
+            63.3877356
+          ],
+          [
+            30.4177673,
+            63.387995
+          ],
+          [
+            30.4173923,
+            63.3884356
+          ],
+          [
+            30.4171319,
+            63.3888827
+          ],
+          [
+            30.416604,
+            63.389415
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Koskikierros",
+        "selectionKey": "ruunaa-koskikierros",
+        "parentSlug": "ruunaan-retkeilyalue",
+        "osmWayId": 912146843,
+        "osmWayVersion": 2,
+        "startNodeId": 8473270359,
+        "endNodeId": 1395796361,
+        "sourceUrl": "https://www.openstreetmap.org/way/912146843"
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            30.416604,
+            63.389415
+          ],
+          [
+            30.4172557,
+            63.3896497
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Koskikierros",
+        "selectionKey": "ruunaa-koskikierros",
+        "parentSlug": "ruunaan-retkeilyalue",
+        "osmWayId": 1434151044,
+        "osmWayVersion": 1,
+        "startNodeId": 1395796361,
+        "endNodeId": 13181232148,
+        "sourceUrl": "https://www.openstreetmap.org/way/1434151044"
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            30.4172557,
+            63.3896497
+          ],
+          [
+            30.4174202,
+            63.3896966
+          ],
+          [
+            30.4178992,
+            63.3898115
+          ],
+          [
+            30.4185527,
+            63.3899142
+          ],
+          [
+            30.4189475,
+            63.3899805
+          ],
+          [
+            30.4192257,
+            63.3900195
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Koskikierros",
+        "selectionKey": "ruunaa-koskikierros",
+        "parentSlug": "ruunaan-retkeilyalue",
+        "osmWayId": 1434151045,
+        "osmWayVersion": 1,
+        "startNodeId": 13181232148,
+        "endNodeId": 13181232149,
+        "sourceUrl": "https://www.openstreetmap.org/way/1434151045"
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            30.4192257,
+            63.3900195
+          ],
+          [
+            30.4192986,
+            63.3900297
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Koskikierros",
+        "selectionKey": "ruunaa-koskikierros",
+        "parentSlug": "ruunaan-retkeilyalue",
+        "osmWayId": 1434151043,
+        "osmWayVersion": 1,
+        "startNodeId": 13181232149,
+        "endNodeId": 13181232150,
+        "sourceUrl": "https://www.openstreetmap.org/way/1434151043"
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            30.4192986,
+            63.3900297
+          ],
+          [
+            30.4193411,
+            63.3900356
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Koskikierros",
+        "selectionKey": "ruunaa-koskikierros",
+        "parentSlug": "ruunaan-retkeilyalue",
+        "osmWayId": 1434151042,
+        "osmWayVersion": 1,
+        "startNodeId": 13181232150,
+        "endNodeId": 1395796352,
+        "sourceUrl": "https://www.openstreetmap.org/way/1434151042"
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            30.4193411,
+            63.3900356
+          ],
+          [
+            30.419404,
+            63.3900413
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Koskikierros",
+        "selectionKey": "ruunaa-koskikierros",
+        "parentSlug": "ruunaan-retkeilyalue",
+        "osmWayId": 125728744,
+        "osmWayVersion": 15,
+        "startNodeId": 1395796352,
+        "endNodeId": 1395796347,
+        "sourceUrl": "https://www.openstreetmap.org/way/125728744"
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            30.419404,
+            63.3900413
+          ],
+          [
+            30.4199983,
+            63.3900419
+          ],
+          [
+            30.4206329,
+            63.3900748
+          ],
+          [
+            30.4211764,
+            63.3900565
+          ],
+          [
+            30.4217165,
+            63.3901488
+          ],
+          [
+            30.4221628,
+            63.3901574
+          ],
+          [
+            30.4226821,
+            63.3901699
+          ],
+          [
+            30.4230196,
+            63.3901341
+          ],
+          [
+            30.4235417,
+            63.3899353
+          ],
+          [
+            30.4237959,
+            63.38977
+          ],
+          [
+            30.4240143,
+            63.3897004
+          ],
+          [
+            30.424329,
+            63.3896239
+          ],
+          [
+            30.4247829,
+            63.3895766
+          ],
+          [
+            30.4253106,
+            63.3894826
+          ],
+          [
+            30.4257598,
+            63.3893613
+          ],
+          [
+            30.4261367,
+            63.3892664
+          ],
+          [
+            30.426677,
+            63.3891877
+          ],
+          [
+            30.4270869,
+            63.3891771
+          ],
+          [
+            30.4276544,
+            63.3890331
+          ],
+          [
+            30.4284914,
+            63.3888014
+          ],
+          [
+            30.4292621,
+            63.3887645
+          ],
+          [
+            30.4296454,
+            63.3887554
+          ],
+          [
+            30.4300899,
+            63.3886757
+          ],
+          [
+            30.4306322,
+            63.3884619
+          ],
+          [
+            30.4309778,
+            63.3882872
+          ],
+          [
+            30.4314081,
+            63.3883147
+          ],
+          [
+            30.4317413,
+            63.3883722
+          ],
+          [
+            30.4323578,
+            63.3885325
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Koskikierros",
+        "selectionKey": "ruunaa-koskikierros",
+        "parentSlug": "ruunaan-retkeilyalue",
+        "osmWayId": 912161813,
+        "osmWayVersion": 4,
+        "startNodeId": 1395796347,
+        "endNodeId": 1395796336,
+        "sourceUrl": "https://www.openstreetmap.org/way/912161813"
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            30.4323578,
+            63.3885325
+          ],
+          [
+            30.433146,
+            63.3887508
+          ],
+          [
+            30.4335439,
+            63.3888939
+          ],
+          [
+            30.4341298,
+            63.3890483
+          ],
+          [
+            30.4347571,
+            63.3891062
+          ],
+          [
+            30.4356676,
+            63.3892083
+          ],
+          [
+            30.4363142,
+            63.3892828
+          ],
+          [
+            30.4371291,
+            63.3893316
+          ],
+          [
+            30.4376076,
+            63.3894753
+          ],
+          [
+            30.4382931,
+            63.3896709
+          ],
+          [
+            30.4388569,
+            63.3897876
+          ],
+          [
+            30.4392277,
+            63.3898457
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Koskikierros",
+        "selectionKey": "ruunaa-koskikierros",
+        "parentSlug": "ruunaan-retkeilyalue",
+        "osmWayId": 912161812,
+        "osmWayVersion": 5,
+        "startNodeId": 1395796336,
+        "endNodeId": 1395796348,
+        "sourceUrl": "https://www.openstreetmap.org/way/912161812"
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            30.4392277,
+            63.3898457
+          ],
+          [
+            30.4396978,
+            63.3898768
+          ],
+          [
+            30.4401589,
+            63.3899309
+          ],
+          [
+            30.4407635,
+            63.3899868
+          ],
+          [
+            30.4414029,
+            63.3899393
+          ],
+          [
+            30.441934,
+            63.3898888
+          ],
+          [
+            30.4421128,
+            63.3898353
+          ],
+          [
+            30.4426106,
+            63.3897803
+          ],
+          [
+            30.4435199,
+            63.3897281
+          ],
+          [
+            30.4438764,
+            63.3897212
+          ],
+          [
+            30.444207,
+            63.3898592
+          ],
+          [
+            30.4444707,
+            63.3899516
+          ],
+          [
+            30.4446678,
+            63.3900692
+          ],
+          [
+            30.4448469,
+            63.3900895
+          ],
+          [
+            30.4450078,
+            63.390049
+          ],
+          [
+            30.4456497,
+            63.3901396
+          ],
+          [
+            30.4462658,
+            63.390307
+          ],
+          [
+            30.4471354,
+            63.390402
+          ],
+          [
+            30.4477311,
+            63.3904268
+          ],
+          [
+            30.4480859,
+            63.3904567
+          ],
+          [
+            30.4485251,
+            63.3905118
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Koskikierros",
+        "selectionKey": "ruunaa-koskikierros",
+        "parentSlug": "ruunaan-retkeilyalue",
+        "osmWayId": 911651072,
+        "osmWayVersion": 3,
+        "startNodeId": 1395796348,
+        "endNodeId": 2827561437,
+        "sourceUrl": "https://www.openstreetmap.org/way/911651072"
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            30.4485251,
+            63.3905118
+          ],
+          [
+            30.4487001,
+            63.3906388
+          ],
+          [
+            30.4487713,
+            63.3906852
+          ],
+          [
+            30.4488809,
+            63.390756
+          ],
+          [
+            30.4489413,
+            63.3907956
+          ],
+          [
+            30.4493339,
+            63.3910529
+          ],
+          [
+            30.449749,
+            63.3913464
+          ],
+          [
+            30.4502582,
+            63.3912832
+          ],
+          [
+            30.4507643,
+            63.3911574
+          ],
+          [
+            30.451287,
+            63.3910382
+          ],
+          [
+            30.4514043,
+            63.39103
+          ],
+          [
+            30.451505,
+            63.3910335
+          ],
+          [
+            30.4515865,
+            63.3910506
+          ],
+          [
+            30.4516941,
+            63.3910772
+          ],
+          [
+            30.4517953,
+            63.3911204
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Koskikierros",
+        "selectionKey": "ruunaa-koskikierros",
+        "parentSlug": "ruunaan-retkeilyalue",
+        "osmWayId": 911651078,
+        "osmWayVersion": 1,
+        "startNodeId": 2827561437,
+        "endNodeId": 1323562726,
+        "sourceUrl": "https://www.openstreetmap.org/way/911651078"
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            30.4517953,
+            63.3911204
+          ],
+          [
+            30.4518726,
+            63.3910868
+          ],
+          [
+            30.452141,
+            63.3909444
+          ],
+          [
+            30.4525854,
+            63.3909055
+          ],
+          [
+            30.4526869,
+            63.3908842
+          ],
+          [
+            30.4530099,
+            63.3907793
+          ],
+          [
+            30.4530982,
+            63.3907207
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Koskikierros",
+        "selectionKey": "ruunaa-koskikierros",
+        "parentSlug": "ruunaan-retkeilyalue",
+        "osmWayId": 478381731,
+        "osmWayVersion": 9,
+        "startNodeId": 1323562726,
+        "endNodeId": 1323562758,
+        "sourceUrl": "https://www.openstreetmap.org/way/478381731"
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            30.4530982,
+            63.3907207
+          ],
+          [
+            30.4531698,
+            63.3906178
+          ],
+          [
+            30.4532111,
+            63.3905583
+          ],
+          [
+            30.4532775,
+            63.39051
+          ],
+          [
+            30.4539069,
+            63.3902358
+          ],
+          [
+            30.4540358,
+            63.390167
+          ],
+          [
+            30.4544274,
+            63.3899942
+          ],
+          [
+            30.4553231,
+            63.38939
+          ],
+          [
+            30.4557522,
+            63.3891593
+          ],
+          [
+            30.4558703,
+            63.3890959
+          ],
+          [
+            30.4560596,
+            63.3890397
+          ],
+          [
+            30.456294,
+            63.3890152
+          ],
+          [
+            30.4564398,
+            63.3890203
+          ],
+          [
+            30.4565422,
+            63.3890705
+          ],
+          [
+            30.4566026,
+            63.3891894
+          ],
+          [
+            30.4566531,
+            63.3892322
           ]
         ],
         "type": "LineString"

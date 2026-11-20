@@ -23,6 +23,7 @@ const loader = resolve('node_modules/tsx/dist/loader.mjs');
 const manifest = JSON.parse(
   await readFile(new URL('../../src/importer/osm-linked-trails.geojson', import.meta.url), 'utf8')
 ) as { selections: { parentSlug: string; name: string }[] };
+const parentSlugs = [...new Set(manifest.selections.map((selection) => selection.parentSlug))];
 
 describe('selected trails CLI', () => {
   let directory: string;
@@ -40,7 +41,7 @@ describe('selected trails CLI', () => {
     });
     const { id: _id, ...area } = (await database.select().from(parks))[0]!;
     await database.insert(parks).values(
-      [...new Set(manifest.selections.map((s) => s.parentSlug))].map((slug, index) => ({
+      parentSlugs.map((slug, index) => ({
         ...area,
         slug,
         name: slug,
@@ -63,8 +64,10 @@ describe('selected trails CLI', () => {
   };
   it('shows a readable preview and apply summary, with a compact no-op rerun', async () => {
     const preview = await run('--dry-run');
-    expect(preview.stdout).toContain('Dry run — 32 trails in 15 areas');
-    expect(preview.stdout).toContain('32 to add, 0 to update');
+    expect(preview.stdout).toContain(
+      `Dry run — ${manifest.selections.length} trails in ${parentSlugs.length} areas`
+    );
+    expect(preview.stdout).toContain(`${manifest.selections.length} to add, 0 to update`);
     for (const selection of manifest.selections) {
       expect(preview.stdout).toContain(selection.parentSlug);
       expect(preview.stdout).toContain(selection.name);
@@ -74,10 +77,12 @@ describe('selected trails CLI', () => {
     expect(preview.stdout).not.toContain('(add)');
     expect(await database.select().from(curatedTrailSources)).toHaveLength(0);
     const applied = await run();
-    expect(applied.stdout).toContain('Imported — 32 trails in 15 areas');
-    expect(applied.stdout).toContain('32 added, 0 updated, 0 unchanged');
+    expect(applied.stdout).toContain(
+      `Imported — ${manifest.selections.length} trails in ${parentSlugs.length} areas`
+    );
+    expect(applied.stdout).toContain(`${manifest.selections.length} added, 0 updated, 0 unchanged`);
     expect(applied.stderr).toContain('Expire affected UI caches now');
-    expect(await database.select().from(trailAreaLinks)).toHaveLength(32);
+    expect(await database.select().from(trailAreaLinks)).toHaveLength(manifest.selections.length);
     const rerun = await run();
     expect(rerun.stdout).toContain('No changes needed');
     expect(rerun.stderr).not.toContain('Expire');
@@ -100,7 +105,7 @@ describe('selected trails CLI', () => {
   it('provides structured preview changes and the complete apply report', async () => {
     const preview = JSON.parse((await run('--dry-run', '--json')).stdout);
     expect(preview.mode).toBe('preview');
-    expect(preview.selections).toHaveLength(32);
+    expect(preview.selections).toHaveLength(manifest.selections.length);
     expect(preview.selections[0].geometryHash).toMatch(/^[a-f0-9]{64}$/);
     const applied = JSON.parse((await run('--json')).stdout);
     expect(applied.mode).toBe('apply');
@@ -134,12 +139,12 @@ describe('selected trails CLI', () => {
     });
     const before = JSON.parse((await run('--dry-run', '--json')).stdout);
     expect(before.selections.map((trail: { action: string }) => trail.action).sort()).toEqual([
-      ...Array(31).fill('create'),
+      ...Array(manifest.selections.length - 1).fill('create'),
       'update'
     ]);
     expect(await database.select().from(curatedTrailSources)).toHaveLength(0);
     const applied = JSON.parse((await run('--json')).stdout);
-    expect(applied.selections).toHaveLength(32);
+    expect(applied.selections).toHaveLength(manifest.selections.length);
     expect((await database.select().from(parks).where(eq(parks.id, iso!.id)))[0]).toMatchObject({
       name: 'Iso Karhunkierros',
       slug: 'osm-relation-1633747',
@@ -155,7 +160,7 @@ describe('selected trails CLI', () => {
               `https://www.openstreetmap.org/relation/${source.selectionKey.slice(13)}`
         )
     ).toBe(true);
-    expect(await database.select().from(trailAreaLinks)).toHaveLength(32);
+    expect(await database.select().from(trailAreaLinks)).toHaveLength(manifest.selections.length);
     const rerun = JSON.parse((await run('--json')).stdout);
     expect(rerun.affectedSlugs).toEqual([]);
     expect(
