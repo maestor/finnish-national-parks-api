@@ -17,17 +17,20 @@ import type { OsmRoute, OsmSnapshot } from './import-osm-trails.js';
 import { exceedsTrailLengthLimit } from './trail-area-geometry.js';
 
 export const prepareMergedTrailRefresh = async (database: DbClient, snapshot: OsmSnapshot) => {
-  const members = await database
-    .select()
+  const memberRows = await database
+    .select({ member: trailMergeMembers })
     .from(trailMergeMembers)
+    .innerJoin(osmTrailSources, eq(osmTrailSources.trailId, trailMergeMembers.trailId))
     .orderBy(asc(trailMergeMembers.trailId));
+  const members = memberRows.map(({ member }) => member);
   const groups = await database
-    .select()
+    .select({ group: trailMergeGroups })
     .from(trailMergeGroups)
+    .innerJoin(osmTrailSources, eq(osmTrailSources.trailId, trailMergeGroups.trailId))
     .orderBy(asc(trailMergeGroups.trailId));
   const warnings: string[] = [];
   const plans = [];
-  for (const group of groups) {
+  for (const { group } of groups) {
     const current = members.filter((m) => m.canonicalTrailId === group.trailId);
     const canonical = (await database.select().from(parks).where(eq(parks.id, group.trailId)))[0]!;
     const sources = await database

@@ -17,6 +17,7 @@ import {
 import { publicTripRouteSchema } from '../contracts/parks.js';
 import type { DateRangeReviewStory } from '../date-range-review/story.js';
 import type { GeoJsonFeatureCollection } from '../importer/geometry.js';
+import { seitsemansVeljestaTrail } from '../importer/seitsemans-veljesta-trail.js';
 import { deriveDisplayNameFromLabel } from '../location-display.js';
 import { createParkSlug, createSlug, normalizeParkUrl } from '../parks/park-normalization.js';
 import type { SupportedParkCategorySlug, SupportedParkTypeSlug } from '../parks/park-types.js';
@@ -46,6 +47,7 @@ import {
   parkVisits,
   publicDataVersions,
   trailAreaLinks,
+  trailMergeGroups,
   tripFeaturedImages,
   tripRoutes,
   tripRouteWaypoints,
@@ -57,6 +59,7 @@ import {
   yearReviewShares
 } from './schema.js';
 import { listAreaTrails } from './trail-areas.js';
+import { unabsorbedTrailWhere } from './trail-merges.js';
 
 const standalonePublicParkWhere = () =>
   and(eq(parks.removed, false), eq(parks.trailPublicationRole, 'independent'));
@@ -1063,7 +1066,7 @@ const visibleCatalogWhere = (
   return and(...conditions);
 };
 
-const removedCatalogWhere = () => eq(parks.removed, true);
+const removedCatalogWhere = () => and(eq(parks.removed, true), unabsorbedTrailWhere());
 
 const withOptionalDisplayTypeName = <T extends object>(
   park: { displayTypeName: string | null },
@@ -5119,7 +5122,15 @@ export const updateParkRemoved = async (database: Database, slug: string, remove
           park.lengthKm
         )
       ) {
-        throw new RepositoryValidationError('A trail over 100 km cannot be enabled.');
+        const [curatedMerge] =
+          park.lipasId === seitsemansVeljestaTrail.canonicalId
+            ? await tx
+                .select({ id: trailMergeGroups.trailId })
+                .from(trailMergeGroups)
+                .where(eq(trailMergeGroups.trailId, park.id))
+            : [];
+        if (!curatedMerge)
+          throw new RepositoryValidationError('A trail over 100 km cannot be enabled.');
       }
     }
 

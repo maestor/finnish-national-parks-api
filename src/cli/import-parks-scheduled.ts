@@ -24,6 +24,11 @@ try {
     console.log(
       `Expire these public park URLs immediately: ${result.adoptedParks.map((park) => park.slug).join(', ')}`
     );
+  for (const warning of result.mergeWarnings) console.warn(warning);
+  if (result.affectedMergedTrailSlugs.length)
+    console.log(
+      `${result.dryRun ? 'After applying, expire' : 'Expire'} these merged-trail public park URLs: ${result.affectedMergedTrailSlugs.join(', ')}`
+    );
   for (const trail of result.excludedLongTrails)
     console.log(
       `Excluded long trail: ${trail.name} [${trail.lipasId}]: ${trail.reportedLengthKm?.toFixed(3) ?? 'unknown'} km reported, ${trail.measuredLengthKm?.toFixed(3) ?? 'unknown'} km measured.`

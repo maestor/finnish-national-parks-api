@@ -15,6 +15,8 @@ import {
   visitTrails
 } from './schema.js';
 
+import { unabsorbedTrailWhere } from './trail-merges.js';
+
 const trailTypes = [4403, 4404, 4405];
 export class TrailAreaValidationError extends Error {}
 export class TrailVisitConflictError extends Error {
@@ -68,7 +70,7 @@ export const listAreaTrails = async (database: DbClient, areaId: number) => {
     .innerJoin(parks, eq(parks.id, trailAreaLinks.trailId))
     .leftJoin(osmTrailSources, eq(osmTrailSources.trailId, parks.id))
     .leftJoin(curatedTrailSources, eq(curatedTrailSources.trailId, parks.id))
-    .where(eq(trailAreaLinks.areaId, areaId))
+    .where(and(eq(trailAreaLinks.areaId, areaId), unabsorbedTrailWhere()))
     .orderBy(asc(parks.name));
   return rows.map(({ link, trail, source, curatedId }) => ({
     ...selectLink(link, trail),
