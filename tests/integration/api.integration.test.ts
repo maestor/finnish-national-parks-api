@@ -19,6 +19,7 @@ import {
 } from '../../src/db/repositories.js';
 import { parks, tripRoutes } from '../../src/db/schema.js';
 import { createSessionToken } from '../../src/http/session.js';
+import { importSpecialParks } from '../../src/importer/import-special-parks.js';
 import { createMemoryStorage } from '../../src/storage/memory-storage.js';
 import { createTripPlannerBudget } from '../../src/trip-planner/budget.js';
 import { TripPlannerError } from '../../src/trip-planner/search.js';
@@ -28,10 +29,7 @@ import type {
   TripPlannerService
 } from '../../src/trip-planner/types.js';
 import { createLipasPark, createLipasTrail, parkTypeFixtures } from '../fixtures/lipas.js';
-import {
-  importPublishedParkFixtures,
-  importPublishedSpecialParkFixtures
-} from '../helpers/import-published-park-fixtures.js';
+import { importPublishedParkFixtures } from '../helpers/import-published-park-fixtures.js';
 import { createTestDatabase } from '../helpers/test-db.js';
 
 const createAdminSessionCookie = async () => {
@@ -1045,7 +1043,7 @@ describe('API routes', () => {
 
   it('includes an optional display type name for manual catalog parks', async () => {
     const { createSpecialParksSource } = await import('../fixtures/special-parks.js');
-    await importPublishedSpecialParkFixtures({
+    await importSpecialParks({
       database: testDatabase.database,
       fetchSource: createSpecialParksSource(),
       now: () => '2026-05-01T10:00:00.000Z'
@@ -1083,7 +1081,7 @@ describe('API routes', () => {
 
   it('filters manual cultural history areas by the normalized type slug', async () => {
     const { createSpecialParksSource } = await import('../fixtures/special-parks.js');
-    await importPublishedSpecialParkFixtures({
+    await importSpecialParks({
       database: testDatabase.database,
       fetchSource: createSpecialParksSource(),
       now: () => '2026-05-01T10:00:00.000Z'

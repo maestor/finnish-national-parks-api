@@ -15,32 +15,3 @@ export const importPublishedParkFixtures = async (options: Parameters<typeof imp
   }
   return result;
 };
-
-import { importSpecialParks } from '../../src/importer/import-special-parks.js';
-
-export const importPublishedSpecialParkFixtures = async (
-  options: Parameters<typeof importSpecialParks>[0]
-) => {
-  const existing = new Set(
-    (await options.database.select({ id: parks.id }).from(parks)).map((row) => row.id)
-  );
-  const result = await importSpecialParks(options);
-  const inserted = (await options.database.select({ id: parks.id }).from(parks)).filter(
-    (row) => !existing.has(row.id)
-  );
-  if (inserted.length) {
-    await options.database
-      .update(parks)
-      .set({ removed: false })
-      .where(
-        and(
-          inArray(
-            parks.id,
-            inserted.map((row) => row.id)
-          ),
-          eq(parks.trailPublicationRole, 'independent')
-        )
-      );
-  }
-  return result;
-};
