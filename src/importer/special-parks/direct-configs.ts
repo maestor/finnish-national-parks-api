@@ -12,7 +12,7 @@ export const baseSpecialParkConfigs: SpecialParkConfig[] = [
     displayTypeName: null,
     extractMetadata: extractGeoJsonAreaM2Metadata,
     locationLabel: 'Pillisuontie 90',
-    markerPoint: { lat: 60.9150308, lon: 24.377007 },
+    markerPoint: { lat: 60.9033043, lon: 24.3750601 },
     parkUrl:
       'https://www.hameenlinna.fi/kaupunki-ja-paatoksenteko/tietoa-hameenlinnasta/pitajat/renko/paivaretki-renkoon/',
     name: 'Heinisuo',
