@@ -4,7 +4,8 @@ This repo has three separate import paths:
 
 - `npm run import:parks` for the main LIPAS-backed catalog import
 - `npm run import:special-parks` for curated non-LIPAS additions that still belong in the shared park catalog
-- `npm run import:osm-trails` for supplemental OpenStreetMap routes linked to existing areas
+- `npm run import:osm-linked-trails` for the maintained catalog of explicitly linked trails
+- `npm run import:osm-trails` for supplemental OpenStreetMap discovery
 
 The main LIPAS import does not block on raw upstream count drift.
 When `npm run import:parks` finds brand-new parks, it imports them as removed so they stay hidden until you explicitly enable them from the admin UI, and it prints the newly added names in the CLI output.
@@ -147,28 +148,90 @@ publishing imported data.
 
 ### Selected linked trails
 
-The selected-trail importer reads a tracked manifest and geometry from
-[src/importer/selected-trails/](../src/importer/selected-trails). It verifies source
-identities and hashes before writing. Nominal walking distance is separate
-from measured unique line length. Networks without an agreed traversal keep
-a null displayed length.
+The linked-trail importer reads one catalog from
+[src/importer/osm-linked-trails.geojson](../src/importer/osm-linked-trails.geojson).
+Each entry pins geometry from reviewed OSM relation members or ways and links
+the trail to its parent area. Luontoon URLs are visitor references.
 
-Set the intended `DATABASE_URL` and optional `DATABASE_AUTH_TOKEN`, verify a backup and apply pending migrations through the normal deployment workflow. The command checks for pending migrations and never applies them:
-
-```sh
-npm run import:selected-trails -- --selection visited-trails-2026-11 --dry-run
-npm run import:selected-trails -- --selection visited-trails-2026-11
-```
-
-The normal report groups trails by parent area and summarizes additions, updates and unchanged entries. Use `--json` for the complete source identities, geometry hashes, distant namesakes and affected cache slugs. To save a clean JSON preview, run:
+On production, merge and let the `Production Migration` workflow apply pending
+schema changes before API promotion. From the deployed API checkout, set
+`DATABASE_URL` and, for Turso, `DATABASE_AUTH_TOKEN` for the intended database.
+Take a fresh backup, preview the import, then apply the reviewed result from the
+same checkout:
 
 ```sh
-DOTENV_CONFIG_QUIET=true npm run --silent import:selected-trails -- --selection visited-trails-2026-11 --dry-run --json > selected-trails-preview.json
+npm run db:backup -- before-osm-linked-trails
+npm run import:osm-linked-trails -- --dry-run
+npm run import:osm-linked-trails -- --json
 ```
 
-Review the preview's manifest hash, source identities, geometry hashes, resolved parents, actions and affected cache slugs before applying the same files. Missing/inactive parents, nearby same-name trails or same-name trails linked to the selected parent, changed snapshots, selected link exclusions, merged sources and independent trails with direct visits abort the batch. Name collisions use a conservative bounding-box margin of 0.1° latitude and 0.3° longitude; unrelated distant namesakes are listed in `distantNamesakes` and are never reused or changed. Only matching relation-owned rows can be reused; other ambiguous candidates need an explicit preservation decision. The transaction preserves visits, photos, existing unrelated links and administrator name/length edits. New rows are linked-only and hidden as standalone destinations. An unchanged rerun writes nothing and reports no affected slugs.
+Dry runs list only trails that would be added or updated. Use `--dry-run --json`
+to inspect source identities, geometry hashes, existing records, and affected
+cache slugs for those changes before applying. The
+importer checks for pending migrations. It resolves existing OSM trails by
+relation ID, preserves their IDs, existing visit assignments and administrator
+name and length edits, and writes the reviewed batch in a single transaction.
+New rows appear under their linked parents. Nearby same-name trails, administrator
+link exclusions, merged sources, and standalone trails with direct visits
+require review before the batch can apply. An unchanged rerun writes nothing.
 
-After applying, immediately expire every reported UI park cache through the authenticated cache-clear workflow; API version changes do not invalidate Next.js caches. Retain the report and manifest hash as operator evidence. Regular LIPAS/special-area reconciliation preserves selected membership, and regular OSM discovery reports relation geometry drift while retaining the accepted snapshot. Revision of the accepted snapshot requires a separate reviewed implementation; selected snapshots cannot enter manual merges. Source attribution and ODbL links remain in the public contract.
+After applying, expire every reported `affectedSlugs` entry through the [authenticated
+cache-clear workflow](#trailarea-reconciliation), then check the public park pages.
+The preview's hashes and the apply output identify the reviewed catalog version.
+
+#### Add a trail or edit an entry before its first import
+
+1. Download the OSM relation or selected ways and check the route on a map
+   against its intended start, finish, and branches. Use a Luontoon URL only as an
+   optional visitor reference. Record the OSM identity, snapshot timestamp, and
+   any choice to omit or include particular member ways.
+2. Add or edit the entry in `selections` and its ordered LineString geometry in
+   `features`. Use the same stable `selectionKey` on the entry and every feature.
+   Set the existing park's `parentSlug`. Record the nominal walking distance
+   separately from the measured mapped line length.
+3. Set `featureCount` and `geometrySha256` for that entry. This helper prints both
+   values from the ordered features. Pass the relevant selection key as its
+   argument.
+
+   ```sh
+   node --input-type=module - osm-relation-1633747 <<'JS'
+   import { createHash } from 'node:crypto';
+   import { readFileSync } from 'node:fs';
+   const catalog = JSON.parse(readFileSync('src/importer/osm-linked-trails.geojson', 'utf8'));
+   const geometries = catalog.features
+     .filter(({ properties }) => properties.selectionKey === process.argv[2])
+     .map(({ geometry }) => ({ coordinates: geometry.coordinates, type: geometry.type }));
+   if (!geometries.length) throw new Error('No features for that selection key');
+   console.log({
+     featureCount: geometries.length,
+     geometrySha256: createHash('sha256').update(JSON.stringify(geometries)).digest('hex')
+   });
+   JS
+   ```
+
+4. Run `npm run import:osm-linked-trails -- --dry-run --json`. Check the source
+   IDs, trail identity, parent and affected slugs against the intended change.
+   Use the backup, apply and cache refresh sequence above.
+
+#### Correct a trail that has already been imported
+
+An administrator can edit the trail's displayed name and length. The importer
+preserves those edits. For a geometry, source, or parent correction, keep the
+selection key and trail ID. The importer stops with `Selected source drift` or
+`Stored geometry drift` when an already accepted snapshot differs from the
+stored one.
+
+Prepare a reviewed, transactional correction alongside the catalog edit. On a
+backup copy, verify the current source identity and old geometry hash, update
+the trail and its curated source record together, and review the affected park
+links and visit assignments. For a parent change, check whether visits pin the
+old membership before removing it. Rehearse the correction and rerun the
+importer on that copy. The corrected entry should produce no further changes.
+This catalog importer handles additions and adoption of uncurated relation
+rows. A correction to an accepted snapshot needs that separate reviewed write.
+
+Regular LIPAS and OSM imports preserve pinned memberships and accepted geometry.
+Catalog additions use the existing database schema.
 
 ### Merged OSM trail refresh
 

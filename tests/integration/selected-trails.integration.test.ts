@@ -42,12 +42,11 @@ const auth = {
   googleClientSecret: 'test',
   jwtSecret: 'test-jwt-secret-at-least-32-characters-long'
 };
-const manifest = JSON.parse(
-  await readFile(
-    new URL('../../src/importer/selected-trails/selected-trails-27.json', import.meta.url),
-    'utf8'
-  )
-) as {
+const catalogText = await readFile(
+  new URL('../../src/importer/osm-linked-trails.geojson', import.meta.url),
+  'utf8'
+);
+const manifest = JSON.parse(catalogText) as {
   selections: {
     parentSlug: string;
     selectionKey: string;
@@ -55,6 +54,7 @@ const manifest = JSON.parse(
     geometrySha256: string;
     osmRelationId: number | null;
     sourceUrls: string[];
+    referenceUrl?: string;
   }[];
 };
 
@@ -87,11 +87,11 @@ describe('selected trail batch', () => {
   it('previews without writes, publishes all selected lines under their parents, and reruns without writes', async () => {
     const before = await db.database.select().from(parks);
     const preview = await importSelectedTrails({ database: db.database, dryRun: true });
-    expect(preview.selections).toHaveLength(27);
+    expect(preview.selections).toHaveLength(32);
     expect(await db.database.select().from(parks)).toEqual(before);
     expect(await db.database.select().from(trailAreaLinks)).toHaveLength(0);
     await importSelectedTrails({ database: db.database });
-    expect(await db.database.select().from(trailAreaLinks)).toHaveLength(27);
+    expect(await db.database.select().from(trailAreaLinks)).toHaveLength(32);
     for (const slug of new Set(manifest.selections.map((s) => s.parentSlug))) {
       const response = await createApp({ database: db.database }).request(
         `/api/parks/${slug}?includeBoundary=true`
@@ -106,7 +106,7 @@ describe('selected trail batch', () => {
       );
     }
     const sources = await db.database.select().from(curatedTrailSources);
-    expect(sources).toHaveLength(27);
+    expect(sources).toHaveLength(32);
     const token = await createSessionToken(
       { email: 'admin@example.com', name: 'Admin', picture: '', role: 'admin', sub: 'admin' },
       new TextEncoder().encode(auth.jwtSecret)
@@ -136,6 +136,7 @@ describe('selected trail batch', () => {
       );
       const detail = parkDetailSchema.parse(await detailResponse.json());
       const linked = detail.linkedTrails!.find((t) => t.slug === trail.slug)!;
+      if (selected.referenceUrl) expect(trail.parkUrl).toBe(selected.referenceUrl);
       expect(linked.source?.type).toBe(
         selected.osmRelationId ? 'openstreetmap' : 'openstreetmap-curated'
       );
@@ -367,22 +368,6 @@ describe('selected trail batch', () => {
     ).toEqual(link);
   });
 
-  it('rejects changes to the approved manifest or selected geometry', async () => {
-    const base = new URL('../../src/importer/selected-trails/', import.meta.url);
-    const manifestText = await readFile(new URL('selected-trails-27.json', base), 'utf8');
-    const geometryText = await readFile(new URL('selected-trails-27.geojson', base), 'utf8');
-    expect(() => parseSelectedTrails(`${manifestText} `, geometryText)).toThrow(
-      'manifest hash mismatch'
-    );
-    const geometry = JSON.parse(geometryText) as {
-      features: { geometry: { coordinates: number[][] } }[];
-    };
-    geometry.features[0]!.geometry.coordinates[0]![0]! += 0.001;
-    expect(() => parseSelectedTrails(manifestText, JSON.stringify(geometry))).toThrow(
-      'Geometry hash mismatch'
-    );
-  });
-
   it('refuses to convert an existing relation with direct visits and preserves its photo', async () => {
     const selected = (await loadSelectedTrails()).selections.find(
       (s) => s.selection.osmRelationId === 6425065
@@ -489,90 +474,158 @@ describe('selected trail batch', () => {
       'Stored geometry drift'
     );
   });
-  it('rejects changed selection identities and altered snapshot metadata before applying', async () => {
-    const base = new URL('../../src/importer/selected-trails/', import.meta.url);
-    const manifestText = await readFile(new URL('selected-trails-27.json', base), 'utf8');
-    const geometryText = await readFile(new URL('selected-trails-27.geojson', base), 'utf8');
-    const mutate = (
-      change: (data: {
-        selections: Array<{
-          selectionKey: string;
-          parentSlug: string;
-          sourceKind: string;
-          osmRelationId: number | null;
-          osmWayIds: number[];
-          sourceUrls: string[];
-          featureCount: number;
-          geometrySha256: string;
-          initialDisplayLengthKm: number | null;
-        }>;
-      }) => void
-    ) => {
-      const data = JSON.parse(manifestText) as Parameters<typeof change>[0];
-      change(data);
-      return JSON.stringify(data);
-    };
-    expect(() =>
-      parseSelectedTrails(
-        mutate((d) => {
-          d.selections[0]!.selectionKey = d.selections[1]!.selectionKey;
-        }),
-        geometryText
-      )
-    ).toThrow('identities or parents');
-    expect(() =>
-      parseSelectedTrails(
-        mutate((d) => {
-          d.selections[0]!.sourceUrls = ['https://www.openstreetmap.org/way/1'];
-        }),
-        geometryText
-      )
-    ).toThrow('Invalid source identity');
-    expect(() =>
-      parseSelectedTrails(
-        mutate((d) => {
-          d.selections[0]!.featureCount += 1;
-        }),
-        geometryText
-      )
-    ).toThrow('Geometry hash mismatch');
-    expect(() =>
-      parseSelectedTrails(
-        mutate((d) => {
-          d.selections[0]!.initialDisplayLengthKm = 101;
-        }),
-        geometryText
-      )
-    ).toThrow('manifest hash mismatch');
-    const degenerate = JSON.parse(geometryText) as {
+  it('selects the Siilastupa branch for Iso Karhunkierros and keeps both branches on Pieni', async () => {
+    const { selections } = await loadSelectedTrails();
+    const iso = selections.find(({ selection }) => selection.osmRelationId === 1633747)!;
+    const pieni = selections.find(({ selection }) => selection.osmRelationId === 1632296)!;
+    const southernWays = [
+      118603734, 117642972, 1266351320, 117642965, 1266351725, 631281705, 631281706, 631281707,
+      1266353181
+    ];
+    const northernWays = [
+      117932199, 117932200, 117631752, 117631769, 117631770, 117631771, 118603731, 118603733
+    ];
+    const isoWays = iso.provenance.map((feature) => feature.osmWayId);
+    const pieniWays = pieni.provenance.map((feature) => feature.osmWayId);
+    expect(isoWays).toEqual(expect.arrayContaining(southernWays));
+    expect(isoWays.filter((id) => northernWays.includes(Number(id)))).toEqual([]);
+    expect(pieniWays).toEqual(expect.arrayContaining([...southernWays, ...northernWays]));
+  });
+
+  it('rejects conflicting identities and invalid geometry while accepting catalog additions', () => {
+    type Input = {
+      selections: Array<{
+        selectionKey: string;
+        osmRelationId: number | null;
+        sourceUrls: string[];
+        featureCount: number;
+        geometrySha256: string;
+      }>;
       features: Array<{
         properties: { selectionKey: string };
         geometry: { type: 'LineString'; coordinates: [number, number][] };
       }>;
     };
-    const degenerateManifest = mutate((d) => {
-      const selection = d.selections[0]!;
-      const features = degenerate.features.filter(
-        (feature) => feature.properties.selectionKey === selection.selectionKey
-      );
-      const geometries = features.map(({ geometry }) => {
-        geometry.coordinates = [geometry.coordinates[0]!, geometry.coordinates[0]!];
-        return { coordinates: geometry.coordinates, type: geometry.type };
-      });
-      selection.geometrySha256 = createHash('sha256')
-        .update(JSON.stringify(geometries))
-        .digest('hex');
-    });
-    expect(() => parseSelectedTrails(degenerateManifest, JSON.stringify(degenerate))).toThrow(
-      'Invalid selected trail length'
-    );
-    const geometry = JSON.parse(geometryText) as {
-      features: Array<{ properties: { selectionKey: string; routeName: string } }>;
+    const mutate = (change: (catalog: Input) => void) => {
+      const catalog = JSON.parse(catalogText) as Input;
+      change(catalog);
+      return JSON.stringify(catalog);
     };
-    geometry.features[0]!.properties.routeName = 'Changed provenance';
-    expect(() => parseSelectedTrails(manifestText, JSON.stringify(geometry))).toThrow(
-      'snapshot hash mismatch'
+    expect(() =>
+      parseSelectedTrails(
+        mutate((catalog) => {
+          catalog.selections[0]!.selectionKey = catalog.selections[1]!.selectionKey;
+        })
+      )
+    ).toThrow('Invalid selected trail identities');
+    expect(() =>
+      parseSelectedTrails(
+        mutate((catalog) => {
+          catalog.selections[0]!.sourceUrls = ['https://www.openstreetmap.org/way/1'];
+        })
+      )
+    ).toThrow('Invalid source identity');
+    expect(() =>
+      parseSelectedTrails(
+        mutate((catalog) => {
+          catalog.selections[0]!.featureCount += 1;
+        })
+      )
+    ).toThrow('Geometry hash mismatch');
+    expect(() =>
+      parseSelectedTrails(
+        mutate((catalog) => {
+          catalog.features[0]!.geometry.coordinates[0]![0] += 0.001;
+        })
+      )
+    ).toThrow('Geometry hash mismatch');
+    expect(() =>
+      parseSelectedTrails(
+        mutate((catalog) => {
+          const selection = catalog.selections[0]!;
+          const features = catalog.features.filter(
+            (feature) => feature.properties.selectionKey === selection.selectionKey
+          );
+          const geometries = features.map(({ geometry }) => {
+            geometry.coordinates = [geometry.coordinates[0]!, geometry.coordinates[0]!];
+            return { coordinates: geometry.coordinates, type: geometry.type };
+          });
+          selection.geometrySha256 = createHash('sha256')
+            .update(JSON.stringify(geometries))
+            .digest('hex');
+        })
+      )
+    ).toThrow('Invalid selected trail length');
+    const expanded = parseSelectedTrails(
+      mutate((catalog) => {
+        const original = catalog.selections[0]!;
+        const selectionKey = 'new-reviewed-trail';
+        catalog.selections.push({ ...original, selectionKey });
+        catalog.features.push(
+          ...catalog.features
+            .filter((feature) => feature.properties.selectionKey === original.selectionKey)
+            .map((feature) => ({ ...feature, properties: { selectionKey } }))
+        );
+      })
     );
+    expect(expanded.selections).toHaveLength(33);
+  });
+
+  it('adopts existing OSM identities, keeps edited reference links and accepts earlier catalog hashes', async () => {
+    const { selections } = await loadSelectedTrails();
+    const { id: _id, ...area } = (await db.database.select().from(parks))[0]!;
+    const officialRoutes = selections.filter(({ selection }) => selection.referenceUrl);
+    const adopted = [];
+    for (const [index, { selection }] of officialRoutes.slice(0, 2).entries()) {
+      const editedUrl = index === 0 ? null : 'https://example.test/edited-url';
+      const [prior] = await db.database
+        .insert(parks)
+        .values({
+          ...area,
+          lipasId: -100 - index,
+          managedByLipasImport: false,
+          slug: `osm-relation-${selection.osmRelationId}`,
+          typeId: 4405,
+          name: selection.name,
+          importedName: selection.name,
+          parkUrl: editedUrl,
+          importedParkUrl: null,
+          lengthKm: 82,
+          importedLengthKm: 82,
+          trailPublicationRole: 'area_member',
+          removed: true
+        })
+        .returning();
+      await db.database.insert(osmTrailSources).values({
+        trailId: prior!.id,
+        relationId: selection.osmRelationId!,
+        sourceTimestamp: '2026-11-10T21:21:39Z'
+      });
+      adopted.push({
+        id: prior!.id,
+        name: selection.name,
+        lengthKm: selection.initialDisplayLengthKm,
+        parkUrl: editedUrl ?? selection.referenceUrl,
+        importedParkUrl: selection.referenceUrl
+      });
+    }
+    await importSelectedTrails({ database: db.database });
+    for (const expected of adopted)
+      expect(
+        (await db.database.select().from(parks).where(eq(parks.id, expected.id)))[0]
+      ).toMatchObject(expected);
+    const owners = await db.database.select().from(curatedTrailSources);
+    for (const { selection } of selections) {
+      const source = owners.find((owner) => owner.selectionKey === selection.selectionKey)!;
+      if (!selection.referenceUrl)
+        await db.database
+          .update(curatedTrailSources)
+          .set({ manifestHash: '1e7245517fab2b653583a8a56fd5ad11d3bf016e4039a49b906e730a62ac' })
+          .where(eq(curatedTrailSources.trailId, source.trailId));
+    }
+    const before = await db.database.select().from(curatedTrailSources);
+    expect((await importSelectedTrails({ database: db.database })).affectedSlugs).toEqual([]);
+    expect(await db.database.select().from(curatedTrailSources)).toEqual(before);
   });
 
   it('reports a source drift or an administrator exclusion instead of overwriting it', async () => {
@@ -768,7 +821,7 @@ describe('selected trail batch', () => {
         }
       })
     ).rejects.toThrow('Selected trail ownership changed during import');
-    expect(await db.database.select().from(curatedTrailSources)).toHaveLength(27);
+    expect(await db.database.select().from(curatedTrailSources)).toHaveLength(32);
     expect(
       await db.database.select().from(osmTrailSources).where(eq(osmTrailSources.relationId, 12345))
     ).toEqual([]);
@@ -861,6 +914,6 @@ describe('selected trail batch', () => {
       }
     });
     expect(result.changedIds).toContain(12345);
-    expect(await db.database.select().from(curatedTrailSources)).toHaveLength(27);
+    expect(await db.database.select().from(curatedTrailSources)).toHaveLength(32);
   });
 });
