@@ -1,41 +1,54 @@
 {
-  "version": 1,
+  "version": 2,
   "skills": {
     "api-contract-sync": {
       "source": "maestor/agent-skills",
       "sourceType": "github",
       "skillPath": "skills/api-contract-sync/SKILL.md",
-      "computedHash": "5a84737d3a58e6f43228303570f7997ee1a644e75f4aaf592d0bf33a70d220ca"
+      "computedHash": "278632f0aac94785f4729cad0946d949762175cbd39177be7684562b38ae8875",
+      "commit": "4f662c8ab98a1f6a07ee0e26de6624e94d832d2d"
+    },
+    "clean-code-typescript": {
+      "source": "maestor/agent-skills",
+      "commit": "4f662c8ab98a1f6a07ee0e26de6624e94d832d2d",
+      "sourceType": "github",
+      "skillPath": "skills/clean-code-typescript/SKILL.md",
+      "computedHash": "668e15f99cf55ee0f2a888c8ed42e3b6a3d79f9b28cb903a4c00feaf06ede5e2"
     },
     "git-pr-workflow": {
       "source": "maestor/agent-skills",
       "sourceType": "github",
       "skillPath": "skills/git-pr-workflow/SKILL.md",
-      "computedHash": "c353dd79adcf41e6e9ee157d4bfbe3d753adabdc058e16b504ef1dff3610e1a4"
+      "computedHash": "33fc63f6d1ff56feea93d6878d6826316cd4159833d3a6bdc53b40015c1eabed",
+      "commit": "4f662c8ab98a1f6a07ee0e26de6624e94d832d2d"
     },
     "intelligence-testing": {
       "source": "maestor/agent-skills",
       "sourceType": "github",
       "skillPath": "skills/intelligence-testing/SKILL.md",
-      "computedHash": "fa2a6b3c383c6400d4c1a7f593d06cda9ae41284e8bcb3a585db7e6e2d0ec2ee"
+      "computedHash": "a76a0d50b3d578445136b479dae2f5e5cb32a9dde1df485b52eaf0ce15754eee",
+      "commit": "4f662c8ab98a1f6a07ee0e26de6624e94d832d2d"
     },
     "local-first-verification": {
       "source": "maestor/agent-skills",
       "sourceType": "github",
       "skillPath": "skills/local-first-verification/SKILL.md",
-      "computedHash": "faf7380a5e2c35402ff699534a1d84948ec3c230b71e79d8a5472105aa3afa12"
+      "computedHash": "8754f43b2bbaf577d85070ab8e3c880f7cd611d80f7de510ec2f3d61f617433d",
+      "commit": "4f662c8ab98a1f6a07ee0e26de6624e94d832d2d"
     },
     "mutation-testing": {
       "source": "maestor/agent-skills",
       "sourceType": "github",
       "skillPath": "skills/mutation-testing/SKILL.md",
-      "computedHash": "73d761e9ad67367073d9dbc54966f8ae27fcbc5f9e26633b6a89977a8eabacfb"
+      "computedHash": "09809843ccef061e6a410eb344c02db69afaa15bf2f8ecb308562501e6be892b",
+      "commit": "4f662c8ab98a1f6a07ee0e26de6624e94d832d2d"
     },
     "project-documentation": {
       "source": "maestor/agent-skills",
       "sourceType": "github",
       "skillPath": "skills/project-documentation/SKILL.md",
-      "computedHash": "6045f59b9b299ff3e7223f5dea726d78817e9937573a48324fd0d50ab86b6d03"
+      "computedHash": "a15471828ae9ef57cfd5eb8fd9f4e95d73844c6a26d8c6d6e44cc9ae3c285207",
+      "commit": "4f662c8ab98a1f6a07ee0e26de6624e94d832d2d"
     }
   }
 }
