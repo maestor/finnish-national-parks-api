@@ -46,7 +46,13 @@ const mockGeoapifyFetch = ({
     { formatted: 'Helsinge, Finland', lat: 60.3, lon: 25.01 },
     { formatted: 'Ignored fourth', lat: 61, lon: 26 }
   ],
-  routeStatus = 200
+  routeStatus = 200,
+  routeCoordinates = [
+    [
+      [24, 60],
+      [24.3, 60]
+    ]
+  ]
 } = {}) => {
   return vi.fn().mockImplementation((input: string | URL) => {
     const url = new URL(String(input));
@@ -122,12 +128,7 @@ const mockGeoapifyFetch = ({
                 features: [
                   {
                     geometry: {
-                      coordinates: [
-                        [
-                          [24, 60],
-                          [24.3, 60]
-                        ]
-                      ],
+                      coordinates: routeCoordinates,
                       type: 'MultiLineString'
                     },
                     properties: {
@@ -1044,6 +1045,27 @@ describe('trip planner route', () => {
     expect(body).toEqual({
       error: 'Trip planner provider is unavailable.',
       errorCode: 'provider_unavailable'
+    });
+  });
+
+  it('preserves the current search response for an incomplete routing coordinate pair', async () => {
+    const app = createTripPlannerApp(mockGeoapifyFetch({ routeCoordinates: [[[24], [24.3, 60]]] }));
+    const response = await requestAsRemote(app, {
+      destinationQuery: 'Destination',
+      mode: 'drive',
+      originQuery: 'Origin'
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      route: {
+        geometry: {
+          coordinates: [
+            [24, null],
+            [24.3, 60]
+          ]
+        }
+      }
     });
   });
 

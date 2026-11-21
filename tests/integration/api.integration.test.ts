@@ -5627,6 +5627,13 @@ describe('API routes', () => {
     );
     const createdVisit = (await createVisitResponse.json()) as { id: number };
 
+    const publishResponse = await requestAsAdmin(app, `/api/visits/${createdVisit.id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status: 'published' }),
+      headers: { 'content-type': 'application/json' }
+    });
+    expect(publishResponse.status).toBe(200);
+
     await testDatabase.database
       .update(parks)
       .set({ removed: true })
@@ -5642,6 +5649,7 @@ describe('API routes', () => {
     const visitsBody = (await visitsResponse.json()) as {
       visits: Array<{ id: number }>;
     };
+    const adminVisitsResponse = await requestAsAdmin(app, '/api/admin/visits');
     const visitDetailResponse = await app.request(`/api/visits/${createdVisit.id}`);
     const createRemovedVisitResponse = await requestAsAdmin(
       app,
@@ -5666,6 +5674,14 @@ describe('API routes', () => {
     expect(parkVisitsResponse.status).toBe(404);
     expect(visitsResponse.status).toBe(200);
     expect(visitsBody.visits).toEqual([]);
+    expect(visitsResponse.headers.get('cache-control')).toBe('private, no-store');
+    expect(adminVisitsResponse.status).toBe(200);
+    expect(adminVisitsResponse.headers.get('cache-control')).toBe('private, no-store');
+    await expect(adminVisitsResponse.json()).resolves.toMatchObject({
+      visits: [
+        { id: createdVisit.id, status: 'published', park: { slug: 'akasmannyn-kansallispuisto' } }
+      ]
+    });
     expect(visitDetailResponse.status).toBe(404);
     expect(createRemovedVisitResponse.status).toBe(404);
   });

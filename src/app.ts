@@ -14,7 +14,6 @@ import {
   AdminAlreadyEnrolledError,
   AdminSelfModificationError,
   acceptAdminInvitation,
-  claimPendingMediaUpload,
   completeTripStopImage,
   completeVisitImage,
   countTripStopImages,
@@ -36,7 +35,6 @@ import {
   deleteVisitImage,
   findAdminByEmailAndGoogleSub,
   findAdminByGoogleSub,
-  findMediaUploadByUploadKey,
   findParkRecordBySlugIncludingRemoved,
   findPublicMediaKey,
   findTripStopImageById,
@@ -92,12 +90,10 @@ import {
   listVisits,
   listVisitsTimeline,
   listYearReviewTimelineVisits,
-  MEDIA_UPLOAD_PROCESSING_LEASE_MS,
   publishDateRangeReviewShare,
   publishYearReviewShare,
   RepositoryNotFoundError,
   RepositoryValidationError,
-  releasePendingMediaUploadClaim,
   removeAdminUser,
   reorderTripStopImages,
   reorderVisitImages,
@@ -169,7 +165,14 @@ import {
   setSessionCookie,
   verifySessionToken
 } from './http/session.js';
-import { ImageProcessingError, processImage } from './images/process-image.js';
+import {
+  ACCEPTED_VISIT_IMAGE_MIME_TYPES,
+  claimAndFinalizeDirectImage,
+  createFinalImageKeys,
+  DIRECT_VISIT_UPLOAD_URL_TTL_SECONDS,
+  MAX_VISIT_IMAGE_FILE_SIZE,
+  prepareDirectImageCompletion
+} from './media/direct-image-completion.js';
 import { createSlug } from './parks/park-normalization.js';
 import { createAdminInvitationRoute } from './routes/admin-invitations.js';
 import {
@@ -278,11 +281,7 @@ import {
   publishYearReviewRoute,
   unpublishYearReviewRoute
 } from './routes/year-review.js';
-import {
-  type StorageClient,
-  StorageObjectTooLargeError,
-  type StoredObjectMetadata
-} from './storage/types.js';
+import type { StorageClient } from './storage/types.js';
 import {
   createTripPlannerBudget,
   getTripPlannerClientId,
@@ -328,17 +327,12 @@ type AppDependencies = {
 type SessionContext = Parameters<typeof getSessionCookie>[0];
 type PublicTripDetail = NonNullable<Awaited<ReturnType<typeof getPublicTripBySlug>>>;
 
-const MAX_VISIT_IMAGE_FILE_SIZE = 15 * 1024 * 1024;
 const MAX_TRIP_STOP_IMAGE_COUNT = 6;
-const ACCEPTED_VISIT_IMAGE_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
-const DIRECT_VISIT_UPLOAD_URL_TTL_SECONDS = 15 * 60;
 const LOGO_PRESIGNED_URL_TTL_SECONDS = 7 * 24 * 60 * 60;
 const MAP_PRESIGNED_URL_TTL_SECONDS = 7 * 24 * 60 * 60;
 const PUBLIC_LOGO_REDIRECT_CACHE_CONTROL = 'public, max-age=86400';
 const PUBLIC_MEDIA_REDIRECT_CACHE_CONTROL = 'private, no-store';
 const TRIP_PLANNER_REQUEST_BODY_LIMIT_BYTES = 16 * 1024;
-const DIRECT_IMAGE_COMPLETION_WAIT_MS = 5_000;
-const DIRECT_IMAGE_COMPLETION_POLL_MS = 50;
 const LOOPBACK_HOSTNAMES = new Set(['127.0.0.1', '::1', 'localhost']);
 
 const readRequestBodyWithinLimit = async (request: Request, maxBytes: number) => {
@@ -385,61 +379,6 @@ const readRequestBodyWithinLimit = async (request: Request, maxBytes: number) =>
     }
     return 'read_error' as const;
   }
-};
-
-type StoredImageCompletionMetadata =
-  | {
-      contentLength: number;
-      contentType: string;
-      valid: true;
-    }
-  | {
-      error: string;
-      status: 413 | 422;
-      valid: false;
-    };
-
-const validateStoredImageCompletionMetadata = (
-  objectMetadata: StoredObjectMetadata
-): StoredImageCompletionMetadata => {
-  const { contentLength } = objectMetadata;
-
-  if (
-    typeof contentLength !== 'number' ||
-    !Number.isFinite(contentLength) ||
-    !Number.isInteger(contentLength) ||
-    contentLength <= 0
-  ) {
-    return {
-      error: 'Invalid stored file size.',
-      status: 422,
-      valid: false
-    };
-  }
-
-  if (contentLength > MAX_VISIT_IMAGE_FILE_SIZE) {
-    return {
-      error: 'File too large.',
-      status: 413,
-      valid: false
-    };
-  }
-
-  const contentType = objectMetadata.contentType ?? 'application/octet-stream';
-
-  if (!ACCEPTED_VISIT_IMAGE_MIME_TYPES.includes(contentType)) {
-    return {
-      error: 'Unsupported file type.',
-      status: 422,
-      valid: false
-    };
-  }
-
-  return {
-    contentLength,
-    contentType,
-    valid: true
-  };
 };
 
 const sanitizeRequestPath = (path: string) => {
@@ -963,99 +902,6 @@ const getVisitImageFileExtension = (contentType: string) => {
   }
 
   return 'jpg';
-};
-
-const createFinalImageKeys = (parentPrefix: 'trip-stops' | 'visits', parentId: number) => {
-  const baseKey = `${parentPrefix}/${parentId}/final/${randomUUID()}`;
-
-  return {
-    fullKey: `${baseKey}-full.jpg`,
-    thumbKey: `${baseKey}-thumb.jpg`
-  };
-};
-
-const isDirectUploadKeyForParent = (
-  key: string,
-  parentPrefix: 'trip-stops' | 'visits',
-  parentId: number
-) => {
-  return key.startsWith(`${parentPrefix}/${parentId}/`);
-};
-
-type DirectImageFinalization =
-  | {
-      error: string;
-      status: 413 | 422;
-      valid: false;
-    }
-  | {
-      fileSizeBytes: number;
-      fullHeight: number;
-      fullKey: string;
-      fullWidth: number;
-      thumbHeight: number;
-      thumbKey: string;
-      thumbWidth: number;
-      valid: true;
-    };
-
-const finalizeDirectImageUpload = async (
-  storage: StorageClient,
-  key: string,
-  parentPrefix: 'trip-stops' | 'visits',
-  parentId: number,
-  finalKeys = createFinalImageKeys(parentPrefix, parentId)
-): Promise<DirectImageFinalization> => {
-  let sourceBuffer: Buffer | null;
-  try {
-    sourceBuffer = await storage.getObject(key, {
-      maxBytes: MAX_VISIT_IMAGE_FILE_SIZE,
-      timeoutMs: 10_000
-    });
-  } catch (error) {
-    if (error instanceof StorageObjectTooLargeError) {
-      return { error: 'File too large.', status: 413, valid: false };
-    }
-
-    throw error;
-  }
-
-  if (!sourceBuffer || sourceBuffer.length === 0) {
-    return { error: 'Upload is missing from storage.', status: 422, valid: false };
-  }
-
-  if (sourceBuffer.length > MAX_VISIT_IMAGE_FILE_SIZE) {
-    return { error: 'File too large.', status: 413, valid: false };
-  }
-
-  try {
-    const processed = await processImage(sourceBuffer);
-    const { fullKey, thumbKey } = finalKeys;
-
-    await storage.upload(fullKey, processed.fullBuffer, 'image/jpeg');
-    await storage.upload(thumbKey, processed.thumbBuffer, 'image/jpeg');
-
-    return {
-      fileSizeBytes: processed.fullBuffer.length,
-      fullHeight: processed.fullHeight,
-      fullKey,
-      fullWidth: processed.fullWidth,
-      thumbHeight: processed.thumbHeight,
-      thumbKey,
-      thumbWidth: processed.thumbWidth,
-      valid: true
-    };
-  } catch (error) {
-    if (error instanceof ImageProcessingError) {
-      return { error: 'Invalid image content.', status: 422, valid: false };
-    }
-
-    throw error;
-  }
-};
-
-const normalizeOptionalOriginalName = (originalName?: string | null) => {
-  return originalName?.trim() || null;
 };
 
 type PublicTripRouteErrorCode =
@@ -3499,153 +3345,36 @@ export const createApp = ({
           return context.json(jsonNotFound('Trip stop not found.'), 404);
         }
 
-        if (!isDirectUploadKeyForParent(key, 'trip-stops', id)) {
-          return context.json({ error: 'Upload key does not belong to this trip stop.' }, 422);
+        const completion = {
+          database,
+          storage,
+          key,
+          parent: { id, type: 'trip-stop' as const },
+          findCompletedImage: () => findTripStopImageByUploadKey(database, id, key)
+        };
+        const prepared = await prepareDirectImageCompletion(completion);
+        if (prepared.kind === 'invalid') {
+          return context.json({ error: prepared.error }, prepared.status);
         }
-
-        const existingImage = await findTripStopImageByUploadKey(database, id, key);
-
-        if (existingImage) {
-          return context.json(
-            {
-              image: await toVisitImageResponse(storage, existingImage)
-            },
-            200
-          );
-        }
-
-        let pendingUpload = await findMediaUploadByUploadKey(database, key);
-
-        if (
-          pendingUpload &&
-          (pendingUpload.parentId !== id || pendingUpload.parentType !== 'trip-stop')
-        ) {
-          return context.json({ error: 'Upload key does not belong to this trip stop.' }, 422);
-        }
-
-        if (!pendingUpload) {
-          const timestamp = new Date().toISOString();
-          const finalKeys = createFinalImageKeys('trip-stops', id);
-          await createPendingMediaUpload(database, {
-            ...finalKeys,
-            expiresAt: new Date(
-              Date.now() + DIRECT_VISIT_UPLOAD_URL_TTL_SECONDS * 1000
-            ).toISOString(),
-            parentId: id,
-            parentType: 'trip-stop',
-            timestamp,
-            uploadKey: key
-          });
-          pendingUpload = await findMediaUploadByUploadKey(database, key);
-        }
-
-        if (!pendingUpload) {
-          return context.json({ error: 'Upload could not be prepared for completion.' }, 422);
-        }
-
-        const objectMetadata = await storage.getObjectMetadata(key);
-
-        if (!objectMetadata) {
-          return context.json({ error: 'Upload is missing from storage.' }, 422);
-        }
-
-        const validatedMetadata = validateStoredImageCompletionMetadata(objectMetadata);
-
-        if (!validatedMetadata.valid) {
-          return context.json({ error: validatedMetadata.error }, validatedMetadata.status);
+        if (prepared.kind === 'existing') {
+          return context.json({ image: await toVisitImageResponse(storage, prepared.image) }, 200);
         }
 
         try {
-          const completionDeadline = Date.now() + DIRECT_IMAGE_COMPLETION_WAIT_MS;
-          let claimedUpload: typeof pendingUpload | null = null;
-          let processingToken: string | undefined;
-
-          while (!claimedUpload) {
-            const completedImage = await findTripStopImageByUploadKey(database, id, key);
-
-            if (completedImage) {
-              return context.json(
-                {
-                  image: await toVisitImageResponse(storage, completedImage)
-                },
-                200
-              );
-            }
-
-            const currentUpload = await findMediaUploadByUploadKey(database, key);
-
-            if (!currentUpload) {
-              return context.json({ error: 'Upload could not be prepared for completion.' }, 422);
-            }
-
-            const timestamp = new Date().toISOString();
-            processingToken = randomUUID();
-            const finalKeys = createFinalImageKeys('trip-stops', id);
-            claimedUpload = await claimPendingMediaUpload(database, {
-              expectedFullKey: currentUpload.fullKey,
-              expectedThumbKey: currentUpload.thumbKey,
-              fullKey: finalKeys.fullKey,
-              parentId: id,
-              parentType: 'trip-stop',
-              processingStartedAt: timestamp,
-              processingToken,
-              staleBefore: new Date(
-                Date.parse(timestamp) - MEDIA_UPLOAD_PROCESSING_LEASE_MS
-              ).toISOString(),
-              thumbKey: finalKeys.thumbKey,
-              timestamp,
-              uploadKey: key
-            });
-
-            if (!claimedUpload && Date.now() >= completionDeadline) {
-              return context.json(
-                { error: 'Upload completion is already in progress. Retry shortly.' },
-                422
-              );
-            }
-
-            if (!claimedUpload) {
-              await new Promise((resolve) => setTimeout(resolve, DIRECT_IMAGE_COMPLETION_POLL_MS));
-            }
+          const result = await claimAndFinalizeDirectImage(completion, originalName);
+          if (result.kind === 'invalid') {
+            return context.json({ error: result.error }, result.status);
+          }
+          if (result.kind === 'existing') {
+            return context.json({ image: await toVisitImageResponse(storage, result.image) }, 200);
           }
 
-          const finalizedImage = await finalizeDirectImageUpload(storage, key, 'trip-stops', id, {
-            fullKey: claimedUpload.fullKey,
-            thumbKey: claimedUpload.thumbKey
-          });
-
-          if (!finalizedImage.valid) {
-            await releasePendingMediaUploadClaim(database, {
-              processingToken: processingToken!,
-              timestamp: new Date().toISOString(),
-              uploadKey: key
-            });
-            return context.json({ error: finalizedImage.error }, finalizedImage.status);
-          }
-
-          const timestamp = new Date().toISOString();
           const completedImage = await completeTripStopImage(database, {
-            createdAt: timestamp,
-            displayOrder: 0,
-            fileSizeBytes: finalizedImage.fileSizeBytes,
-            fullHeight: finalizedImage.fullHeight,
-            fullKey: finalizedImage.fullKey,
-            fullWidth: finalizedImage.fullWidth,
-            mimeType: 'image/jpeg',
-            originalName: normalizeOptionalOriginalName(originalName),
-            thumbHeight: finalizedImage.thumbHeight,
-            thumbKey: finalizedImage.thumbKey,
-            thumbWidth: finalizedImage.thumbWidth,
-            tripStopId: id,
-            updatedAt: timestamp,
-            uploadKey: key,
-            processingToken
+            ...result.image,
+            tripStopId: id
           });
-
           return context.json(
-            {
-              image: await toVisitImageResponse(storage, completedImage.row)
-            },
+            { image: await toVisitImageResponse(storage, completedImage.row) },
             completedImage.created ? 201 : 200
           );
         } catch (error) {
@@ -3911,152 +3640,35 @@ export const createApp = ({
           return context.json(jsonNotFound('Visit not found.'), 404);
         }
 
-        if (!isDirectUploadKeyForParent(key, 'visits', id)) {
-          return context.json({ error: 'Upload key does not belong to this visit.' }, 422);
+        const completion = {
+          database,
+          storage,
+          key,
+          parent: { id, type: 'visit' as const },
+          findCompletedImage: () => findVisitImageByUploadKey(database, id, key)
+        };
+        const prepared = await prepareDirectImageCompletion(completion);
+        if (prepared.kind === 'invalid') {
+          return context.json({ error: prepared.error }, prepared.status);
+        }
+        if (prepared.kind === 'existing') {
+          return context.json({ image: await toVisitImageResponse(storage, prepared.image) }, 200);
         }
 
-        const existingImage = await findVisitImageByUploadKey(database, id, key);
-
-        if (existingImage) {
-          return context.json(
-            {
-              image: await toVisitImageResponse(storage, existingImage)
-            },
-            200
-          );
+        const result = await claimAndFinalizeDirectImage(completion, originalName);
+        if (result.kind === 'invalid') {
+          return context.json({ error: result.error }, result.status);
+        }
+        if (result.kind === 'existing') {
+          return context.json({ image: await toVisitImageResponse(storage, result.image) }, 200);
         }
 
-        let pendingUpload = await findMediaUploadByUploadKey(database, key);
-
-        if (
-          pendingUpload &&
-          (pendingUpload.parentId !== id || pendingUpload.parentType !== 'visit')
-        ) {
-          return context.json({ error: 'Upload key does not belong to this visit.' }, 422);
-        }
-
-        if (!pendingUpload) {
-          const timestamp = new Date().toISOString();
-          const finalKeys = createFinalImageKeys('visits', id);
-          await createPendingMediaUpload(database, {
-            ...finalKeys,
-            expiresAt: new Date(
-              Date.now() + DIRECT_VISIT_UPLOAD_URL_TTL_SECONDS * 1000
-            ).toISOString(),
-            parentId: id,
-            parentType: 'visit',
-            timestamp,
-            uploadKey: key
-          });
-          pendingUpload = await findMediaUploadByUploadKey(database, key);
-        }
-
-        if (!pendingUpload) {
-          return context.json({ error: 'Upload could not be prepared for completion.' }, 422);
-        }
-
-        const objectMetadata = await storage.getObjectMetadata(key);
-
-        if (!objectMetadata) {
-          return context.json({ error: 'Upload is missing from storage.' }, 422);
-        }
-
-        const validatedMetadata = validateStoredImageCompletionMetadata(objectMetadata);
-
-        if (!validatedMetadata.valid) {
-          return context.json({ error: validatedMetadata.error }, validatedMetadata.status);
-        }
-
-        const completionDeadline = Date.now() + DIRECT_IMAGE_COMPLETION_WAIT_MS;
-        let claimedUpload: typeof pendingUpload | null = null;
-        let processingToken: string | undefined;
-
-        while (!claimedUpload) {
-          const completedImage = await findVisitImageByUploadKey(database, id, key);
-
-          if (completedImage) {
-            return context.json(
-              {
-                image: await toVisitImageResponse(storage, completedImage)
-              },
-              200
-            );
-          }
-
-          const currentUpload = await findMediaUploadByUploadKey(database, key);
-
-          if (!currentUpload) {
-            return context.json({ error: 'Upload could not be prepared for completion.' }, 422);
-          }
-
-          const timestamp = new Date().toISOString();
-          processingToken = randomUUID();
-          const finalKeys = createFinalImageKeys('visits', id);
-          claimedUpload = await claimPendingMediaUpload(database, {
-            expectedFullKey: currentUpload.fullKey,
-            expectedThumbKey: currentUpload.thumbKey,
-            fullKey: finalKeys.fullKey,
-            parentId: id,
-            parentType: 'visit',
-            processingStartedAt: timestamp,
-            processingToken,
-            staleBefore: new Date(
-              Date.parse(timestamp) - MEDIA_UPLOAD_PROCESSING_LEASE_MS
-            ).toISOString(),
-            thumbKey: finalKeys.thumbKey,
-            timestamp,
-            uploadKey: key
-          });
-
-          if (!claimedUpload && Date.now() >= completionDeadline) {
-            return context.json(
-              { error: 'Upload completion is already in progress. Retry shortly.' },
-              422
-            );
-          }
-
-          if (!claimedUpload) {
-            await new Promise((resolve) => setTimeout(resolve, DIRECT_IMAGE_COMPLETION_POLL_MS));
-          }
-        }
-
-        const finalizedImage = await finalizeDirectImageUpload(storage, key, 'visits', id, {
-          fullKey: claimedUpload.fullKey,
-          thumbKey: claimedUpload.thumbKey
-        });
-
-        if (!finalizedImage.valid) {
-          await releasePendingMediaUploadClaim(database, {
-            processingToken: processingToken!,
-            timestamp: new Date().toISOString(),
-            uploadKey: key
-          });
-          return context.json({ error: finalizedImage.error }, finalizedImage.status);
-        }
-
-        const timestamp = new Date().toISOString();
         const completedImage = await completeVisitImage(database, {
-          createdAt: timestamp,
-          displayOrder: 0,
-          fileSizeBytes: finalizedImage.fileSizeBytes,
-          fullHeight: finalizedImage.fullHeight,
-          fullKey: finalizedImage.fullKey,
-          fullWidth: finalizedImage.fullWidth,
-          mimeType: 'image/jpeg',
-          originalName: normalizeOptionalOriginalName(originalName),
-          thumbHeight: finalizedImage.thumbHeight,
-          thumbKey: finalizedImage.thumbKey,
-          thumbWidth: finalizedImage.thumbWidth,
-          updatedAt: timestamp,
-          uploadKey: key,
-          processingToken,
+          ...result.image,
           visitId: id
         });
-
         return context.json(
-          {
-            image: await toVisitImageResponse(storage, completedImage.row)
-          },
+          { image: await toVisitImageResponse(storage, completedImage.row) },
           completedImage.created ? 201 : 200
         );
       });
