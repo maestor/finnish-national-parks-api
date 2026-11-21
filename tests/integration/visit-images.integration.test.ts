@@ -1054,6 +1054,16 @@ describe('Visit image routes', () => {
       expect(response.status).toBe(413);
       await expect(response.json()).resolves.toEqual({ error: 'File too large.' });
       expect(getObjectSpy).toHaveBeenCalledTimes(1);
+      await expect(
+        repositories.findMediaUploadByUploadKey(testDatabase.database, initBody.key)
+      ).resolves.toMatchObject({ processingToken: null, processingStartedAt: null });
+
+      const retry = await requestAsAdmin(app, `/api/visits/${visitId}/images/complete`, {
+        body: JSON.stringify({ key: initBody.key }),
+        headers: { 'content-type': 'application/json' },
+        method: 'POST'
+      });
+      expect(retry.status).toBe(201);
     } finally {
       vi.restoreAllMocks();
     }
@@ -1089,7 +1099,7 @@ describe('Visit image routes', () => {
     }
   });
 
-  it('returns a retryable server error when final derivative storage fails', async () => {
+  it('retries failed derivative storage after the claim expires and queues its old keys', async () => {
     const visitId = await createVisit();
     const app = createAuthedApp({ allowServerImageUploads: false, storage });
     const initResponse = await createDirectUploadPlan(
@@ -1102,13 +1112,44 @@ describe('Visit image routes', () => {
     await storage.upload(initBody.key, await createTestImageBuffer(), 'image/jpeg');
     vi.spyOn(storage, 'upload').mockRejectedValueOnce(new Error('R2 unavailable'));
 
-    const response = await requestAsAdmin(app, `/api/visits/${visitId}/images/complete`, {
-      body: JSON.stringify({ key: initBody.key }),
-      headers: { 'content-type': 'application/json' },
-      method: 'POST'
-    });
+    const complete = () =>
+      requestAsAdmin(app, `/api/visits/${visitId}/images/complete`, {
+        body: JSON.stringify({ key: initBody.key }),
+        headers: { 'content-type': 'application/json' },
+        method: 'POST'
+      });
 
-    expect(response.status).toBe(500);
+    expect((await complete()).status).toBe(500);
+    const failedUpload = await repositories.findMediaUploadByUploadKey(
+      testDatabase.database,
+      initBody.key
+    );
+    expect(failedUpload?.processingToken).toEqual(expect.any(String));
+
+    await testDatabase.database
+      .update(mediaUploads)
+      .set({
+        processingStartedAt: new Date(
+          Date.now() - repositories.MEDIA_UPLOAD_PROCESSING_LEASE_MS - 1
+        ).toISOString()
+      })
+      .where(eq(mediaUploads.uploadKey, initBody.key));
+
+    expect((await complete()).status).toBe(201);
+    const image = await repositories.findVisitImageByUploadKey(
+      testDatabase.database,
+      visitId,
+      initBody.key
+    );
+    expect(image).toMatchObject({ uploadKey: initBody.key });
+    expect(image?.fullKey).not.toBe(failedUpload?.fullKey);
+    expect(image?.thumbKey).not.toBe(failedUpload?.thumbKey);
+    const cleanup = await testDatabase.database
+      .select({ key: mediaCleanupTasks.key })
+      .from(mediaCleanupTasks);
+    expect(cleanup.map(({ key }) => key)).toEqual(
+      expect.arrayContaining([failedUpload?.fullKey, failedUpload?.thumbKey])
+    );
   });
 
   it('rejects image completion atomically when its visit no longer exists', async () => {
