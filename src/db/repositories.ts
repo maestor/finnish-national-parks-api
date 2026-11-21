@@ -2059,7 +2059,9 @@ const countVisitsBySeason = (visits: Array<{ visitedOn: string }>) => {
   return counts;
 };
 
-const listVisitRowsWithPark = async (database: Database, publicOnly: boolean) => {
+type VisitListingScope = 'public' | 'admin';
+
+const listVisitRowsWithPark = async (database: Database, scope: VisitListingScope) => {
   const visibilityWhere = and(standalonePublicParkWhere(), eq(parkVisits.status, 'published'));
   const visitRows = await database
     .select({
@@ -2068,7 +2070,7 @@ const listVisitRowsWithPark = async (database: Database, publicOnly: boolean) =>
     })
     .from(parkVisits)
     .innerJoin(parks, eq(parkVisits.parkId, parks.id))
-    .where(publicOnly ? visibilityWhere : undefined)
+    .where(scope === 'public' ? visibilityWhere : undefined)
     .orderBy(desc(parkVisits.visitedOn), desc(parkVisits.id));
 
   return sortTripAwareVisitRows(visitRows.map((row) => row.visit)).map(
@@ -3371,7 +3373,7 @@ export const listVisits = async (
   database: Database,
   getImagePublicUrl: (key: string) => Promise<string>
 ) => {
-  const rows = await listVisitRowsWithPark(database, true);
+  const rows = await listVisitRowsWithPark(database, 'public');
 
   return Promise.all(rows.map((row) => buildVisitWithPark(database, row, getImagePublicUrl)));
 };
@@ -3380,7 +3382,7 @@ export const listAdminVisits = async (
   database: Database,
   getImagePublicUrl: (key: string) => Promise<string>
 ) => {
-  const rows = await listVisitRowsWithPark(database, false);
+  const rows = await listVisitRowsWithPark(database, 'admin');
   return Promise.all(rows.map((row) => buildAdminVisitWithPark(database, row, getImagePublicUrl)));
 };
 
