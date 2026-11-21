@@ -321,7 +321,7 @@ It runs typecheck, lint, and coverage tests with 100 percent thresholds for firs
 ## Documentation
 
 - [AGENTS.md](AGENTS.md): codebase rules for future agents and implementation sessions.
-- [docs/development.md](docs/development.md): local development, database, importer, and deployment notes.
+- [docs/development.md](docs/development.md): local development, database, importer, and deployment notes, plus [coding conventions](docs/development.md#coding-conventions).
 - [docs/importing.md](docs/importing.md): reproducible import workflow for curated special parks, including Helsinki-specific sourcing tips.
 - [docs/recovery.md](docs/recovery.md): safe database recovery drill and remaining operator evidence for Turso, R2, GitHub, and Vercel.
 - [docs/security.md](docs/security.md): current security and operational sustainability priorities, plus contributor guardrails.
