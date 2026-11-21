@@ -1,5 +1,5 @@
 import { logger } from '../http/logger.js';
-import type { GeoJsonFeatureCollection } from '../importer/geometry.js';
+import type { GeoJsonCoordinate, GeoJsonFeatureCollection } from '../importer/geometry.js';
 import { deriveLocationDisplayName } from '../location-display.js';
 import { type BoundedTtlCache, createBoundedTtlCache } from './bounded-cache.js';
 import { createConcurrencyLimiter } from './concurrency.js';
@@ -26,33 +26,6 @@ type GeoapifyClientOptions = {
   routeCacheTtlMs?: number | undefined;
   suggestionCacheMaxEntries?: number | undefined;
   providerAdmission?: ((operation: GeoapifyOperation) => Promise<void>) | undefined;
-};
-
-type GeoapifyGeocodeResponse = {
-  results?: GeoapifyGeocodeResult[];
-};
-
-type GeoapifyGeocodeResult = {
-  address_line1?: string;
-  formatted?: string;
-  lat?: number;
-  lon?: number;
-  name?: string;
-};
-
-type GeoapifyRoutingResponse = {
-  features?: GeoapifyRoutingFeature[];
-};
-
-type GeoapifyRoutingFeature = {
-  geometry?: {
-    coordinates?: number[][][];
-    type?: string;
-  };
-  properties?: {
-    distance?: number;
-    time?: number;
-  };
 };
 
 const GEOAPIFY_GEOCODE_URL = 'https://api.geoapify.com/v1/geocode/search';
@@ -115,29 +88,52 @@ const buildRouteUrl = (
   return `${GEOAPIFY_ROUTING_URL}?${params.toString()}`;
 };
 
-const normalizeGeocodedLocation = (
-  result?: GeoapifyGeocodeResult
-): TripPlannerResolvedLocation | null => {
-  if (!(result?.formatted && typeof result.lat === 'number' && typeof result.lon === 'number')) {
+const readRecord = (value: unknown): Record<string, unknown> | undefined =>
+  typeof value === 'object' && value !== null ? (value as Record<string, unknown>) : undefined;
+
+const firstEntry = (value: unknown): unknown => readRecord(value)?.[0];
+
+const readOptionalLabel = (value: unknown): string | undefined => {
+  if (value == null || typeof value === 'string') {
+    return value ?? undefined;
+  }
+
+  throw new TypeError('Geoapify location label must be a string.');
+};
+
+const normalizeGeocodedLocation = (value: unknown): TripPlannerResolvedLocation | null => {
+  const result = readRecord(value);
+  if (!result) {
     return null;
   }
 
+  const { formatted, lat, lon } = result;
+  if (!formatted || typeof lat !== 'number' || typeof lon !== 'number') {
+    return null;
+  }
+
+  const label = readOptionalLabel(formatted)!;
   return {
-    coordinate: {
-      lat: result.lat,
-      lon: result.lon
-    },
+    coordinate: { lat, lon },
     displayName: deriveLocationDisplayName({
-      addressLine1: result.address_line1,
-      formatted: result.formatted,
-      name: result.name
+      addressLine1: readOptionalLabel(result.address_line1),
+      formatted: label,
+      name: readOptionalLabel(result.name)
     })!,
-    label: result.formatted
+    label
   };
 };
 
-const normalizeSuggestions = (results?: GeoapifyGeocodeResult[]): TripPlannerSuggestion[] => {
-  return (results ?? [])
+const normalizeSuggestions = (results: unknown): TripPlannerSuggestion[] => {
+  if (results == null) {
+    return [];
+  }
+
+  if (!Array.isArray(results)) {
+    throw new TypeError('Geoapify autocomplete results must be an array.');
+  }
+
+  return results
     .map((result) => normalizeGeocodedLocation(result))
     .filter((result): result is TripPlannerSuggestion => result !== null)
     .slice(0, DEFAULT_SUGGESTION_LIMIT);
@@ -159,38 +155,47 @@ const createRouteCacheKey = (
   return `${mode}:${formatCoordinateForCacheKey(origin)}->${formatCoordinateForCacheKey(destination)}`;
 };
 
-const normalizeRouteGeometry = (coordinates?: number[][][]): GeoJsonFeatureCollection | null => {
-  if (!coordinates || coordinates.length === 0) {
+const normalizeRouteGeometry = (coordinates: unknown): GeoJsonFeatureCollection | null => {
+  if (!coordinates || readRecord(coordinates)?.length === 0) {
     return null;
   }
 
-  const features = coordinates
-    .filter((line) => line.length >= 2)
-    .map((line) => ({
-      geometry: {
-        coordinates: line.map(([lon, lat]) => [lon, lat] as [number, number]),
-        type: 'LineString' as const
-      },
-      type: 'Feature' as const
-    }));
-
-  if (features.length === 0) {
-    return null;
+  if (!Array.isArray(coordinates)) {
+    throw new TypeError('Geoapify routing coordinates must be an array.');
   }
 
-  return {
-    features,
-    type: 'FeatureCollection'
-  };
+  const features: GeoJsonFeatureCollection['features'] = [];
+  for (const line of coordinates) {
+    if (!Array.isArray(line)) {
+      // The provider's short-line filter also ignored entries without a usable length.
+      const length = typeof line === 'string' ? line.length : readRecord(line)?.length;
+      if (line == null || Number(length) >= 2) {
+        throw new TypeError('Geoapify routing lines must be arrays.');
+      }
+      continue;
+    }
+
+    if (line.length >= 2) {
+      features.push({
+        geometry: {
+          // Rejecting incomplete pairs changes the planner response and requires separate review.
+          coordinates: (line as number[][]).map(([lon, lat]) => [lon, lat] as GeoJsonCoordinate),
+          type: 'LineString'
+        },
+        type: 'Feature'
+      });
+    }
+  }
+
+  return features.length === 0 ? null : { features, type: 'FeatureCollection' };
 };
 
-const normalizeRoute = (
-  mode: TripPlannerMode,
-  feature?: GeoapifyRoutingFeature
-): TripPlannerRoute | null => {
-  const geometry = normalizeRouteGeometry(feature?.geometry?.coordinates);
-  const distanceMeters = feature?.properties?.distance;
-  const durationSeconds = feature?.properties?.time;
+const normalizeRoute = (mode: TripPlannerMode, value: unknown): TripPlannerRoute | null => {
+  const feature = readRecord(value);
+  const geometry = normalizeRouteGeometry(readRecord(feature?.geometry)?.coordinates);
+  const properties = readRecord(feature?.properties);
+  const distanceMeters = properties?.distance;
+  const durationSeconds = properties?.time;
 
   if (!(geometry && typeof distanceMeters === 'number' && typeof durationSeconds === 'number')) {
     return null;
@@ -214,13 +219,13 @@ const estimateSerializedBytes = (value: unknown) => {
   return new TextEncoder().encode(serialized).byteLength;
 };
 
-const fetchJson = async <T>(
+const fetchJson = async (
   fetchFn: typeof fetch,
   url: string,
   requestTimeoutMs: number,
   operation: GeoapifyOperation,
   now: () => number
-): Promise<T | null> => {
+): Promise<unknown> => {
   const controller = new AbortController();
   const startedAt = now();
   const timeout = setTimeout(() => {
@@ -252,7 +257,7 @@ const fetchJson = async <T>(
       throw new Error(`Geoapify request failed with status ${response.status}`);
     }
 
-    return (await response.json()) as T;
+    return await response.json();
   } catch (error) {
     if (isAbortError(error)) {
       logger.warn(
@@ -367,7 +372,7 @@ export const createGeoapifyClient = ({
         key: normalizeGeocodeCacheKey(query),
         load: () =>
           runPaidProviderRequest('geocode', async () => {
-            const response = await fetchJson<GeoapifyGeocodeResponse>(
+            const response = await fetchJson(
               fetchFn,
               buildGeocodeUrl(apiKey, query.trim()),
               requestTimeoutMs,
@@ -375,7 +380,7 @@ export const createGeoapifyClient = ({
               now
             );
 
-            return normalizeGeocodedLocation(response?.results?.[0]);
+            return normalizeGeocodedLocation(firstEntry(readRecord(response)?.results));
           }),
         ttlMs: geocodeCacheTtlMs
       });
@@ -387,7 +392,7 @@ export const createGeoapifyClient = ({
         key: normalizeGeocodeCacheKey(query),
         load: () =>
           runPaidProviderRequest('suggest', async () => {
-            const response = await fetchJson<GeoapifyGeocodeResponse>(
+            const response = await fetchJson(
               fetchFn,
               buildAutocompleteUrl(apiKey, query.trim()),
               requestTimeoutMs,
@@ -395,7 +400,7 @@ export const createGeoapifyClient = ({
               now
             );
 
-            return normalizeSuggestions(response?.results);
+            return normalizeSuggestions(readRecord(response)?.results);
           }),
         ttlMs: DEFAULT_SUGGESTION_CACHE_TTL_MS
       });
@@ -407,7 +412,7 @@ export const createGeoapifyClient = ({
         key: createRouteCacheKey(origin, destination, mode),
         load: () =>
           runPaidProviderRequest('route', async () => {
-            const response = await fetchJson<GeoapifyRoutingResponse>(
+            const response = await fetchJson(
               fetchFn,
               buildRouteUrl(apiKey, origin, destination, mode),
               requestTimeoutMs,
@@ -415,7 +420,7 @@ export const createGeoapifyClient = ({
               now
             );
 
-            return normalizeRoute(mode, response?.features?.[0]);
+            return normalizeRoute(mode, firstEntry(readRecord(response)?.features));
           }),
         ttlMs: routeCacheTtlMs
       });

@@ -285,6 +285,80 @@ describe('geoapify client', () => {
     await expect(client.geocode('Missing place')).resolves.toBeNull();
   });
 
+  it('keeps an incomplete first geocode result as a miss and retries an invalid location name', async () => {
+    const match = { formatted: 'Helsinki', lat: 60, lon: 25 };
+    const fetchFn = vi
+      .fn()
+      .mockResolvedValueOnce(
+        createJsonResponse({ results: [{ formatted: 'Missing coordinates' }, match] })
+      )
+      .mockResolvedValueOnce(createJsonResponse({ results: [{ ...match, name: 42 }] }))
+      .mockResolvedValueOnce(createJsonResponse({ results: [match] }));
+    const client = createGeoapifyClient({ apiKey: 'test-key', fetchFn });
+
+    await expect(client.geocode('incomplete')).resolves.toBeNull();
+    await expect(client.geocode('incomplete')).resolves.toBeNull();
+    await expect(client.geocode('Helsinki')).rejects.toThrow();
+    await expect(client.geocode('Helsinki')).resolves.toMatchObject({ label: 'Helsinki' });
+    expect(fetchFn).toHaveBeenCalledTimes(3);
+  });
+
+  it('caches a missing autocomplete result list but retries a malformed one', async () => {
+    const fetchFn = vi
+      .fn()
+      .mockResolvedValueOnce(createJsonResponse({}))
+      .mockResolvedValueOnce(createJsonResponse({ results: {} }))
+      .mockResolvedValueOnce(createJsonResponse({ results: [] }));
+    const client = createGeoapifyClient({ apiKey: 'test-key', fetchFn });
+
+    await expect(client.suggest('missing')).resolves.toEqual([]);
+    await expect(client.suggest('missing')).resolves.toEqual([]);
+    await expect(client.suggest('malformed')).rejects.toThrow();
+    await expect(client.suggest('malformed')).resolves.toEqual([]);
+    expect(fetchFn).toHaveBeenCalledTimes(3);
+  });
+
+  it('retries malformed routing coordinates and lines instead of caching them as empty routes', async () => {
+    const fetchFn = vi
+      .fn()
+      .mockResolvedValueOnce(createJsonResponse({ features: [{ geometry: {} }] }))
+      .mockResolvedValueOnce(
+        createJsonResponse({
+          features: [{ geometry: { coordinates: [[], {}, 'x'] } }]
+        })
+      )
+      .mockResolvedValueOnce(
+        createJsonResponse({
+          features: [{ geometry: { coordinates: ['xy'] } }]
+        })
+      )
+      .mockResolvedValueOnce(createJsonResponse({ features: [{ geometry: { coordinates: {} } }] }))
+      .mockResolvedValueOnce(
+        createJsonResponse({
+          features: [{ geometry: { coordinates: [null] }, properties: { distance: 10, time: 1 } }]
+        })
+      )
+      .mockResolvedValueOnce(createRouteResponse());
+    const client = createGeoapifyClient({ apiKey: 'test-key', fetchFn });
+    const request = {
+      origin: { lat: 60, lon: 24 },
+      destination: { lat: 61, lon: 25 },
+      mode: 'drive' as const
+    };
+
+    const missing = { ...request, destination: { lat: 62, lon: 26 } };
+    await expect(client.route(missing)).resolves.toBeNull();
+    await expect(client.route(missing)).resolves.toBeNull();
+    await expect(
+      client.route({ ...request, destination: { lat: 63, lon: 26 } })
+    ).resolves.toBeNull();
+    await expect(client.route(request)).rejects.toThrow();
+    await expect(client.route(request)).rejects.toThrow();
+    await expect(client.route(request)).rejects.toThrow();
+    await expect(client.route(request)).resolves.toMatchObject({ mode: 'drive' });
+    expect(fetchFn).toHaveBeenCalledTimes(6);
+  });
+
   it('caches and deduplicates repeated geocode lookups', async () => {
     const fetchFn = vi.fn().mockImplementation(
       async () =>
