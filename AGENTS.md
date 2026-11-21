@@ -9,7 +9,13 @@
 - Identify the owning area and current workflow phase before loading more context. Use targeted search (`rg`) and targeted file reads; do not preload entire README or development/testing documents.
 - Detailed documentation remains authoritative. “Do not preload the whole document” means “do not guess”: locate the relevant heading, read that section and enough surrounding context to understand it, and expand only when uncertainty or a cross-cutting concern requires it.
 - When documentation and implementation demonstrably drift, inspect the runtime code/config as the source of current behavior, then correct the documentation in the same task where appropriate.
-- Load project skills when their workflow or concern is reached, not all at startup. In particular: API/OpenAPI/generated consumers or contracts → `api-contract-sync`; tests/TDD → `intelligence-testing`; local verification → `local-first-verification`; documentation/planning → `project-documentation`; branch, commit, push, PR handoff, or cleanup → `git-pr-workflow`. Read the relevant local `SKILL.md` completely before acting on that concern.
+- Load project skills when their workflow or concern is reached, not all at startup. Read the relevant local `SKILL.md` completely before acting on that concern.
+  - API/OpenAPI/generated consumers or contracts → `api-contract-sync`
+  - writing, refactoring, or reviewing TypeScript when naming, domain types, function responsibilities, side effects, or abstractions affect callers → `.agents/skills/clean-code-typescript/SKILL.md`
+  - tests/TDD → `intelligence-testing`
+  - local verification → `local-first-verification`
+  - documentation/planning → `project-documentation`
+  - branch, commit, push, PR handoff, or cleanup → `git-pr-workflow`
 - Keep Reissuvihko-specific skill overrides in this file and repository documentation. Do not modify installed general skills or their supporting references to encode project-specific rules.
 
 ## Documentation routing

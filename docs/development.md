@@ -23,6 +23,10 @@ The Vercel deployment entrypoint is `src/index.ts`, which default-exports the Ho
 Do not add direct `hono` imports to `src/app.ts` or other non-entry modules just for types or helpers. Vercel can mis-detect those files as the entrypoint, then fail deployment because they do not default-export the runnable server.
 The deployment guardrail test for this lives in `tests/integration/vercel-entry.integration.test.ts`. Keep it updated whenever the runtime entry shape changes.
 
+## Coding Conventions
+
+Use [Clean Code for TypeScript](../.agents/skills/clean-code-typescript/SKILL.md) when writing, refactoring, or reviewing TypeScript. Start at a real call site, make domain intent clear in names and types, and keep reads, writes, and failure handling visible. Reuse the project's Zod schemas where they validate external inputs, and preserve the [API contract](#api-contract) and behavior callers rely on during local refactors.
+
 ## Runtime Requirements
 
 - Node.js 24 or newer.
