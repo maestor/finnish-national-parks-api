@@ -1,5 +1,12 @@
 # Agent Instructions
 
+## Reissuvihko workspace
+
+- The workspace contains the UI repository (`finnish-national-parks-ui`), the API repository (`finnish-national-parks-api`), and the shared Reissuvihko Plans vault. Resolve them from the project's source folders or the workspace paths supplied in the chat. The desktop app's primary folder sets the starting directory. Determine which parts of the workspace are in scope from the request, the active plan, and the work already in progress.
+- When an operation affects both repositories, handle it in both. Carry that scope through follow-up requests such as verification, delivery, or cleanup unless the user narrows it. Read each affected repository's `AGENTS.md` and apply its own workflow, Git state checks, and verification commands from its root. Respect dependencies between repositories. If one repository is blocked, continue independent work in the other and report the outcome for each.
+- Record the repository and branch for each PR in the handoff. For example, after a two-PR handoff, ask the user to say `clean workspace` once both PRs have merged. The unqualified request then confirms both merges. For cleanup scoped to one repository, use that repository's handoff. Apply the Git workflow skill's cleanup checks to each in-scope branch.
+- Use the shared Plans vault for planning artifacts and keep vault work outside the repositories' Git workflows.
+
 ## Always-on workflow
 
 - Read this file first. It contains the repository invariants that apply to every task.
