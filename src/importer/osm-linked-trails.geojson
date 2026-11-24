@@ -1705,6 +1705,214 @@
           "approximateGapMetres": 364
         }
       ]
+    },
+    {
+      "selectionKey": "katariinan-polku-kotka",
+      "name": "Katariinan polku",
+      "parentName": "Kotkan kansallinen kaupunkipuisto",
+      "parentSlug": "kotkan-kansallinen-kaupunkipuisto",
+      "sourceKind": "osm-way-selection",
+      "osmRelationId": null,
+      "osmWayIds": [
+        40689508,
+        41958919,
+        41958922,
+        69768255,
+        69772456,
+        69772464,
+        76559670,
+        76564018,
+        84101573,
+        87818115,
+        89153679,
+        102802763,
+        102802787,
+        102802791,
+        172091389,
+        172091397,
+        176921459,
+        179189429,
+        179189430,
+        295418739,
+        363968035,
+        364883322,
+        595958934,
+        688952669,
+        688952676,
+        689203458,
+        689205029,
+        728841912,
+        815518208,
+        815518210,
+        815663181,
+        815663182,
+        815663188,
+        815663189,
+        1037195072,
+        1088121696,
+        1096977015,
+        1212092253,
+        1239666153,
+        1239666154,
+        1239666155,
+        1239666156,
+        1239666157,
+        1289193588,
+        1289193589,
+        1289193595,
+        1320443031,
+        1429405741,
+        1429405742,
+        1429405743,
+        1429405744,
+        1429405748,
+        1551962390
+      ],
+      "sourceUrls": [
+        "https://www.openstreetmap.org/way/40689508",
+        "https://www.openstreetmap.org/way/41958919",
+        "https://www.openstreetmap.org/way/41958922",
+        "https://www.openstreetmap.org/way/69768255",
+        "https://www.openstreetmap.org/way/69772456",
+        "https://www.openstreetmap.org/way/69772464",
+        "https://www.openstreetmap.org/way/76559670",
+        "https://www.openstreetmap.org/way/76564018",
+        "https://www.openstreetmap.org/way/84101573",
+        "https://www.openstreetmap.org/way/87818115",
+        "https://www.openstreetmap.org/way/89153679",
+        "https://www.openstreetmap.org/way/102802763",
+        "https://www.openstreetmap.org/way/102802787",
+        "https://www.openstreetmap.org/way/102802791",
+        "https://www.openstreetmap.org/way/172091389",
+        "https://www.openstreetmap.org/way/172091397",
+        "https://www.openstreetmap.org/way/176921459",
+        "https://www.openstreetmap.org/way/179189429",
+        "https://www.openstreetmap.org/way/179189430",
+        "https://www.openstreetmap.org/way/295418739",
+        "https://www.openstreetmap.org/way/363968035",
+        "https://www.openstreetmap.org/way/364883322",
+        "https://www.openstreetmap.org/way/595958934",
+        "https://www.openstreetmap.org/way/688952669",
+        "https://www.openstreetmap.org/way/688952676",
+        "https://www.openstreetmap.org/way/689203458",
+        "https://www.openstreetmap.org/way/689205029",
+        "https://www.openstreetmap.org/way/728841912",
+        "https://www.openstreetmap.org/way/815518208",
+        "https://www.openstreetmap.org/way/815518210",
+        "https://www.openstreetmap.org/way/815663181",
+        "https://www.openstreetmap.org/way/815663182",
+        "https://www.openstreetmap.org/way/815663188",
+        "https://www.openstreetmap.org/way/815663189",
+        "https://www.openstreetmap.org/way/1037195072",
+        "https://www.openstreetmap.org/way/1088121696",
+        "https://www.openstreetmap.org/way/1096977015",
+        "https://www.openstreetmap.org/way/1212092253",
+        "https://www.openstreetmap.org/way/1239666153",
+        "https://www.openstreetmap.org/way/1239666154",
+        "https://www.openstreetmap.org/way/1239666155",
+        "https://www.openstreetmap.org/way/1239666156",
+        "https://www.openstreetmap.org/way/1239666157",
+        "https://www.openstreetmap.org/way/1289193588",
+        "https://www.openstreetmap.org/way/1289193589",
+        "https://www.openstreetmap.org/way/1289193595",
+        "https://www.openstreetmap.org/way/1320443031",
+        "https://www.openstreetmap.org/way/1429405741",
+        "https://www.openstreetmap.org/way/1429405742",
+        "https://www.openstreetmap.org/way/1429405743",
+        "https://www.openstreetmap.org/way/1429405744",
+        "https://www.openstreetmap.org/way/1429405748",
+        "https://www.openstreetmap.org/way/1551962390"
+      ],
+      "sourceTimestamp": "2026-11-23T21:21:17Z",
+      "geometrySha256": "3a6aa21e868f55b7d660bb1502dabcacbd036c13006d6d7237ab305f859351d9",
+      "featureCount": 60,
+      "requestedLengthKm": 4.6,
+      "measuredUniqueLengthKm": 4.534291479856398,
+      "walkLengthKm": 4.664842186680246,
+      "initialDisplayLengthKm": 4.6,
+      "displayLengthBasis": "Published Sapokka loop length from Visit Kotka-Hamina on Outdooractive.",
+      "alignmentReferenceUrl": "https://www.outdooractive.fi/fi/route/kaupunkikaevely/kotka/katariinan-polku-kotka/64770159/",
+      "selectionPolicy": "Use connected OSM way sections for the published Sapokka loop. Reach the eastern side stop by the mapped steps and path, and the southern side stop by the mapped path off Puistotie. Both side visits return by the same ways."
+    },
+    {
+      "selectionKey": "langinkoski-yhdysreitit-kotka",
+      "name": "Langinkoski yhdysreitit",
+      "parentName": "Kotkan kansallinen kaupunkipuisto",
+      "parentSlug": "kotkan-kansallinen-kaupunkipuisto",
+      "sourceKind": "osm-way-selection",
+      "osmRelationId": null,
+      "osmWayIds": [
+        36810566,
+        75655999,
+        99508569,
+        99508606,
+        99508611,
+        99511131,
+        123153240,
+        123153241,
+        170835542,
+        170835549,
+        232618417,
+        232618419,
+        232618421,
+        232618422,
+        232618424,
+        232618426,
+        232618427,
+        232618428,
+        232673964,
+        232673966,
+        232673968,
+        232673970,
+        810254741,
+        810254743,
+        815065892,
+        1413068076,
+        1429405667,
+        1429405668,
+        1429578914
+      ],
+      "sourceUrls": [
+        "https://www.openstreetmap.org/way/36810566",
+        "https://www.openstreetmap.org/way/75655999",
+        "https://www.openstreetmap.org/way/99508569",
+        "https://www.openstreetmap.org/way/99508606",
+        "https://www.openstreetmap.org/way/99508611",
+        "https://www.openstreetmap.org/way/99511131",
+        "https://www.openstreetmap.org/way/123153240",
+        "https://www.openstreetmap.org/way/123153241",
+        "https://www.openstreetmap.org/way/170835542",
+        "https://www.openstreetmap.org/way/170835549",
+        "https://www.openstreetmap.org/way/232618417",
+        "https://www.openstreetmap.org/way/232618419",
+        "https://www.openstreetmap.org/way/232618421",
+        "https://www.openstreetmap.org/way/232618422",
+        "https://www.openstreetmap.org/way/232618424",
+        "https://www.openstreetmap.org/way/232618426",
+        "https://www.openstreetmap.org/way/232618427",
+        "https://www.openstreetmap.org/way/232618428",
+        "https://www.openstreetmap.org/way/232673964",
+        "https://www.openstreetmap.org/way/232673966",
+        "https://www.openstreetmap.org/way/232673968",
+        "https://www.openstreetmap.org/way/232673970",
+        "https://www.openstreetmap.org/way/810254741",
+        "https://www.openstreetmap.org/way/810254743",
+        "https://www.openstreetmap.org/way/815065892",
+        "https://www.openstreetmap.org/way/1413068076",
+        "https://www.openstreetmap.org/way/1429405667",
+        "https://www.openstreetmap.org/way/1429405668",
+        "https://www.openstreetmap.org/way/1429578914"
+      ],
+      "sourceTimestamp": "2026-11-23T21:21:17Z",
+      "geometrySha256": "5849294f07a648e59d133e8fcd6d338b2d667ab16e03541057f8b1e17fb04fc9",
+      "featureCount": 30,
+      "requestedLengthKm": 2,
+      "measuredUniqueLengthKm": 1.9505140308704652,
+      "walkLengthKm": null,
+      "initialDisplayLengthKm": 2,
+      "displayLengthBasis": "Rounded measured length of the connected OpenStreetMap trail network.",
+      "areaMapUrl": "https://suomenkansallismuseo.fi/kohde/langinkoski/langinkosken-aluekartta/",
+      "selectionPolicy": "Use connected OSM way sections for the island loop, lodge and parking approaches, riverside path under Langinkoskentie, and the arboretum branches. Keep only one mapped alignment where paths run together near the island loop."
     }
   ],
   "features": [
@@ -113782,6 +113990,3522 @@
           [
             30.4566531,
             63.3892322
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "selectionKey": "katariinan-polku-kotka",
+        "parentSlug": "kotkan-kansallinen-kaupunkipuisto",
+        "osmWayId": 1037195072,
+        "sourceUrl": "https://www.openstreetmap.org/way/1037195072",
+        "fromNodeId": 519933497,
+        "toNodeId": 11516677840
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            26.9420277,
+            60.458553
+          ],
+          [
+            26.9421928,
+            60.4585443
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "selectionKey": "katariinan-polku-kotka",
+        "parentSlug": "kotkan-kansallinen-kaupunkipuisto",
+        "osmWayId": 1239666155,
+        "sourceUrl": "https://www.openstreetmap.org/way/1239666155",
+        "fromNodeId": 11516677840,
+        "toNodeId": 11516677845
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            26.9421928,
+            60.4585443
+          ],
+          [
+            26.9422223,
+            60.4585019
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "selectionKey": "katariinan-polku-kotka",
+        "parentSlug": "kotkan-kansallinen-kaupunkipuisto",
+        "osmWayId": 1239666153,
+        "sourceUrl": "https://www.openstreetmap.org/way/1239666153",
+        "fromNodeId": 11516677845,
+        "toNodeId": 11516677842
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            26.9422223,
+            60.4585019
+          ],
+          [
+            26.9422893,
+            60.4584411
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "selectionKey": "katariinan-polku-kotka",
+        "parentSlug": "kotkan-kansallinen-kaupunkipuisto",
+        "osmWayId": 1239666154,
+        "sourceUrl": "https://www.openstreetmap.org/way/1239666154",
+        "fromNodeId": 11516677842,
+        "toNodeId": 11516677847
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            26.9422893,
+            60.4584411
+          ],
+          [
+            26.9423993,
+            60.4583565
+          ],
+          [
+            26.9424409,
+            60.4583723
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "selectionKey": "katariinan-polku-kotka",
+        "parentSlug": "kotkan-kansallinen-kaupunkipuisto",
+        "osmWayId": 1239666155,
+        "sourceUrl": "https://www.openstreetmap.org/way/1239666155",
+        "fromNodeId": 11516677847,
+        "toNodeId": 11516677848
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            26.9424409,
+            60.4583723
+          ],
+          [
+            26.9425093,
+            60.4583386
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "selectionKey": "katariinan-polku-kotka",
+        "parentSlug": "kotkan-kansallinen-kaupunkipuisto",
+        "osmWayId": 1239666156,
+        "sourceUrl": "https://www.openstreetmap.org/way/1239666156",
+        "fromNodeId": 11516677848,
+        "toNodeId": 11516677849
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            26.9425093,
+            60.4583386
+          ],
+          [
+            26.9425844,
+            60.4583049
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "selectionKey": "katariinan-polku-kotka",
+        "parentSlug": "kotkan-kansallinen-kaupunkipuisto",
+        "osmWayId": 1239666157,
+        "sourceUrl": "https://www.openstreetmap.org/way/1239666157",
+        "fromNodeId": 11516677849,
+        "toNodeId": 11516677850
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            26.9425844,
+            60.4583049
+          ],
+          [
+            26.9426865,
+            60.4582605
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "selectionKey": "katariinan-polku-kotka",
+        "parentSlug": "kotkan-kansallinen-kaupunkipuisto",
+        "osmWayId": 172091397,
+        "sourceUrl": "https://www.openstreetmap.org/way/172091397",
+        "fromNodeId": 11516677850,
+        "toNodeId": 818629020
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            26.9426865,
+            60.4582605
+          ],
+          [
+            26.9427526,
+            60.4582939
+          ],
+          [
+            26.9428742,
+            60.4583492
+          ],
+          [
+            26.9430684,
+            60.4583959
+          ],
+          [
+            26.9433605,
+            60.458432
+          ],
+          [
+            26.9437684,
+            60.4584494
+          ],
+          [
+            26.9440315,
+            60.4584464
+          ],
+          [
+            26.9444044,
+            60.4584437
+          ],
+          [
+            26.9447597,
+            60.4584712
+          ],
+          [
+            26.9451355,
+            60.4585296
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "selectionKey": "katariinan-polku-kotka",
+        "parentSlug": "kotkan-kansallinen-kaupunkipuisto",
+        "osmWayId": 1096977015,
+        "sourceUrl": "https://www.openstreetmap.org/way/1096977015",
+        "fromNodeId": 818629020,
+        "toNodeId": 1020912116
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            26.9451355,
+            60.4585296
+          ],
+          [
+            26.9451814,
+            60.4585036
+          ],
+          [
+            26.9452084,
+            60.458481
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "selectionKey": "katariinan-polku-kotka",
+        "parentSlug": "kotkan-kansallinen-kaupunkipuisto",
+        "osmWayId": 87818115,
+        "sourceUrl": "https://www.openstreetmap.org/way/87818115",
+        "fromNodeId": 1020912116,
+        "toNodeId": 1020902739
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            26.9452084,
+            60.458481
+          ],
+          [
+            26.9453727,
+            60.4583691
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "selectionKey": "katariinan-polku-kotka",
+        "parentSlug": "kotkan-kansallinen-kaupunkipuisto",
+        "osmWayId": 84101573,
+        "sourceUrl": "https://www.openstreetmap.org/way/84101573",
+        "fromNodeId": 1020902739,
+        "toNodeId": 818629019
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            26.9453727,
+            60.4583691
+          ],
+          [
+            26.9454295,
+            60.4583157
+          ],
+          [
+            26.9454621,
+            60.4582865
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "selectionKey": "katariinan-polku-kotka",
+        "parentSlug": "kotkan-kansallinen-kaupunkipuisto",
+        "osmWayId": 69768255,
+        "sourceUrl": "https://www.openstreetmap.org/way/69768255",
+        "fromNodeId": 818629019,
+        "toNodeId": 834571775
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            26.9454621,
+            60.4582865
+          ],
+          [
+            26.9458396,
+            60.458314
+          ],
+          [
+            26.9460326,
+            60.4583281
+          ],
+          [
+            26.9462486,
+            60.4583727
+          ],
+          [
+            26.9463958,
+            60.4584203
+          ],
+          [
+            26.9465562,
+            60.4584722
+          ],
+          [
+            26.9469658,
+            60.4584873
+          ],
+          [
+            26.9472615,
+            60.4585806
+          ],
+          [
+            26.9473181,
+            60.4585993
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "selectionKey": "katariinan-polku-kotka",
+        "parentSlug": "kotkan-kansallinen-kaupunkipuisto",
+        "osmWayId": 69772456,
+        "sourceUrl": "https://www.openstreetmap.org/way/69772456",
+        "fromNodeId": 834571775,
+        "toNodeId": 834608337
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            26.9473181,
+            60.4585993
+          ],
+          [
+            26.9475837,
+            60.4586742
+          ],
+          [
+            26.947733,
+            60.458767
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "selectionKey": "katariinan-polku-kotka",
+        "parentSlug": "kotkan-kansallinen-kaupunkipuisto",
+        "osmWayId": 179189430,
+        "sourceUrl": "https://www.openstreetmap.org/way/179189430",
+        "fromNodeId": 834608337,
+        "toNodeId": 1895361934
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            26.947733,
+            60.458767
+          ],
+          [
+            26.9480792,
+            60.458497
+          ],
+          [
+            26.9482051,
+            60.4583045
+          ],
+          [
+            26.948075,
+            60.4581307
+          ],
+          [
+            26.948004,
+            60.458091
+          ],
+          [
+            26.9477391,
+            60.4579589
+          ],
+          [
+            26.9473938,
+            60.4578022
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "selectionKey": "katariinan-polku-kotka",
+        "parentSlug": "kotkan-kansallinen-kaupunkipuisto",
+        "osmWayId": 728841912,
+        "sourceUrl": "https://www.openstreetmap.org/way/728841912",
+        "fromNodeId": 1895361934,
+        "toNodeId": 5678654289
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            26.9473938,
+            60.4578022
+          ],
+          [
+            26.9476416,
+            60.4577627
+          ],
+          [
+            26.9478045,
+            60.4577105
+          ],
+          [
+            26.9482458,
+            60.4574757
+          ],
+          [
+            26.948454,
+            60.4574132
+          ],
+          [
+            26.9486569,
+            60.4573839
+          ],
+          [
+            26.9488278,
+            60.4573786
+          ],
+          [
+            26.9492241,
+            60.457301
+          ],
+          [
+            26.9492797,
+            60.4572696
+          ],
+          [
+            26.9492907,
+            60.4572146
+          ],
+          [
+            26.9493394,
+            60.4571811
+          ],
+          [
+            26.9494875,
+            60.4571028
+          ],
+          [
+            26.9497101,
+            60.4570265
+          ],
+          [
+            26.9500452,
+            60.4570093
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "selectionKey": "katariinan-polku-kotka",
+        "parentSlug": "kotkan-kansallinen-kaupunkipuisto",
+        "osmWayId": 595958934,
+        "sourceUrl": "https://www.openstreetmap.org/way/595958934",
+        "fromNodeId": 5678654289,
+        "toNodeId": 902320286
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            26.9500452,
+            60.4570093
+          ],
+          [
+            26.950071,
+            60.4569489
+          ],
+          [
+            26.9502862,
+            60.4566971
+          ],
+          [
+            26.9503894,
+            60.4565457
+          ],
+          [
+            26.950522,
+            60.4563762
+          ],
+          [
+            26.9510107,
+            60.4560539
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "selectionKey": "katariinan-polku-kotka",
+        "parentSlug": "kotkan-kansallinen-kaupunkipuisto",
+        "osmWayId": 102802787,
+        "sourceUrl": "https://www.openstreetmap.org/way/102802787",
+        "fromNodeId": 902320286,
+        "toNodeId": 1895361923
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            26.9510107,
+            60.4560539
+          ],
+          [
+            26.9507862,
+            60.4560151
+          ],
+          [
+            26.9503356,
+            60.456031
+          ],
+          [
+            26.9497783,
+            60.4561102
+          ],
+          [
+            26.9495124,
+            60.4561434
+          ],
+          [
+            26.9494578,
+            60.4561502
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "selectionKey": "katariinan-polku-kotka",
+        "parentSlug": "kotkan-kansallinen-kaupunkipuisto",
+        "osmWayId": 89153679,
+        "sourceUrl": "https://www.openstreetmap.org/way/89153679",
+        "fromNodeId": 1895361923,
+        "toNodeId": 1034160431
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            26.9494578,
+            60.4561502
+          ],
+          [
+            26.9493843,
+            60.4560422
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "selectionKey": "katariinan-polku-kotka",
+        "parentSlug": "kotkan-kansallinen-kaupunkipuisto",
+        "osmWayId": 179189429,
+        "sourceUrl": "https://www.openstreetmap.org/way/179189429",
+        "fromNodeId": 1034160431,
+        "toNodeId": 11229596132
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            26.9493843,
+            60.4560422
+          ],
+          [
+            26.9495712,
+            60.455832
+          ],
+          [
+            26.9497648,
+            60.4557281
+          ],
+          [
+            26.9499755,
+            60.4555728
+          ],
+          [
+            26.9501211,
+            60.4554019
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "selectionKey": "katariinan-polku-kotka",
+        "parentSlug": "kotkan-kansallinen-kaupunkipuisto",
+        "osmWayId": 1320443031,
+        "sourceUrl": "https://www.openstreetmap.org/way/1320443031",
+        "fromNodeId": 11229596132,
+        "toNodeId": 11229596131
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            26.9501211,
+            60.4554019
+          ],
+          [
+            26.9500691,
+            60.4553927
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "selectionKey": "katariinan-polku-kotka",
+        "parentSlug": "kotkan-kansallinen-kaupunkipuisto",
+        "osmWayId": 1289193588,
+        "sourceUrl": "https://www.openstreetmap.org/way/1289193588",
+        "fromNodeId": 11229596131,
+        "toNodeId": 11229596124
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            26.9500691,
+            60.4553927
+          ],
+          [
+            26.9499698,
+            60.4554204
+          ],
+          [
+            26.9499001,
+            60.4554125
+          ],
+          [
+            26.949825,
+            60.4553622
+          ],
+          [
+            26.9497526,
+            60.4553556
+          ],
+          [
+            26.9496855,
+            60.4553054
+          ],
+          [
+            26.9496024,
+            60.4552617
+          ],
+          [
+            26.9494856,
+            60.4551823
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "selectionKey": "katariinan-polku-kotka",
+        "parentSlug": "kotkan-kansallinen-kaupunkipuisto",
+        "osmWayId": 1212092253,
+        "sourceUrl": "https://www.openstreetmap.org/way/1212092253",
+        "fromNodeId": 11229596124,
+        "toNodeId": 11229596124
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            26.9494856,
+            60.4551823
+          ],
+          [
+            26.9495472,
+            60.455118
+          ],
+          [
+            26.9495589,
+            60.4550818
+          ],
+          [
+            26.9494832,
+            60.4550269
+          ],
+          [
+            26.9494637,
+            60.4549905
+          ],
+          [
+            26.9495221,
+            60.4549221
+          ],
+          [
+            26.9495832,
+            60.4549101
+          ],
+          [
+            26.949773,
+            60.4549537
+          ],
+          [
+            26.949792,
+            60.4549718
+          ],
+          [
+            26.949724,
+            60.4550455
+          ],
+          [
+            26.949792,
+            60.4549718
+          ],
+          [
+            26.949773,
+            60.4549537
+          ],
+          [
+            26.9495832,
+            60.4549101
+          ],
+          [
+            26.9495221,
+            60.4549221
+          ],
+          [
+            26.9494637,
+            60.4549905
+          ],
+          [
+            26.9494832,
+            60.4550269
+          ],
+          [
+            26.9495589,
+            60.4550818
+          ],
+          [
+            26.9495472,
+            60.455118
+          ],
+          [
+            26.9494856,
+            60.4551823
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "selectionKey": "katariinan-polku-kotka",
+        "parentSlug": "kotkan-kansallinen-kaupunkipuisto",
+        "osmWayId": 1289193588,
+        "sourceUrl": "https://www.openstreetmap.org/way/1289193588",
+        "fromNodeId": 11229596124,
+        "toNodeId": 11229596131
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            26.9494856,
+            60.4551823
+          ],
+          [
+            26.9496024,
+            60.4552617
+          ],
+          [
+            26.9496855,
+            60.4553054
+          ],
+          [
+            26.9497526,
+            60.4553556
+          ],
+          [
+            26.949825,
+            60.4553622
+          ],
+          [
+            26.9499001,
+            60.4554125
+          ],
+          [
+            26.9499698,
+            60.4554204
+          ],
+          [
+            26.9500691,
+            60.4553927
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "selectionKey": "katariinan-polku-kotka",
+        "parentSlug": "kotkan-kansallinen-kaupunkipuisto",
+        "osmWayId": 1320443031,
+        "sourceUrl": "https://www.openstreetmap.org/way/1320443031",
+        "fromNodeId": 11229596131,
+        "toNodeId": 11229596132
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            26.9500691,
+            60.4553927
+          ],
+          [
+            26.9501211,
+            60.4554019
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "selectionKey": "katariinan-polku-kotka",
+        "parentSlug": "kotkan-kansallinen-kaupunkipuisto",
+        "osmWayId": 179189429,
+        "sourceUrl": "https://www.openstreetmap.org/way/179189429",
+        "fromNodeId": 11229596132,
+        "toNodeId": 1895361910
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            26.9501211,
+            60.4554019
+          ],
+          [
+            26.950205,
+            60.4552957
+          ],
+          [
+            26.9502888,
+            60.4551799
+          ],
+          [
+            26.9503412,
+            60.4550367
+          ],
+          [
+            26.9504657,
+            60.4548983
+          ],
+          [
+            26.950728,
+            60.4548549
+          ],
+          [
+            26.9509535,
+            60.4547808
+          ],
+          [
+            26.9512275,
+            60.4546233
+          ],
+          [
+            26.9514199,
+            60.4545711
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "selectionKey": "katariinan-polku-kotka",
+        "parentSlug": "kotkan-kansallinen-kaupunkipuisto",
+        "osmWayId": 102802763,
+        "sourceUrl": "https://www.openstreetmap.org/way/102802763",
+        "fromNodeId": 1895361910,
+        "toNodeId": 1187209003
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            26.9514199,
+            60.4545711
+          ],
+          [
+            26.9513939,
+            60.4545337
+          ],
+          [
+            26.9513231,
+            60.454432
+          ],
+          [
+            26.9513718,
+            60.4541767
+          ],
+          [
+            26.9513371,
+            60.4539534
+          ],
+          [
+            26.9512691,
+            60.453841
+          ],
+          [
+            26.9510866,
+            60.4535392
+          ],
+          [
+            26.9506959,
+            60.4530508
+          ],
+          [
+            26.9504706,
+            60.452955
+          ],
+          [
+            26.9501658,
+            60.4528563
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "selectionKey": "katariinan-polku-kotka",
+        "parentSlug": "kotkan-kansallinen-kaupunkipuisto",
+        "osmWayId": 69772464,
+        "sourceUrl": "https://www.openstreetmap.org/way/69772464",
+        "fromNodeId": 1187209003,
+        "toNodeId": 14018441375
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            26.9501658,
+            60.4528563
+          ],
+          [
+            26.9497476,
+            60.4526898
+          ],
+          [
+            26.9492206,
+            60.4525431
+          ],
+          [
+            26.948969,
+            60.4524673
+          ],
+          [
+            26.9487806,
+            60.4524023
+          ],
+          [
+            26.9486131,
+            60.4523176
+          ],
+          [
+            26.9483721,
+            60.4522145
+          ],
+          [
+            26.9481647,
+            60.4520717
+          ],
+          [
+            26.9478214,
+            60.4519553
+          ],
+          [
+            26.9477838,
+            60.4519425
+          ],
+          [
+            26.9476349,
+            60.4518848
+          ],
+          [
+            26.9468937,
+            60.4515338
+          ],
+          [
+            26.9466991,
+            60.4514643
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "selectionKey": "katariinan-polku-kotka",
+        "parentSlug": "kotkan-kansallinen-kaupunkipuisto",
+        "osmWayId": 1551962390,
+        "sourceUrl": "https://www.openstreetmap.org/way/1551962390",
+        "fromNodeId": 14018441375,
+        "toNodeId": 902320280
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            26.9466991,
+            60.4514643
+          ],
+          [
+            26.9462723,
+            60.4513119
+          ],
+          [
+            26.9461214,
+            60.4512664
+          ],
+          [
+            26.9456314,
+            60.4511187
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "selectionKey": "katariinan-polku-kotka",
+        "parentSlug": "kotkan-kansallinen-kaupunkipuisto",
+        "osmWayId": 1088121696,
+        "sourceUrl": "https://www.openstreetmap.org/way/1088121696",
+        "fromNodeId": 902320280,
+        "toNodeId": 519933992
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            26.9456314,
+            60.4511187
+          ],
+          [
+            26.9454266,
+            60.4509739
+          ],
+          [
+            26.945261,
+            60.4508544
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "selectionKey": "katariinan-polku-kotka",
+        "parentSlug": "kotkan-kansallinen-kaupunkipuisto",
+        "osmWayId": 41958922,
+        "sourceUrl": "https://www.openstreetmap.org/way/41958922",
+        "fromNodeId": 519933992,
+        "toNodeId": 519933952
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            26.945261,
+            60.4508544
+          ],
+          [
+            26.9451947,
+            60.4509857
+          ],
+          [
+            26.9451783,
+            60.4511169
+          ],
+          [
+            26.9452355,
+            60.4515034
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "selectionKey": "katariinan-polku-kotka",
+        "parentSlug": "kotkan-kansallinen-kaupunkipuisto",
+        "osmWayId": 40689508,
+        "sourceUrl": "https://www.openstreetmap.org/way/40689508",
+        "fromNodeId": 519933952,
+        "toNodeId": 444937322
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            26.9452355,
+            60.4515034
+          ],
+          [
+            26.9451208,
+            60.4514165
+          ],
+          [
+            26.9447286,
+            60.4512231
+          ],
+          [
+            26.9443839,
+            60.4510616
+          ],
+          [
+            26.9440447,
+            60.4508915
+          ],
+          [
+            26.9440067,
+            60.4508596
+          ],
+          [
+            26.943974,
+            60.4507872
+          ],
+          [
+            26.9439491,
+            60.4505661
+          ],
+          [
+            26.9439505,
+            60.45039
+          ],
+          [
+            26.9439158,
+            60.4502206
+          ],
+          [
+            26.943756,
+            60.4500035
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "selectionKey": "katariinan-polku-kotka",
+        "parentSlug": "kotkan-kansallinen-kaupunkipuisto",
+        "osmWayId": 176921459,
+        "sourceUrl": "https://www.openstreetmap.org/way/176921459",
+        "fromNodeId": 444937322,
+        "toNodeId": 1874052051
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            26.943756,
+            60.4500035
+          ],
+          [
+            26.943487,
+            60.4496631
+          ],
+          [
+            26.9434064,
+            60.4494445
+          ],
+          [
+            26.9433815,
+            60.4492319
+          ],
+          [
+            26.943377,
+            60.4490857
+          ],
+          [
+            26.9433498,
+            60.4490338
+          ],
+          [
+            26.9433291,
+            60.4489943
+          ],
+          [
+            26.9432598,
+            60.4489199
+          ],
+          [
+            26.9432154,
+            60.4488723
+          ],
+          [
+            26.9430484,
+            60.4487285
+          ],
+          [
+            26.9427759,
+            60.4485069
+          ],
+          [
+            26.942508,
+            60.4483257
+          ],
+          [
+            26.9422862,
+            60.4480637
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "selectionKey": "katariinan-polku-kotka",
+        "parentSlug": "kotkan-kansallinen-kaupunkipuisto",
+        "osmWayId": 1289193595,
+        "sourceUrl": "https://www.openstreetmap.org/way/1289193595",
+        "fromNodeId": 1874052051,
+        "toNodeId": 1874052043
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            26.9422862,
+            60.4480637
+          ],
+          [
+            26.9422885,
+            60.4478648
+          ],
+          [
+            26.942221,
+            60.4476677
+          ],
+          [
+            26.9422883,
+            60.4476149
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "selectionKey": "katariinan-polku-kotka",
+        "parentSlug": "kotkan-kansallinen-kaupunkipuisto",
+        "osmWayId": 689203458,
+        "sourceUrl": "https://www.openstreetmap.org/way/689203458",
+        "fromNodeId": 1874052043,
+        "toNodeId": 2991278536
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            26.9422883,
+            60.4476149
+          ],
+          [
+            26.9421881,
+            60.4475425
+          ],
+          [
+            26.9421349,
+            60.4474661
+          ],
+          [
+            26.9420614,
+            60.4474159
+          ],
+          [
+            26.9419243,
+            60.4473986
+          ],
+          [
+            26.9413757,
+            60.4474678
+          ],
+          [
+            26.9412094,
+            60.4475217
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "selectionKey": "katariinan-polku-kotka",
+        "parentSlug": "kotkan-kansallinen-kaupunkipuisto",
+        "osmWayId": 76559670,
+        "sourceUrl": "https://www.openstreetmap.org/way/76559670",
+        "fromNodeId": 2991278536,
+        "toNodeId": 685697490
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            26.9412094,
+            60.4475217
+          ],
+          [
+            26.9411184,
+            60.4474574
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "selectionKey": "katariinan-polku-kotka",
+        "parentSlug": "kotkan-kansallinen-kaupunkipuisto",
+        "osmWayId": 1289193589,
+        "sourceUrl": "https://www.openstreetmap.org/way/1289193589",
+        "fromNodeId": 685697490,
+        "toNodeId": 685697490
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            26.9411184,
+            60.4474574
+          ],
+          [
+            26.9410777,
+            60.4474862
+          ],
+          [
+            26.9410291,
+            60.4475281
+          ],
+          [
+            26.9409664,
+            60.4475685
+          ],
+          [
+            26.9410291,
+            60.4475281
+          ],
+          [
+            26.9410777,
+            60.4474862
+          ],
+          [
+            26.9411184,
+            60.4474574
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "selectionKey": "katariinan-polku-kotka",
+        "parentSlug": "kotkan-kansallinen-kaupunkipuisto",
+        "osmWayId": 76559670,
+        "sourceUrl": "https://www.openstreetmap.org/way/76559670",
+        "fromNodeId": 685697490,
+        "toNodeId": 2991285064
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            26.9411184,
+            60.4474574
+          ],
+          [
+            26.9412094,
+            60.4475217
+          ],
+          [
+            26.9413495,
+            60.4476251
+          ],
+          [
+            26.9414902,
+            60.447734
+          ],
+          [
+            26.9416834,
+            60.4479109
+          ],
+          [
+            26.9417611,
+            60.4480845
+          ],
+          [
+            26.9417676,
+            60.4482705
+          ],
+          [
+            26.9417279,
+            60.4484249
+          ],
+          [
+            26.9416374,
+            60.4485714
+          ],
+          [
+            26.9414302,
+            60.4487579
+          ],
+          [
+            26.9412013,
+            60.4489297
+          ],
+          [
+            26.940948,
+            60.4490921
+          ],
+          [
+            26.9396203,
+            60.449939
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "selectionKey": "katariinan-polku-kotka",
+        "parentSlug": "kotkan-kansallinen-kaupunkipuisto",
+        "osmWayId": 815663182,
+        "sourceUrl": "https://www.openstreetmap.org/way/815663182",
+        "fromNodeId": 2991285064,
+        "toNodeId": 7617810961
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            26.9396203,
+            60.449939
+          ],
+          [
+            26.9394949,
+            60.449872
+          ],
+          [
+            26.9394136,
+            60.4498066
+          ],
+          [
+            26.9393678,
+            60.4497091
+          ],
+          [
+            26.9393728,
+            60.449536
+          ],
+          [
+            26.9393034,
+            60.4494623
+          ],
+          [
+            26.9391808,
+            60.4494074
+          ],
+          [
+            26.9390041,
+            60.449375
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "selectionKey": "katariinan-polku-kotka",
+        "parentSlug": "kotkan-kansallinen-kaupunkipuisto",
+        "osmWayId": 815663188,
+        "sourceUrl": "https://www.openstreetmap.org/way/815663188",
+        "fromNodeId": 7617810961,
+        "toNodeId": 2991285057
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            26.9390041,
+            60.449375
+          ],
+          [
+            26.9387237,
+            60.4494383
+          ],
+          [
+            26.9385691,
+            60.4494308
+          ],
+          [
+            26.938234,
+            60.4493925
+          ],
+          [
+            26.9381255,
+            60.4493723
+          ],
+          [
+            26.9380944,
+            60.4493073
+          ],
+          [
+            26.9380824,
+            60.4492356
+          ],
+          [
+            26.9381001,
+            60.4491679
+          ],
+          [
+            26.9381677,
+            60.4491043
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "selectionKey": "katariinan-polku-kotka",
+        "parentSlug": "kotkan-kansallinen-kaupunkipuisto",
+        "osmWayId": 815663182,
+        "sourceUrl": "https://www.openstreetmap.org/way/815663182",
+        "fromNodeId": 2991285057,
+        "toNodeId": 2991285056
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            26.9381677,
+            60.4491043
+          ],
+          [
+            26.9379366,
+            60.4490562
+          ],
+          [
+            26.9377554,
+            60.4490536
+          ],
+          [
+            26.937635,
+            60.4490607
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "selectionKey": "katariinan-polku-kotka",
+        "parentSlug": "kotkan-kansallinen-kaupunkipuisto",
+        "osmWayId": 815663181,
+        "sourceUrl": "https://www.openstreetmap.org/way/815663181",
+        "fromNodeId": 2991285056,
+        "toNodeId": 7616503318
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            26.937635,
+            60.4490607
+          ],
+          [
+            26.937544,
+            60.4491006
+          ],
+          [
+            26.9373324,
+            60.4490891
+          ],
+          [
+            26.9371262,
+            60.4490911
+          ],
+          [
+            26.9369377,
+            60.4490567
+          ],
+          [
+            26.9368075,
+            60.4490205
+          ],
+          [
+            26.9367004,
+            60.4489756
+          ],
+          [
+            26.9366245,
+            60.4489695
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "selectionKey": "katariinan-polku-kotka",
+        "parentSlug": "kotkan-kansallinen-kaupunkipuisto",
+        "osmWayId": 295418739,
+        "sourceUrl": "https://www.openstreetmap.org/way/295418739",
+        "fromNodeId": 7616503318,
+        "toNodeId": 7616503312
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            26.9366245,
+            60.4489695
+          ],
+          [
+            26.9365713,
+            60.4490774
+          ],
+          [
+            26.9365467,
+            60.4491859
+          ],
+          [
+            26.9365355,
+            60.4493401
+          ],
+          [
+            26.9365543,
+            60.4494312
+          ],
+          [
+            26.9365895,
+            60.4495023
+          ],
+          [
+            26.9366925,
+            60.449568
+          ],
+          [
+            26.9368334,
+            60.4496485
+          ],
+          [
+            26.9369473,
+            60.4496908
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "selectionKey": "katariinan-polku-kotka",
+        "parentSlug": "kotkan-kansallinen-kaupunkipuisto",
+        "osmWayId": 815518208,
+        "sourceUrl": "https://www.openstreetmap.org/way/815518208",
+        "fromNodeId": 7616503312,
+        "toNodeId": 7616503294
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            26.9369473,
+            60.4496908
+          ],
+          [
+            26.9372118,
+            60.4496923
+          ],
+          [
+            26.9373095,
+            60.4497037
+          ],
+          [
+            26.9374885,
+            60.4497574
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "selectionKey": "katariinan-polku-kotka",
+        "parentSlug": "kotkan-kansallinen-kaupunkipuisto",
+        "osmWayId": 815663189,
+        "sourceUrl": "https://www.openstreetmap.org/way/815663189",
+        "fromNodeId": 7616503294,
+        "toNodeId": 7616503265
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            26.9374885,
+            60.4497574
+          ],
+          [
+            26.9372331,
+            60.4499402
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "selectionKey": "katariinan-polku-kotka",
+        "parentSlug": "kotkan-kansallinen-kaupunkipuisto",
+        "osmWayId": 1429405748,
+        "sourceUrl": "https://www.openstreetmap.org/way/1429405748",
+        "fromNodeId": 7616503265,
+        "toNodeId": 7616503268
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            26.9372331,
+            60.4499402
+          ],
+          [
+            26.9371773,
+            60.4499999
+          ],
+          [
+            26.9371854,
+            60.4500314
+          ],
+          [
+            26.9372193,
+            60.4500709
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "selectionKey": "katariinan-polku-kotka",
+        "parentSlug": "kotkan-kansallinen-kaupunkipuisto",
+        "osmWayId": 815518210,
+        "sourceUrl": "https://www.openstreetmap.org/way/815518210",
+        "fromNodeId": 7616503268,
+        "toNodeId": 7616503271
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            26.9372193,
+            60.4500709
+          ],
+          [
+            26.9372219,
+            60.4501185
+          ],
+          [
+            26.937253,
+            60.4501581
+          ],
+          [
+            26.9373099,
+            60.4502265
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "selectionKey": "katariinan-polku-kotka",
+        "parentSlug": "kotkan-kansallinen-kaupunkipuisto",
+        "osmWayId": 1429405744,
+        "sourceUrl": "https://www.openstreetmap.org/way/1429405744",
+        "fromNodeId": 7616503271,
+        "toNodeId": 13140023816
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            26.9373099,
+            60.4502265
+          ],
+          [
+            26.9373748,
+            60.4503029
+          ],
+          [
+            26.9373689,
+            60.450362
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "selectionKey": "katariinan-polku-kotka",
+        "parentSlug": "kotkan-kansallinen-kaupunkipuisto",
+        "osmWayId": 1429405743,
+        "sourceUrl": "https://www.openstreetmap.org/way/1429405743",
+        "fromNodeId": 13140023816,
+        "toNodeId": 7616503273
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            26.9373689,
+            60.450362
+          ],
+          [
+            26.9373665,
+            60.450386
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "selectionKey": "katariinan-polku-kotka",
+        "parentSlug": "kotkan-kansallinen-kaupunkipuisto",
+        "osmWayId": 1429405742,
+        "sourceUrl": "https://www.openstreetmap.org/way/1429405742",
+        "fromNodeId": 7616503273,
+        "toNodeId": 7616503276
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            26.9373665,
+            60.450386
+          ],
+          [
+            26.9374463,
+            60.4505215
+          ],
+          [
+            26.9375127,
+            60.4505379
+          ],
+          [
+            26.9376525,
+            60.4505725
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "selectionKey": "katariinan-polku-kotka",
+        "parentSlug": "kotkan-kansallinen-kaupunkipuisto",
+        "osmWayId": 1429405741,
+        "sourceUrl": "https://www.openstreetmap.org/way/1429405741",
+        "fromNodeId": 7616503276,
+        "toNodeId": 7616503308
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            26.9376525,
+            60.4505725
+          ],
+          [
+            26.9378763,
+            60.4505907
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "selectionKey": "katariinan-polku-kotka",
+        "parentSlug": "kotkan-kansallinen-kaupunkipuisto",
+        "osmWayId": 815518208,
+        "sourceUrl": "https://www.openstreetmap.org/way/815518208",
+        "fromNodeId": 7616503308,
+        "toNodeId": 7616503309
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            26.9378763,
+            60.4505907
+          ],
+          [
+            26.9378959,
+            60.4506794
+          ],
+          [
+            26.9378968,
+            60.450695
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "selectionKey": "katariinan-polku-kotka",
+        "parentSlug": "kotkan-kansallinen-kaupunkipuisto",
+        "osmWayId": 688952669,
+        "sourceUrl": "https://www.openstreetmap.org/way/688952669",
+        "fromNodeId": 7616503309,
+        "toNodeId": 902320295
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            26.9378968,
+            60.450695
+          ],
+          [
+            26.9379003,
+            60.4507917
+          ],
+          [
+            26.9379783,
+            60.450848
+          ],
+          [
+            26.9381239,
+            60.4509302
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "selectionKey": "katariinan-polku-kotka",
+        "parentSlug": "kotkan-kansallinen-kaupunkipuisto",
+        "osmWayId": 689205029,
+        "sourceUrl": "https://www.openstreetmap.org/way/689205029",
+        "fromNodeId": 902320295,
+        "toNodeId": 3681328590
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            26.9381239,
+            60.4509302
+          ],
+          [
+            26.9373967,
+            60.4514358
+          ],
+          [
+            26.9372878,
+            60.4515121
+          ],
+          [
+            26.9371622,
+            60.4516171
+          ],
+          [
+            26.9371259,
+            60.4516474
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "selectionKey": "katariinan-polku-kotka",
+        "parentSlug": "kotkan-kansallinen-kaupunkipuisto",
+        "osmWayId": 688952676,
+        "sourceUrl": "https://www.openstreetmap.org/way/688952676",
+        "fromNodeId": 3681328590,
+        "toNodeId": 902320311
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            26.9371259,
+            60.4516474
+          ],
+          [
+            26.9373015,
+            60.4517371
+          ],
+          [
+            26.9374135,
+            60.4518611
+          ],
+          [
+            26.9374749,
+            60.4520325
+          ],
+          [
+            26.9374906,
+            60.4521849
+          ],
+          [
+            26.9375662,
+            60.4524428
+          ],
+          [
+            26.9375588,
+            60.4525541
+          ],
+          [
+            26.9375086,
+            60.4526836
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "selectionKey": "katariinan-polku-kotka",
+        "parentSlug": "kotkan-kansallinen-kaupunkipuisto",
+        "osmWayId": 363968035,
+        "sourceUrl": "https://www.openstreetmap.org/way/363968035",
+        "fromNodeId": 902320311,
+        "toNodeId": 2537532190
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            26.9375086,
+            60.4526836
+          ],
+          [
+            26.9371167,
+            60.4532987
+          ],
+          [
+            26.9368612,
+            60.4538752
+          ],
+          [
+            26.9367647,
+            60.4542905
+          ],
+          [
+            26.9367543,
+            60.4545957
+          ],
+          [
+            26.9368202,
+            60.4549564
+          ],
+          [
+            26.9368304,
+            60.4550206
+          ],
+          [
+            26.9368635,
+            60.4552294
+          ],
+          [
+            26.9369127,
+            60.4554462
+          ],
+          [
+            26.9369843,
+            60.4556511
+          ],
+          [
+            26.9370093,
+            60.4558655
+          ],
+          [
+            26.9369691,
+            60.4559912
+          ],
+          [
+            26.9370506,
+            60.456435
+          ],
+          [
+            26.9373119,
+            60.4569784
+          ],
+          [
+            26.937368,
+            60.4570813
+          ],
+          [
+            26.9374431,
+            60.4572602
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "selectionKey": "katariinan-polku-kotka",
+        "parentSlug": "kotkan-kansallinen-kaupunkipuisto",
+        "osmWayId": 76564018,
+        "sourceUrl": "https://www.openstreetmap.org/way/76564018",
+        "fromNodeId": 2537532190,
+        "toNodeId": 902482877
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            26.9374431,
+            60.4572602
+          ],
+          [
+            26.9376764,
+            60.4572348
+          ],
+          [
+            26.9381911,
+            60.4571758
+          ],
+          [
+            26.9384172,
+            60.4570805
+          ],
+          [
+            26.9385534,
+            60.4569891
+          ],
+          [
+            26.9395534,
+            60.4569446
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "selectionKey": "katariinan-polku-kotka",
+        "parentSlug": "kotkan-kansallinen-kaupunkipuisto",
+        "osmWayId": 102802791,
+        "sourceUrl": "https://www.openstreetmap.org/way/102802791",
+        "fromNodeId": 902482877,
+        "toNodeId": 1187209068
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            26.9395534,
+            60.4569446
+          ],
+          [
+            26.9400253,
+            60.4569343
+          ],
+          [
+            26.9409785,
+            60.4569518
+          ],
+          [
+            26.9414645,
+            60.4569506
+          ],
+          [
+            26.9419717,
+            60.4568885
+          ],
+          [
+            26.9423447,
+            60.4568444
+          ],
+          [
+            26.9424047,
+            60.4568453
+          ],
+          [
+            26.9425434,
+            60.4568474
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "selectionKey": "katariinan-polku-kotka",
+        "parentSlug": "kotkan-kansallinen-kaupunkipuisto",
+        "osmWayId": 172091389,
+        "sourceUrl": "https://www.openstreetmap.org/way/172091389",
+        "fromNodeId": 1187209068,
+        "toNodeId": 3689101690
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            26.9425434,
+            60.4568474
+          ],
+          [
+            26.9425148,
+            60.4569226
+          ],
+          [
+            26.9426075,
+            60.4573271
+          ],
+          [
+            26.9426472,
+            60.4574386
+          ],
+          [
+            26.9427391,
+            60.4574983
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "selectionKey": "katariinan-polku-kotka",
+        "parentSlug": "kotkan-kansallinen-kaupunkipuisto",
+        "osmWayId": 364883322,
+        "sourceUrl": "https://www.openstreetmap.org/way/364883322",
+        "fromNodeId": 3689101690,
+        "toNodeId": 3689101675
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            26.9427391,
+            60.4574983
+          ],
+          [
+            26.9426366,
+            60.4575765
+          ],
+          [
+            26.9424541,
+            60.4577158
+          ],
+          [
+            26.9423764,
+            60.4578004
+          ],
+          [
+            26.9420572,
+            60.4581614
+          ],
+          [
+            26.9418533,
+            60.4583651
+          ],
+          [
+            26.941703,
+            60.458546
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "selectionKey": "katariinan-polku-kotka",
+        "parentSlug": "kotkan-kansallinen-kaupunkipuisto",
+        "osmWayId": 41958919,
+        "sourceUrl": "https://www.openstreetmap.org/way/41958919",
+        "fromNodeId": 3689101675,
+        "toNodeId": 519933497
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            26.941703,
+            60.458546
+          ],
+          [
+            26.9418195,
+            60.4585471
+          ],
+          [
+            26.9420277,
+            60.458553
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "selectionKey": "langinkoski-yhdysreitit-kotka",
+        "parentSlug": "kotkan-kansallinen-kaupunkipuisto",
+        "osmWayId": 75655999,
+        "sourceUrl": "https://www.openstreetmap.org/way/75655999",
+        "fromNodeId": 893170866,
+        "toNodeId": 893170881
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            26.8863749,
+            60.4925042
+          ],
+          [
+            26.8859839,
+            60.4923575
+          ],
+          [
+            26.8854335,
+            60.4921274
+          ],
+          [
+            26.8850649,
+            60.4919388
+          ],
+          [
+            26.8846272,
+            60.4917576
+          ],
+          [
+            26.8845193,
+            60.491718
+          ],
+          [
+            26.8843747,
+            60.491665
+          ],
+          [
+            26.884155,
+            60.4914439
+          ],
+          [
+            26.8841234,
+            60.4911832
+          ],
+          [
+            26.8841815,
+            60.4908649
+          ],
+          [
+            26.8842228,
+            60.4908283
+          ],
+          [
+            26.8843552,
+            60.490711
+          ],
+          [
+            26.884675,
+            60.4906131
+          ],
+          [
+            26.8849438,
+            60.4904232
+          ],
+          [
+            26.8851328,
+            60.4901888
+          ],
+          [
+            26.8852288,
+            60.4899629
+          ],
+          [
+            26.8853547,
+            60.4898492
+          ],
+          [
+            26.8856117,
+            60.4897717
+          ],
+          [
+            26.8859624,
+            60.4896949
+          ],
+          [
+            26.886258,
+            60.4895675
+          ],
+          [
+            26.8865777,
+            60.4894252
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "selectionKey": "langinkoski-yhdysreitit-kotka",
+        "parentSlug": "kotkan-kansallinen-kaupunkipuisto",
+        "osmWayId": 815065892,
+        "sourceUrl": "https://www.openstreetmap.org/way/815065892",
+        "fromNodeId": 893170881,
+        "toNodeId": 7575418360
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            26.8865777,
+            60.4894252
+          ],
+          [
+            26.8867213,
+            60.4893931
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "selectionKey": "langinkoski-yhdysreitit-kotka",
+        "parentSlug": "kotkan-kansallinen-kaupunkipuisto",
+        "osmWayId": 1429578914,
+        "sourceUrl": "https://www.openstreetmap.org/way/1429578914",
+        "fromNodeId": 7575418360,
+        "toNodeId": 2410097158
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            26.8867213,
+            60.4893931
+          ],
+          [
+            26.886696,
+            60.4895474
+          ],
+          [
+            26.8868358,
+            60.4896374
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "selectionKey": "langinkoski-yhdysreitit-kotka",
+        "parentSlug": "kotkan-kansallinen-kaupunkipuisto",
+        "osmWayId": 36810566,
+        "sourceUrl": "https://www.openstreetmap.org/way/36810566",
+        "fromNodeId": 2410097158,
+        "toNodeId": 277382551
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            26.8868358,
+            60.4896374
+          ],
+          [
+            26.8869485,
+            60.4897233
+          ],
+          [
+            26.8871852,
+            60.4899382
+          ],
+          [
+            26.8873571,
+            60.4900898
+          ],
+          [
+            26.8875387,
+            60.4902499
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "selectionKey": "langinkoski-yhdysreitit-kotka",
+        "parentSlug": "kotkan-kansallinen-kaupunkipuisto",
+        "osmWayId": 1429405667,
+        "sourceUrl": "https://www.openstreetmap.org/way/1429405667",
+        "fromNodeId": 893170877,
+        "toNodeId": 1151003008
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            26.8852288,
+            60.4899629
+          ],
+          [
+            26.8851247,
+            60.4899276
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "selectionKey": "langinkoski-yhdysreitit-kotka",
+        "parentSlug": "kotkan-kansallinen-kaupunkipuisto",
+        "osmWayId": 99508606,
+        "sourceUrl": "https://www.openstreetmap.org/way/99508606",
+        "fromNodeId": 1151003008,
+        "toNodeId": 1151003017
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            26.8851247,
+            60.4899276
+          ],
+          [
+            26.8849959,
+            60.4898694
+          ],
+          [
+            26.8850818,
+            60.4897532
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "selectionKey": "langinkoski-yhdysreitit-kotka",
+        "parentSlug": "kotkan-kansallinen-kaupunkipuisto",
+        "osmWayId": 1429405668,
+        "sourceUrl": "https://www.openstreetmap.org/way/1429405668",
+        "fromNodeId": 1151003017,
+        "toNodeId": 1151003018
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            26.8850818,
+            60.4897532
+          ],
+          [
+            26.8853285,
+            60.489695
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "selectionKey": "langinkoski-yhdysreitit-kotka",
+        "parentSlug": "kotkan-kansallinen-kaupunkipuisto",
+        "osmWayId": 170835542,
+        "sourceUrl": "https://www.openstreetmap.org/way/170835542",
+        "fromNodeId": 1151003018,
+        "toNodeId": 1151003021
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            26.8853285,
+            60.489695
+          ],
+          [
+            26.8854358,
+            60.4895946
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "selectionKey": "langinkoski-yhdysreitit-kotka",
+        "parentSlug": "kotkan-kansallinen-kaupunkipuisto",
+        "osmWayId": 170835549,
+        "sourceUrl": "https://www.openstreetmap.org/way/170835549",
+        "fromNodeId": 1151003021,
+        "toNodeId": 1151003022
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            26.8854358,
+            60.4895946
+          ],
+          [
+            26.8854787,
+            60.4894837
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "selectionKey": "langinkoski-yhdysreitit-kotka",
+        "parentSlug": "kotkan-kansallinen-kaupunkipuisto",
+        "osmWayId": 1413068076,
+        "sourceUrl": "https://www.openstreetmap.org/way/1413068076",
+        "fromNodeId": 1151003022,
+        "toNodeId": 12986007828
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            26.8854787,
+            60.4894837
+          ],
+          [
+            26.8855771,
+            60.4894202
+          ],
+          [
+            26.8856725,
+            60.4893783
+          ],
+          [
+            26.8857713,
+            60.4893783
+          ],
+          [
+            26.8858531,
+            60.4893699
+          ],
+          [
+            26.8859382,
+            60.489333
+          ],
+          [
+            26.8860608,
+            60.4892927
+          ],
+          [
+            26.8861358,
+            60.4892474
+          ],
+          [
+            26.8861703,
+            60.4892214
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "selectionKey": "langinkoski-yhdysreitit-kotka",
+        "parentSlug": "kotkan-kansallinen-kaupunkipuisto",
+        "osmWayId": 810254741,
+        "sourceUrl": "https://www.openstreetmap.org/way/810254741",
+        "fromNodeId": 7575418360,
+        "toNodeId": 7575418361
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            26.8867213,
+            60.4893931
+          ],
+          [
+            26.8866166,
+            60.4893378
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "selectionKey": "langinkoski-yhdysreitit-kotka",
+        "parentSlug": "kotkan-kansallinen-kaupunkipuisto",
+        "osmWayId": 99508611,
+        "sourceUrl": "https://www.openstreetmap.org/way/99508611",
+        "fromNodeId": 7575418361,
+        "toNodeId": 427891298
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            26.8866166,
+            60.4893378
+          ],
+          [
+            26.8864525,
+            60.4892975
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "selectionKey": "langinkoski-yhdysreitit-kotka",
+        "parentSlug": "kotkan-kansallinen-kaupunkipuisto",
+        "osmWayId": 123153241,
+        "sourceUrl": "https://www.openstreetmap.org/way/123153241",
+        "fromNodeId": 427891298,
+        "toNodeId": 427891299
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            26.8864525,
+            60.4892975
+          ],
+          [
+            26.8862224,
+            60.4892297
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "selectionKey": "langinkoski-yhdysreitit-kotka",
+        "parentSlug": "kotkan-kansallinen-kaupunkipuisto",
+        "osmWayId": 123153240,
+        "sourceUrl": "https://www.openstreetmap.org/way/123153240",
+        "fromNodeId": 427891299,
+        "toNodeId": 427891300
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            26.8862224,
+            60.4892297
+          ],
+          [
+            26.8861703,
+            60.4892214
+          ],
+          [
+            26.8861251,
+            60.4892141
+          ],
+          [
+            26.885569,
+            60.4891247
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "selectionKey": "langinkoski-yhdysreitit-kotka",
+        "parentSlug": "kotkan-kansallinen-kaupunkipuisto",
+        "osmWayId": 99508569,
+        "sourceUrl": "https://www.openstreetmap.org/way/99508569",
+        "fromNodeId": 427891300,
+        "toNodeId": 1374248321
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            26.885569,
+            60.4891247
+          ],
+          [
+            26.8854535,
+            60.489084
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "selectionKey": "langinkoski-yhdysreitit-kotka",
+        "parentSlug": "kotkan-kansallinen-kaupunkipuisto",
+        "osmWayId": 232618419,
+        "sourceUrl": "https://www.openstreetmap.org/way/232618419",
+        "fromNodeId": 1374248321,
+        "toNodeId": 1151002874
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            26.8854535,
+            60.489084
+          ],
+          [
+            26.8853317,
+            60.4890779
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "selectionKey": "langinkoski-yhdysreitit-kotka",
+        "parentSlug": "kotkan-kansallinen-kaupunkipuisto",
+        "osmWayId": 232618427,
+        "sourceUrl": "https://www.openstreetmap.org/way/232618427",
+        "fromNodeId": 1151002874,
+        "toNodeId": 1151002886
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            26.8853317,
+            60.4890779
+          ],
+          [
+            26.8849316,
+            60.489056
+          ],
+          [
+            26.8847921,
+            60.4890714
+          ],
+          [
+            26.8847063,
+            60.4891877
+          ],
+          [
+            26.8846097,
+            60.4892564
+          ],
+          [
+            26.8845239,
+            60.4893462
+          ],
+          [
+            26.8845592,
+            60.4894666
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "selectionKey": "langinkoski-yhdysreitit-kotka",
+        "parentSlug": "kotkan-kansallinen-kaupunkipuisto",
+        "osmWayId": 232618422,
+        "sourceUrl": "https://www.openstreetmap.org/way/232618422",
+        "fromNodeId": 1151002886,
+        "toNodeId": 1151003031
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            26.8845592,
+            60.4894666
+          ],
+          [
+            26.884717,
+            60.4894149
+          ],
+          [
+            26.8848887,
+            60.4893568
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "selectionKey": "langinkoski-yhdysreitit-kotka",
+        "parentSlug": "kotkan-kansallinen-kaupunkipuisto",
+        "osmWayId": 232618426,
+        "sourceUrl": "https://www.openstreetmap.org/way/232618426",
+        "fromNodeId": 1151003031,
+        "toNodeId": 2409618889
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            26.8848887,
+            60.4893568
+          ],
+          [
+            26.8849573,
+            60.4892844
+          ],
+          [
+            26.8850411,
+            60.4892439
+          ],
+          [
+            26.8851094,
+            60.489213
+          ],
+          [
+            26.8851764,
+            60.4891779
+          ],
+          [
+            26.8852113,
+            60.4891731
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "selectionKey": "langinkoski-yhdysreitit-kotka",
+        "parentSlug": "kotkan-kansallinen-kaupunkipuisto",
+        "osmWayId": 232618421,
+        "sourceUrl": "https://www.openstreetmap.org/way/232618421",
+        "fromNodeId": 2409618889,
+        "toNodeId": 2409618894
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            26.8852113,
+            60.4891731
+          ],
+          [
+            26.8853732,
+            60.4891889
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "selectionKey": "langinkoski-yhdysreitit-kotka",
+        "parentSlug": "kotkan-kansallinen-kaupunkipuisto",
+        "osmWayId": 232618428,
+        "sourceUrl": "https://www.openstreetmap.org/way/232618428",
+        "fromNodeId": 2409618894,
+        "toNodeId": 2409618900
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            26.8853732,
+            60.4891889
+          ],
+          [
+            26.8854192,
+            60.4891916
+          ],
+          [
+            26.8854695,
+            60.4891655
+          ],
+          [
+            26.8856802,
+            60.4891882
+          ],
+          [
+            26.8858853,
+            60.4892095
+          ],
+          [
+            26.8859174,
+            60.4892363
+          ],
+          [
+            26.8860472,
+            60.4892363
+          ],
+          [
+            26.8861251,
+            60.4892141
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "selectionKey": "langinkoski-yhdysreitit-kotka",
+        "parentSlug": "kotkan-kansallinen-kaupunkipuisto",
+        "osmWayId": 232618422,
+        "sourceUrl": "https://www.openstreetmap.org/way/232618422",
+        "fromNodeId": 1151002886,
+        "toNodeId": 2410097152
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            26.8845592,
+            60.4894666
+          ],
+          [
+            26.884547,
+            60.4894784
+          ],
+          [
+            26.884534,
+            60.489491
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "selectionKey": "langinkoski-yhdysreitit-kotka",
+        "parentSlug": "kotkan-kansallinen-kaupunkipuisto",
+        "osmWayId": 232673966,
+        "sourceUrl": "https://www.openstreetmap.org/way/232673966",
+        "fromNodeId": 2410097152,
+        "toNodeId": 2410097157
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            26.884534,
+            60.489491
+          ],
+          [
+            26.8841584,
+            60.4895575
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "selectionKey": "langinkoski-yhdysreitit-kotka",
+        "parentSlug": "kotkan-kansallinen-kaupunkipuisto",
+        "osmWayId": 232673970,
+        "sourceUrl": "https://www.openstreetmap.org/way/232673970",
+        "fromNodeId": 2410097157,
+        "toNodeId": 1151003034
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            26.8841584,
+            60.4895575
+          ],
+          [
+            26.88408,
+            60.4895732
+          ],
+          [
+            26.884087,
+            60.4895953
+          ],
+          [
+            26.8841143,
+            60.4896819
+          ],
+          [
+            26.8840861,
+            60.4897782
+          ],
+          [
+            26.8839942,
+            60.489856
+          ],
+          [
+            26.8838887,
+            60.4899121
+          ],
+          [
+            26.8838524,
+            60.4899598
+          ],
+          [
+            26.88384,
+            60.4900261
+          ],
+          [
+            26.8839218,
+            60.4901674
+          ],
+          [
+            26.8838161,
+            60.4902635
+          ],
+          [
+            26.8836918,
+            60.4903409
+          ],
+          [
+            26.8834464,
+            60.4904237
+          ],
+          [
+            26.8831613,
+            60.4904825
+          ],
+          [
+            26.8829253,
+            60.4903979
+          ],
+          [
+            26.8827751,
+            60.490176
+          ],
+          [
+            26.8827319,
+            60.4901263
+          ],
+          [
+            26.882582,
+            60.489954
+          ],
+          [
+            26.8825605,
+            60.4897426
+          ],
+          [
+            26.8826571,
+            60.4895418
+          ],
+          [
+            26.8828824,
+            60.4895048
+          ],
+          [
+            26.883054,
+            60.4895101
+          ],
+          [
+            26.8834403,
+            60.4894889
+          ],
+          [
+            26.8836441,
+            60.4895259
+          ],
+          [
+            26.88408,
+            60.4895732
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "selectionKey": "langinkoski-yhdysreitit-kotka",
+        "parentSlug": "kotkan-kansallinen-kaupunkipuisto",
+        "osmWayId": 810254743,
+        "sourceUrl": "https://www.openstreetmap.org/way/810254743",
+        "fromNodeId": 7575418361,
+        "toNodeId": 893170889
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            26.8866166,
+            60.4893378
+          ],
+          [
+            26.886791,
+            60.4891161
+          ],
+          [
+            26.8869651,
+            60.4890189
+          ],
+          [
+            26.8870729,
+            60.4889588
+          ],
+          [
+            26.8873264,
+            60.4888771
+          ],
+          [
+            26.8874594,
+            60.4887952
+          ],
+          [
+            26.8874915,
+            60.488671
+          ],
+          [
+            26.8875091,
+            60.4886031
+          ],
+          [
+            26.8875646,
+            60.4885097
+          ],
+          [
+            26.8876544,
+            60.4884164
+          ],
+          [
+            26.8878218,
+            60.4882353
+          ],
+          [
+            26.8879778,
+            60.488109
+          ],
+          [
+            26.8881219,
+            60.4880507
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "selectionKey": "langinkoski-yhdysreitit-kotka",
+        "parentSlug": "kotkan-kansallinen-kaupunkipuisto",
+        "osmWayId": 232618424,
+        "sourceUrl": "https://www.openstreetmap.org/way/232618424",
+        "fromNodeId": 893170889,
+        "toNodeId": 1196682162
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            26.8881219,
+            60.4880507
+          ],
+          [
+            26.8880999,
+            60.4880016
+          ],
+          [
+            26.8880328,
+            60.4879657
+          ],
+          [
+            26.8879341,
+            60.4878871
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "selectionKey": "langinkoski-yhdysreitit-kotka",
+        "parentSlug": "kotkan-kansallinen-kaupunkipuisto",
+        "osmWayId": 232673968,
+        "sourceUrl": "https://www.openstreetmap.org/way/232673968",
+        "fromNodeId": 1196682162,
+        "toNodeId": 2409618858
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            26.8879341,
+            60.4878871
+          ],
+          [
+            26.8879994,
+            60.4877428
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "selectionKey": "langinkoski-yhdysreitit-kotka",
+        "parentSlug": "kotkan-kansallinen-kaupunkipuisto",
+        "osmWayId": 232618417,
+        "sourceUrl": "https://www.openstreetmap.org/way/232618417",
+        "fromNodeId": 2409618858,
+        "toNodeId": 946410912
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            26.8879994,
+            60.4877428
+          ],
+          [
+            26.8883306,
+            60.4877273
+          ],
+          [
+            26.8883948,
+            60.4875372
+          ],
+          [
+            26.8884488,
+            60.4871691
+          ],
+          [
+            26.888542,
+            60.4871062
+          ],
+          [
+            26.8886885,
+            60.4869689
+          ],
+          [
+            26.888761,
+            60.4869171
+          ],
+          [
+            26.8890468,
+            60.4869137
+          ],
+          [
+            26.889258,
+            60.4869376
+          ],
+          [
+            26.8894807,
+            60.4869097
+          ],
+          [
+            26.889636,
+            60.4868296
+          ],
+          [
+            26.8897877,
+            60.4867392
+          ],
+          [
+            26.8902287,
+            60.4864926
+          ],
+          [
+            26.890539,
+            60.4863579
+          ],
+          [
+            26.8909137,
+            60.4862253
+          ],
+          [
+            26.8913289,
+            60.4861132
+          ],
+          [
+            26.8916628,
+            60.4860278
+          ],
+          [
+            26.8919555,
+            60.4859078
+          ],
+          [
+            26.8921912,
+            60.4857759
+          ],
+          [
+            26.8923495,
+            60.4855989
+          ],
+          [
+            26.8924842,
+            60.4855045
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "selectionKey": "langinkoski-yhdysreitit-kotka",
+        "parentSlug": "kotkan-kansallinen-kaupunkipuisto",
+        "osmWayId": 232673964,
+        "sourceUrl": "https://www.openstreetmap.org/way/232673964",
+        "fromNodeId": 2410097126,
+        "toNodeId": 2409618859
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            26.8883306,
+            60.4877273
+          ],
+          [
+            26.8885949,
+            60.4878118
+          ]
+        ],
+        "type": "LineString"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "selectionKey": "langinkoski-yhdysreitit-kotka",
+        "parentSlug": "kotkan-kansallinen-kaupunkipuisto",
+        "osmWayId": 99511131,
+        "sourceUrl": "https://www.openstreetmap.org/way/99511131",
+        "fromNodeId": 1151027359,
+        "toNodeId": 1151027438
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            26.8884488,
+            60.4871691
+          ],
+          [
+            26.8884587,
+            60.4870919
+          ],
+          [
+            26.8884109,
+            60.4870233
+          ],
+          [
+            26.8883568,
+            60.4869382
           ]
         ],
         "type": "LineString"
