@@ -1,16 +1,22 @@
 import { createDatabaseClient } from '../db/client.js';
 import { createDatabase } from '../db/database.js';
 import { migrateDatabase } from '../db/migrate.js';
-import { defaultLipasCatalogSourceUrl, importParks } from '../importer/import-parks.js';
+import {
+  defaultLipasCatalogSourceUrl,
+  importParks,
+  kuntorataSourceUrl
+} from '../importer/import-parks.js';
 
 type ParsedArgs = {
   dryRun: boolean;
+  kuntorataOnly: boolean;
 };
 
-const usage = 'Usage: npm run import:parks [-- --dry-run]';
+const usage = 'Usage: npm run import:parks [-- --dry-run] [--kuntorata-only]';
 
 const parseArgs = (argv: string[]): ParsedArgs => {
   let dryRun = false;
+  let kuntorataOnly = false;
 
   for (const arg of argv) {
     if (arg === '--dry-run') {
@@ -18,10 +24,15 @@ const parseArgs = (argv: string[]): ParsedArgs => {
       continue;
     }
 
+    if (arg === '--kuntorata-only') {
+      kuntorataOnly = true;
+      continue;
+    }
+
     throw new Error(`Unknown argument: ${arg}\n${usage}`);
   }
 
-  return { dryRun };
+  return { dryRun, kuntorataOnly };
 };
 
 const client = createDatabaseClient();
@@ -32,7 +43,8 @@ await migrateDatabase(client);
 const result = await importParks({
   database: createDatabase(client),
   dryRun: args.dryRun,
-  sourceUrl: defaultLipasCatalogSourceUrl
+  scope: args.kuntorataOnly ? 'area-link-only' : 'catalog',
+  sourceUrl: args.kuntorataOnly ? kuntorataSourceUrl : defaultLipasCatalogSourceUrl
 });
 
 await client.close();
@@ -65,8 +77,8 @@ if (result.newParks.length === 0) {
 } else {
   console.log(
     result.dryRun
-      ? `New parks that would be added (${result.newParks.length}). They would be imported as disabled until enabled from the admin UI:`
-      : `New parks added (${result.newParks.length}). They were imported as disabled and must be enabled from admin UI:`
+      ? `New parks that would be added (${result.newParks.length}):`
+      : `New parks added (${result.newParks.length}):`
   );
 
   for (const park of result.newParks) {
@@ -90,4 +102,9 @@ for (const warning of result.mergeWarnings) console.warn(warning);
 if (result.affectedMergedTrailSlugs.length)
   console.log(
     `${result.dryRun ? 'After applying, expire' : 'Expire'} these merged-trail public park URLs: ${result.affectedMergedTrailSlugs.join(', ')}`
+  );
+
+if (result.affectedAreaLinkOnlySlugs.length)
+  console.log(
+    `${result.dryRun ? 'After applying, expire' : 'Expire'} these Kuntorata-related URLs: ${result.affectedAreaLinkOnlySlugs.join(', ')}`
   );

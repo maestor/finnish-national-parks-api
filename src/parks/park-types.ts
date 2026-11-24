@@ -90,6 +90,7 @@ export type SupportedParkCategorySlug = SupportedParkCategory['slug'];
 
 export const hikingAreaTypeCode = 109;
 export const hikingAreaDisplayTypeName = 'Valtion retkeilyalue';
+export const kuntorataLipasTypeCode = 4401;
 export const walkingTrailTypeCode = 4403;
 export const natureTrailTypeCode = 4404;
 export const hikingTrailTypeCode = 4405;
@@ -148,6 +149,15 @@ export const getSupportedParkCategoryBySlug = (slug: string) => {
 
   return category;
 };
+
+export const trailTypeCodes = [
+  walkingTrailTypeCode,
+  natureTrailTypeCode,
+  hikingTrailTypeCode
+] as const;
+
+export const isVisibleTrailParent = (area: { removed: boolean; trailPublicationRole: string }) =>
+  !area.removed && area.trailPublicationRole === 'independent';
 
 export const isWalkingTrailTypeCode = (code: number) => code === walkingTrailTypeCode;
 export const isNatureTrailTypeCode = (code: number) => code === natureTrailTypeCode;

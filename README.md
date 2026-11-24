@@ -255,7 +255,7 @@ Catalog endpoints stay cache-friendly and database-backed:
 The catalog importer should use:
 
 ```text
-https://api.lipas.fi/v2/sports-sites?type-codes=103,106,109,110,111,112,4403,4404,4405&page-size=100&page=1
+https://api.lipas.fi/v2/sports-sites?type-codes=103,106,109,110,111,112,4401,4403,4404,4405&page-size=100&page=1
 ```
 
 Importer expectations:
@@ -272,6 +272,7 @@ Importer expectations:
   - `110` Erämaa-alue
   - `111` Kansallispuisto
   - `112` Muu luonnonsuojelualue
+  - `4401` Kuntorata (visible-area links only)
   - `4403` Ulkoilureitti
   - `4404` Luontopolku
   - `4405` Retkeilyreitti

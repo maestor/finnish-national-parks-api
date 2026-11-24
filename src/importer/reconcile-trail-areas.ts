@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 
-import { and, eq, inArray, sql } from 'drizzle-orm';
+import { and, eq, notInArray, or, sql } from 'drizzle-orm';
 
 import type { DbClient } from '../db/database.js';
 import {
@@ -10,7 +10,8 @@ import {
   parkVisits,
   trailAreaLinks
 } from '../db/schema.js';
-import { isTrailTypeCode } from '../parks/park-types.js';
+import { isTrailTypeCode, isVisibleTrailParent, trailTypeCodes } from '../parks/park-types.js';
+import { loadParkGeometries } from './area-link-only-trails.js';
 import type { GeoJsonFeatureCollection } from './geometry.js';
 import {
   hasUsableLineLength,
@@ -20,8 +21,6 @@ import {
 } from './trail-area-geometry.js';
 
 const method = 'jsts-wgs84-clip-epsg3067-v3';
-const MAX_GEOMETRY_BATCH_BYTES = 2 * 1024 * 1024;
-const MAX_GEOMETRY_BATCH_ROWS = 50;
 const TRANSACTION_KEEPALIVE_INTERVAL_MS = 1000;
 type BoundedPark = Pick<
   typeof parks.$inferSelect,
@@ -37,16 +36,23 @@ const fingerprint = (trail: string, area: string) =>
     .update(JSON.stringify([method, trail, area]))
     .digest('hex');
 
-export const reconcileTrailAreas = async (database: DbClient, timestamp: string) => {
+export const reconcileTrailAreas = async (
+  database: DbClient,
+  timestamp: string,
+  scope: 'catalog' | 'area-link-only' = 'catalog'
+) => {
+  const areaLinkOnly = scope === 'area-link-only';
   const metadata = await database
     .select({
       id: parks.id,
       slug: parks.slug,
+      name: parks.name,
       catalogStatus: parks.catalogStatus,
       typeId: parks.typeId,
       managedByLipasImport: parks.managedByLipasImport,
       trailPublicationRole: parks.trailPublicationRole,
       removed: parks.removed,
+      areaLinkOnly: parks.areaLinkOnly,
       bboxMinLon: parks.bboxMinLon,
       bboxMinLat: parks.bboxMinLat,
       bboxMaxLon: parks.bboxMaxLon,
@@ -54,33 +60,25 @@ export const reconcileTrailAreas = async (database: DbClient, timestamp: string)
       geometryBytes: sql<number>`length(cast(${parks.boundaryGeojson} as blob))`
     })
     .from(parks)
-    .where(eq(parks.catalogStatus, 'active'));
-  const geometries = new Map<number, string>();
-  let ids: number[] = [];
-  let bytes = 0;
-  const flushGeometryBatch = async () => {
-    const rows = await database
-      .select({ id: parks.id, geometry: parks.boundaryGeojson })
-      .from(parks)
-      .where(inArray(parks.id, ids));
-    for (const row of rows) geometries.set(row.id, row.geometry);
-    ids = [];
-    bytes = 0;
-  };
-  for (const park of metadata) {
-    if (
-      ids.length > 0 &&
-      (ids.length === MAX_GEOMETRY_BATCH_ROWS ||
-        bytes + park.geometryBytes > MAX_GEOMETRY_BATCH_BYTES)
-    ) {
-      await flushGeometryBatch();
-    }
-    ids.push(park.id);
-    bytes += park.geometryBytes;
-  }
-  if (ids.length > 0) await flushGeometryBatch();
+    .where(
+      and(
+        eq(parks.catalogStatus, 'active'),
+        areaLinkOnly
+          ? or(eq(parks.areaLinkOnly, true), notInArray(parks.typeId, [...trailTypeCodes]))
+          : undefined
+      )
+    );
+  const geometries = await loadParkGeometries(database, metadata);
   const records = metadata.map((park) => ({ ...park, boundaryGeojson: geometries.get(park.id)! }));
-  const links = await database.select().from(trailAreaLinks);
+  const links = areaLinkOnly
+    ? (
+        await database
+          .select({ link: trailAreaLinks })
+          .from(trailAreaLinks)
+          .innerJoin(parks, eq(parks.id, trailAreaLinks.trailId))
+          .where(eq(parks.areaLinkOnly, true))
+      ).map(({ link }) => link)
+    : await database.select().from(trailAreaLinks);
   const visited = new Set(
     (await database.selectDistinct({ id: parkVisits.parkId }).from(parkVisits)).map((row) => row.id)
   );
@@ -89,13 +87,17 @@ export const reconcileTrailAreas = async (database: DbClient, timestamp: string)
   );
   const trails = records.filter(
     (park) =>
-      park.catalogStatus === 'active' && park.managedByLipasImport && isTrailTypeCode(park.typeId)
+      park.catalogStatus === 'active' &&
+      park.managedByLipasImport &&
+      isTrailTypeCode(park.typeId) &&
+      (!areaLinkOnly || park.areaLinkOnly)
   );
   const byPair = new Map(links.map((link) => [`${link.trailId}:${link.areaId}`, link]));
   const seen = new Set<string>();
   const unresolved: { trailId: number; areaId: number | null; status: string }[] = [];
   const newlyHiddenPublicSlugs: string[] = [];
   let automaticLinks = 0;
+  const newAreaOnlyLinks: { trailName: string; areaName: string }[] = [];
   let newlyHidden = 0;
   // Geometry matching can otherwise leave a remote interactive transaction idle
   // long enough for its libSQL stream to expire before commit or rollback.
@@ -140,6 +142,7 @@ export const reconcileTrailAreas = async (database: DbClient, timestamp: string)
       continue;
     }
     for (const area of areas) {
+      if (trail.areaLinkOnly && !isVisibleTrailParent(area)) continue;
       if (!intersectsBounds(trail, area)) continue;
       await keepTransactionActive();
       const key = `${trail.id}:${area.id}`;
@@ -183,6 +186,9 @@ export const reconcileTrailAreas = async (database: DbClient, timestamp: string)
       }
       seen.add(key);
       if (matches) automaticLinks += 1;
+      if (trail.areaLinkOnly && matches && !prior?.automaticMatch && !prior?.override) {
+        newAreaOnlyLinks.push({ trailName: trail.name, areaName: area.name });
+      }
       const effective = prior?.override === 'include' || (matches && prior?.override !== 'exclude');
       if (effective && trail.trailPublicationRole === 'independent') {
         if (visited.has(trail.id))
@@ -255,6 +261,7 @@ export const reconcileTrailAreas = async (database: DbClient, timestamp: string)
   }
   return {
     automaticLinks,
+    newAreaOnlyLinks,
     manualExclusions: links.filter((link) => link.override === 'exclude').length,
     newlyHidden,
     newlyHiddenPublicSlugs,

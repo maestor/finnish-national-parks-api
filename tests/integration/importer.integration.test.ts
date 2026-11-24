@@ -8,8 +8,19 @@ import {
   listParks,
   updateParkRemoved
 } from '../../src/db/repositories.js';
-import { importRuns, parks, parkVisits, trailAreaLinks, visitTrails } from '../../src/db/schema.js';
-import { listAreaTrails, setAreaTrailOverride } from '../../src/db/trail-areas.js';
+import {
+  importRuns,
+  parkImportNotifications,
+  parks,
+  parkVisits,
+  trailAreaLinks,
+  visitTrails
+} from '../../src/db/schema.js';
+import {
+  listAreaTrails,
+  listPublicAreaTrails,
+  setAreaTrailOverride
+} from '../../src/db/trail-areas.js';
 import { importOsmTrails } from '../../src/importer/import-osm-trails.js';
 import { defaultLipasCatalogSourceUrl, importParks } from '../../src/importer/import-parks.js';
 import { reconcileTrailAreas } from '../../src/importer/reconcile-trail-areas.js';
@@ -64,6 +75,157 @@ describe('importParks', () => {
 
   afterEach(async () => {
     await testDatabase.dispose();
+  });
+
+  it('imports Kuntorata only as links to visible areas and prevents standalone publication', async () => {
+    const { database } = testDatabase;
+    const area = createLipasPark();
+    const hiddenArea = createLipasPark({ 'lipas-id': 87123, name: 'Hidden area' });
+    const source = createLipasTrail({
+      'lipas-id': 99101,
+      name: 'Testikuntorata',
+      type: { 'type-code': 4401 }
+    });
+    const unmatched = createLipasTrail({
+      'lipas-id': 99102,
+      type: { 'type-code': 4401 },
+      location: { geometries: { type: 'FeatureCollection', features: [] } }
+    });
+    const invalid = createLipasTrail({
+      'lipas-id': 99103,
+      type: { 'type-code': 4401 },
+      location: {
+        geometries: {
+          type: 'FeatureCollection',
+          features: [
+            {
+              type: 'Feature',
+              geometry: {
+                type: 'LineString',
+                coordinates: [
+                  [24.5, 61],
+                  [24.6, 999]
+                ]
+              }
+            }
+          ]
+        }
+      }
+    });
+    const options = { database, sourceUrl: 'https://example.test' };
+    await importParks({ ...options, fetchSource: async () => ({ items: [area, hiddenArea] }) });
+    const parent = await database.query.parks.findFirst({
+      where: eq(parks.lipasId, area['lipas-id'])
+    });
+    await updateParkRemoved(database, parent!.slug, false);
+
+    const fetchSource = async () => ({ items: [area, hiddenArea, source, unmatched, invalid] });
+    const result = await importParks({ ...options, fetchSource, queueNewParkNotification: true });
+    expect(result.affectedAreaLinkOnlySlugs).toEqual([parent!.slug]);
+    expect(await database.select().from(parkImportNotifications)).toMatchObject([
+      {
+        parksJson: JSON.stringify({
+          parks: [],
+          areaLinks: [{ trailName: source.name, areaName: area.name }]
+        })
+      }
+    ]);
+    const trail = await database.query.parks.findFirst({ where: eq(parks.lipasId, 99101) });
+    expect(trail).toMatchObject({ removed: true, trailPublicationRole: 'area_member' });
+    expect(
+      await database.query.parks.findFirst({ where: eq(parks.lipasId, 99102) })
+    ).toBeUndefined();
+    expect(
+      await database.query.parks.findFirst({ where: eq(parks.lipasId, 99103) })
+    ).toBeUndefined();
+    const visibility = await listAdminParkVisibility(database);
+    expect(
+      [...visibility.visibleParks, ...visibility.removedParks].map(({ slug }) => slug)
+    ).not.toContain(trail!.slug);
+    expect(await database.select().from(trailAreaLinks)).toMatchObject([
+      { trailId: trail!.id, areaId: parent!.id, automaticMatch: true }
+    ]);
+    expect(await listPublicAreaTrails(database, parent!.id)).toMatchObject([{ name: source.name }]);
+    expect(await getParkBySlug(database, trail!.slug)).toBeNull();
+
+    await setAreaTrailOverride(database, parent!.slug, trail!.id, 'exclude');
+    await expect(updateParkRemoved(database, trail!.slug, false)).rejects.toThrow(
+      'standalone destination'
+    );
+    await setAreaTrailOverride(database, parent!.slug, trail!.id, 'include');
+    await updateParkRemoved(database, parent!.slug, true);
+    expect(await listPublicAreaTrails(database, parent!.id)).toEqual([]);
+    await expect(
+      setAreaTrailOverride(database, 'hidden-area', trail!.id, 'include')
+    ).rejects.toThrow('visible parent area');
+    await importParks({ ...options, fetchSource });
+    expect(await database.query.parks.findFirst({ where: eq(parks.id, trail!.id) })).toMatchObject({
+      catalogStatus: 'inactive'
+    });
+  });
+
+  it('previews and refreshes Kuntorata without changing the rest of the local catalog', async () => {
+    const { database } = testDatabase;
+    const area = createLipasPark();
+    const source = createLipasTrail({ 'lipas-id': 99101, type: { 'type-code': 4401 } });
+    const formerTrail = createLipasWalkingTrail({ 'lipas-id': 99101 });
+    const options = { database, sourceUrl: 'https://example.test' };
+    await importParks({ ...options, fetchSource: async () => ({ items: [area, formerTrail] }) });
+    const areaRow = await database.query.parks.findFirst({
+      where: eq(parks.lipasId, area['lipas-id'])
+    });
+    const trailRow = await database.query.parks.findFirst({ where: eq(parks.lipasId, 99101) });
+    await updateParkRemoved(database, areaRow!.slug, false);
+    const scoped = { ...options, scope: 'area-link-only' as const };
+    await expect(
+      importParks({ ...scoped, fetchSource: async () => ({ items: [area] }) })
+    ).rejects.toThrow('Kuntorata-only source');
+    const fetchSource = async () => ({ items: [source] });
+    const preview = await importParks({ ...scoped, fetchSource, dryRun: true });
+    expect(preview.activeCount).toBe(1);
+    expect(preview.trailAreaResult?.automaticLinks).toBe(1);
+    expect(
+      await database.query.parks.findFirst({ where: eq(parks.id, trailRow!.id) })
+    ).toMatchObject({ areaLinkOnly: false });
+    await importParks({ ...scoped, fetchSource });
+    await importParks({ ...scoped, fetchSource });
+    expect(
+      await database.query.parks.findFirst({ where: eq(parks.id, trailRow!.id) })
+    ).toMatchObject({
+      areaLinkOnly: true,
+      catalogStatus: 'active'
+    });
+    expect(await database.select().from(trailAreaLinks)).toMatchObject([
+      { trailId: trailRow!.id, areaId: areaRow!.id, automaticMatch: true }
+    ]);
+    const omitted = await importParks({ ...scoped, fetchSource: async () => ({ items: [] }) });
+    expect(omitted.affectedAreaLinkOnlySlugs).toEqual([areaRow!.slug]);
+    expect(await listPublicAreaTrails(database, areaRow!.id)).toEqual([]);
+    expect(
+      await database.query.parks.findFirst({ where: eq(parks.id, trailRow!.id) })
+    ).toMatchObject({ catalogStatus: 'inactive' });
+    expect(
+      await database.query.parks.findFirst({ where: eq(parks.id, areaRow!.id) })
+    ).toMatchObject({ catalogStatus: 'active', removed: false });
+  });
+
+  it('retires a former standalone trail when LIPAS reclassifies it as an unmatched Kuntorata', async () => {
+    const { database } = testDatabase;
+    const original = createLipasWalkingTrail({ 'lipas-id': 99101 });
+    const options = { database, sourceUrl: 'https://example.test' };
+    await importParks({ ...options, fetchSource: async () => ({ items: [original] }) });
+    const park = await database.query.parks.findFirst({ where: eq(parks.lipasId, 99101) });
+    await updateParkRemoved(database, park!.slug, false);
+    const reclassified = { ...original, type: { 'type-code': 4401 } };
+    const fetchSource = async () => ({ items: [reclassified] });
+    await expect(
+      importParks({ ...options, fetchSource, requireNoPublicTrailConversions: true })
+    ).rejects.toThrow(park!.slug);
+    expect(await getParkBySlug(database, park!.slug)).not.toBeNull();
+    const result = await importParks({ ...options, scope: 'area-link-only', fetchSource });
+    expect(result.affectedAreaLinkOnlySlugs).toEqual([park!.slug]);
+    expect(result.deactivatedParks).toEqual([{ lipasId: 99101, slug: park!.slug }]);
+    expect(await getParkBySlug(database, park!.slug)).toBeNull();
   });
 
   it('consolidates the six Seitsemän veljeksen records and retains the combined trail on reimport', async () => {

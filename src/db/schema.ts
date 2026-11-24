@@ -87,6 +87,7 @@ export const parks = sqliteTable(
     importedMarkerLon: real('imported_marker_lon'),
     importedMarkerLat: real('imported_marker_lat'),
     catalogStatus: text('catalog_status').notNull(),
+    areaLinkOnly: integer('area_link_only', { mode: 'boolean' }).notNull().default(false),
     trailPublicationRole: text('trail_publication_role', { enum: ['independent', 'area_member'] })
       .notNull()
       .default('independent'),

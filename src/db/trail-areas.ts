@@ -1,7 +1,8 @@
 import { and, asc, desc, eq, inArray, isNotNull, or, sql } from 'drizzle-orm';
 
+import { alias } from 'drizzle-orm/sqlite-core';
 import type { GeoJsonFeatureCollection } from '../importer/geometry.js';
-import { isTrailTypeCode } from '../parks/park-types.js';
+import { isTrailTypeCode, isVisibleTrailParent, trailTypeCodes } from '../parks/park-types.js';
 import { toAddress } from './address.js';
 import type { Database, DbClient } from './database.js';
 import {
@@ -17,7 +18,6 @@ import {
 
 import { unabsorbedTrailWhere } from './trail-merges.js';
 
-const trailTypes = [4403, 4404, 4405];
 export class TrailAreaValidationError extends Error {}
 export class TrailVisitConflictError extends Error {
   constructor(public visits: { id: number; visitedOn: string }[]) {
@@ -112,6 +112,7 @@ export const listTrailAreas = async (database: DbClient, slug: string) => {
     .map(({ name, slug: areaSlug }) => ({ name, slug: areaSlug }));
 };
 export const listPublicAreaTrails = async (database: DbClient, areaId: number) => {
+  const parent = alias(parks, 'parent_area');
   const mergedSources = await database
     .select({
       canonicalTrailId: trailMergeMembers.canonicalTrailId,
@@ -131,20 +132,23 @@ export const listPublicAreaTrails = async (database: DbClient, areaId: number) =
     .select({
       link: trailAreaLinks,
       trail: parks,
+      area: { removed: parent.removed, trailPublicationRole: parent.trailPublicationRole },
       source: osmTrailSources,
       curatedId: curatedTrailSources.trailId,
       sourceUrlsJson: curatedTrailSources.sourceUrlsJson
     })
     .from(trailAreaLinks)
     .innerJoin(parks, eq(parks.id, trailAreaLinks.trailId))
+    .innerJoin(parent, eq(parent.id, trailAreaLinks.areaId))
     .leftJoin(osmTrailSources, eq(osmTrailSources.trailId, parks.id))
     .leftJoin(curatedTrailSources, eq(curatedTrailSources.trailId, parks.id))
     .where(eq(trailAreaLinks.areaId, areaId))
     .orderBy(asc(parks.name), asc(parks.id));
   return rows
     .filter(
-      ({ link, trail, source, curatedId }) =>
+      ({ link, trail, area, source, curatedId }) =>
         trail.catalogStatus === 'active' &&
+        (!trail.areaLinkOnly || isVisibleTrailParent(area)) &&
         (trail.managedByLipasImport || source !== null || curatedId !== null) &&
         isTrailTypeCode(trail.typeId) &&
         selectLink(link, trail).effective
@@ -214,7 +218,7 @@ export const listAreaTrailCandidates = async (
           isNotNull(osmTrailSources.trailId),
           isNotNull(curatedTrailSources.trailId)
         ),
-        inArray(parks.typeId, trailTypes),
+        inArray(parks.typeId, trailTypeCodes),
         sql`instr(lower(${parks.name}), lower(${q})) > 0`
       )
     )
@@ -259,6 +263,9 @@ export const setAreaTrailOverride = async (
       trail.catalogStatus !== 'active'
     )
       throw new TrailAreaValidationError('An active supported trail is required.');
+    if (override === 'include' && trail.areaLinkOnly && !isVisibleTrailParent(area)) {
+      throw new TrailAreaValidationError('An area-only trail requires a visible parent area.');
+    }
     if (override === 'include' && trail.trailPublicationRole === 'independent') {
       const visits = await tx
         .select({ id: parkVisits.id })

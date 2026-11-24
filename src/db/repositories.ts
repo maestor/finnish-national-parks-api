@@ -59,11 +59,15 @@ import { listAreaTrails } from './trail-areas.js';
 import { unabsorbedTrailWhere } from './trail-merges.js';
 
 const standalonePublicParkWhere = () =>
-  and(eq(parks.removed, false), eq(parks.trailPublicationRole, 'independent'));
+  and(
+    eq(parks.removed, false),
+    eq(parks.trailPublicationRole, 'independent'),
+    eq(parks.areaLinkOnly, false)
+  );
 const administrativeHistoryParkWhere = () =>
   or(eq(parks.removed, false), eq(parks.trailPublicationRole, 'area_member'));
 const isStandaloneParkHidden = () =>
-  sql<boolean>`(${parks.removed} = 1 OR ${parks.trailPublicationRole} != 'independent')`.mapWith(
+  sql<boolean>`(${parks.removed} = 1 OR ${parks.trailPublicationRole} != 'independent' OR ${parks.areaLinkOnly} = 1)`.mapWith(
     Boolean
   );
 
@@ -1063,7 +1067,8 @@ const visibleCatalogWhere = (
   return and(...conditions);
 };
 
-const removedCatalogWhere = () => and(eq(parks.removed, true), unabsorbedTrailWhere());
+const removedCatalogWhere = () =>
+  and(eq(parks.removed, true), eq(parks.areaLinkOnly, false), unabsorbedTrailWhere());
 
 const withOptionalDisplayTypeName = <T extends object>(
   park: { displayTypeName: string | null },
@@ -5123,6 +5128,12 @@ export const updateParkRemoved = async (database: Database, slug: string, remove
       throw new RepositoryValidationError('A place without coordinates cannot be enabled.');
     }
 
+    if (!removed && park.areaLinkOnly) {
+      throw new RepositoryValidationError(
+        'An area-only trail cannot be enabled as a standalone destination.'
+      );
+    }
+
     if (!removed && park.trailPublicationRole !== 'independent') {
       const activeLinks = await tx
         .select({ trailId: trailAreaLinks.trailId })
@@ -6283,6 +6294,7 @@ export const upsertCatalogParks = async (database: DbClient, inputs: UpsertCatal
         bboxMinLon: sql`excluded.bbox_min_lon`,
         boundaryGeojson: sql`excluded.boundary_geojson`,
         catalogStatus: sql`excluded.catalog_status`,
+        areaLinkOnly: sql`excluded.area_link_only`,
         displayTypeName: sql`CASE
           WHEN ${parks.displayTypeName} IS ${parks.importedDisplayTypeName}
             THEN excluded.imported_display_type_name
@@ -6371,8 +6383,10 @@ export const markMissingParksInactive = async (
   database: DbClient,
   activeLipasIds: number[],
   lastImportRunId: number,
-  updatedAt: string
+  updatedAt: string,
+  scopeCondition?: ReturnType<typeof and>
 ) => {
+  const managed = and(eq(parks.managedByLipasImport, true), scopeCondition);
   if (activeLipasIds.length === 0) {
     await database
       .update(parks)
@@ -6381,7 +6395,7 @@ export const markMissingParksInactive = async (
         lastImportRunId,
         updatedAt
       })
-      .where(eq(parks.managedByLipasImport, true));
+      .where(managed);
     return;
   }
 
@@ -6393,11 +6407,7 @@ export const markMissingParksInactive = async (
       updatedAt
     })
     .where(
-      and(
-        eq(parks.catalogStatus, 'active'),
-        eq(parks.managedByLipasImport, true),
-        notInArray(parks.lipasId, activeLipasIds)
-      )
+      and(eq(parks.catalogStatus, 'active'), managed, notInArray(parks.lipasId, activeLipasIds))
     );
 };
 

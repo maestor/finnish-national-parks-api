@@ -3,7 +3,9 @@ import { createParkSlug, normalizeParkUrl } from '../parks/park-normalization.js
 import {
   getSupportedParkTypeByCode,
   getSupportedParkTypeBySlug,
-  hasMagnetByDefaultForTypeSlug
+  hasMagnetByDefaultForTypeSlug,
+  kuntorataLipasTypeCode,
+  walkingTrailTypeCode
 } from '../parks/park-types.js';
 import type { BoundingBox, GeoJsonFeatureCollection } from './geometry.js';
 import { deriveBoundingBox } from './geometry.js';
@@ -122,7 +124,11 @@ export const mapLipasPark = (source: unknown, existingSlug?: string): MappedPark
   const parkType = shouldPromoteToHikingArea(park)
     ? getSupportedParkTypeBySlug('hiking-area')
     : getSupportedParkTypeByCode(
-        sourceTypeCode === multiUseAreaLipasTypeCode ? 103 : sourceTypeCode
+        sourceTypeCode === multiUseAreaLipasTypeCode
+          ? 103
+          : sourceTypeCode === kuntorataLipasTypeCode
+            ? walkingTrailTypeCode
+            : sourceTypeCode
       );
   const sourceGeometry = park.location.geometries;
   const hasMultipart = sourceGeometry.features.some(
