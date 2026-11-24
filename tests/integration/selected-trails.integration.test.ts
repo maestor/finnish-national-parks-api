@@ -341,7 +341,24 @@ describe('selected trail batch', () => {
     await db.database
       .insert(osmTrailSources)
       .values({ trailId: prior.id, relationId: 6425065, sourceTimestamp: '2026-01-01T00:00:00Z' });
-    await importSelectedTrails({ database: db.database });
+    const selectOne = {
+      database: db.database,
+      selectionKeys: [item.selection.selectionKey],
+      guardPublicConversions: true
+    };
+    await db.database
+      .update(parks)
+      .set({ removed: false, trailPublicationRole: 'independent' })
+      .where(eq(parks.id, prior.id));
+    await expect(importSelectedTrails(selectOne)).rejects.toThrow(
+      'Public trail conversion requires immediate frontend cache expiry'
+    );
+    await expect(
+      importSelectedTrails({ ...selectOne, selectionKeys: ['unknown'] })
+    ).rejects.toThrow('Unknown selection keys: unknown');
+    expect(await db.database.select().from(curatedTrailSources)).toEqual([]);
+    await db.database.update(parks).set({ removed: true }).where(eq(parks.id, prior.id));
+    await importSelectedTrails(selectOne);
     const selected = (await db.database.select().from(parks).where(eq(parks.id, prior.id)))[0]!;
     expect(selected).toMatchObject({ slug: prior.slug, name: 'Edited name', lengthKm: 9 });
     const link = (await db.database.select().from(trailAreaLinks)).find(

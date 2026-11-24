@@ -8,7 +8,7 @@ on:
 
 concurrency:
   group: production-database
-  cancel-in-progress: false
+  queue: max
 
 jobs:
   import-parks:

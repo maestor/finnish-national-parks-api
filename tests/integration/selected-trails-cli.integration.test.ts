@@ -22,7 +22,7 @@ const cli = resolve('src/cli/import-selected-trails.ts');
 const loader = resolve('node_modules/tsx/dist/loader.mjs');
 const manifest = JSON.parse(
   await readFile(new URL('../../src/importer/osm-linked-trails.geojson', import.meta.url), 'utf8')
-) as { selections: { parentSlug: string; name: string }[] };
+) as { selections: { parentSlug: string; name: string; selectionKey: string }[] };
 const parentSlugs = [...new Set(manifest.selections.map((selection) => selection.parentSlug))];
 
 describe('selected trails CLI', () => {
@@ -205,12 +205,33 @@ describe('selected trails CLI', () => {
     );
     expect(await database.select().from(curatedTrailSources)).toHaveLength(0);
   });
+  it('applies only the requested selections', async () => {
+    const requested = manifest.selections.slice(0, 2).map(({ selectionKey }) => selectionKey);
+    const result = JSON.parse(
+      (
+        await run(
+          '--json',
+          '--guard-public-conversions',
+          ...requested.flatMap((key) => ['--selection', key])
+        )
+      ).stdout
+    );
+    expect(result.selections.map(({ key }: { key: string }) => key)).toEqual(requested);
+    expect(
+      (await database.select().from(curatedTrailSources))
+        .map(({ selectionKey }) => selectionKey)
+        .sort()
+    ).toEqual(requested.toSorted());
+    await expect(run('--selection', 'unknown')).rejects.toThrow('Unknown selection keys: unknown');
+  });
+
   it('refuses pending migrations and unsupported arguments', async () => {
     await client.execute(
       "DELETE FROM schema_migrations WHERE name = '0052_curated_trail_sources.sql'"
     );
     await expect(run('--dry-run')).rejects.toThrow('Database schema is not current');
-    await expect(run('--selection', 'other')).rejects.toThrow('Usage:');
+    await expect(run('--selection')).rejects.toThrow('Usage:');
+    await expect(run('--selection', 'one', '--selection', 'one')).rejects.toThrow('Usage:');
     await expect(run('--json', '--json')).rejects.toThrow('Usage:');
   });
 });

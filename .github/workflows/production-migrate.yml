@@ -5,10 +5,15 @@ on:
     branches:
       - main
   workflow_dispatch:
+    inputs:
+      refresh_osm:
+        description: Refresh supplemental OpenStreetMap trails
+        type: boolean
+        default: false
 
 concurrency:
   group: production-database
-  cancel-in-progress: false
+  queue: max
 
 jobs:
   migrate-production-database:
@@ -65,3 +70,143 @@ jobs:
       - name: Skip backup and migrate when schema is current
         if: steps.pending-migrations.outputs.has_pending != 'true'
         run: echo "Production database is already up to date."
+
+  import-production-catalog:
+    name: Import changed production catalog data
+    needs: migrate-production-database
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || inputs.refresh_osm)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+    timeout-minutes: 30
+    environment: production
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Check for catalog input changes
+        id: changed
+        env:
+          BEFORE: ${{ github.event.before }}
+          REFRESH_OSM: ${{ inputs.refresh_osm }}
+        run: |
+          if [[ "$REFRESH_OSM" == true ]]; then
+            echo 'has_changes=true' >> "$GITHUB_OUTPUT"
+          else
+            git cat-file -e "$BEFORE^{commit}"
+            changed=$(git diff --name-only "$BEFORE" "$GITHUB_SHA" -- \
+              src/importer/special-parks src/importer/osm-linked-trails.geojson .github/osm-trails-refresh)
+            if [[ -n "$changed" ]]; then
+              echo 'has_changes=true' >> "$GITHUB_OUTPUT"
+            fi
+          fi
+
+      - name: Setup Node.js
+        if: steps.changed.outputs.has_changes == 'true'
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install dependencies
+        if: steps.changed.outputs.has_changes == 'true'
+        run: npm ci
+
+      - name: Plan scoped imports
+        if: steps.changed.outputs.has_changes == 'true'
+        id: plan
+        env:
+          BEFORE: ${{ github.event.before }}
+          REFRESH_OSM: ${{ inputs.refresh_osm }}
+        run: |
+          if [[ "$REFRESH_OSM" == true ]]; then
+            plan='{"special":{"changed":[],"removed":[],"superseded":[]},"linked":{"changed":[],"removed":[],"superseded":[]},"osm":true}'
+          else
+            before_dir=$(mktemp -d .catalog-before.XXXXXX)
+            latest_dir=$(mktemp -d .catalog-latest.XXXXXX)
+            trap 'rm -rf "$before_dir" "$latest_dir"' EXIT
+
+            extract_catalog() {
+              local revision=$1 directory=$2
+              git archive "$revision" src/importer/special-parks src/importer/osm-linked-trails.geojson |
+                tar -xf - -C "$directory"
+              if git cat-file -e "$revision:.github/osm-trails-refresh" 2>/dev/null; then
+                mkdir -p "$directory/.github"
+                git show "$revision:.github/osm-trails-refresh" > "$directory/.github/osm-trails-refresh"
+              fi
+            }
+
+            extract_catalog "$BEFORE" "$before_dir"
+            latest_commit=$(git rev-parse refs/remotes/origin/main)
+            if [[ "$latest_commit" == "$GITHUB_SHA" ]]; then
+              plan=$(node --import tsx scripts/catalog-import-plan.ts "$before_dir" .)
+            else
+              extract_catalog "$latest_commit" "$latest_dir"
+              plan=$(node --import tsx scripts/catalog-import-plan.ts "$before_dir" . "$latest_dir")
+            fi
+          fi
+          echo "json=$plan" >> "$GITHUB_OUTPUT"
+          echo "has_imports=$(jq -r '(.special.changed | length > 0) or (.linked.changed | length > 0) or .osm' <<< "$plan")" >> "$GITHUB_OUTPUT"
+          echo '### Catalog import plan' >> "$GITHUB_STEP_SUMMARY"
+          jq -r '
+            "* Special parks: " + (.special.changed | join(", ")),
+            "* Curated linked trails: " + (.linked.changed | join(", ")),
+            "* Supplemental OSM refresh: " + (.osm | tostring),
+            "* Removed definitions for manual review: " + ((.special.removed + .linked.removed) | join(", ")),
+            "* Changes superseded by newer merges: " + ((.special.superseded + .linked.superseded) | join(", "))
+          ' <<< "$plan" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Back up production before catalog imports
+        if: steps.plan.outputs.has_imports == 'true'
+        env:
+          DATABASE_AUTH_TOKEN: ${{ secrets.DATABASE_AUTH_TOKEN }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: npm run db:backup -- before-production-catalog-import
+
+      - name: Upload catalog backup artifact
+        if: steps.plan.outputs.has_imports == 'true'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: production-catalog-backup-${{ github.run_id }}-${{ github.run_attempt }}
+          path: data/backups/*.db
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Import affected special parks
+        if: steps.plan.outputs.has_imports == 'true' && fromJSON(steps.plan.outputs.json).special.changed[0] != null
+        env:
+          CATALOG_PLAN: ${{ steps.plan.outputs.json }}
+          DATABASE_AUTH_TOKEN: ${{ secrets.DATABASE_AUTH_TOKEN }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          mapfile -t slugs < <(jq -r '.special.changed[]' <<< "$CATALOG_PLAN")
+          (( ${#slugs[@]} > 0 ))
+          npm run import:special-parks -- "${slugs[@]}" 2>&1 | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Import affected curated trails
+        if: steps.plan.outputs.has_imports == 'true' && fromJSON(steps.plan.outputs.json).linked.changed[0] != null
+        env:
+          CATALOG_PLAN: ${{ steps.plan.outputs.json }}
+          DATABASE_AUTH_TOKEN: ${{ secrets.DATABASE_AUTH_TOKEN }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          mapfile -t keys < <(jq -r '.linked.changed[]' <<< "$CATALOG_PLAN")
+          (( ${#keys[@]} > 0 ))
+          args=()
+          for key in "${keys[@]}"; do args+=(--selection "$key"); done
+          npm run import:osm-linked-trails -- --guard-public-conversions --json "${args[@]}" 2>&1 | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Refresh supplemental OpenStreetMap trails
+        if: steps.plan.outputs.has_imports == 'true' && fromJSON(steps.plan.outputs.json).osm
+        env:
+          DATABASE_AUTH_TOKEN: ${{ secrets.DATABASE_AUTH_TOKEN }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: npm run import:osm-trails 2>&1 | tee -a "$GITHUB_STEP_SUMMARY"
