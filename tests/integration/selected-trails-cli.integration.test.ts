@@ -62,7 +62,7 @@ describe('selected trails CLI', () => {
     delete env.DATABASE_AUTH_TOKEN;
     return exec(process.execPath, ['--import', loader, cli, ...args], { cwd: directory, env });
   };
-  it('shows a readable preview and apply summary, with a compact no-op rerun', async () => {
+  it('lists only changed trails in readable preview and apply output', async () => {
     const preview = await run('--dry-run');
     expect(preview.stdout).toContain(
       `Dry run — ${manifest.selections.length} trails in ${parentSlugs.length} areas`
@@ -80,11 +80,11 @@ describe('selected trails CLI', () => {
     expect(applied.stdout).toContain(
       `Imported — ${manifest.selections.length} trails in ${parentSlugs.length} areas`
     );
-    expect(applied.stdout).toContain(`${manifest.selections.length} added, 0 updated, 0 unchanged`);
+    expect(applied.stdout).toContain(`${manifest.selections.length} added, 0 updated`);
     expect(applied.stderr).toContain('Expire affected UI caches now');
     expect(await database.select().from(trailAreaLinks)).toHaveLength(manifest.selections.length);
     const rerun = await run();
-    expect(rerun.stdout).toContain('No changes needed');
+    expect(rerun.stdout.trim()).toBe('No changes needed.');
     expect(rerun.stderr).not.toContain('Expire');
     expect((await run('--dry-run')).stdout.trim()).toBe('No changes needed.');
     const link = (await database.select().from(trailAreaLinks))[0]!;
@@ -101,8 +101,15 @@ describe('selected trails CLI', () => {
     expect(previewJson.selections).toEqual([
       expect.objectContaining({ name: changed!.name, action: 'update' })
     ]);
+    const mixedApply = await run();
+    expect(mixedApply.stdout).toContain('Imported — 1 trail in 1 area');
+    expect(mixedApply.stdout).toContain('0 added, 1 updated');
+    expect(mixedApply.stdout).not.toContain('unchanged');
+    expect(mixedApply.stdout.split('\n').filter((line) => line.startsWith('- '))).toEqual([
+      `- ${changed!.name}`
+    ]);
   });
-  it('provides structured preview changes and the complete apply report', async () => {
+  it('lists only changed trails in JSON preview and apply output', async () => {
     const preview = JSON.parse((await run('--dry-run', '--json')).stdout);
     expect(preview.mode).toBe('preview');
     expect(preview.selections).toHaveLength(manifest.selections.length);
@@ -110,9 +117,18 @@ describe('selected trails CLI', () => {
     const applied = JSON.parse((await run('--json')).stdout);
     expect(applied.mode).toBe('apply');
     expect(applied.manifestHash).toBe(preview.manifestHash);
-    const rerun = JSON.parse((await run('--json', '--dry-run')).stdout);
-    expect(rerun.affectedSlugs).toEqual([]);
-    expect(rerun.selections).toEqual([]);
+    expect(applied.selections).toHaveLength(manifest.selections.length);
+    const [link] = await database.select().from(trailAreaLinks).limit(1);
+    await database.delete(trailAreaLinks).where(eq(trailAreaLinks.trailId, link!.trailId));
+    const mixedApply = JSON.parse((await run('--json')).stdout);
+    expect(mixedApply.selections).toEqual([
+      expect.objectContaining({ trailId: link!.trailId, action: 'update' })
+    ]);
+    for (const args of [['--json', '--dry-run'], ['--json']]) {
+      const rerun = JSON.parse((await run(...args)).stdout);
+      expect(rerun.affectedSlugs).toEqual([]);
+      expect(rerun.selections).toEqual([]);
+    }
   });
   it('imports reviewed national park routes while preserving a previous OSM trail identity', async () => {
     const { id: _id, ...area } = (await database.select().from(parks))[0]!;
@@ -163,9 +179,7 @@ describe('selected trails CLI', () => {
     expect(await database.select().from(trailAreaLinks)).toHaveLength(manifest.selections.length);
     const rerun = JSON.parse((await run('--json')).stdout);
     expect(rerun.affectedSlugs).toEqual([]);
-    expect(
-      rerun.selections.every((trail: { action: string }) => trail.action === 'unchanged')
-    ).toBe(true);
+    expect(rerun.selections).toEqual([]);
   });
   it('identifies distant namesakes without treating them as imported trails', async () => {
     const { id: _id, ...area } = (await database.select().from(parks))[0]!;

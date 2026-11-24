@@ -165,10 +165,11 @@ npm run import:osm-linked-trails -- --dry-run
 npm run import:osm-linked-trails -- --json
 ```
 
-Dry runs list only trails that would be added or updated. Use `--dry-run --json`
-to inspect source identities, geometry hashes, existing records, and affected
-cache slugs for those changes before applying. The
-importer checks for pending migrations. It resolves existing OSM trails by
+Preview and apply output list only added or updated trails. A text run with
+zero changes prints `No changes needed.` and the JSON report has an empty
+`selections` array. Use `--dry-run --json` to inspect source identities,
+geometry hashes, distant namesakes, and affected cache slugs before applying.
+The importer checks for pending migrations. It resolves existing OSM trails by
 relation ID, preserves their IDs, existing visit assignments and administrator
 name and length edits, and writes the reviewed batch in a single transaction.
 New rows appear under their linked parents. Nearby same-name trails, administrator

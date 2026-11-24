@@ -19,58 +19,35 @@ try {
       `Database schema is not current. Apply migrations first: ${pending.join(', ')}`
     );
   const report = await importSelectedTrails({ database: createDatabase(client), dryRun });
-  const selections = dryRun
-    ? report.selections.filter((trail) => trail.action !== 'unchanged')
-    : report.selections;
+  const selections = report.selections.filter((trail) => trail.action !== 'unchanged');
   if (json) {
     console.log(
       JSON.stringify({ mode: dryRun ? 'preview' : 'apply', ...report, selections }, null, 2)
     );
-  } else if (dryRun && !selections.length) {
+  } else if (!selections.length) {
     console.log('No changes needed.');
   } else {
-    const areas = new Map<string, typeof report.selections>();
+    const areas = new Map<string, typeof selections>();
     for (const trail of selections) {
       const group = areas.get(trail.parent) ?? [];
       group.push(trail);
       areas.set(trail.parent, group);
     }
+
     const added = selections.filter((trail) => trail.action === 'create').length;
-    const updated = selections.filter((trail) => trail.action === 'update').length;
-    const unchanged = selections.length - added - updated;
-    if (!added && !updated) {
-      console.log(`No changes needed — all ${unchanged} trails are up to date.`);
-    } else {
-      console.log(
-        `${dryRun ? 'Dry run' : 'Imported'} — ${selections.length} ${selections.length === 1 ? 'trail' : 'trails'} in ${areas.size} ${areas.size === 1 ? 'area' : 'areas'}`
-      );
-      console.log(
-        dryRun
-          ? `${added} to add, ${updated} to update`
-          : `${added} added, ${updated} updated, ${unchanged} unchanged`
-      );
-      const mixedActions = [added, updated, unchanged].filter((count) => count > 0).length > 1;
-      for (const trails of areas.values()) {
-        console.log(`\n${trails[0]!.parentName}`);
-        for (const trail of trails) {
-          const action =
-            trail.action === 'create'
-              ? dryRun
-                ? 'add'
-                : 'added'
-              : trail.action === 'update' && !dryRun
-                ? 'updated'
-                : trail.action;
-          console.log(`- ${trail.name}${mixedActions ? ` (${action})` : ''}`);
-        }
-      }
-      const namesakes = dryRun ? [] : selections.filter((trail) => trail.distantNamesakes.length);
-      if (namesakes.length) {
-        console.log('\nOther trails with the same name (not changed):');
-        for (const trail of namesakes)
-          console.log(
-            `- ${trail.name}: ${trail.distantNamesakes.map((item) => item.slug).join(', ')}`
-          );
+    const updated = selections.length - added;
+    const addLabel = dryRun ? 'to add' : 'added';
+    const updateLabel = dryRun ? 'to update' : 'updated';
+    console.log(
+      `${dryRun ? 'Dry run' : 'Imported'} — ${selections.length} ${selections.length === 1 ? 'trail' : 'trails'} in ${areas.size} ${areas.size === 1 ? 'area' : 'areas'}`
+    );
+    console.log(`${added} ${addLabel}, ${updated} ${updateLabel}`);
+    for (const trails of areas.values()) {
+      console.log(`\n${trails[0]!.parentName}`);
+      for (const trail of trails) {
+        const action = trail.action === 'create' ? addLabel : updateLabel;
+        const label = added > 0 && updated > 0 ? ` (${action})` : '';
+        console.log(`- ${trail.name}${label}`);
       }
     }
     console.log(`\nCatalog SHA-256: ${report.snapshotHash}`);
