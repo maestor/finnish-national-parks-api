@@ -106,5 +106,5 @@ if (result.affectedMergedTrailSlugs.length)
 
 if (result.affectedAreaLinkOnlySlugs.length)
   console.log(
-    `${result.dryRun ? 'After applying, expire' : 'Expire'} these Kuntorata-related URLs: ${result.affectedAreaLinkOnlySlugs.join(', ')}`
+    `${result.dryRun ? 'After applying, expire' : 'Expire'} these URLs affected by link-only trails: ${result.affectedAreaLinkOnlySlugs.join(', ')}`
   );

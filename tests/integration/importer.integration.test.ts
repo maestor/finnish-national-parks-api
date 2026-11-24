@@ -77,13 +77,13 @@ describe('importParks', () => {
     await testDatabase.dispose();
   });
 
-  it('imports Kuntorata only as links to visible areas and prevents standalone publication', async () => {
+  it('imports fitness trails only as links to visible areas and prevents standalone publication', async () => {
     const { database } = testDatabase;
     const area = createLipasPark();
     const hiddenArea = createLipasPark({ 'lipas-id': 87123, name: 'Hidden area' });
     const source = createLipasTrail({
       'lipas-id': 99101,
-      name: 'Testikuntorata',
+      name: 'Harjureitti',
       type: { 'type-code': 4401 }
     });
     const unmatched = createLipasTrail({
@@ -122,6 +122,7 @@ describe('importParks', () => {
     const fetchSource = async () => ({ items: [area, hiddenArea, source, unmatched, invalid] });
     const result = await importParks({ ...options, fetchSource, queueNewParkNotification: true });
     expect(result.affectedAreaLinkOnlySlugs).toEqual([parent!.slug]);
+    expect(result.newParks).toMatchObject([{ typeCode: 4401, typeName: 'Fitness trail' }]);
     expect(await database.select().from(parkImportNotifications)).toMatchObject([
       {
         parksJson: JSON.stringify({
@@ -131,7 +132,12 @@ describe('importParks', () => {
       }
     ]);
     const trail = await database.query.parks.findFirst({ where: eq(parks.lipasId, 99101) });
-    expect(trail).toMatchObject({ removed: true, trailPublicationRole: 'area_member' });
+    expect(trail).toMatchObject({
+      removed: true,
+      trailPublicationRole: 'area_member',
+      displayTypeName: null,
+      importedDisplayTypeName: null
+    });
     expect(
       await database.query.parks.findFirst({ where: eq(parks.lipasId, 99102) })
     ).toBeUndefined();
@@ -164,7 +170,7 @@ describe('importParks', () => {
     });
   });
 
-  it('previews and refreshes Kuntorata without changing the rest of the local catalog', async () => {
+  it('previews and refreshes link-only trails without changing the rest of the local catalog', async () => {
     const { database } = testDatabase;
     const area = createLipasPark();
     const source = createLipasTrail({ 'lipas-id': 99101, type: { 'type-code': 4401 } });
@@ -179,7 +185,7 @@ describe('importParks', () => {
     const scoped = { ...options, scope: 'area-link-only' as const };
     await expect(
       importParks({ ...scoped, fetchSource: async () => ({ items: [area] }) })
-    ).rejects.toThrow('Kuntorata-only source');
+    ).rejects.toThrow('link-only trail source');
     const fetchSource = async () => ({ items: [source] });
     const preview = await importParks({ ...scoped, fetchSource, dryRun: true });
     expect(preview.activeCount).toBe(1);
@@ -188,12 +194,21 @@ describe('importParks', () => {
       await database.query.parks.findFirst({ where: eq(parks.id, trailRow!.id) })
     ).toMatchObject({ areaLinkOnly: false });
     await importParks({ ...scoped, fetchSource });
+    await database
+      .update(parks)
+      .set({
+        displayTypeName: 'Legacy source label',
+        importedDisplayTypeName: 'Legacy source label'
+      })
+      .where(eq(parks.id, trailRow!.id));
     await importParks({ ...scoped, fetchSource });
     expect(
       await database.query.parks.findFirst({ where: eq(parks.id, trailRow!.id) })
     ).toMatchObject({
       areaLinkOnly: true,
-      catalogStatus: 'active'
+      catalogStatus: 'active',
+      displayTypeName: null,
+      importedDisplayTypeName: null
     });
     expect(await database.select().from(trailAreaLinks)).toMatchObject([
       { trailId: trailRow!.id, areaId: areaRow!.id, automaticMatch: true }
@@ -209,7 +224,7 @@ describe('importParks', () => {
     ).toMatchObject({ catalogStatus: 'active', removed: false });
   });
 
-  it('retires a former standalone trail when LIPAS reclassifies it as an unmatched Kuntorata', async () => {
+  it('retires a former standalone trail when LIPAS reclassifies it as an unmatched fitness trail', async () => {
     const { database } = testDatabase;
     const original = createLipasWalkingTrail({ 'lipas-id': 99101 });
     const options = { database, sourceUrl: 'https://example.test' };
@@ -782,7 +797,7 @@ describe('importParks', () => {
     expect(statements.some((statement) => /^select 1$/i.test(statement))).toBe(true);
   });
 
-  it('keeps the transaction active while scanning Kuntorata before writing the matches', async () => {
+  it('keeps the transaction active while scanning link-only trail candidates before writing the matches', async () => {
     const area = createLipasPark();
     const options = { database: testDatabase.database, sourceUrl: 'https://example.test/lipas' };
     await importPublishedParkFixtures({ ...options, fetchSource: async () => ({ items: [area] }) });

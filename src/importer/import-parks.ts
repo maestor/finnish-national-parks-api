@@ -222,7 +222,7 @@ export const importParks = async ({
       .map((park) => park.lipasId)
   );
   if (areaLinkOnlyImport && fitnessTrailLipasIds.size !== mappedActiveParks.length) {
-    throw new Error('The Kuntorata import requires a Kuntorata-only source.');
+    throw new Error('This import requires a link-only trail source.');
   }
   const existingParks = await listExistingParksByLipasIds(
     database,
@@ -242,7 +242,7 @@ export const importParks = async ({
       slug: park.slug,
       typeCode: fitnessTrailLipasIds.has(park.lipasId) ? fitnessTrailLipasTypeCode : park.type.code,
       typeName: fitnessTrailLipasIds.has(park.lipasId)
-        ? 'Kuntorata'
+        ? 'Fitness trail'
         : getSupportedParkTypeByCode(park.type.code).name
     }));
   const takenSlugs = new Set(
@@ -467,11 +467,8 @@ export const importParks = async ({
               ? 'inactive'
               : 'active',
           createdAt: importedAt,
-          displayTypeName: areaLinkOnly
-            ? 'Kuntorata'
-            : mapped.sourceTypeCode === hikingAreaTypeCode
-              ? hikingAreaDisplayTypeName
-              : null,
+          displayTypeName:
+            mapped.sourceTypeCode === hikingAreaTypeCode ? hikingAreaDisplayTypeName : null,
           establishmentYear: mapped.establishmentYear,
           hasMagnet: mapped.hasMagnet,
           lastImportRunId: importRunId!,

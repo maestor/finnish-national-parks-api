@@ -70,7 +70,7 @@ export const sendPendingParkReviews = async (database: Database, target: GithubR
       }
       if (areaLinks.length) {
         body.push(
-          '### Alueisiin liitetyt Kuntoradat',
+          '### Alueisiin liitetyt reitit',
           areaLinks
             .map(
               ({ trailName, areaName }) =>
