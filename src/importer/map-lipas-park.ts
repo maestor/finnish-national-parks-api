@@ -118,7 +118,7 @@ const shouldPromoteToHikingArea = (park: LipasPark) => {
   return normalizedName.endsWith('retkeilyalue') && (typeCode === 103 || typeCode === 112);
 };
 
-export const mapLipasPark = (source: unknown, existingSlug?: string): MappedPark => {
+export const mapLipasPark = (source: unknown): MappedPark => {
   const park = lipasParkSchema.parse(source);
   const sourceTypeCode = park.type['type-code'];
   const parkType = shouldPromoteToHikingArea(park)
@@ -173,7 +173,7 @@ export const mapLipasPark = (source: unknown, existingSlug?: string): MappedPark
     postalCode: park.location['postal-code'] ?? null,
     postalOffice: park.location['postal-office'] ?? null,
     sourceTypeCode,
-    slug: existingSlug ?? createParkSlug(park.name),
+    slug: createParkSlug(park.name),
     sourceEventDate: park['event-date'] ?? null,
     type: parkType
   };
