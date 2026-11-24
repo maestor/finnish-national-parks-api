@@ -262,7 +262,7 @@ Importer expectations:
 
 - Keep only `status === "active"` records.
 - Import new matching LIPAS rows automatically when they appear upstream.
-- Import newly discovered parks as removed by default so they stay hidden until explicitly enabled from the admin UI.
+- Import newly discovered standalone destinations as removed so they stay hidden until explicitly enabled from the admin UI.
 - Support `npm run import:parks -- --dry-run` so you can preview incoming parks without writing any catalog changes.
 - Print the newly added catalog rows after each import run so operator review does not block the sync itself.
 - Import these supported LIPAS catalog types:
@@ -272,7 +272,7 @@ Importer expectations:
   - `110` Erämaa-alue
   - `111` Kansallispuisto
   - `112` Muu luonnonsuojelualue
-  - `4401` Kuntorata (visible-area links only)
+  - `4401` Fitness trail (link-only)
   - `4403` Ulkoilureitti
   - `4404` Luontopolku
   - `4405` Retkeilyreitti

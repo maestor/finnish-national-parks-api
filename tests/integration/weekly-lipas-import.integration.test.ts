@@ -140,12 +140,12 @@ describe('weekly LIPAS import', () => {
   });
 
   it.each([false, true])(
-    'reports new Kuntorata area links separately (with a new destination: %s)',
+    'reports new area links for link-only trails separately (with a new destination: %s)',
     async (withNewPark) => {
       const area = createLipasPark();
       const trail = createLipasTrail({
         'lipas-id': 55216,
-        name: 'Testikuntorata',
+        name: 'Harjureitti',
         type: { 'type-code': 4401 }
       });
       const normalFetch = fetchMock.getMockImplementation()!;
@@ -166,7 +166,8 @@ describe('weekly LIPAS import', () => {
       expect(repeat.affectedAreaLinkOnlySlugs).toEqual(['akasmannyn-kansallispuisto']);
       expect(issues).toHaveLength(1);
       const body = issues[0]!.body;
-      expect(body).toContain(`\`Testikuntorata\` on liitetty kohteeseen \`${area.name}\`.`);
+      expect(body).toContain('### Alueisiin liitetyt reitit');
+      expect(body).toContain(`\`Harjureitti\` on liitetty kohteeseen \`${area.name}\`.`);
       if (withNewPark) {
         expect(body).toContain('ota haluamasi kohteet käyttöön hallintanäkymässä');
         expect(body).toContain(newPark.name);

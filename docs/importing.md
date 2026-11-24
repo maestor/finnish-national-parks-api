@@ -28,9 +28,11 @@ LIPAS imports create new records disabled. Manual special-park imports create ne
 
 The LIPAS `route-length-km` property is stored as nullable `lengthKm` independently of the geometry measurements used for matching. Re-imports refresh the source value while preserving administrator edits, as with area. Existing rows receive their source length on the next LIPAS import after migration `0048_trail_length.sql`; missing values remain null.
 
-LIPAS Kuntorata (type `4401`) are eligible for import only when their source-active geometry meets the overlap rule for at least one visible area. Each automatic Kuntorata match also requires a visible parent. Kuntorata use the existing walking-trail catalog type with an area-only flag and appear in the parent’s linked trails and map. The flag blocks standalone publication even after unlinking. Admins can only add a manual Kuntorata link to a visible area. When a trail loses its final qualifying visible parent, the next import retires it and preserves historical visit assignments. Kuntorata are omitted from standalone visibility controls and listed as area links in the weekly import issue.
+### Link-only trails
 
-The regular LIPAS import includes Kuntorata. To refresh just these trails, back up the database, run `npm run import:parks -- --link-only-trails --dry-run`, review the matches and affected parent slugs, then run `npm run import:parks -- --link-only-trails`. The scoped mode uses the stored area boundaries and leaves unrelated catalog records and links alone. Manually expire the Kuntorata-related URLs reported by the import through the UI cache endpoint below. Scheduled imports rely on the normal area detail cache refresh.
+Fitness trails (LIPAS type `4401`) use the existing walking-trail catalog type with an area-only flag. The regular LIPAS import includes them when the source is active and their geometry meets the overlap rule for at least one visible area. Automatic and manual links both require a visible parent. These trails appear in the parent’s linked-trail list and map. The flag blocks standalone publication even after unlinking. When the last qualifying visible parent is lost, the next import retires the trail and preserves historical visit assignments.
+
+For a scoped import of link-only trails, back up the database and run `npm run import:parks -- --link-only-trails --dry-run`. Review the matches and affected parent slugs, then run `npm run import:parks -- --link-only-trails`. The scoped mode uses the stored area boundaries and leaves unrelated catalog records and links alone. Expire the reported URLs through the UI cache endpoint below for immediate updates.
 
 ### Long trails
 
@@ -46,7 +48,7 @@ the UI's public park caches after applying. Existing trail and area IDs stay
 the same. Formerly retired OSM trails can return through the regular OSM import
 when they meet its area match and duplicate checks.
 
-To reduce traffic to remote libSQL, the main import upserts at most ten parks per statement, with a 1 MiB geometry budget per batch. Trail reconciliation loads geometry in groups of at most 50 records and 2 MiB. A single geometry larger than a budget is sent or read on its own. The import normalizes geometry before opening the write transaction. Periodic lightweight queries keep the remote transaction stream active during both Kuntorata eligibility checks and trail reconciliation. All catalog writes, reconciliation and notification queuing remain in one transaction. Dry runs roll it back.
+To reduce traffic to remote libSQL, the main import upserts at most ten parks per statement, with a 1 MiB geometry budget per batch. Trail reconciliation loads geometry in groups of at most 50 records and 2 MiB. A single geometry larger than a budget is sent or read on its own. The import normalizes geometry before opening the write transaction. Periodic lightweight queries keep the remote transaction stream active during both link-only trail eligibility checks and trail reconciliation. All catalog writes, reconciliation and notification queuing remain in one transaction. Dry runs roll it back.
 
 Back up the target database before applying. Run `npm run import:parks -- --dry-run` first. The dry run rolls back catalog changes and reports new rows, automatic links, exclusions, deactivations, in-place source transfers and affected public slugs. A trail with visits that would newly become a member aborts the transaction. See [the parent-area import workflow](#import-a-parent-area-for-a-trail-with-visits). After review, run `npm run import:parks` and immediately expire every reported slug through the UI's authenticated `POST /api/revalidate-public-cache` with `{ "parkSlugs": ["slug"] }` (maximum 500 per request). That endpoint also expires summary, map, planner and sitemap paths. API ETags do not invalidate the UI cache by themselves. Repeat the dry run to check stability before rollout.
 
@@ -298,16 +300,16 @@ existing `DATABASE_URL` and `DATABASE_AUTH_TOKEN` secrets. It shares the
 `production-database` concurrency group with production migrations and never
 applies migrations itself. Wait for Production Migration to finish before
 starting a manual workflow dispatch. It must apply `0053_area_link_only_trails.sql`
-before the first Kuntorata import.
+before the first link-only trail import.
 
 The workflow opens one Finnish issue, mentioning only `@maestor`, when it adds
-new standalone destinations or new automatic Kuntorata links. The enable
-instructions apply to the standalone destinations section. The Kuntorata
-section lists each new link as “Trail on liitetty kohteeseen Area”. Repeat runs
-stay quiet while the links and catalog memberships stay the same. The job log
-prints a `parkSlugs` payload for immediate cache expiry of affected Kuntorata
-pages through the UI endpoint above. Without manual expiry, area detail caches
-refresh on their normal one-hour cycle.
+new standalone destinations or new automatic links for link-only trails. The
+enable instructions apply to the standalone destinations section. The linked
+trails section lists each new link as “Trail on liitetty kohteeseen Area”.
+Repeat runs stay quiet while the links and catalog memberships stay the same.
+The job log prints a `parkSlugs` payload for immediate expiry of affected pages
+through the UI endpoint above. Area detail caches refresh on their normal
+one-hour cycle.
 
 Existing parks are refreshed using the same import and preservation rules as
 the manual command. Missing LIPAS-managed parks become inactive. Normal API

@@ -21,7 +21,7 @@ try {
   ).length;
   const newLinkCount = result.trailAreaResult?.newAreaOnlyLinks.length ?? 0;
   console.log(
-    `Imported ${result.activeCount} catalog places; ${newStandaloneCount} new places to review and ${newLinkCount} new Kuntorata area links.`
+    `Imported ${result.activeCount} catalog places; ${newStandaloneCount} new places to review and ${newLinkCount} new links for link-only trails.`
   );
   for (const park of result.adoptedParks)
     console.log(`Adopted ${park.slug} in place [LIPAS ${park.lipasId}].`);
@@ -36,7 +36,7 @@ try {
     );
   if (result.affectedAreaLinkOnlySlugs.length) {
     console.log(
-      `Expire these Kuntorata-related pages: ${JSON.stringify({ parkSlugs: result.affectedAreaLinkOnlySlugs })}`
+      `Expire these pages affected by link-only trails: ${JSON.stringify({ parkSlugs: result.affectedAreaLinkOnlySlugs })}`
     );
   }
 } finally {
