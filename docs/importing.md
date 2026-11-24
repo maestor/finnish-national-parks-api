@@ -28,6 +28,10 @@ LIPAS imports create new records disabled. Manual special-park imports create ne
 
 The LIPAS `route-length-km` property is stored as nullable `lengthKm` independently of the geometry measurements used for matching. Re-imports refresh the source value while preserving administrator edits, as with area. Existing rows receive their source length on the next LIPAS import after migration `0048_trail_length.sql`; missing values remain null.
 
+LIPAS Kuntorata (type `4401`) are eligible for import only when their source-active geometry meets the overlap rule for at least one visible area. Each automatic Kuntorata match also requires a visible parent. Kuntorata use the existing walking-trail catalog type with an area-only flag and appear in the parent’s linked trails and map. The flag blocks standalone publication even after unlinking. Admins can only add a manual Kuntorata link to a visible area. When a trail loses its final qualifying visible parent, the next import retires it and preserves historical visit assignments. Kuntorata are omitted from standalone visibility controls and listed as area links in the weekly import issue.
+
+The regular LIPAS import includes Kuntorata. To refresh just these trails, back up the database, run `npm run import:parks -- --link-only-trails --dry-run`, review the matches and affected parent slugs, then run `npm run import:parks -- --link-only-trails`. The scoped mode uses the stored area boundaries and leaves unrelated catalog records and links alone. Manually expire the Kuntorata-related URLs reported by the import through the UI cache endpoint below. Scheduled imports rely on the normal area detail cache refresh.
+
 ### Long trails
 
 Catalog admission and admin visibility do not use a maximum trail length.
@@ -292,15 +296,23 @@ Each run backs up production to a GitHub Actions artifact retained for 14 days,
 then runs `npm run import:parks:scheduled` using the `production` environment's
 existing `DATABASE_URL` and `DATABASE_AUTH_TOKEN` secrets. It shares the
 `production-database` concurrency group with production migrations and never
-applies migrations itself. Migrations `0046_park_import_notifications.sql` and `0047_trail_area_links.sql` must
-be applied by the normal production migration workflow before the first import.
+applies migrations itself. Wait for Production Migration to finish before
+starting a manual workflow dispatch. It must apply `0053_area_link_only_trails.sql`
+before the first Kuntorata import.
 
-New parks stay hidden until enabled in the admin UI. A run with new parks opens
-one Finnish review issue with their names, types and LIPAS IDs, mentioning only
-`@maestor`. With no additions, it creates no issue. Existing parks are refreshed
-using the same import and preservation rules as the manual command; missing
-LIPAS-managed parks become inactive. Normal API reads remain local-first, and
-public trail conversions requiring immediate cache expiry use the manual workflow above.
+The workflow opens one Finnish issue, mentioning only `@maestor`, when it adds
+new standalone destinations or new automatic Kuntorata links. The enable
+instructions apply to the standalone destinations section. The Kuntorata
+section lists each new link as “Trail on liitetty kohteeseen Area”. Repeat runs
+stay quiet while the links and catalog memberships stay the same. The job log
+prints a `parkSlugs` payload for immediate cache expiry of affected Kuntorata
+pages through the UI endpoint above. Without manual expiry, area detail caches
+refresh on their normal one-hour cycle.
+
+Existing parks are refreshed using the same import and preservation rules as
+the manual command. Missing LIPAS-managed parks become inactive. Normal API
+reads remain local-first. Use the manual workflow above for public trail
+conversions that require immediate cache expiry.
 
 Notification reports are queued in the same database transaction as the import.
 Failed notifications remain queued for the next workflow run, which retries

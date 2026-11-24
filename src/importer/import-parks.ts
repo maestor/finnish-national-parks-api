@@ -1,4 +1,4 @@
-import { and, eq } from 'drizzle-orm';
+import { and, eq, inArray, or } from 'drizzle-orm';
 import { z } from 'zod';
 
 import type { Database } from '../db/database.js';
@@ -11,14 +11,20 @@ import {
   type UpsertCatalogParkInput,
   upsertCatalogParks
 } from '../db/repositories.js';
-import { parkImportNotifications, parks } from '../db/schema.js';
+import { importRuns, parkImportNotifications, parks } from '../db/schema.js';
 import { mergedTrailSlugs } from '../db/trail-merges.js';
 import {
+  fitnessTrailLipasTypeCode,
   getSupportedParkTypeByCode,
   hikingAreaDisplayTypeName,
   hikingAreaTypeCode,
   isTrailTypeCode
 } from '../parks/park-types.js';
+import {
+  listAreaLinkOnlyParentSlugs,
+  qualifiesForVisibleParent,
+  selectVisibleTrailParents
+} from './area-link-only-trails.js';
 import { createLuontoonUrlResolver } from './luontoon-sitemap.js';
 import { mapLipasPark, multiUseAreaLipasTypeCode } from './map-lipas-park.js';
 import {
@@ -46,6 +52,7 @@ type ImportParksOptions = {
   expectedActiveCount?: number;
   beforeEachUpsert?: (index: number, lipasId: number) => void | Promise<void>;
   dryRun?: boolean;
+  scope?: 'catalog' | 'area-link-only';
   fetchSource?: (sourceUrl: string) => Promise<unknown>;
   fetchLuontoonSitemap?: ((sourceUrl: string) => Promise<string>) | undefined;
   queueNewParkNotification?: boolean;
@@ -65,6 +72,7 @@ const SUPPORTED_LIPAS_TYPE_CODES = [
   110,
   111,
   112,
+  fitnessTrailLipasTypeCode,
   4403,
   4404,
   4405
@@ -82,6 +90,8 @@ class ImportDryRunRollbackError extends Error {
 }
 
 export const defaultLipasCatalogSourceUrl = `https://api.lipas.fi/v2/sports-sites?type-codes=${SUPPORTED_LIPAS_TYPE_CODES.join(',')}&page-size=100&page=1`;
+
+export const fitnessTrailSourceUrl = `https://api.lipas.fi/v2/sports-sites?type-codes=${fitnessTrailLipasTypeCode}&page-size=100&page=1`;
 
 const defaultFetchSource = async (sourceUrl: string) => {
   const firstResponse = await fetch(sourceUrl);
@@ -176,6 +186,7 @@ export const importParks = async ({
   expectedActiveCount: _expectedActiveCount,
   beforeEachUpsert,
   dryRun = false,
+  scope = 'catalog',
   fetchSource = defaultFetchSource,
   fetchLuontoonSitemap,
   queueNewParkNotification = false,
@@ -184,9 +195,12 @@ export const importParks = async ({
   sourceUrl
 }: ImportParksOptions) => {
   const payload = lipasResponseSchema.parse(await fetchSource(sourceUrl));
+  const areaLinkOnlyImport = scope === 'area-link-only';
   const effectiveFetchLuontoonSitemap =
     fetchLuontoonSitemap ??
-    (fetchSource === defaultFetchSource ? defaultFetchLuontoonSitemap : emptyLuontoonSitemap);
+    (fetchSource === defaultFetchSource && !areaLinkOnlyImport
+      ? defaultFetchLuontoonSitemap
+      : emptyLuontoonSitemap);
   const resolveParkUrl = createLuontoonUrlResolver(
     await effectiveFetchLuontoonSitemap(LUONTOON_SITEMAP_URL)
   );
@@ -201,6 +215,14 @@ export const importParks = async ({
     return candidate.status === 'active';
   });
   const mappedActiveParks = activeItems.map((item) => mapLipasPark(item));
+  const fitnessTrailLipasIds = new Set(
+    mappedActiveParks
+      .filter((park) => park.sourceTypeCode === fitnessTrailLipasTypeCode)
+      .map((park) => park.lipasId)
+  );
+  if (areaLinkOnlyImport && fitnessTrailLipasIds.size !== mappedActiveParks.length) {
+    throw new Error('The Kuntorata import requires a Kuntorata-only source.');
+  }
   const existingParks = await listExistingParksByLipasIds(
     database,
     mappedActiveParks.map((park) => park.lipasId)
@@ -217,15 +239,17 @@ export const importParks = async ({
       name: park.name,
       removed: true,
       slug: park.slug,
-      typeCode: park.type.code,
-      typeName: getSupportedParkTypeByCode(park.type.code).name
+      typeCode: fitnessTrailLipasIds.has(park.lipasId) ? fitnessTrailLipasTypeCode : park.type.code,
+      typeName: fitnessTrailLipasIds.has(park.lipasId)
+        ? 'Kuntorata'
+        : getSupportedParkTypeByCode(park.type.code).name
     }));
   const takenSlugs = new Set(
     (await listParkRecordsIncludingRemoved(database)).map((park) => park.slug)
   );
   const importedAt = now();
   const parksByLipasId = new Map(mappedActiveParks.map((park) => [park.lipasId, park]));
-  const mergePlan = prepareLipasTrailMerge(parksByLipasId);
+  const mergePlan = areaLinkOnlyImport ? undefined : prepareLipasTrailMerge(parksByLipasId);
   const readyMerge = mergePlan && 'combined' in mergePlan ? mergePlan : undefined;
   const mergeWarnings: string[] = [];
   if (mergePlan && 'error' in mergePlan)
@@ -239,10 +263,32 @@ export const importParks = async ({
   const deactivatedParks: { lipasId: number; slug: string }[] = [];
   let affectedMergedTrailSlugs: string[] = [];
   let activeCount = 0;
+  let affectedAreaLinkOnlySlugs: string[] = [];
 
   try {
     await database.transaction(async (tx) => {
       await syncParkTypes(tx);
+      const priorAreaLinkOnlySlugs = await listAreaLinkOnlyParentSlugs(tx);
+      const hasFitnessTrailSourceId = inArray(parks.lipasId, [...fitnessTrailLipasIds]);
+      const scopedCatalog = areaLinkOnlyImport
+        ? or(eq(parks.areaLinkOnly, true), hasFitnessTrailSourceId)
+        : undefined;
+      const formerStandaloneFitnessTrails = fitnessTrailLipasIds.size
+        ? await tx
+            .select({ slug: parks.slug })
+            .from(parks)
+            .where(
+              and(
+                eq(parks.managedByLipasImport, true),
+                eq(parks.catalogStatus, 'active'),
+                eq(parks.removed, false),
+                eq(parks.trailPublicationRole, 'independent'),
+                eq(parks.areaLinkOnly, false),
+                hasFitnessTrailSourceId
+              )
+            )
+        : [];
+      const formerStandaloneSlugs = formerStandaloneFitnessTrails.map(({ slug }) => slug);
 
       for (const [lipasId, { legacyLipasId }] of formerSpecialParks) {
         const incoming = parksByLipasId.get(lipasId);
@@ -271,7 +317,7 @@ export const importParks = async ({
       }
       newParks = newParks.filter(({ lipasId }) => !existingImportedSlugByLipasId.has(lipasId));
 
-      const previousMerge = await getLipasTrailMergeState(tx);
+      const previousMerge = areaLinkOnlyImport ? undefined : await getLipasTrailMergeState(tx);
       const maintainMerge = Boolean(readyMerge || previousMerge?.group);
       if (previousMerge?.group && !readyMerge)
         mergeWarnings.push(
@@ -306,7 +352,8 @@ export const importParks = async ({
         );
       }
 
-      activeCount = activeLipasIds.length;
+      const activeIds = new Set(activeLipasIds);
+      activeCount = activeIds.size;
       importRunId = await createImportRun(tx, {
         activeCount,
         importedAt,
@@ -322,15 +369,31 @@ export const importParks = async ({
         batchGeometryBytes = 0;
       };
 
-      for (let index = 0; index < importableItems.length; index += 1) {
-        const item = importableItems[index];
+      const isFitnessTrailItem = (item: unknown) =>
+        fitnessTrailLipasIds.has((item as { 'lipas-id': number })['lipas-id']);
+      const regularItems = importableItems.filter((item) => !isFitnessTrailItem(item));
+      const orderedItems = [...regularItems, ...importableItems.filter(isFitnessTrailItem)];
+      let visibleParents: Awaited<ReturnType<typeof selectVisibleTrailParents>> = [];
+      for (let index = 0; index < orderedItems.length; index += 1) {
+        const item = orderedItems[index];
         const lipasId = (item as { 'lipas-id': number })['lipas-id'];
 
+        const areaLinkOnly = fitnessTrailLipasIds.has(lipasId);
+        if (index === regularItems.length) {
+          if (batch.length) await flushBatch();
+          visibleParents = await selectVisibleTrailParents(
+            tx,
+            (id) => areaLinkOnlyImport || activeIds.has(id)
+          );
+        }
+        const raw = mapLipasPark(item, existingImportedSlugByLipasId.get(lipasId));
+        if (areaLinkOnly && !qualifiesForVisibleParent(raw, visibleParents)) {
+          activeIds.delete(lipasId);
+          continue;
+        }
         if (beforeEachUpsert) {
           await beforeEachUpsert(index, lipasId);
         }
-
-        const raw = mapLipasPark(item, existingImportedSlugByLipasId.get(lipasId));
         const combined = lipasId === mergedTrail.canonicalId ? readyMerge?.combined : undefined;
         const mapped = combined
           ? {
@@ -385,6 +448,8 @@ export const importParks = async ({
         }
         batch.push({
           areaKm2: mapped.areaKm2,
+          areaLinkOnly,
+          ...(areaLinkOnly ? { trailPublicationRole: 'area_member' as const } : {}),
           lengthKm: mapped.lengthKm,
           bboxMaxLat: bounds.maxLat,
           bboxMaxLon: bounds.maxLon,
@@ -398,8 +463,11 @@ export const importParks = async ({
               ? 'inactive'
               : 'active',
           createdAt: importedAt,
-          displayTypeName:
-            mapped.sourceTypeCode === hikingAreaTypeCode ? hikingAreaDisplayTypeName : null,
+          displayTypeName: areaLinkOnly
+            ? 'Kuntorata'
+            : mapped.sourceTypeCode === hikingAreaTypeCode
+              ? hikingAreaDisplayTypeName
+              : null,
           establishmentYear: mapped.establishmentYear,
           hasMagnet: mapped.hasMagnet,
           lastImportRunId: importRunId!,
@@ -428,14 +496,40 @@ export const importParks = async ({
       const appliedMerge = readyMerge
         ? await applyLipasTrailMerge(tx, readyMerge, previousMerge, importedAt)
         : undefined;
-      const activeIds = new Set(activeLipasIds);
+      newParks = newParks.filter(({ lipasId }) => activeIds.has(lipasId));
+      if (activeCount !== activeIds.size) {
+        activeCount = activeIds.size;
+        await tx.update(importRuns).set({ activeCount }).where(eq(importRuns.id, importRunId!));
+      }
       const previouslyActive = await tx
         .select({ lipasId: parks.lipasId, slug: parks.slug })
         .from(parks)
-        .where(and(eq(parks.managedByLipasImport, true), eq(parks.catalogStatus, 'active')));
+        .where(
+          and(
+            eq(parks.managedByLipasImport, true),
+            eq(parks.catalogStatus, 'active'),
+            scopedCatalog
+          )
+        );
       deactivatedParks.push(...previouslyActive.filter((park) => !activeIds.has(park.lipasId)));
-      await markMissingParksInactive(tx, activeLipasIds, importRunId!, importedAt);
-      trailAreaResult.value = await reconcileTrailAreas(tx, importedAt);
+      const retiredFitnessTrailLipasIds = deactivatedParks
+        .filter(({ lipasId }) => fitnessTrailLipasIds.has(lipasId))
+        .map(({ lipasId }) => lipasId);
+      if (retiredFitnessTrailLipasIds.length) {
+        await tx
+          .update(parks)
+          .set({ areaLinkOnly: true })
+          .where(inArray(parks.lipasId, retiredFitnessTrailLipasIds));
+      }
+      await markMissingParksInactive(tx, [...activeIds], importRunId!, importedAt, scopedCatalog);
+      trailAreaResult.value = await reconcileTrailAreas(tx, importedAt, scope);
+      affectedAreaLinkOnlySlugs = [
+        ...new Set([
+          ...priorAreaLinkOnlySlugs,
+          ...formerStandaloneSlugs,
+          ...(await listAreaLinkOnlyParentSlugs(tx))
+        ])
+      ].sort();
       if (appliedMerge?.affectedSlugs.length) {
         affectedMergedTrailSlugs = [
           ...new Set([
@@ -446,24 +540,30 @@ export const importParks = async ({
       }
       const manualExpirySlugs = [
         ...(appliedMerge?.needsImmediateExpiry ? affectedMergedTrailSlugs : []),
-        ...trailAreaResult.value.newlyHiddenPublicSlugs
+        ...trailAreaResult.value.newlyHiddenPublicSlugs,
+        ...formerStandaloneSlugs
       ];
       if (requireNoPublicTrailConversions && manualExpirySlugs.length) {
         throw new Error(
-          `Public trail conversion requires immediate frontend cache expiry: ${manualExpirySlugs.join(', ')}`
+          `Public trail conversion requires immediate frontend cache expiry: ${[...new Set(manualExpirySlugs)].join(', ')}`
         );
       }
 
-      if (queueNewParkNotification && newParks.length > 0) {
+      const newStandaloneParks = newParks.filter(
+        ({ lipasId }) => !fitnessTrailLipasIds.has(lipasId)
+      );
+      const newAreaOnlyLinks = trailAreaResult.value.newAreaOnlyLinks;
+      if (queueNewParkNotification && (newStandaloneParks.length || newAreaOnlyLinks.length)) {
         await tx.insert(parkImportNotifications).values({
           importRunId: importRunId!,
-          parksJson: JSON.stringify(
-            newParks.map(({ lipasId, name, typeName }) => ({
+          parksJson: JSON.stringify({
+            parks: newStandaloneParks.map(({ lipasId, name, typeName }) => ({
               lipasId,
               name,
               typeName
-            }))
-          )
+            })),
+            areaLinks: newAreaOnlyLinks
+          })
         });
       }
 
@@ -481,6 +581,7 @@ export const importParks = async ({
 
   return {
     activeCount,
+    affectedAreaLinkOnlySlugs,
     affectedMergedTrailSlugs,
     mergeWarnings,
     trailAreaResult: trailAreaResult.value,

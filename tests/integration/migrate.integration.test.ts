@@ -100,7 +100,8 @@ describe('migrateDatabase', () => {
       '0049_osm_trails.sql',
       '0050_visit_trails.sql',
       '0051_trail_merges.sql',
-      '0052_curated_trail_sources.sql'
+      '0052_curated_trail_sources.sql',
+      '0053_area_link_only_trails.sql'
     ]);
     expect(parkTypes.rows.map((row) => String(row.slug))).toEqual([
       'outdoor-recreation-area',
@@ -340,7 +341,8 @@ describe('migrateDatabase', () => {
       '0049_osm_trails.sql',
       '0050_visit_trails.sql',
       '0051_trail_merges.sql',
-      '0052_curated_trail_sources.sql'
+      '0052_curated_trail_sources.sql',
+      '0053_area_link_only_trails.sql'
     ]);
     expect(schemaMigrationTableBeforeApply.rows).toEqual([]);
     expect(pendingAfterApply).toEqual([]);

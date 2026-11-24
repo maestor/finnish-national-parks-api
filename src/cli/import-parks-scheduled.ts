@@ -1,6 +1,7 @@
 import { createDatabaseClient } from '../db/client.js';
 import { getEnv } from '../env.js';
 import { runScheduledParkImport } from '../importer/scheduled-park-import.js';
+import { fitnessTrailLipasTypeCode } from '../parks/park-types.js';
 
 const env = getEnv();
 if (!env.GITHUB_REPOSITORY || !env.GITHUB_TOKEN) {
@@ -15,8 +16,12 @@ try {
     repository: env.GITHUB_REPOSITORY,
     token: env.GITHUB_TOKEN
   });
+  const newStandaloneCount = result.newParks.filter(
+    ({ typeCode }) => typeCode !== fitnessTrailLipasTypeCode
+  ).length;
+  const newLinkCount = result.trailAreaResult?.newAreaOnlyLinks.length ?? 0;
   console.log(
-    `Imported ${result.activeCount} catalog places; ${result.newParks.length} new parks sent for review.`
+    `Imported ${result.activeCount} catalog places; ${newStandaloneCount} new places to review and ${newLinkCount} new Kuntorata area links.`
   );
   for (const park of result.adoptedParks)
     console.log(`Adopted ${park.slug} in place [LIPAS ${park.lipasId}].`);
@@ -29,6 +34,11 @@ try {
     console.log(
       `${result.dryRun ? 'After applying, expire' : 'Expire'} these merged-trail public park URLs: ${result.affectedMergedTrailSlugs.join(', ')}`
     );
+  if (result.affectedAreaLinkOnlySlugs.length) {
+    console.log(
+      `Expire these Kuntorata-related pages: ${JSON.stringify({ parkSlugs: result.affectedAreaLinkOnlySlugs })}`
+    );
+  }
 } finally {
   await client.close();
 }

@@ -73,6 +73,44 @@ describe('weekly LIPAS import', () => {
     expect(issues).toHaveLength(1);
   });
 
+  it.each([false, true])(
+    'reports new Kuntorata area links separately (with a new destination: %s)',
+    async (withNewPark) => {
+      const area = createLipasPark();
+      const trail = createLipasTrail({
+        'lipas-id': 55216,
+        name: 'Testikuntorata',
+        type: { 'type-code': 4401 }
+      });
+      const normalFetch = fetchMock.getMockImplementation()!;
+      fetchMock.mockImplementation((input, init) =>
+        String(input).startsWith('https://api.lipas.fi/')
+          ? Promise.resolve(
+              Response.json({ items: [area, trail, ...(withNewPark ? [newPark] : [])] })
+            )
+          : normalFetch(input, init)
+      );
+
+      failCreation = true;
+      await expect(runScheduledParkImport(db.client, github)).rejects.toThrow('503');
+      expect(await db.database.select().from(parkImportNotifications)).toHaveLength(1);
+      failCreation = false;
+
+      const repeat = await runScheduledParkImport(db.client, github);
+      expect(repeat.affectedAreaLinkOnlySlugs).toEqual(['akasmannyn-kansallispuisto']);
+      expect(issues).toHaveLength(1);
+      const body = issues[0]!.body;
+      expect(body).toContain(`\`Testikuntorata\` on liitetty kohteeseen \`${area.name}\`.`);
+      if (withNewPark) {
+        expect(body).toContain('ota haluamasi kohteet käyttöön hallintanäkymässä');
+        expect(body).toContain(newPark.name);
+      } else {
+        expect(body).not.toContain('hallintanäkymässä');
+      }
+      expect(await db.database.select().from(parkImportNotifications)).toEqual([]);
+    }
+  );
+
   it('rolls back an unattended public trail conversion that needs immediate frontend expiry', async () => {
     const outside = createLipasTrail({
       location: {
@@ -182,6 +220,12 @@ describe('weekly LIPAS import', () => {
   it('delivers an older queued report even if LIPAS is unavailable this week', async () => {
     failCreation = true;
     await expect(runScheduledParkImport(db.client, github)).rejects.toThrow('503');
+    // Preserve reports written by the earlier parks-only queue format.
+    await db.database.update(parkImportNotifications).set({
+      parksJson: JSON.stringify([
+        { lipasId: 99999, name: newPark.name, typeName: 'Kansallispuisto' }
+      ])
+    });
     failCreation = false;
     const normalFetch = fetchMock.getMockImplementation()!;
     fetchMock.mockImplementation((input, init) =>
@@ -191,6 +235,7 @@ describe('weekly LIPAS import', () => {
     );
     await expect(runScheduledParkImport(db.client, github)).rejects.toThrow('LIPAS unavailable');
     expect(issues).toHaveLength(1);
+    expect(issues[0]?.body).toContain(newPark.name);
     expect(await db.database.select().from(parkImportNotifications)).toEqual([]);
   });
 

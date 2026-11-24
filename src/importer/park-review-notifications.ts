@@ -13,6 +13,14 @@ const notificationParksSchema = z.array(
     typeName: z.string()
   })
 );
+const notificationSchema = z.union([
+  z.object({
+    parks: notificationParksSchema,
+    areaLinks: z.array(z.object({ trailName: z.string(), areaName: z.string() }))
+  }),
+  notificationParksSchema.transform((parks) => ({ parks, areaLinks: [] }))
+]);
+const nameAsCode = (name: string) => `\`${name.replace(/[`\r\n]/g, ' ')}\``;
 const issuesSchema = z.array(z.object({ body: z.string().nullable() }));
 
 export const sendPendingParkReviews = async (database: Database, target: GithubReviewTarget) => {
@@ -49,22 +57,37 @@ export const sendPendingParkReviews = async (database: Database, target: GithubR
     }
 
     if (!alreadySent) {
-      const parks = notificationParksSchema.parse(JSON.parse(notification.parksJson));
-      const body = [
-        marker,
-        '@maestor Uusia LIPAS-kohteita on tuotu tarkistettavaksi.',
-        'Kohteet ovat piilotettuina. Tarkista tiedot ja ota haluamasi kohteet käyttöön hallintanäkymässä.',
-        ...parks.map(
-          (park) =>
-            `- ${park.typeName}: \`${park.name.replace(/[`\r\n]/g, ' ')}\` (LIPAS ${park.lipasId})`
-        )
-      ].join('\n\n');
+      const { parks, areaLinks } = notificationSchema.parse(JSON.parse(notification.parksJson));
+      const body = [marker, '@maestor LIPAS-tuonnin yhteenveto'];
+      if (parks.length) {
+        body.push(
+          '### Uudet tarkistettavat kohteet',
+          'Kohteet ovat piilotettuina. Tarkista tiedot ja ota haluamasi kohteet käyttöön hallintanäkymässä.',
+          parks
+            .map((park) => `- ${park.typeName}: ${nameAsCode(park.name)} (LIPAS ${park.lipasId})`)
+            .join('\n')
+        );
+      }
+      if (areaLinks.length) {
+        body.push(
+          '### Alueisiin liitetyt Kuntoradat',
+          areaLinks
+            .map(
+              ({ trailName, areaName }) =>
+                `- ${nameAsCode(trailName)} on liitetty kohteeseen ${nameAsCode(areaName)}.`
+            )
+            .join('\n')
+        );
+      }
+      const title = areaLinks.length
+        ? `LIPAS-tuonnin yhteenveto (${parks.length} tarkistettavaa kohdetta, ${areaLinks.length} alueliitosta)`
+        : `Uusia LIPAS-kohteita tarkistettavaksi (${parks.length})`;
       const response = await fetch(issuesUrl, {
         method: 'POST',
         headers,
         body: JSON.stringify({
-          title: `Uusia LIPAS-kohteita tarkistettavaksi (${parks.length})`,
-          body
+          title,
+          body: body.join('\n\n')
         }),
         signal: AbortSignal.timeout(30_000)
       });
