@@ -473,12 +473,12 @@ This is intentionally a narrow contract: `src/index.ts` is the one place that sh
 11. Start the login flow through the same public domain that owns the callback URI so the OAuth state/session cookies stay on the correct host.
 12. In Vercel project settings, add a Deployment Check that requires the GitHub check `Migrate production database` before promoting production deployments.
 13. Merge changes to `main` to let GitHub Actions back up and migrate the production Turso database before Vercel promotes the new production build.
-14. Import catalog data into the production database after the first schema bootstrap or whenever importer changes require a fresh production import.
+14. Bootstrap catalog data after the first schema migration. Subsequent catalog data merges use the [scoped production imports](./importing.md#production-imports-after-merges).
 15. Verify `GET /health`, `GET /openapi.json`, and one real catalog endpoint on the deployed URL.
 
 ### Production Data Operations
 
-Vercel only serves the HTTP API. Production schema migrations belong in the GitHub Actions `Production Migration` workflow that runs on pushes to `main`. The `Weekly LIPAS Import` workflow refreshes the catalog on Mondays at 09:43 Finland time and opens a review issue mentioning `@maestor` only when new parks are found. Manual catalog imports remain available. See [weekly LIPAS automation](./importing.md#weekly-lipas-automation) for notification retries, permissions and setup requirements.
+Vercel only serves the HTTP API. Production schema migrations belong in the GitHub Actions `Production Migration` workflow that runs on pushes to `main`. The `Weekly LIPAS Import` workflow refreshes the catalog on Mondays at 09:43 Finland time and opens a review issue mentioning `@maestor` only when new parks are found. Curated catalog imports run after relevant merges. See [production imports after merges](./importing.md#production-imports-after-merges) for triggers, backups and cache refresh, and [weekly LIPAS automation](./importing.md#weekly-lipas-automation) for notification retries, permissions and setup requirements.
 
 The workflow first checks whether production has any unapplied SQL migration files. It only takes a fresh Turso backup artifact and runs `npm run db:migrate` when pending migrations exist. Keep the manual commands below as the fallback path for recovery, first-time setup, or exceptional maintenance:
 

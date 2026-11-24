@@ -3,14 +3,29 @@ import { createDatabase } from '../db/database.js';
 import { getPendingMigrationNames } from '../db/migrate.js';
 import { importSelectedTrails } from '../importer/import-selected-trails.js';
 
-const options = process.argv.slice(2);
-if (
-  options.some((option) => option !== '--dry-run' && option !== '--json') ||
-  new Set(options).size !== options.length
-)
-  throw new Error('Usage: npm run import:osm-linked-trails -- [--dry-run] [--json]');
-const dryRun = options.includes('--dry-run');
-const json = options.includes('--json');
+const flags = new Set<string>();
+const selectionKeys = new Set<string>();
+const args = process.argv.slice(2);
+const usage =
+  'Usage: npm run import:osm-linked-trails -- [--dry-run] [--json] [--guard-public-conversions] [--selection <key>]...';
+for (let index = 0; index < args.length; index++) {
+  const option = args[index]!;
+  if (option === '--selection') {
+    const key = args[++index];
+    if (!key || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(key) || selectionKeys.has(key))
+      throw new Error(usage);
+    selectionKeys.add(key);
+  } else {
+    if (
+      !['--dry-run', '--json', '--guard-public-conversions'].includes(option) ||
+      flags.has(option)
+    )
+      throw new Error(usage);
+    flags.add(option);
+  }
+}
+const dryRun = flags.has('--dry-run');
+const json = flags.has('--json');
 const client = createDatabaseClient();
 try {
   const pending = await getPendingMigrationNames(client);
@@ -18,7 +33,12 @@ try {
     throw new Error(
       `Database schema is not current. Apply migrations first: ${pending.join(', ')}`
     );
-  const report = await importSelectedTrails({ database: createDatabase(client), dryRun });
+  const report = await importSelectedTrails({
+    database: createDatabase(client),
+    dryRun,
+    guardPublicConversions: flags.has('--guard-public-conversions'),
+    ...(selectionKeys.size ? { selectionKeys: [...selectionKeys] } : {})
+  });
   const selections = report.selections.filter((trail) => trail.action !== 'unchanged');
   if (json) {
     console.log(

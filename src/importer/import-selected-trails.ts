@@ -123,7 +123,7 @@ export const loadSelectedTrails = async () =>
   parseSelectedTrails(await readFile(catalogUrl, 'utf8'));
 
 type Dataset = Awaited<ReturnType<typeof loadSelectedTrails>>;
-const prepare = async (database: DbClient, dataset: Dataset) => {
+const prepare = async (database: DbClient, dataset: Dataset, guardPublicConversions: boolean) => {
   const { boundaryGeojson: _geometryColumn, ...columns } = getTableColumns(parks);
   const records = await database.select(columns).from(parks);
   const sources = await database.select().from(osmTrailSources);
@@ -213,6 +213,10 @@ const prepare = async (database: DbClient, dataset: Dataset) => {
       throw new Error(
         `Standalone trail has visits: ${selection.selectionKey} (${prior!.slug}): ${directVisits.map((visit) => `${visit.id} on ${visit.visitedOn}`).join(', ')}`
       );
+    if (guardPublicConversions && prior?.trailPublicationRole === 'independent' && !prior.removed)
+      throw new Error(
+        `Public trail conversion requires immediate frontend cache expiry: ${prior.slug}`
+      );
     const namesakes = records.filter(
       (p) =>
         p.id !== prior?.id &&
@@ -269,14 +273,27 @@ const prepare = async (database: DbClient, dataset: Dataset) => {
 export const importSelectedTrails = async ({
   database,
   dryRun = false,
+  selectionKeys,
+  guardPublicConversions = false,
   beforeApply = async () => {}
 }: {
   database: Database;
   dryRun?: boolean;
+  selectionKeys?: string[];
+  guardPublicConversions?: boolean;
   beforeApply?: () => Promise<void>;
 }) => {
   const dataset = await loadSelectedTrails();
-  const prepared = await database.transaction(async (tx) => prepare(tx, dataset));
+  if (selectionKeys) {
+    const requested = new Set(selectionKeys);
+    dataset.selections = dataset.selections.filter(({ selection }) =>
+      requested.delete(selection.selectionKey)
+    );
+    if (requested.size) throw new Error(`Unknown selection keys: ${[...requested].join(', ')}`);
+  }
+  const prepared = await database.transaction(async (tx) =>
+    prepare(tx, dataset, guardPublicConversions)
+  );
   const changed = prepared.actions.filter((a) => a.changed);
   const appliedIds = new Map<string, number>();
   const affectedSlugs = [
@@ -285,7 +302,7 @@ export const importSelectedTrails = async ({
   if (!dryRun && changed.length) {
     await beforeApply();
     await database.transaction(async (tx) => {
-      const current = await prepare(tx, dataset);
+      const current = await prepare(tx, dataset, guardPublicConversions);
       if (JSON.stringify(current) !== JSON.stringify(prepared))
         throw new Error('Catalog changed during import; retry the preview.');
       const timestamp = new Date().toISOString();

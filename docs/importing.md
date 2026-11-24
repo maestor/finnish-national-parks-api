@@ -242,6 +242,43 @@ Known merge members refresh before duplicate/containment filtering. The importer
 
 New automatic area matches use combined geometry and are included in the affected cache slugs. Previously pinned memberships survive geometry changes. After import, immediately clear the UI's public caches as above; API data-version updates do not expire them. LIPAS area imports and long-trail retirement retain source identities and merge membership. Source snapshots cannot be treated as a reversible edit history: there is no automatic unmerge.
 
+## Production imports after merges
+
+The API repository's **Production Migration** workflow compares the previous
+and current `main` commits after a merge, including squash merges. The
+catalog import job runs after the schema check and uses the existing
+`production` database secrets. It takes one backup before running the selected
+imports. The workflow queues production database jobs serially alongside the
+weekly LIPAS workflow.
+
+| Change merged to `main` | Import |
+| --- | --- |
+| A special-park definition or its `special://` geometry changes | `npm run import:special-parks -- <affected-slugs...>` |
+| A selection changes in `osm-linked-trails.geojson` | `npm run import:osm-linked-trails -- --selection <key>` for the affected keys in one batch |
+| A PR sets or changes the nonempty file `.github/osm-trails-refresh` | `npm run import:osm-trails` |
+
+Special parks run first so new parent areas exist when curated trails are
+linked. Routine merges with no catalog changes skip the import and backup
+steps. Removed definitions appear in the workflow summary for manual review.
+An older run skips changes superseded by a newer merge.
+Existing selected-trail drift protections still apply. Automatic imports stop
+for conversions that would hide a public standalone trail and require
+immediate cache expiry.
+
+Supplemental OSM discovery reads live OpenStreetMap data across all active
+areas. To request it in a PR, put a new nonempty value such as an issue number
+and short refresh reason in `.github/osm-trails-refresh`. For an on-demand run,
+open **Actions → Production Migration → Run workflow**, select `main`, and
+enable **Refresh supplemental OpenStreetMap trails**.
+
+After a successful run, expire the affected park caches through the
+[authenticated cache workflow](#trailarea-reconciliation). The Actions summary
+reports the scoped special-park slugs and the trail import reports.
+For a failed run, review the error and the backup artifact before retrying.
+Existing catalog changes can be applied manually from `main` with the commands
+above. Repeat `--selection <key>` to include multiple curated trails, and add
+`--dry-run --json` to preview the selection.
+
 ## Weekly LIPAS automation
 
 The API repository's `Weekly LIPAS Import` workflow runs every Monday at 09:43

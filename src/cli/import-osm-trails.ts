@@ -142,7 +142,7 @@ try {
   for (const warning of report.mergedWarnings) console.error(warning);
   if (report.affectedSlugs.length)
     console.error(
-      dryRun ? 'Expire affected area caches after applying.' : 'Expire affected area caches now.'
+      `Expire affected area caches ${dryRun ? 'after applying' : 'now'}: ${report.affectedSlugs.join(', ')}`
     );
 } finally {
   await client.close();
