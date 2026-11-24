@@ -1,10 +1,10 @@
 import { z } from 'zod';
 import { createParkSlug, normalizeParkUrl } from '../parks/park-normalization.js';
 import {
+  fitnessTrailLipasTypeCode,
   getSupportedParkTypeByCode,
   getSupportedParkTypeBySlug,
   hasMagnetByDefaultForTypeSlug,
-  kuntorataLipasTypeCode,
   walkingTrailTypeCode
 } from '../parks/park-types.js';
 import type { BoundingBox, GeoJsonFeatureCollection } from './geometry.js';
@@ -126,7 +126,7 @@ export const mapLipasPark = (source: unknown, existingSlug?: string): MappedPark
     : getSupportedParkTypeByCode(
         sourceTypeCode === multiUseAreaLipasTypeCode
           ? 103
-          : sourceTypeCode === kuntorataLipasTypeCode
+          : sourceTypeCode === fitnessTrailLipasTypeCode
             ? walkingTrailTypeCode
             : sourceTypeCode
       );

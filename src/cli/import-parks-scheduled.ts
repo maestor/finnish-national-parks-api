@@ -1,7 +1,7 @@
 import { createDatabaseClient } from '../db/client.js';
 import { getEnv } from '../env.js';
 import { runScheduledParkImport } from '../importer/scheduled-park-import.js';
-import { kuntorataLipasTypeCode } from '../parks/park-types.js';
+import { fitnessTrailLipasTypeCode } from '../parks/park-types.js';
 
 const env = getEnv();
 if (!env.GITHUB_REPOSITORY || !env.GITHUB_TOKEN) {
@@ -17,7 +17,7 @@ try {
     token: env.GITHUB_TOKEN
   });
   const newStandaloneCount = result.newParks.filter(
-    ({ typeCode }) => typeCode !== kuntorataLipasTypeCode
+    ({ typeCode }) => typeCode !== fitnessTrailLipasTypeCode
   ).length;
   const newLinkCount = result.trailAreaResult?.newAreaOnlyLinks.length ?? 0;
   console.log(

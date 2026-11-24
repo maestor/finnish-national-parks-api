@@ -90,7 +90,7 @@ export type SupportedParkCategorySlug = SupportedParkCategory['slug'];
 
 export const hikingAreaTypeCode = 109;
 export const hikingAreaDisplayTypeName = 'Valtion retkeilyalue';
-export const kuntorataLipasTypeCode = 4401;
+export const fitnessTrailLipasTypeCode = 4401;
 export const walkingTrailTypeCode = 4403;
 export const natureTrailTypeCode = 4404;
 export const hikingTrailTypeCode = 4405;

@@ -3,20 +3,20 @@ import { createDatabase } from '../db/database.js';
 import { migrateDatabase } from '../db/migrate.js';
 import {
   defaultLipasCatalogSourceUrl,
-  importParks,
-  kuntorataSourceUrl
+  fitnessTrailSourceUrl,
+  importParks
 } from '../importer/import-parks.js';
 
 type ParsedArgs = {
   dryRun: boolean;
-  kuntorataOnly: boolean;
+  linkOnlyTrails: boolean;
 };
 
-const usage = 'Usage: npm run import:parks [-- --dry-run] [--kuntorata-only]';
+const usage = 'Usage: npm run import:parks [-- [--dry-run] [--link-only-trails]]';
 
 const parseArgs = (argv: string[]): ParsedArgs => {
   let dryRun = false;
-  let kuntorataOnly = false;
+  let linkOnlyTrails = false;
 
   for (const arg of argv) {
     if (arg === '--dry-run') {
@@ -24,15 +24,15 @@ const parseArgs = (argv: string[]): ParsedArgs => {
       continue;
     }
 
-    if (arg === '--kuntorata-only') {
-      kuntorataOnly = true;
+    if (arg === '--link-only-trails') {
+      linkOnlyTrails = true;
       continue;
     }
 
     throw new Error(`Unknown argument: ${arg}\n${usage}`);
   }
 
-  return { dryRun, kuntorataOnly };
+  return { dryRun, linkOnlyTrails };
 };
 
 const client = createDatabaseClient();
@@ -43,8 +43,8 @@ await migrateDatabase(client);
 const result = await importParks({
   database: createDatabase(client),
   dryRun: args.dryRun,
-  scope: args.kuntorataOnly ? 'area-link-only' : 'catalog',
-  sourceUrl: args.kuntorataOnly ? kuntorataSourceUrl : defaultLipasCatalogSourceUrl
+  scope: args.linkOnlyTrails ? 'area-link-only' : 'catalog',
+  sourceUrl: args.linkOnlyTrails ? fitnessTrailSourceUrl : defaultLipasCatalogSourceUrl
 });
 
 await client.close();

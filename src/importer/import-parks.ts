@@ -14,11 +14,11 @@ import {
 import { importRuns, parkImportNotifications, parks } from '../db/schema.js';
 import { mergedTrailSlugs } from '../db/trail-merges.js';
 import {
+  fitnessTrailLipasTypeCode,
   getSupportedParkTypeByCode,
   hikingAreaDisplayTypeName,
   hikingAreaTypeCode,
-  isTrailTypeCode,
-  kuntorataLipasTypeCode
+  isTrailTypeCode
 } from '../parks/park-types.js';
 import {
   listAreaLinkOnlyParentSlugs,
@@ -72,7 +72,7 @@ const SUPPORTED_LIPAS_TYPE_CODES = [
   110,
   111,
   112,
-  kuntorataLipasTypeCode,
+  fitnessTrailLipasTypeCode,
   4403,
   4404,
   4405
@@ -91,7 +91,7 @@ class ImportDryRunRollbackError extends Error {
 
 export const defaultLipasCatalogSourceUrl = `https://api.lipas.fi/v2/sports-sites?type-codes=${SUPPORTED_LIPAS_TYPE_CODES.join(',')}&page-size=100&page=1`;
 
-export const kuntorataSourceUrl = `https://api.lipas.fi/v2/sports-sites?type-codes=${kuntorataLipasTypeCode}&page-size=100&page=1`;
+export const fitnessTrailSourceUrl = `https://api.lipas.fi/v2/sports-sites?type-codes=${fitnessTrailLipasTypeCode}&page-size=100&page=1`;
 
 const defaultFetchSource = async (sourceUrl: string) => {
   const firstResponse = await fetch(sourceUrl);
@@ -215,12 +215,12 @@ export const importParks = async ({
     return candidate.status === 'active';
   });
   const mappedActiveParks = activeItems.map((item) => mapLipasPark(item));
-  const kuntorataIds = new Set(
+  const fitnessTrailLipasIds = new Set(
     mappedActiveParks
-      .filter((park) => park.sourceTypeCode === kuntorataLipasTypeCode)
+      .filter((park) => park.sourceTypeCode === fitnessTrailLipasTypeCode)
       .map((park) => park.lipasId)
   );
-  if (areaLinkOnlyImport && kuntorataIds.size !== mappedActiveParks.length) {
+  if (areaLinkOnlyImport && fitnessTrailLipasIds.size !== mappedActiveParks.length) {
     throw new Error('The Kuntorata import requires a Kuntorata-only source.');
   }
   const existingParks = await listExistingParksByLipasIds(
@@ -239,8 +239,8 @@ export const importParks = async ({
       name: park.name,
       removed: true,
       slug: park.slug,
-      typeCode: kuntorataIds.has(park.lipasId) ? kuntorataLipasTypeCode : park.type.code,
-      typeName: kuntorataIds.has(park.lipasId)
+      typeCode: fitnessTrailLipasIds.has(park.lipasId) ? fitnessTrailLipasTypeCode : park.type.code,
+      typeName: fitnessTrailLipasIds.has(park.lipasId)
         ? 'Kuntorata'
         : getSupportedParkTypeByCode(park.type.code).name
     }));
@@ -269,11 +269,11 @@ export const importParks = async ({
     await database.transaction(async (tx) => {
       await syncParkTypes(tx);
       const priorAreaLinkOnlySlugs = await listAreaLinkOnlyParentSlugs(tx);
-      const kuntorataSourceIdentity = inArray(parks.lipasId, [...kuntorataIds]);
+      const hasFitnessTrailSourceId = inArray(parks.lipasId, [...fitnessTrailLipasIds]);
       const scopedCatalog = areaLinkOnlyImport
-        ? or(eq(parks.areaLinkOnly, true), kuntorataSourceIdentity)
+        ? or(eq(parks.areaLinkOnly, true), hasFitnessTrailSourceId)
         : undefined;
-      const kuntorataFormerStandalone = kuntorataIds.size
+      const formerStandaloneFitnessTrails = fitnessTrailLipasIds.size
         ? await tx
             .select({ slug: parks.slug })
             .from(parks)
@@ -284,11 +284,11 @@ export const importParks = async ({
                 eq(parks.removed, false),
                 eq(parks.trailPublicationRole, 'independent'),
                 eq(parks.areaLinkOnly, false),
-                kuntorataSourceIdentity
+                hasFitnessTrailSourceId
               )
             )
         : [];
-      const formerStandaloneSlugs = kuntorataFormerStandalone.map(({ slug }) => slug);
+      const formerStandaloneSlugs = formerStandaloneFitnessTrails.map(({ slug }) => slug);
 
       for (const [lipasId, { legacyLipasId }] of formerSpecialParks) {
         const incoming = parksByLipasId.get(lipasId);
@@ -369,16 +369,16 @@ export const importParks = async ({
         batchGeometryBytes = 0;
       };
 
-      const isKuntorataItem = (item: unknown) =>
-        kuntorataIds.has((item as { 'lipas-id': number })['lipas-id']);
-      const regularItems = importableItems.filter((item) => !isKuntorataItem(item));
-      const orderedItems = [...regularItems, ...importableItems.filter(isKuntorataItem)];
+      const isFitnessTrailItem = (item: unknown) =>
+        fitnessTrailLipasIds.has((item as { 'lipas-id': number })['lipas-id']);
+      const regularItems = importableItems.filter((item) => !isFitnessTrailItem(item));
+      const orderedItems = [...regularItems, ...importableItems.filter(isFitnessTrailItem)];
       let visibleParents: Awaited<ReturnType<typeof selectVisibleTrailParents>> = [];
       for (let index = 0; index < orderedItems.length; index += 1) {
         const item = orderedItems[index];
         const lipasId = (item as { 'lipas-id': number })['lipas-id'];
 
-        const areaLinkOnly = kuntorataIds.has(lipasId);
+        const areaLinkOnly = fitnessTrailLipasIds.has(lipasId);
         if (index === regularItems.length) {
           if (batch.length) await flushBatch();
           visibleParents = await selectVisibleTrailParents(
@@ -512,14 +512,14 @@ export const importParks = async ({
           )
         );
       deactivatedParks.push(...previouslyActive.filter((park) => !activeIds.has(park.lipasId)));
-      const retiredKuntorataIds = deactivatedParks
-        .filter(({ lipasId }) => kuntorataIds.has(lipasId))
+      const retiredFitnessTrailLipasIds = deactivatedParks
+        .filter(({ lipasId }) => fitnessTrailLipasIds.has(lipasId))
         .map(({ lipasId }) => lipasId);
-      if (retiredKuntorataIds.length) {
+      if (retiredFitnessTrailLipasIds.length) {
         await tx
           .update(parks)
           .set({ areaLinkOnly: true })
-          .where(inArray(parks.lipasId, retiredKuntorataIds));
+          .where(inArray(parks.lipasId, retiredFitnessTrailLipasIds));
       }
       await markMissingParksInactive(tx, [...activeIds], importRunId!, importedAt, scopedCatalog);
       trailAreaResult.value = await reconcileTrailAreas(tx, importedAt, scope);
@@ -549,7 +549,9 @@ export const importParks = async ({
         );
       }
 
-      const newStandaloneParks = newParks.filter(({ lipasId }) => !kuntorataIds.has(lipasId));
+      const newStandaloneParks = newParks.filter(
+        ({ lipasId }) => !fitnessTrailLipasIds.has(lipasId)
+      );
       const newAreaOnlyLinks = trailAreaResult.value.newAreaOnlyLinks;
       if (queueNewParkNotification && (newStandaloneParks.length || newAreaOnlyLinks.length)) {
         await tx.insert(parkImportNotifications).values({
