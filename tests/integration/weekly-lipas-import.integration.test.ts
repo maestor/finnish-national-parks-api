@@ -2,13 +2,18 @@ import { eq } from 'drizzle-orm';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { listParks } from '../../src/db/repositories.js';
-import { parkImportNotifications, parks } from '../../src/db/schema.js';
+import { importRuns, parkImportNotifications, parks } from '../../src/db/schema.js';
 import { importParks } from '../../src/importer/import-parks.js';
 import { sendPendingParkReviews } from '../../src/importer/park-review-notifications.js';
 import { runScheduledParkImport } from '../../src/importer/scheduled-park-import.js';
 import { createLipasPark, createLipasTrail } from '../fixtures/lipas.js';
 import { importPublishedParkFixtures } from '../helpers/import-published-park-fixtures.js';
 import { createTestDatabase } from '../helpers/test-db.js';
+
+const databaseSocketError = () =>
+  new TypeError('fetch failed', {
+    cause: Object.assign(new Error('other side closed'), { code: 'UND_ERR_SOCKET' })
+  });
 
 describe('weekly LIPAS import', () => {
   let db: Awaited<ReturnType<typeof createTestDatabase>>;
@@ -71,6 +76,67 @@ describe('weekly LIPAS import', () => {
 
     await runScheduledParkImport(db.client, github);
     expect(issues).toHaveLength(1);
+  });
+
+  it.each([1, 2])('handles %i socket disconnects during a catalog write', async (disconnects) => {
+    const transaction = db.client.transaction.bind(db.client);
+    const socketError = databaseSocketError();
+    let failures = 0;
+    const attempts = vi.spyOn(db.client, 'transaction').mockImplementation(async (...args) => {
+      const tx = await transaction(...args);
+      const execute = tx.execute.bind(tx);
+      vi.spyOn(tx, 'execute').mockImplementation(async (statement) => {
+        const sql = typeof statement === 'string' ? statement : statement.sql;
+        const result = await execute(statement);
+        if (sql.startsWith('insert into "parks"') && failures < disconnects) {
+          failures += 1;
+          throw socketError;
+        }
+        return result;
+      });
+      return tx;
+    });
+
+    const runsBefore = await db.database.select().from(importRuns);
+    const run = runScheduledParkImport(db.client, github);
+    if (disconnects === 1) {
+      await expect(run).resolves.toMatchObject({ activeCount: 2 });
+      expect(await db.database.select().from(importRuns)).toHaveLength(runsBefore.length + 1);
+      expect(await db.database.select().from(parks)).toHaveLength(2);
+      expect(issues).toHaveLength(1);
+    } else {
+      await expect(run).rejects.toMatchObject({ cause: socketError });
+      expect(await db.database.select().from(importRuns)).toEqual(runsBefore);
+      expect(await db.database.select().from(parks)).toHaveLength(1);
+      expect(issues).toEqual([]);
+    }
+    expect(failures).toBe(disconnects);
+    expect(attempts).toHaveBeenCalledTimes(2);
+  });
+
+  it('leaves the committed review queued when the database loses the commit response', async () => {
+    const transaction = db.client.transaction.bind(db.client);
+    const socketError = databaseSocketError();
+    const attempts = vi.spyOn(db.client, 'transaction').mockImplementation(async (...args) => {
+      const tx = await transaction(...args);
+      const commit = tx.commit.bind(tx);
+      const rollback = tx.rollback.bind(tx);
+      vi.spyOn(tx, 'rollback').mockImplementation(async () => {
+        if (!tx.closed) await rollback();
+      });
+      vi.spyOn(tx, 'commit').mockImplementation(async () => {
+        await commit();
+        throw socketError;
+      });
+      return tx;
+    });
+
+    const runsBefore = await db.database.select().from(importRuns);
+    await expect(runScheduledParkImport(db.client, github)).rejects.toBe(socketError);
+    expect(attempts).toHaveBeenCalledTimes(1);
+    expect(await db.database.select().from(importRuns)).toHaveLength(runsBefore.length + 1);
+    expect(await db.database.select().from(parkImportNotifications)).toHaveLength(1);
+    expect(issues).toEqual([]);
   });
 
   it.each([false, true])(

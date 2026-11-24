@@ -46,7 +46,7 @@ the UI's public park caches after applying. Existing trail and area IDs stay
 the same. Formerly retired OSM trails can return through the regular OSM import
 when they meet its area match and duplicate checks.
 
-To reduce traffic to remote libSQL, the main import upserts at most ten parks per statement, with a 1 MiB geometry budget per batch. Trail reconciliation loads geometry in groups of at most 50 records and 2 MiB. A single geometry larger than a budget is sent or read on its own. During lengthy geometry matching, periodic lightweight queries keep the remote transaction stream active. All catalog writes, reconciliation and notification queuing remain in one transaction; dry runs roll it back.
+To reduce traffic to remote libSQL, the main import upserts at most ten parks per statement, with a 1 MiB geometry budget per batch. Trail reconciliation loads geometry in groups of at most 50 records and 2 MiB. A single geometry larger than a budget is sent or read on its own. The import normalizes geometry before opening the write transaction. Periodic lightweight queries keep the remote transaction stream active during both Kuntorata eligibility checks and trail reconciliation. All catalog writes, reconciliation and notification queuing remain in one transaction. Dry runs roll it back.
 
 Back up the target database before applying. Run `npm run import:parks -- --dry-run` first. The dry run rolls back catalog changes and reports new rows, automatic links, exclusions, deactivations, in-place source transfers and affected public slugs. A trail with visits that would newly become a member aborts the transaction. See [the parent-area import workflow](#import-a-parent-area-for-a-trail-with-visits). After review, run `npm run import:parks` and immediately expire every reported slug through the UI's authenticated `POST /api/revalidate-public-cache` with `{ "parkSlugs": ["slug"] }` (maximum 500 per request). That endpoint also expires summary, map, planner and sitemap paths. API ETags do not invalidate the UI cache by themselves. Repeat the dry run to check stability before rollout.
 
@@ -313,6 +313,10 @@ Existing parks are refreshed using the same import and preservation rules as
 the manual command. Missing LIPAS-managed parks become inactive. Normal API
 reads remain local-first. Use the manual workflow above for public trail
 conversions that require immediate cache expiry.
+
+If a database statement loses its HTTP socket (`UND_ERR_SOCKET`), the workflow
+retries the full catalog import once after the failed attempt exits. A socket
+failure during commit fails the run because the database may have committed it.
 
 Notification reports are queued in the same database transaction as the import.
 Failed notifications remain queued for the next workflow run, which retries

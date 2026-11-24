@@ -19,9 +19,9 @@ import {
   measureTrailAreaOverlap,
   qualifiesTrailAreaOverlap
 } from './trail-area-geometry.js';
+import { createTransactionKeepalive } from './transaction-keepalive.js';
 
 const method = 'jsts-wgs84-clip-epsg3067-v3';
-const TRANSACTION_KEEPALIVE_INTERVAL_MS = 1000;
 type BoundedPark = Pick<
   typeof parks.$inferSelect,
   'bboxMinLon' | 'bboxMaxLon' | 'bboxMinLat' | 'bboxMaxLat'
@@ -99,15 +99,7 @@ export const reconcileTrailAreas = async (
   let automaticLinks = 0;
   const newAreaOnlyLinks: { trailName: string; areaName: string }[] = [];
   let newlyHidden = 0;
-  // Geometry matching can otherwise leave a remote interactive transaction idle
-  // long enough for its libSQL stream to expire before commit or rollback.
-  let lastKeepalive = Date.now();
-  const keepTransactionActive = async () => {
-    if (Date.now() - lastKeepalive >= TRANSACTION_KEEPALIVE_INTERVAL_MS) {
-      await database.run(sql`select 1`);
-      lastKeepalive = Date.now();
-    }
-  };
+  const keepTransactionActive = createTransactionKeepalive(database);
 
   for (const trail of trails) {
     await keepTransactionActive();

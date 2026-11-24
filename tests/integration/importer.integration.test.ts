@@ -782,6 +782,39 @@ describe('importParks', () => {
     expect(statements.some((statement) => /^select 1$/i.test(statement))).toBe(true);
   });
 
+  it('keeps the transaction active while scanning Kuntorata before writing the matches', async () => {
+    const area = createLipasPark();
+    const options = { database: testDatabase.database, sourceUrl: 'https://example.test/lipas' };
+    await importPublishedParkFixtures({ ...options, fetchSource: async () => ({ items: [area] }) });
+    const transaction = testDatabase.client.transaction.bind(testDatabase.client);
+    const statements: string[] = [];
+    vi.spyOn(testDatabase.client, 'transaction').mockImplementation(async (...args) => {
+      const tx = await transaction(...args);
+      const execute = tx.execute.bind(tx);
+      vi.spyOn(tx, 'execute').mockImplementation((statement) => {
+        statements.push(typeof statement === 'string' ? statement : statement.sql);
+        return execute(statement);
+      });
+      return tx;
+    });
+    const trail = createLipasTrail({ 'lipas-id': 99101, type: { 'type-code': 4401 } });
+    let time = 0;
+    const clock = vi.spyOn(Date, 'now').mockImplementation(() => (time += 2500));
+    try {
+      const result = await importParks({
+        ...options,
+        fetchSource: async () => ({ items: [area, trail] })
+      });
+      expect(result.trailAreaResult?.newAreaOnlyLinks).toHaveLength(1);
+    } finally {
+      clock.mockRestore();
+    }
+    const lastUpsert = statements.findLastIndex((statement) =>
+      statement.startsWith('insert into "parks"')
+    );
+    expect(statements.slice(0, lastUpsert)).toContain('select 1');
+  });
+
   it('imports and refreshes a trail length, retaining a local override', async () => {
     const run = async (length: number | undefined) =>
       importPublishedParkFixtures({

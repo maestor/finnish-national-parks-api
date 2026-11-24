@@ -34,6 +34,7 @@ import {
 } from './merge-lipas-trail.js';
 import { reconcileTrailAreas } from './reconcile-trail-areas.js';
 import { seitsemansVeljestaTrail as mergedTrail } from './seitsemans-veljesta-trail.js';
+import { createTransactionKeepalive } from './transaction-keepalive.js';
 
 const lipasResponseSchema = z.object({
   items: z.array(z.unknown()),
@@ -214,7 +215,7 @@ export const importParks = async ({
     const candidate = item as { status?: string };
     return candidate.status === 'active';
   });
-  const mappedActiveParks = activeItems.map((item) => mapLipasPark(item));
+  const mappedActiveParks = activeItems.map(mapLipasPark);
   const fitnessTrailLipasIds = new Set(
     mappedActiveParks
       .filter((park) => park.sourceTypeCode === fitnessTrailLipasTypeCode)
@@ -331,13 +332,10 @@ export const importParks = async ({
             mergedTrail.canonicalId
           ]
         : mappedActiveParks.map((park) => park.lipasId);
-      const importableItems =
+      const importableParks =
         maintainMerge && !readyMerge
-          ? activeItems.filter(
-              (item) =>
-                !mergedTrail.componentIds.includes((item as { 'lipas-id': number })['lipas-id'])
-            )
-          : activeItems;
+          ? mappedActiveParks.filter((park) => !mergedTrail.componentIds.includes(park.lipasId))
+          : mappedActiveParks;
       const canonicalSlug = readyMerge
         ? (existingImportedSlugByLipasId.get(mergedTrail.canonicalId) ??
           ensureUniqueSlug(mergedTrail.slug, mergedTrail.canonicalId, takenSlugs))
@@ -369,32 +367,38 @@ export const importParks = async ({
         batchGeometryBytes = 0;
       };
 
-      const isFitnessTrailItem = (item: unknown) =>
-        fitnessTrailLipasIds.has((item as { 'lipas-id': number })['lipas-id']);
-      const regularItems = importableItems.filter((item) => !isFitnessTrailItem(item));
-      const orderedItems = [...regularItems, ...importableItems.filter(isFitnessTrailItem)];
+      const regularParks = importableParks.filter(
+        (park) => !fitnessTrailLipasIds.has(park.lipasId)
+      );
+      const fitnessTrails = importableParks.filter((park) =>
+        fitnessTrailLipasIds.has(park.lipasId)
+      );
+      const orderedParks = [...regularParks, ...fitnessTrails];
+      const keepTransactionActive = createTransactionKeepalive(tx);
       let visibleParents: Awaited<ReturnType<typeof selectVisibleTrailParents>> = [];
-      for (let index = 0; index < orderedItems.length; index += 1) {
-        const item = orderedItems[index];
-        const lipasId = (item as { 'lipas-id': number })['lipas-id'];
+      for (const [index, park] of orderedParks.entries()) {
+        const { lipasId } = park;
 
         const areaLinkOnly = fitnessTrailLipasIds.has(lipasId);
-        if (index === regularItems.length) {
+        if (index === regularParks.length) {
           if (batch.length) await flushBatch();
           visibleParents = await selectVisibleTrailParents(
             tx,
             (id) => areaLinkOnlyImport || activeIds.has(id)
           );
         }
-        const raw = mapLipasPark(item, existingImportedSlugByLipasId.get(lipasId));
-        if (areaLinkOnly && !qualifiesForVisibleParent(raw, visibleParents)) {
-          activeIds.delete(lipasId);
-          continue;
+        if (areaLinkOnly) {
+          await keepTransactionActive();
+          if (!qualifiesForVisibleParent(park, visibleParents)) {
+            activeIds.delete(lipasId);
+            continue;
+          }
         }
         if (beforeEachUpsert) {
           await beforeEachUpsert(index, lipasId);
         }
         const combined = lipasId === mergedTrail.canonicalId ? readyMerge?.combined : undefined;
+        const raw = { ...park, slug: existingImportedSlugByLipasId.get(lipasId) ?? park.slug };
         const mapped = combined
           ? {
               ...raw,
