@@ -611,6 +611,24 @@ describe('manual catalog imports', () => {
 
     expect(result.results.map(({ slug }) => slug).sort()).toEqual(specialParkSlugs);
 
+    const norvajarviCemetery = await getParkBySlug(
+      testDatabase.database,
+      'saksalaisten-sotilaiden-hautausmaa'
+    );
+    expect(norvajarviCemetery).toMatchObject({
+      address: 'Lentosatamantie 60, 96900 Rovaniemi',
+      name: 'Saksalaisten sotilaiden hautausmaa',
+      parkUrl: 'https://www.rky.fi/read/asp/r_kohde_det.aspx?KOHDE_ID=5176',
+      type: { slug: 'cultural-history-area' },
+      boundingBox: {
+        minLat: 66.62697917,
+        maxLat: 66.62853236,
+        minLon: 25.7835321,
+        maxLon: 25.78700624
+      },
+      boundaryGeoJson: { features: [{ geometry: { type: 'Polygon' } }] }
+    });
+
     const merenkurkku = await getParkBySlug(
       testDatabase.database,
       'merenkurkun-maailmanperintoalue'

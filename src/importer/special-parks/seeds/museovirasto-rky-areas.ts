@@ -3,6 +3,19 @@ import type { MuseovirastoRkyAreaSeed } from '../types.js';
 export const sourceReadyHistoryRkyAreaSeeds: MuseovirastoRkyAreaSeed[] = [
   {
     displayTypeName: null,
+    locationLabel: 'Lentosatamantie 60',
+    parkUrl: 'https://www.rky.fi/read/asp/r_kohde_det.aspx?KOHDE_ID=5176',
+    name: 'Saksalaisten sotilaiden hautausmaa',
+    parkTypeSlug: 'cultural-history-area',
+    postalCode: '96900',
+    postalOffice: 'Rovaniemi',
+    slug: 'saksalaisten-sotilaiden-hautausmaa',
+    sourceFeatureName: 'Norvajärven kappeli',
+    sourceName: 'Jatkosodan tapahtuma- ja muistopaikat',
+    syntheticLipasId: 9_001_095
+  },
+  {
+    displayTypeName: null,
     locationLabel: 'Kristiinankatu 3-5',
     parkUrl: 'https://www.rky.fi/read/asp/r_kohde_det.aspx?KOHDE_ID=1170',
     name: 'Lappeenrannan linnoitus',

@@ -767,6 +767,41 @@ export const createSpecialParksSource = () => {
       throw new Error('Lappeenrannan linnoitus must select the fortress feature.');
     }
 
+    if (
+      sourceUrl.includes(encodeURIComponent("kohdenimi='Jatkosodan tapahtuma- ja muistopaikat'"))
+    ) {
+      if (!sourceUrl.includes(encodeURIComponent("nimi='Norvajärven kappeli'"))) {
+        throw new Error('The cemetery import must select the Norvajärven kappeli feature.');
+      }
+      return {
+        type: 'FeatureCollection',
+        features: [
+          {
+            type: 'Feature',
+            geometry: {
+              type: 'MultiPolygon',
+              coordinates: [
+                [
+                  [
+                    [25.78561029, 66.62842857],
+                    [25.78421791, 66.62853236],
+                    [25.7835321, 66.62781863],
+                    [25.78396473, 66.62744996],
+                    [25.78533758, 66.6270098],
+                    [25.78600566, 66.62697917],
+                    [25.78700624, 66.62715151],
+                    [25.78689405, 66.62760134],
+                    [25.78561029, 66.62842857]
+                  ]
+                ]
+              ]
+            },
+            properties: { ID: 5176, OBJECTID: 1678, nimi: 'Norvajärven kappeli' }
+          }
+        ]
+      };
+    }
+
     if (sourceUrl.includes('typeNames=rajapinta_suojellut:rky_alue')) {
       return {
         type: 'FeatureCollection',
