@@ -2,6 +2,7 @@ import { eq } from 'drizzle-orm';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { createApp } from '../../src/app.js';
+import { parkDetailSchema } from '../../src/contracts/parks.js';
 import {
   trailAreaCandidateSchema,
   trailAreaLinkSchema,
@@ -365,21 +366,35 @@ describe('admin trail relationships', () => {
     });
     const linked = await app.request(detailPath, { headers: { 'if-none-match': initialEtag } });
     expect(linked.status).toBe(200);
-    expect(await linked.json()).toMatchObject({
+    expect(parkDetailSchema.parse(await linked.json())).toMatchObject({
       linkedTrails: [
         {
           name: trail.name,
           address: 'Polkutie 1, 00999 Testikylä',
+          parkUrl: 'https://www.luontoon.fi/testi-luontopolku',
           boundaryGeoJson: JSON.parse(trail.boundaryGeojson)
         }
       ]
+    });
+    const clearUrl = await app.request(`/api/parks/${trail.slug}`, {
+      method: 'PATCH',
+      headers: { cookie, 'content-type': 'application/json' },
+      body: JSON.stringify({ parkUrl: null })
+    });
+    expect(clearUrl.status).toBe(200);
+    const withoutUrl = await app.request(detailPath, {
+      headers: { 'if-none-match': linked.headers.get('etag')! }
+    });
+    expect(withoutUrl.status).toBe(200);
+    expect(parkDetailSchema.parse(await withoutUrl.json())).toMatchObject({
+      linkedTrails: [{ parkUrl: null }]
     });
     await db.database
       .update(parks)
       .set({ locationLabel: trail.name, postalCode: null, postalOffice: null })
       .where(eq(parks.id, trail.id));
     const withoutAddress = await app.request(detailPath, {
-      headers: { 'if-none-match': linked.headers.get('etag')! }
+      headers: { 'if-none-match': withoutUrl.headers.get('etag')! }
     });
     expect(withoutAddress.status).toBe(200);
     expect(await withoutAddress.json()).toMatchObject({ linkedTrails: [{ address: null }] });

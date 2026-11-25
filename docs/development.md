@@ -352,7 +352,7 @@ Key route behavior:
 - `GET /api/parks?type=hiking-area` filters by normalized catalog type slug.
 - `GET /api/parks?category=hiking-and-wilderness-areas` filters by the derived `Erämaa-/retkeilyalue` category while preserving each park's imported `type`.
 - `GET /api/parks?category=trails-and-routes` filters by a derived API category while preserving the original imported `type` in responses.
-- `GET /api/parks/:slug?includeBoundary=true` returns the stored boundary GeoJSON.
+- `GET /api/parks/:slug?includeBoundary=true` returns the stored boundary GeoJSON and effective linked trails. Each trail includes its own `parkUrl`, or `null` when unset. Older cached responses can omit this field. The linked trail data contributes to the detail ETag, so URL edits invalidate the parent detail validator.
 - `GET /api/trips/slug/:slug/visits/:visitId/images` verifies that the visit belongs to the requested trip and its parent park is visible, then returns only that visit's ordered image page. It is private/no-store, defaults to 12 images, accepts at most 24, and never builds a trip route or returns notes/history.
 - `GET /api/trips/slug/:slug/stops/:stopId/images` verifies that the stop belongs to the requested trip, then returns only that stop's ordered image page. It is private/no-store and defaults to 12 images with a maximum of 24.
 - `GET /api/parks/:slug` still hides removed parks publicly, but returns removed-park detail to a request carrying a valid admin session cookie when OAuth is enabled.
