@@ -1,3 +1,5 @@
+import { z } from 'zod';
+
 import {
   buildMuseovirastoRkyAreaSourceUrl,
   buildSykeGeologicalRockAreaSourceUrl,
@@ -555,6 +557,24 @@ export const baseSpecialParkConfigs: SpecialParkConfig[] = [
     slug: 'talvipuutarha',
     sourceUrl: 'special://talvipuutarha',
     syntheticLipasId: 9_002_037
+  },
+  {
+    displayTypeName: null,
+    extractMetadata: ([feature]) => ({
+      areaKm2: z.object({ area_km2: z.number().positive() }).parse(feature!.properties).area_km2,
+      establishmentYear: null
+    }),
+    locationLabel: 'Pohjoisranta 4',
+    markerPoint: { lat: 66.509251531064, lon: 25.726248439275 },
+    parkUrl: 'https://www.visitrovaniemi.fi/fi/kayntikohde/arktinen-puutarha/',
+    name: 'Arktinen puutarha',
+    parkTypeSlug: 'outdoor-recreation-area',
+    postalCode: '96200',
+    postalOffice: 'Rovaniemi',
+    responseShapeVersion: 'manual-osm-garden-boundary-v1',
+    slug: 'arktinen-puutarha',
+    sourceUrl: 'special://arktinen-puutarha',
+    syntheticLipasId: 9_002_063
   },
   {
     displayTypeName: null,
