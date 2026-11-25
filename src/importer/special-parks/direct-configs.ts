@@ -287,6 +287,21 @@ export const baseSpecialParkConfigs: SpecialParkConfig[] = [
   },
   {
     displayTypeName: null,
+    locationLabel: '',
+    markerPoint: { lat: 66.50220924192774, lon: 25.76694316721923 },
+    parkUrl:
+      'https://www.visitrovaniemi.fi/fi/kayntikohde/ounasvaaran-ymparivuotinen-talvikavelyreitti/',
+    name: 'Ounasvaaran talvikävelyreitti',
+    parkTypeSlug: 'hiking-trail',
+    postalCode: '96200',
+    postalOffice: 'Rovaniemi',
+    responseShapeVersion: 'etiainen-gpx-v1',
+    slug: 'ounasvaaran-talvikavelyreitti',
+    sourceUrl: 'special://ounasvaaran-talvikavelyreitti',
+    syntheticLipasId: 9_004_407
+  },
+  {
+    displayTypeName: null,
     extractMetadata: extractGeoJsonAreaM2Metadata,
     locationLabel: 'Karkalintie 759',
     markerPoint: { lat: 60.2524074, lon: 23.8572252 },

@@ -80,6 +80,31 @@ describe('manual catalog imports', () => {
     });
   });
 
+  it('imports the Ounasvaara winter walking route as a standalone hiking trail', async () => {
+    const { database } = testDatabase;
+    const slug = 'ounasvaaran-talvikavelyreitti';
+    await importSpecialParks({ database, includeSlugs: [slug] });
+
+    const trail = await getParkBySlug(database, slug);
+    expect(trail).toMatchObject({
+      address: '96200 Rovaniemi',
+      name: 'Ounasvaaran talvikävelyreitti',
+      parkUrl:
+        'https://www.visitrovaniemi.fi/fi/kayntikohde/ounasvaaran-ymparivuotinen-talvikavelyreitti/',
+      type: { slug: 'hiking-trail' }
+    });
+    expect(trail?.boundaryGeoJson?.features.map(({ geometry }) => geometry.type)).toEqual(
+      Array(16).fill('LineString')
+    );
+    await expect(
+      database.query.parks.findFirst({ where: eq(parks.slug, slug) })
+    ).resolves.toMatchObject({
+      managedByLipasImport: false,
+      removed: false,
+      trailPublicationRole: 'independent'
+    });
+  });
+
   it('reuses the old Torhola trail, moves its visit and links the OSM route under the cave area', async () => {
     const database = testDatabase.database;
     const timestamp = '2026-11-19T10:00:00.000Z';
