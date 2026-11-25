@@ -24,6 +24,7 @@ export const runScheduledParkImport = async (client: Client, github: GithubRevie
     importParks({
       database,
       queueNewParkNotification: true,
+      skipDuplicateTrails: true,
       requireNoPublicTrailConversions: true,
       sourceUrl: defaultLipasCatalogSourceUrl
     });

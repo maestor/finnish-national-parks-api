@@ -13,12 +13,23 @@ const notificationParksSchema = z.array(
     typeName: z.string()
   })
 );
+const duplicateTrailSchema = z.object({
+  lipasId: z.number().int(),
+  trailName: z.string(),
+  matchedName: z.string(),
+  matchedSlug: z.string(),
+  source: z.string(),
+  areaNames: z.array(z.string())
+});
+export type DuplicateTrailReview = z.infer<typeof duplicateTrailSchema>;
+
 const notificationSchema = z.union([
   z.object({
     parks: notificationParksSchema,
-    areaLinks: z.array(z.object({ trailName: z.string(), areaName: z.string() }))
+    areaLinks: z.array(z.object({ trailName: z.string(), areaName: z.string() })),
+    duplicateTrails: z.array(duplicateTrailSchema).default([])
   }),
-  notificationParksSchema.transform((parks) => ({ parks, areaLinks: [] }))
+  notificationParksSchema.transform((parks) => ({ parks, areaLinks: [], duplicateTrails: [] }))
 ]);
 const nameAsCode = (name: string) => `\`${name.replace(/[`\r\n]/g, ' ')}\``;
 const issuesSchema = z.array(z.object({ body: z.string().nullable() }));
@@ -57,7 +68,9 @@ export const sendPendingParkReviews = async (database: Database, target: GithubR
     }
 
     if (!alreadySent) {
-      const { parks, areaLinks } = notificationSchema.parse(JSON.parse(notification.parksJson));
+      const { parks, areaLinks, duplicateTrails } = notificationSchema.parse(
+        JSON.parse(notification.parksJson)
+      );
       const body = [marker, '@maestor LIPAS-tuonnin yhteenveto'];
       if (parks.length) {
         body.push(
@@ -79,9 +92,25 @@ export const sendPendingParkReviews = async (database: Database, target: GithubR
             .join('\n')
         );
       }
-      const title = areaLinks.length
-        ? `LIPAS-tuonnin yhteenveto (${parks.length} tarkistettavaa kohdetta, ${areaLinks.length} alueliitosta)`
-        : `Uusia LIPAS-kohteita tarkistettavaksi (${parks.length})`;
+      if (duplicateTrails.length) {
+        body.push(
+          '### Luettelossa jo olevat reitit',
+          'Nämä LIPAS-reitit ohitettiin, koska vähintään 95 % kummankin reitin geometriasta oli enintään 25 metrin päässä toisesta reitistä.',
+          duplicateTrails
+            .map(({ lipasId, trailName, matchedName, matchedSlug, source, areaNames }) => {
+              const areas = areaNames.length
+                ? ` Alueet: ${areaNames.map(nameAsCode).join(', ')}.`
+                : '';
+              return `- ${nameAsCode(trailName)} ([LIPAS ${lipasId}](https://www.lipas.fi/liikuntapaikat/${lipasId})) vastaa reittiä ${nameAsCode(matchedName)} (${nameAsCode(matchedSlug)}, ${source}).${areas}`;
+            })
+            .join('\n')
+        );
+      }
+      const title = duplicateTrails.length
+        ? `LIPAS-tuonnin yhteenveto (${duplicateTrails.length} jo luettelossa olevaa reittiä)`
+        : areaLinks.length
+          ? `LIPAS-tuonnin yhteenveto (${parks.length} tarkistettavaa kohdetta, ${areaLinks.length} alueliitosta)`
+          : `Uusia LIPAS-kohteita tarkistettavaksi (${parks.length})`;
       const response = await fetch(issuesUrl, {
         method: 'POST',
         headers,

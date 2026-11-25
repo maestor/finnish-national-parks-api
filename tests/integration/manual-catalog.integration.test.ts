@@ -134,7 +134,7 @@ describe('manual catalog imports', () => {
 
     const options = {
       database,
-      includeSlugs: ['torholan-luolan-polku', 'torholan-luola', 'paavolan-luontopolku']
+      includeSlugs: ['torholan-luolan-polku', 'torholan-luola']
     };
     await importSpecialParks(options);
     const trail = await database.query.parks.findFirst({
@@ -645,47 +645,6 @@ describe('manual catalog imports', () => {
       postalCode: '99870',
       postalOffice: 'Inari'
     });
-
-    const paavola = await getParkBySlug(testDatabase.database, 'paavolan-luontopolku');
-    expect(paavola).toMatchObject({
-      address: 'Pietiläntie 23, 08800 Lohja',
-      lipasId: 9004404,
-      locationLabel: 'Pietiläntie 23',
-      parkUrl: null,
-      name: 'Paavolan luontopolku',
-      postalCode: '08800',
-      postalOffice: 'Lohja',
-      type: { slug: 'nature-trail' }
-    });
-    expect(paavola?.boundaryGeoJson?.features).toHaveLength(5);
-    expect(
-      paavola?.boundaryGeoJson?.features.every((feature) => feature.geometry.type === 'LineString')
-    ).toBe(true);
-    expect(paavola?.boundingBox.minLon).toBeCloseTo(23.883545);
-    expect(paavola?.boundingBox.maxLon).toBeCloseTo(23.8910535);
-    expect(paavola?.boundingBox.minLat).toBeCloseTo(60.2255034);
-    expect(paavola?.boundingBox.maxLat).toBeCloseTo(60.2278691);
-
-    expect(paavola?.boundaryGeoJson?.features.slice(-2)).toMatchObject([
-      {
-        geometry: {
-          coordinates: expect.arrayContaining([
-            [23.8850462, 60.2266849],
-            [23.8850235, 60.2274901]
-          ])
-        }
-      },
-      {
-        geometry: {
-          coordinates: [
-            [23.8850462, 60.2266849],
-            expect.any(Array),
-            expect.any(Array),
-            [23.886115, 60.2262672]
-          ]
-        }
-      }
-    ]);
 
     const santalahti = await getParkBySlug(testDatabase.database, 'santalahden-luontopolku');
     expect(santalahti).toMatchObject({

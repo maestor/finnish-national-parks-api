@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { promisify } from 'node:util';
@@ -37,7 +37,7 @@ describe('OSM import command', () => {
 const roots=[{type:'relation',id:12345,tags:{type:'route',route:'foot',name:'Testipolku'}},{type:'relation',id:12346,tags:{type:'route',route:'foot',name:'Pitkä reitti',distance:'150'}},{type:'relation',id:12347,tags:{type:'route',route:'foot',name:'Alapolku'}}];
 const relation=(id,coordinates)=>({type:'relation',id,members:[{type:'way',ref:id,geometry:coordinates}]});
 const members=[relation(12345,[{lon:25,lat:61},{lon:25.01,lat:61}]),relation(12346,[{lon:25,lat:61},{lon:25.01,lat:61}]),relation(12347,[{lon:25.002,lat:61},{lon:25.008,lat:61}])];
-globalThis.fetch=async (_url,options)=>Response.json({osm3s,elements:String(options.body).includes('rel%28id%3A')?members:roots});`
+globalThis.fetch=async (_url,options)=>Response.json({osm3s,elements:options.body.get('data').includes('out geom')?members:roots});`
     );
   });
   afterEach(async () => {
@@ -99,6 +99,25 @@ globalThis.fetch=async (_url,options)=>Response.json({osm3s,elements:String(opti
     );
     await expect(run('--dry-run')).rejects.toThrow('area changed: refetch required');
   });
+  it('refetches an old source snapshot before importing', async () => {
+    await run('--dry-run');
+    const cachePath = join(directory, 'data', 'osm-trails-snapshot.json');
+    const cache = JSON.parse(await readFile(cachePath, 'utf8'));
+    const sourceHash = cache.sourceHash;
+    cache.sourceHash = 'old-query';
+    cache.snapshot.routes[0].id = 16799081;
+    cache.snapshot.routes[0].name = 'Vanha Vierumäen reitti';
+    await writeFile(cachePath, JSON.stringify(cache));
+
+    const result = await run();
+    expect(result).toContain('Testipolku');
+    expect(result).not.toContain('Vanha Vierumäen reitti');
+    expect(JSON.parse(await readFile(cachePath, 'utf8'))).toMatchObject({ sourceHash });
+    expect(
+      await database.select().from(parks).where(eq(parks.name, 'Vanha Vierumäen reitti'))
+    ).toEqual([]);
+  });
+
   it('rejects the old apply flag', async () => {
     await expect(run('--apply')).rejects.toThrow('Usage: npm run import:osm-trails');
   });

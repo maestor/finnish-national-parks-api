@@ -1,5 +1,4 @@
 import { and, eq, getTableColumns, inArray, isNull, sql } from 'drizzle-orm';
-import proj4 from 'proj4';
 import type { Database } from '../db/database.js';
 import {
   curatedTrailSources,
@@ -17,6 +16,7 @@ import {
   measureTrailLengthKm,
   qualifiesTrailAreaOverlap
 } from './trail-area-geometry.js';
+import { buildTrailProximity, measureTrailCoverage, nearbyTrailBounds } from './trail-proximity.js';
 
 export type OsmRoute = {
   id: number;
@@ -31,84 +31,6 @@ const norm = (s: string) =>
     .normalize('NFKC')
     .toLocaleLowerCase('fi')
     .replace(/[^\p{L}\p{N}]+/gu, '');
-const projection = '+proj=utm +zone=35 +ellps=GRS80 +units=m +no_defs';
-const model = (geometry: GeoJsonFeatureCollection) => {
-  const grid = new Map<string, number[][]>();
-  const samples: { x: number; y: number; weight: number }[] = [];
-  let length = 0;
-  for (const feature of geometry.features) {
-    if (feature.geometry.type !== 'LineString') continue;
-    const points = feature.geometry.coordinates.map((point) =>
-      proj4('WGS84', projection, point.slice(0, 2))
-    );
-    for (let i = 1; i < points.length; i++) {
-      const a = points[i - 1]!;
-      const b = points[i]!;
-      const distance = Math.hypot(b[0]! - a[0]!, b[1]! - a[1]!);
-      if (!distance) continue;
-      const pieces = Math.ceil(distance / 100);
-      for (let k = 0; k < pieces; k++) {
-        const x1 = a[0]! + (k / pieces) * (b[0]! - a[0]!);
-        const y1 = a[1]! + (k / pieces) * (b[1]! - a[1]!);
-        const x2 = a[0]! + ((k + 1) / pieces) * (b[0]! - a[0]!);
-        const y2 = a[1]! + ((k + 1) / pieces) * (b[1]! - a[1]!);
-        const segment = [x1, y1, x2, y2];
-        for (
-          let x = Math.floor((Math.min(x1, x2) - 25) / 100);
-          x <= Math.floor((Math.max(x1, x2) + 25) / 100);
-          x++
-        )
-          for (
-            let y = Math.floor((Math.min(y1, y2) - 25) / 100);
-            y <= Math.floor((Math.max(y1, y2) + 25) / 100);
-            y++
-          ) {
-            const key = `${x}:${y}`;
-            const entries = grid.get(key) ?? [];
-            entries.push(segment);
-            grid.set(key, entries);
-          }
-      }
-      length += distance;
-      const n = Math.ceil(distance / 50);
-      for (let j = 0; j < n; j++) {
-        const t = (j + 0.5) / n;
-        samples.push({
-          x: a[0]! + t * (b[0]! - a[0]!),
-          y: a[1]! + t * (b[1]! - a[1]!),
-          weight: distance / n
-        });
-      }
-    }
-  }
-  return { grid, samples, length };
-};
-const coverage = (a: ReturnType<typeof model>, b: ReturnType<typeof model>) => {
-  let matched = 0;
-  for (const p of a.samples)
-    for (const s of b.grid.get(`${Math.floor(p.x / 100)}:${Math.floor(p.y / 100)}`) ?? []) {
-      const dx = s[2]! - s[0]!;
-      const dy = s[3]! - s[1]!;
-      const t = Math.max(
-        0,
-        Math.min(1, ((p.x - s[0]!) * dx + (p.y - s[1]!) * dy) / (dx * dx + dy * dy))
-      );
-      if ((p.x - s[0]! - t * dx) ** 2 + (p.y - s[1]! - t * dy) ** 2 <= 625) {
-        matched += p.weight;
-        break;
-      }
-    }
-  return matched / a.length;
-};
-const overlaps = (
-  a: ReturnType<typeof deriveBoundingBox>,
-  b: ReturnType<typeof deriveBoundingBox>
-) =>
-  a.minLon <= b.maxLon + 0.001 &&
-  a.maxLon + 0.001 >= b.minLon &&
-  a.minLat <= b.maxLat + 0.001 &&
-  a.maxLat + 0.001 >= b.minLat;
-
 export const importOsmTrails = async ({
   database,
   snapshot: incomingSnapshot,
@@ -227,7 +149,7 @@ export const importOsmTrails = async ({
       continue;
     }
     const matches = areas
-      .filter((a) => overlaps(bounds, a.bounds))
+      .filter((a) => nearbyTrailBounds(bounds, a.bounds))
       .flatMap((area) => {
         const overlap = measureTrailAreaOverlap(route.geometry, area.geometry);
         return overlap.status === 'ok' && qualifiesTrailAreaOverlap(overlap.ratio)
@@ -238,21 +160,23 @@ export const importOsmTrails = async ({
       reject('no-area');
       continue;
     }
-    const nearby = stored.filter((s) => s.park.id !== prior?.id && overlaps(bounds, s.bounds));
+    const nearby = stored.filter(
+      (s) => s.park.id !== prior?.id && nearbyTrailBounds(bounds, s.bounds)
+    );
     const names = new Set([route.name, ...(route.aliases ?? [])].map(norm));
     const matchingNames = nearby
       .filter((s) => names.has(norm(s.park.name)))
       .map((s) => s.park.name);
-    const routeModel = model(route.geometry);
+    const routeModel = buildTrailProximity(route.geometry);
     const containing = nearby
-      .filter((s) => coverage(routeModel, model(s.geometry)) >= 0.9)
+      .filter((s) => measureTrailCoverage(routeModel, buildTrailProximity(s.geometry)) >= 0.9)
       .map((s) => s.park.name);
     const previous = imported
       .filter(
         (s) =>
-          overlaps(bounds, deriveBoundingBox(s.route.geometry)) &&
+          nearbyTrailBounds(bounds, deriveBoundingBox(s.route.geometry)) &&
           ([s.name, ...(s.route.aliases ?? [])].some((name) => names.has(norm(name))) ||
-            coverage(routeModel, model(s.route.geometry)) >= 0.9)
+            measureTrailCoverage(routeModel, buildTrailProximity(s.route.geometry)) >= 0.9)
       )
       .map((s) => s.name);
     const existing = [...new Set([...matchingNames, ...containing, ...previous])];

@@ -2,7 +2,13 @@ import { eq } from 'drizzle-orm';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { listParks } from '../../src/db/repositories.js';
-import { importRuns, parkImportNotifications, parks } from '../../src/db/schema.js';
+import {
+  curatedTrailSources,
+  importRuns,
+  parkImportNotifications,
+  parks
+} from '../../src/db/schema.js';
+import { importOsmTrails } from '../../src/importer/import-osm-trails.js';
 import { importParks } from '../../src/importer/import-parks.js';
 import { sendPendingParkReviews } from '../../src/importer/park-review-notifications.js';
 import { runScheduledParkImport } from '../../src/importer/scheduled-park-import.js';
@@ -76,6 +82,210 @@ describe('weekly LIPAS import', () => {
 
     await runScheduledParkImport(db.client, github);
     expect(issues).toHaveLength(1);
+  });
+
+  it('reports a LIPAS duplicate in each weekly summary and keeps the existing OSM route', async () => {
+    const area = createLipasPark();
+    const incoming = createLipasTrail({
+      name: 'Valaistu kuntorata',
+      type: { 'type-code': 4401 },
+      location: {
+        geometries: {
+          type: 'FeatureCollection',
+          features: [
+            {
+              type: 'Feature',
+              geometry: {
+                type: 'LineString',
+                coordinates: [
+                  [24.2, 60.2],
+                  [24.4, 60.4],
+                  [24.401, 60.401]
+                ]
+              }
+            }
+          ]
+        }
+      }
+    });
+    await importOsmTrails({
+      database: db.database,
+      snapshot: {
+        timestamp: '2026-11-24T10:00:00Z',
+        routes: [
+          {
+            id: 123456,
+            name: 'Vanha reitti',
+            reportedLengthKm: null,
+            geometry: {
+              type: 'FeatureCollection',
+              features: [
+                {
+                  type: 'Feature',
+                  geometry: {
+                    type: 'LineString',
+                    coordinates: [
+                      [24.4, 60.4],
+                      [24.2, 60.2]
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      }
+    });
+    const normalFetch = fetchMock.getMockImplementation()!;
+    fetchMock.mockImplementation((input, init) =>
+      String(input).startsWith('https://api.lipas.fi/')
+        ? Promise.resolve(Response.json({ items: [area, incoming] }))
+        : normalFetch(input, init)
+    );
+
+    await runScheduledParkImport(db.client, github);
+    expect(await db.database.select({ name: parks.name }).from(parks)).toEqual([
+      { name: area.name },
+      { name: 'Vanha reitti' }
+    ]);
+    expect(await db.database.select().from(parkImportNotifications)).toEqual([]);
+    expect(issues).toHaveLength(1);
+    expect(issues[0]?.body).toContain('### Luettelossa jo olevat reitit');
+    expect(issues[0]?.body).toContain('Valaistu kuntorata');
+    expect(issues[0]?.body).toContain('Vanha reitti');
+    expect(issues[0]?.body).toContain(area.name);
+    expect(issues[0]?.body).toContain('https://www.openstreetmap.org/relation/123456');
+
+    await runScheduledParkImport(db.client, github);
+    expect(issues).toHaveLength(2);
+    expect(issues[1]?.body).toContain('Valaistu kuntorata');
+    expect(
+      await db.database.select().from(parks).where(eq(parks.lipasId, incoming['lipas-id']))
+    ).toEqual([]);
+  });
+
+  it.each([
+    ['LIPAS', 'LIPAS <https://www.lipas.fi/liikuntapaikat/440401>'],
+    ['curated OSM', 'OpenStreetMap, reittivalinta testireitti'],
+    ['local', 'muu paikallinen tuonti']
+  ])(
+    'reports matches with an existing %s trail and still imports a shorter route',
+    async (source, sourceText) => {
+      const area = createLipasPark();
+      const geometries = (coordinates: number[][]) => ({
+        type: 'FeatureCollection' as const,
+        features: [
+          {
+            type: 'Feature' as const,
+            geometry: { type: 'LineString' as const, coordinates }
+          }
+        ]
+      });
+      // This trail is outside the test park, so it has no area link to report.
+      const existing = createLipasTrail({
+        location: {
+          geometries: geometries([
+            [25, 63],
+            [25.2, 63]
+          ])
+        }
+      });
+      const duplicate = createLipasTrail({ 'lipas-id': 440402, location: existing.location });
+      const shortRoute = createLipasTrail({
+        'lipas-id': 440403,
+        location: {
+          geometries: geometries([
+            [25.012, 63],
+            [25.2, 63]
+          ])
+        }
+      });
+      const nearbyTrail = createLipasTrail({
+        'lipas-id': 440404,
+        location: {
+          geometries: geometries([
+            [25, 63.0005],
+            [25.2, 63.0005]
+          ])
+        }
+      });
+      const distantTrail = createLipasTrail({ 'lipas-id': 440405 });
+      await importParks({
+        database: db.database,
+        sourceUrl: 'https://example.test/lipas',
+        fetchSource: async () => ({ items: [area, existing] })
+      });
+      if (source !== 'LIPAS') {
+        const [row] = await db.database
+          .update(parks)
+          .set({ managedByLipasImport: false })
+          .where(eq(parks.lipasId, existing['lipas-id']))
+          .returning({ id: parks.id });
+        if (source === 'curated OSM') {
+          await db.database.insert(curatedTrailSources).values({
+            selectionKey: 'testireitti',
+            trailId: row!.id,
+            sourceKind: 'osm-way-selection',
+            manifestHash: 'manifest-hash',
+            geometryHash: 'geometry-hash',
+            sourceTimestamp: '2026-11-24T10:00:00Z',
+            sourceUrlsJson: '["https://www.openstreetmap.org/way/1"]',
+            provenanceJson: '{}'
+          });
+        }
+      }
+      const normalFetch = fetchMock.getMockImplementation()!;
+      fetchMock.mockImplementation((input, init) =>
+        String(input).startsWith('https://api.lipas.fi/')
+          ? Promise.resolve(
+              Response.json({
+                items: [
+                  area,
+                  ...(source === 'LIPAS' ? [existing] : []),
+                  duplicate,
+                  shortRoute,
+                  nearbyTrail,
+                  distantTrail
+                ]
+              })
+            )
+          : normalFetch(input, init)
+      );
+
+      const result = await runScheduledParkImport(db.client, github);
+      expect(result.newParks.map(({ lipasId }) => lipasId)).toEqual([440403, 440404, 440405]);
+      expect(await db.database.select({ lipasId: parks.lipasId }).from(parks)).toEqual(
+        [area['lipas-id'], 440401, 440403, 440404, 440405].map((lipasId) => ({ lipasId }))
+      );
+      expect(issues[0]?.body).toContain('### Uudet tarkistettavat kohteet');
+      expect(issues[0]?.body).toContain('### Luettelossa jo olevat reitit');
+      expect(issues[0]?.body).toContain(sourceText);
+      expect(issues[0]?.body).not.toContain('Alueet:');
+    }
+  );
+
+  it('imports a previously skipped trail when its LIPAS counterpart retires', async () => {
+    const area = createLipasPark();
+    const oldTrail = createLipasTrail();
+    const replacement = createLipasTrail({ 'lipas-id': 440402, name: 'Korvaava reitti' });
+    const normalFetch = fetchMock.getMockImplementation()!;
+    let items = [area, oldTrail];
+    fetchMock.mockImplementation((input, init) =>
+      String(input).startsWith('https://api.lipas.fi/')
+        ? Promise.resolve(Response.json({ items }))
+        : normalFetch(input, init)
+    );
+    await runScheduledParkImport(db.client, github);
+
+    items = [area, oldTrail, replacement];
+    await runScheduledParkImport(db.client, github);
+    expect(await db.database.select().from(parks).where(eq(parks.lipasId, 440402))).toEqual([]);
+
+    items = [area, replacement];
+    await runScheduledParkImport(db.client, github);
+    expect(await db.database.select().from(parks).where(eq(parks.lipasId, 440402))).toMatchObject([
+      { name: replacement.name, catalogStatus: 'active' }
+    ]);
   });
 
   it.each([1, 2])('handles %i socket disconnects during a catalog write', async (disconnects) => {

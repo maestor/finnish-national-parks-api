@@ -6,7 +6,7 @@ import { createDatabase } from '../db/database.js';
 import { getPendingMigrationNames } from '../db/migrate.js';
 import { osmTrailSources, parks, trailAreaLinks } from '../db/schema.js';
 import { importOsmTrails } from '../importer/import-osm-trails.js';
-import { fetchOsmTrailSnapshot } from '../importer/osm-source.js';
+import { fetchOsmTrailSnapshot, osmTrailIndexQuery } from '../importer/osm-source.js';
 import { isTrailTypeCode } from '../parks/park-types.js';
 
 const coordinate = z
@@ -63,7 +63,9 @@ try {
   const areas = rows.filter(
     (row) => row.catalogStatus === 'active' && !isTrailTypeCode(row.typeId)
   );
-  const areaHash = createHash('sha256').update(JSON.stringify(areas)).digest('hex');
+  const sourceHash = createHash('sha256')
+    .update(JSON.stringify({ areas, query: osmTrailIndexQuery }))
+    .digest('hex');
   let cachedText: string | undefined;
   try {
     cachedText = await readFile(cachePath, 'utf8');
@@ -73,27 +75,29 @@ try {
   const cacheSchema = z.object({
     snapshot: snapshotSchema,
     rejected: z.array(z.object({ id: z.number(), name: z.string(), reason: z.string() })),
-    areaHash: z.string(),
+    sourceHash: z.string(),
     fetchedAt: z.number()
   });
   const cached = cachedText ? cacheSchema.safeParse(JSON.parse(cachedText)) : undefined;
   const age = cached?.success ? Date.now() - cached.data.fetchedAt : Infinity;
   const source =
-    cached?.success && cached.data.areaHash === areaHash && age >= 0 && age < 60 * 60 * 1000
+    cached?.success && cached.data.sourceHash === sourceHash && age >= 0 && age < 60 * 60 * 1000
       ? { snapshot: cached.data.snapshot, rejected: cached.data.rejected }
       : await fetchOsmTrailSnapshot({ areas });
   const snapshot = snapshotSchema.parse(source.snapshot);
   if (new Set(snapshot.routes.map((r) => r.id)).size !== snapshot.routes.length)
     throw new Error('Snapshot contains duplicate relation IDs.');
   const sourceRejected = source.rejected;
-  if (!(cached?.success && cached.data.areaHash === areaHash && age >= 0 && age < 60 * 60 * 1000)) {
+  if (
+    !(cached?.success && cached.data.sourceHash === sourceHash && age >= 0 && age < 60 * 60 * 1000)
+  ) {
     await mkdir('data', { recursive: true });
     await writeFile(
       `${cachePath}.tmp`,
       JSON.stringify({
         snapshot,
         rejected: sourceRejected,
-        areaHash,
+        sourceHash,
         fetchedAt: Date.now(),
         attribution: '© OpenStreetMap contributors',
         licenseUrl: 'https://opendatacommons.org/licenses/odbl/1-0/'
