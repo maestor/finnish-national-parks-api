@@ -20,6 +20,22 @@ Attribute LIPAS data to Jyväskylän yliopisto, Lipas Liikuntapaikat.fi, with th
 sampling date. The Luontoon.fi sitemap supplies visitor links.
 [LIPAS CC BY 4.0 terms](https://www.jyu.fi/fi/liikunta/yhteistyo/lipas-liikunnan-paikkatietojarjestelma/avoimet-rajapinnat-ja-ladattavat-lipas-aineistot)
 
+## Local catalog imports before review
+
+Apply new special parks and OSM trails to `data/local.db` during development
+so reviewers can inspect them locally. Run from the API repository root and
+prefix each database command with `DATABASE_URL=file:./data/local.db DATABASE_AUTH_TOKEN=`.
+
+- Import new special parks with `npm run import:special-parks -- <slug...>`.
+  Import any new parent areas before their linked trails.
+- For new [selected linked trails](#selected-linked-trails), follow the preview,
+  backup and apply workflow. Pass `--selection <key>` for each new entry.
+- When the change calls for a supplemental OSM refresh, follow the [discovery
+  workflow](#supplemental-openstreetmap-trails) with the same local database target.
+
+Verify the stored standalone entries or their links to the intended parent areas
+before handing over for review. Report any import blockers in the handoff.
+
 ## Trail–area reconciliation
 
 Visits may reference an area's linked trails. Assigning a trail to a visit pins that membership with an inclusion override; imports still refresh geometry and automatic-match measurements but retain the membership even if overlap disappears. Draft visits protect membership too. The admin unlink endpoint reports blocking visits for review; direct deletion/exclusion of a used relationship fails at the database boundary. Remove the trail from every relevant visit before unlinking it. The park-visit move command likewise rejects a move to a park without all assigned trails; review and clear assignments first. Inactive source trails retain historical assignments but are omitted from public map choices.
@@ -507,6 +523,11 @@ introduced by georeferencing. Retain all polygon parts and holes within the
 chosen scope. Union overlapping selections in the source projected CRS before
 transforming to WGS84. Keep visitor markers and addresses separate from the
 geometry, and omit LIPAS contact details and comments.
+
+The standalone hiking trail `ounasvaaran-talvikavelyreitti` uses the
+[published Etiäinen GPX](https://etiainen.fi/api/fi/gpx/ounasvaaran-talvikavelyreitti-890).
+Its snapshot preserves all 16 track segments as separate lines without joining
+the loop and its access branches. The GPX provides no license metadata.
 
 Inspect the [checked-in snapshots](../src/importer/special-parks/data) and their
 [configurations](../src/importer/special-parks) before refreshing an existing
