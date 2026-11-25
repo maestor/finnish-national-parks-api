@@ -611,6 +611,22 @@ describe('manual catalog imports', () => {
 
     expect(result.results.map(({ slug }) => slug).sort()).toEqual(specialParkSlugs);
 
+    const arktinenPuutarha = await getParkBySlug(testDatabase.database, 'arktinen-puutarha');
+    expect(arktinenPuutarha).toMatchObject({
+      address: 'Pohjoisranta 4, 96200 Rovaniemi',
+      areaKm2: 0.0553,
+      name: 'Arktinen puutarha',
+      parkUrl: 'https://www.visitrovaniemi.fi/fi/kayntikohde/arktinen-puutarha/',
+      type: { slug: 'outdoor-recreation-area' },
+      boundingBox: {
+        minLat: 66.5080279,
+        maxLat: 66.5112179,
+        minLon: 25.7217337,
+        maxLon: 25.7321766
+      },
+      boundaryGeoJson: { features: [{ geometry: { type: 'Polygon' } }] }
+    });
+
     const norvajarviCemetery = await getParkBySlug(
       testDatabase.database,
       'saksalaisten-sotilaiden-hautausmaa'
