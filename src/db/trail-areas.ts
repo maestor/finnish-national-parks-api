@@ -1,10 +1,10 @@
-import { and, asc, desc, eq, inArray, isNotNull, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm';
 
 import { alias } from 'drizzle-orm/sqlite-core';
 import type { GeoJsonFeatureCollection } from '../importer/geometry.js';
 import { isTrailTypeCode, isVisibleTrailParent, trailTypeCodes } from '../parks/park-types.js';
 import { toAddress } from './address.js';
-import type { Database, DbClient } from './database.js';
+import type { Database, DbClient, Transaction } from './database.js';
 import {
   curatedTrailSources,
   osmTrailSources,
@@ -60,23 +60,17 @@ export const listAreaTrails = async (database: DbClient, areaId: number) => {
         name: parks.name,
         slug: parks.slug,
         catalogStatus: parks.catalogStatus,
-        managedByLipasImport: parks.managedByLipasImport,
         typeId: parks.typeId
-      },
-      source: osmTrailSources.trailId,
-      curatedId: curatedTrailSources.trailId
+      }
     })
     .from(trailAreaLinks)
     .innerJoin(parks, eq(parks.id, trailAreaLinks.trailId))
-    .leftJoin(osmTrailSources, eq(osmTrailSources.trailId, parks.id))
-    .leftJoin(curatedTrailSources, eq(curatedTrailSources.trailId, parks.id))
     .where(and(eq(trailAreaLinks.areaId, areaId), unabsorbedTrailWhere()))
     .orderBy(asc(parks.name));
-  return rows.map(({ link, trail, source, curatedId }) => ({
+  return rows.map(({ link, trail }) => ({
     ...selectLink(link, trail),
     effective:
       trail.catalogStatus === 'active' &&
-      (trail.managedByLipasImport || source !== null || curatedId !== null) &&
       isTrailTypeCode(trail.typeId) &&
       selectLink(link, trail).effective
   }));
@@ -85,22 +79,7 @@ export const listTrailAreas = async (database: DbClient, slug: string) => {
   const trail = (await database.select().from(parks).where(eq(parks.slug, slug)).limit(1))[0];
   if (!trail) return null;
   if (!isTrailTypeCode(trail.typeId)) throw new TrailAreaValidationError('A trail is required.');
-  const source = (
-    await database
-      .select()
-      .from(osmTrailSources)
-      .where(eq(osmTrailSources.trailId, trail.id))
-      .limit(1)
-  )[0];
-  const curated = (
-    await database
-      .select({ trailId: curatedTrailSources.trailId })
-      .from(curatedTrailSources)
-      .where(eq(curatedTrailSources.trailId, trail.id))
-      .limit(1)
-  )[0];
-  if (trail.catalogStatus !== 'active' || (!trail.managedByLipasImport && !source && !curated))
-    return [];
+  if (trail.catalogStatus !== 'active') return [];
   const rows = await database
     .select({ link: trailAreaLinks, name: parks.name, slug: parks.slug })
     .from(trailAreaLinks)
@@ -134,7 +113,6 @@ export const listPublicAreaTrails = async (database: DbClient, areaId: number) =
       trail: parks,
       area: { removed: parent.removed, trailPublicationRole: parent.trailPublicationRole },
       source: osmTrailSources,
-      curatedId: curatedTrailSources.trailId,
       sourceUrlsJson: curatedTrailSources.sourceUrlsJson
     })
     .from(trailAreaLinks)
@@ -146,10 +124,9 @@ export const listPublicAreaTrails = async (database: DbClient, areaId: number) =
     .orderBy(asc(parks.name), asc(parks.id));
   return rows
     .filter(
-      ({ link, trail, area, source, curatedId }) =>
+      ({ link, trail, area }) =>
         trail.catalogStatus === 'active' &&
         (!trail.areaLinkOnly || isVisibleTrailParent(area)) &&
-        (trail.managedByLipasImport || source !== null || curatedId !== null) &&
         isTrailTypeCode(trail.typeId) &&
         selectLink(link, trail).effective
     )
@@ -209,16 +186,9 @@ export const listAreaTrailCandidates = async (
   const rows = await database
     .select({ trailId: parks.id, name: parks.name, slug: parks.slug })
     .from(parks)
-    .leftJoin(osmTrailSources, eq(osmTrailSources.trailId, parks.id))
-    .leftJoin(curatedTrailSources, eq(curatedTrailSources.trailId, parks.id))
     .where(
       and(
         eq(parks.catalogStatus, 'active'),
-        or(
-          eq(parks.managedByLipasImport, true),
-          isNotNull(osmTrailSources.trailId),
-          isNotNull(curatedTrailSources.trailId)
-        ),
         inArray(parks.typeId, trailTypeCodes),
         sql`instr(lower(${parks.name}), lower(${q})) > 0`
       )
@@ -228,91 +198,85 @@ export const listAreaTrailCandidates = async (
     .offset(offset);
   return { trails: rows.slice(0, limit), nextOffset: rows.length > limit ? offset + limit : null };
 };
+export const applyAreaTrailOverride = async (
+  tx: Transaction,
+  slug: string,
+  trailId: number,
+  override: 'include' | 'exclude',
+  timestamp: string
+) => {
+  const area = await findEligibleArea(tx, slug);
+  const trail = (await tx.select().from(parks).where(eq(parks.id, trailId)).limit(1))[0];
+  if (!area || !trail) return null;
+  if (override === 'exclude') {
+    const visits = await tx
+      .select({ id: parkVisits.id, visitedOn: parkVisits.visitedOn })
+      .from(visitTrails)
+      .innerJoin(parkVisits, eq(parkVisits.id, visitTrails.visitId))
+      .where(and(eq(parkVisits.parkId, area.id), eq(visitTrails.trailId, trailId)))
+      .orderBy(desc(parkVisits.visitedOn), desc(parkVisits.id));
+    if (visits.length > 0) throw new TrailVisitConflictError(visits);
+  }
+  if (trail.id === area.id || !isTrailTypeCode(trail.typeId) || trail.catalogStatus !== 'active')
+    throw new TrailAreaValidationError('An active supported trail is required.');
+  if (override === 'include' && trail.areaLinkOnly && !isVisibleTrailParent(area)) {
+    throw new TrailAreaValidationError('An area-only trail requires a visible parent area.');
+  }
+  if (override === 'include' && trail.trailPublicationRole === 'independent') {
+    const visits = await tx
+      .select({ id: parkVisits.id })
+      .from(parkVisits)
+      .where(eq(parkVisits.parkId, trail.id))
+      .limit(1);
+    if (visits.length)
+      throw new TrailAreaValidationError(
+        'Trail has visits and requires a preservation decision before conversion.'
+      );
+  }
+  const prior = (
+    await tx
+      .select()
+      .from(trailAreaLinks)
+      .where(and(eq(trailAreaLinks.areaId, area.id), eq(trailAreaLinks.trailId, trail.id)))
+      .limit(1)
+  )[0];
+  if (prior?.override !== override) {
+    await tx
+      .insert(trailAreaLinks)
+      .values({ trailId, areaId: area.id, override, createdAt: timestamp, updatedAt: timestamp })
+      .onConflictDoUpdate({
+        target: [trailAreaLinks.trailId, trailAreaLinks.areaId],
+        set: { override, updatedAt: timestamp }
+      });
+    if (override === 'include')
+      await tx
+        .update(parks)
+        .set({ trailPublicationRole: 'area_member', updatedAt: timestamp })
+        .where(eq(parks.id, trailId));
+    await tx
+      .insert(publicDataVersions)
+      .values({ key: 'public-visits', version: 1, updatedAt: timestamp })
+      .onConflictDoUpdate({
+        target: publicDataVersions.key,
+        set: { version: sql`${publicDataVersions.version} + 1`, updatedAt: timestamp }
+      });
+  }
+  const result = (
+    await tx
+      .select()
+      .from(trailAreaLinks)
+      .where(and(eq(trailAreaLinks.areaId, area.id), eq(trailAreaLinks.trailId, trail.id)))
+      .limit(1)
+  )[0]!;
+  return selectLink(result, trail);
+};
+
 export const setAreaTrailOverride = async (
   database: Database,
   slug: string,
   trailId: number,
   override: 'include' | 'exclude'
 ) =>
-  database.transaction(async (tx) => {
-    const area = await findEligibleArea(tx, slug);
-    const trail = (await tx.select().from(parks).where(eq(parks.id, trailId)).limit(1))[0];
-    if (!area || !trail) return null;
-    if (override === 'exclude') {
-      const visits = await tx
-        .select({ id: parkVisits.id, visitedOn: parkVisits.visitedOn })
-        .from(visitTrails)
-        .innerJoin(parkVisits, eq(parkVisits.id, visitTrails.visitId))
-        .where(and(eq(parkVisits.parkId, area.id), eq(visitTrails.trailId, trailId)))
-        .orderBy(desc(parkVisits.visitedOn), desc(parkVisits.id));
-      if (visits.length > 0) throw new TrailVisitConflictError(visits);
-    }
-    const source = (
-      await tx.select().from(osmTrailSources).where(eq(osmTrailSources.trailId, trail.id)).limit(1)
-    )[0];
-    const curated = (
-      await tx
-        .select({ trailId: curatedTrailSources.trailId })
-        .from(curatedTrailSources)
-        .where(eq(curatedTrailSources.trailId, trail.id))
-        .limit(1)
-    )[0];
-    if (
-      trail.id === area.id ||
-      !isTrailTypeCode(trail.typeId) ||
-      (!trail.managedByLipasImport && !source && !curated) ||
-      trail.catalogStatus !== 'active'
-    )
-      throw new TrailAreaValidationError('An active supported trail is required.');
-    if (override === 'include' && trail.areaLinkOnly && !isVisibleTrailParent(area)) {
-      throw new TrailAreaValidationError('An area-only trail requires a visible parent area.');
-    }
-    if (override === 'include' && trail.trailPublicationRole === 'independent') {
-      const visits = await tx
-        .select({ id: parkVisits.id })
-        .from(parkVisits)
-        .where(eq(parkVisits.parkId, trail.id))
-        .limit(1);
-      if (visits.length)
-        throw new TrailAreaValidationError(
-          'Trail has visits and requires a preservation decision before conversion.'
-        );
-    }
-    const prior = (
-      await tx
-        .select()
-        .from(trailAreaLinks)
-        .where(and(eq(trailAreaLinks.areaId, area.id), eq(trailAreaLinks.trailId, trail.id)))
-        .limit(1)
-    )[0];
-    const timestamp = new Date().toISOString();
-    if (prior?.override !== override) {
-      await tx
-        .insert(trailAreaLinks)
-        .values({ trailId, areaId: area.id, override, createdAt: timestamp, updatedAt: timestamp })
-        .onConflictDoUpdate({
-          target: [trailAreaLinks.trailId, trailAreaLinks.areaId],
-          set: { override, updatedAt: timestamp }
-        });
-      if (override === 'include')
-        await tx
-          .update(parks)
-          .set({ trailPublicationRole: 'area_member', updatedAt: timestamp })
-          .where(eq(parks.id, trailId));
-      await tx
-        .insert(publicDataVersions)
-        .values({ key: 'public-visits', version: 1, updatedAt: timestamp })
-        .onConflictDoUpdate({
-          target: publicDataVersions.key,
-          set: { version: sql`${publicDataVersions.version} + 1`, updatedAt: timestamp }
-        });
-    }
-    const result = (
-      await tx
-        .select()
-        .from(trailAreaLinks)
-        .where(and(eq(trailAreaLinks.areaId, area.id), eq(trailAreaLinks.trailId, trail.id)))
-        .limit(1)
-    )[0]!;
-    return selectLink(result, trail);
-  });
+  database.transaction((tx) =>
+    applyAreaTrailOverride(tx, slug, trailId, override, new Date().toISOString())
+  );

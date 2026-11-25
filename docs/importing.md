@@ -40,7 +40,13 @@ before handing over for review. Report any import blockers in the handoff.
 
 Visits may reference an area's linked trails. Assigning a trail to a visit pins that membership with an inclusion override; imports still refresh geometry and automatic-match measurements but retain the membership even if overlap disappears. Draft visits protect membership too. The admin unlink endpoint reports blocking visits for review; direct deletion/exclusion of a used relationship fails at the database boundary. Remove the trail from every relevant visit before unlinking it. The park-visit move command likewise rejects a move to a park without all assigned trails; review and clear assignments first. Inactive source trails retain historical assignments but are omitted from public map choices.
 
-LIPAS imports create new records disabled. Manual special-park imports create new records visible. Both preserve existing visibility and editable fields. The LIPAS import retains supported source-active trails, then clips route lines against active stored area polygons in WGS84 and measures the resulting lengths in EPSG:3067. Each area covering at least 10% of measured route length qualifies independently, without a distance floor or buffer; comparison uses a 1e-7 ratio tolerance for projection and floating-point precision. Invalid polygons and wholly degenerate trails are reported without automatic matches. When a trail contains both usable and zero-length line parts, the usable parts are measured and the degenerate parts are flagged in the report and link metadata; no geometry is repaired. A trail without usable coordinates retains its last known bounds and marker; a new trail without usable coordinates uses a private zero-coordinate placeholder and cannot be enabled until coordinates exist. An area without usable coordinates fails the import. Both import paths fetch and validate their source batch before committing catalog or relationship changes. Special-import trails remain independent; special areas can be parents. An effective link hides a trail as a standalone destination, and removing the last match does not automatically republish it; an explicit enable restores independence only when no effective link remains. No visit records are moved or rewritten.
+LIPAS imports create new records disabled. Manual special-park imports create new records visible. Both preserve existing visibility and editable fields. The LIPAS import retains supported source-active trails, then clips route lines against active stored area polygons in WGS84 and measures the resulting lengths in EPSG:3067. Each area covering at least 10% of measured route length qualifies independently, without a distance floor or buffer; comparison uses a 1e-7 ratio tolerance for projection and floating-point precision. Invalid polygons and wholly degenerate trails are reported without automatic matches. When a trail contains both usable and zero-length line parts, the usable parts are measured and the degenerate parts are flagged in the report and link metadata; no geometry is repaired. A trail without usable coordinates retains its last known bounds and marker; a new trail without usable coordinates uses a private zero-coordinate placeholder and cannot be enabled until coordinates exist. An area without usable coordinates fails the import. Both import paths fetch and validate their source batch before committing catalog or relationship changes. An effective link hides a trail as a standalone destination, and removing the last match does not automatically republish it; an explicit enable restores independence only when no effective link remains. No visit records are moved or rewritten.
+
+Admins can link active catalog trails of any supported trail type, regardless
+of source. Special-import trails start independent by default. Set
+`initialParentSlug` to include a new special trail under an explicitly named
+parent as part of its first import. Import the parent in the same batch or
+before the trail. Reimports preserve later admin link decisions.
 
 The LIPAS `route-length-km` property is stored as nullable `lengthKm` independently of the geometry measurements used for matching. Re-imports refresh the source value while preserving administrator edits, as with area. Existing rows receive their source length on the next LIPAS import after migration `0048_trail_length.sql`; missing values remain null.
 
@@ -528,6 +534,12 @@ The standalone hiking trail `ounasvaaran-talvikavelyreitti` uses the
 [published Etiäinen GPX](https://etiainen.fi/api/fi/gpx/ounasvaaran-talvikavelyreitti-890).
 Its snapshot preserves all 16 track segments as separate lines without joining
 the loop and its access branches. The GPX provides no license metadata.
+
+Ounasvaara uses the full WGS84 polygon for regional recreation allocation
+`V 811` (`m19012al728`) from the [Lapland HAME service](https://www.lounaistieto.fi/maakuntakaavat/).
+The WFS ring touches itself at a repeated vertex. The snapshot separates the
+exterior and its touching hole at that vertex and preserves all source vertices.
+The three linked Etiäinen trails preserve their original GPX track segments.
 
 Inspect the [checked-in snapshots](../src/importer/special-parks/data) and their
 [configurations](../src/importer/special-parks) before refreshing an existing

@@ -7,6 +7,7 @@ import { z } from 'zod';
 import type { Database } from '../db/database.js';
 import { createImportRun, syncParkTypes, upsertCatalogPark } from '../db/repositories.js';
 import { curatedTrailSources, parks } from '../db/schema.js';
+import { applyAreaTrailOverride } from '../db/trail-areas.js';
 import {
   getSupportedParkTypeBySlug,
   hasMagnetByDefaultForTypeSlug,
@@ -321,6 +322,7 @@ export const importSpecialParks = async ({
 
   await database.transaction(async (tx) => {
     await syncParkTypes(tx);
+    const newTrailLinks: { parentSlug: string; trailSlug: string; importRunId: number }[] = [];
     for (const {
       config,
       featureCount,
@@ -336,6 +338,19 @@ export const importSpecialParks = async ({
         sourceUrl: config.sourceUrl
       });
 
+      if (
+        config.initialParentSlug &&
+        !(await tx.query.parks.findFirst({
+          columns: { id: true },
+          where: eq(parks.lipasId, config.syntheticLipasId)
+        }))
+      ) {
+        newTrailLinks.push({
+          parentSlug: config.initialParentSlug,
+          trailSlug: config.slug,
+          importRunId
+        });
+      }
       await upsertCatalogPark(tx, {
         areaKm2: metadata.areaKm2,
         bboxMaxLat: boundingBox.maxLat,
@@ -396,6 +411,19 @@ export const importSpecialParks = async ({
           .onConflictDoUpdate({ target: curatedTrailSources.selectionKey, set: source });
       }
       results.push({ featureCount, importRunId, name: config.name, slug: config.slug });
+    }
+    for (const { parentSlug, trailSlug, importRunId } of newTrailLinks) {
+      const parent = await tx.query.parks.findFirst({
+        columns: { slug: true },
+        where: eq(parks.importedSlug, parentSlug)
+      });
+      if (!parent)
+        throw new Error(`Parent area ${parentSlug} must be imported before ${trailSlug}.`);
+      const [trail] = await tx
+        .select({ id: parks.id })
+        .from(parks)
+        .where(eq(parks.lastImportRunId, importRunId));
+      await applyAreaTrailOverride(tx, parent.slug, trail!.id, 'include', importedAt);
     }
     const areas = prepared.filter(({ parkType }) => !isTrailTypeCode(parkType.code));
     if (areas.length && !deferTrailLinks) {
