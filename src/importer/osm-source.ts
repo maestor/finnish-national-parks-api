@@ -1,8 +1,13 @@
+import { readFileSync } from 'node:fs';
 import { z } from 'zod';
 import type { GeoJsonCoordinate, GeoJsonFeature } from './geometry.js';
 import type { OsmRoute, OsmSnapshot } from './import-osm-trails.js';
 
 const OVERPASS_URL = 'https://ovp.dresel.systems/api/interpreter';
+export const osmTrailIndexQuery = readFileSync(
+  new URL('./osm-trail-index.overpassql', import.meta.url),
+  'utf8'
+);
 const batchSize = 150;
 const tagsSchema = z.record(z.string(), z.string());
 const pointSchema = z.object({
@@ -89,9 +94,7 @@ export const fetchOsmTrailSnapshot = async ({
     if (data.remark) throw new Error(`OSM incomplete response: ${data.remark}`);
     return data;
   };
-  const index = await get(
-    '[out:json][timeout:45];rel(59.5,19,70.2,32)["type"="route"]["route"~"^(hiking|foot)$"];out tags bb;'
-  );
+  const index = await get(osmTrailIndexQuery);
   if (!index.elements.length) throw new Error('OSM returned an empty national index.');
   const roots = index.elements.filter((root) => {
     const tags = root.tags;

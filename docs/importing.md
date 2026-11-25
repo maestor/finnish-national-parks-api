@@ -129,9 +129,9 @@ Normal application reads remain local and never call Overpass.
 
 The importer caches its source snapshot in `data/osm-trails-snapshot.json`
 (ignored by Git) for one hour. A dry run and an import within that period use the
-same snapshot when area bounds have not changed. After the cache expires or area
-bounds change, the next run fetches a fresh snapshot. National-park results
-appear first, followed by other areas.
+same snapshot when the area bounds and source query are unchanged. A cache
+expiry or a change to either input fetches a fresh snapshot. National-park
+results appear first, followed by other areas.
 
 The dry run lists trails that would be added or updated, their matched area names,
 OSM relation IDs, measured lengths and review flags. It rejects nearby same-name
@@ -142,6 +142,11 @@ edits and manual link overrides survive refreshes. Missing source relations and
 routes with no current area match are not withdrawn automatically. Automatic
 links which cease matching on an otherwise eligible refreshed route are removed
 or disabled while manual overrides remain.
+
+The [Overpass index query](../src/importer/osm-trail-index.overpassql) defines
+the source candidates and can exclude OSM relations with reviewed LIPAS
+counterparts before snapshot creation. Existing catalog rows and area links
+stay in the database.
 
 After review and backup, run `npm run import:osm-trails` to import and immediately
 use the UI's full cache clear to refresh the affected areas. An unchanged rerun does not
@@ -180,7 +185,10 @@ relation ID, preserves their IDs, existing visit assignments and administrator
 name and length edits, and writes the reviewed batch in a single transaction.
 New rows appear under their linked parents. Nearby same-name trails, administrator
 link exclusions, merged sources, and standalone trails with direct visits
-require review before the batch can apply. An unchanged rerun writes nothing.
+require review before the batch can apply. The name check applies when a
+selection is first imported. Compare complete route geometry with existing
+LIPAS trails during review to catch matches with different names. An
+unchanged rerun writes nothing.
 
 After applying, expire every reported `affectedSlugs` entry through the [authenticated
 cache-clear workflow](#trailarea-reconciliation), then check the public park pages.
@@ -303,10 +311,22 @@ starting a manual workflow dispatch. It must apply `0053_area_link_only_trails.s
 before the first link-only trail import.
 
 The workflow opens one Finnish issue, mentioning only `@maestor`, when it adds
-new standalone destinations or new automatic links for link-only trails. The
-enable instructions apply to the standalone destinations section. The linked
-trails section lists each new link as “Trail on liitetty kohteeseen Area”.
-Repeat runs stay quiet while the links and catalog memberships stay the same.
+new standalone destinations, new automatic links for link-only trails, or
+incoming LIPAS trails skipped because of an existing match.
+The enable instructions apply to the standalone destinations section. The
+linked trails section lists each new link as “Trail on liitetty kohteeseen Area”.
+
+For a new LIPAS trail ID, the scheduled import compares its route to nearby
+active trails already in the catalog, including earlier LIPAS imports still
+present in the feed. It skips the new row if at least 95% of each route is
+within 25 m of the other. Coverage uses length-weighted samples at intervals
+of up to 10 m in EPSG:3067. A shorter loop can pass the check when the reverse
+coverage is below 95%. The issue lists the skipped LIPAS ID, the matching
+trail and its source, and any linked area names. The import checks again each
+week, so a trail can be added if the existing match retires. A skipped trail
+can appear again in a later weekly report. Manual imports still let an operator
+add a reviewed LIPAS trail.
+
 The job log prints a `parkSlugs` payload for immediate expiry of affected pages
 through the UI endpoint above. Area detail caches refresh on their normal
 one-hour cycle.

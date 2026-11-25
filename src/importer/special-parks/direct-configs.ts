@@ -246,23 +246,6 @@ export const baseSpecialParkConfigs: SpecialParkConfig[] = [
   },
   {
     displayTypeName: null,
-    locationLabel: 'Pietiläntie 23',
-    parkUrl: null,
-    name: 'Paavolan luontopolku',
-    parkTypeSlug: 'nature-trail',
-    postalCode: '08800',
-    postalOffice: 'Lohja',
-    curatedOsmWays: {
-      retrievedAt: '2026-11-19T16:26:16Z',
-      ids: [374926007, 374926009, 374926010, 933021771, 374925037]
-    },
-    responseShapeVersion: 'osm-paavola-way-selection-v1',
-    slug: 'paavolan-luontopolku',
-    sourceUrl: 'special://paavolan-luontopolku',
-    syntheticLipasId: 9_004_404
-  },
-  {
-    displayTypeName: null,
     locationLabel: 'Kipparitie 4',
     parkUrl:
       'https://www.kotka.fi/asuminen-ja-ymparisto/puistot-ja-viheralueet/santalahden-luontopolku/',

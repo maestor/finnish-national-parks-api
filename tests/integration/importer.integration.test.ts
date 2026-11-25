@@ -373,7 +373,11 @@ describe('importParks', () => {
       sourceUrl: 'https://example.test/lipas',
       fetchSource: async () => ({ items })
     };
-    const report = await importParks({ ...options, requireNoPublicTrailConversions: true });
+    const report = await importParks({
+      ...options,
+      requireNoPublicTrailConversions: true,
+      skipDuplicateTrails: true
+    });
     expect(report.newParks).toEqual([
       expect.objectContaining({ lipasId: canonicalId, slug: 'seitseman-veljeksen-vaellusreitti' })
     ]);

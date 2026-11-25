@@ -40,6 +40,8 @@ describe('OSM source acquisition', () => {
       }
     });
     expect(calls).toHaveLength(2);
+    expect(calls[0]).toContain('- rel(id:12110420,16799081,18528490,1983131,20190517,20190675);');
+    expect(calls[1]).toContain('rel(id:1);');
     expect(result.snapshot).toMatchObject({
       timestamp: '2026-11-10T21:21:39Z',
       routes: [
