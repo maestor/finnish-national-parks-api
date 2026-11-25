@@ -193,6 +193,7 @@ export const listPublicAreaTrails = async (database: DbClient, areaId: number) =
           trail.postalOffice
         ) || null,
       lengthKm: trail.lengthKm,
+      parkUrl: trail.parkUrl,
       boundaryGeoJson: JSON.parse(trail.boundaryGeojson) as GeoJsonFeatureCollection
     }))
     .filter((trail) =>

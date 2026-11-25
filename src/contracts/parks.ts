@@ -162,6 +162,7 @@ export const parkDetailSchema = parkListItemSchema.extend({
         slug: z.string(),
         address: z.string().nullable(),
         lengthKm: z.number().nullable(),
+        parkUrl: parkListItemSchema.shape.parkUrl.optional(),
         source: z
           .union([
             z.object({
