@@ -10,11 +10,18 @@ import {
   updateParkRemoved
 } from '../../src/db/repositories.js';
 import { parks, parkVisits, trailAreaLinks } from '../../src/db/schema.js';
-import { listPublicAreaTrails, setAreaTrailOverride } from '../../src/db/trail-areas.js';
+import {
+  listAreaTrailCandidates,
+  listAreaTrails,
+  listPublicAreaTrails,
+  listTrailAreas,
+  setAreaTrailOverride
+} from '../../src/db/trail-areas.js';
 import { isFullyInsideArea } from '../../src/importer/geometry.js';
 import { importParks } from '../../src/importer/import-parks.js';
 import { importSpecialParks } from '../../src/importer/import-special-parks.js';
 import { specialParkConfigs } from '../../src/importer/special-parks/index.js';
+import { measureTrailAreaOverlap } from '../../src/importer/trail-area-geometry.js';
 import { createLipasPark, createLipasTrail } from '../fixtures/lipas.js';
 import { createSpecialParksSource } from '../fixtures/special-parks.js';
 import { importPublishedParkFixtures } from '../helpers/import-published-park-fixtures.js';
@@ -103,6 +110,67 @@ describe('manual catalog imports', () => {
       removed: false,
       trailPublicationRole: 'independent'
     });
+  });
+
+  it('imports the Ounasvaara recreation boundary with its three linked Etiäinen routes', async () => {
+    const { database } = testDatabase;
+    const trails = [
+      'ounasvaaran-kesakavelyreitti',
+      'ounasvaaran-luontopolku',
+      'ounasvaaran-satupolku'
+    ];
+    const options = { database, includeSlugs: ['ounasvaara', ...trails] };
+    await importSpecialParks(options);
+
+    const destination = await getParkBySlug(database, 'ounasvaara');
+    expect(destination).toMatchObject({
+      address: 'Taunontie 14, 96600 Rovaniemi',
+      areaKm2: 23.32,
+      type: { slug: 'outdoor-recreation-area' },
+      boundaryGeoJson: { features: [{ geometry: { type: 'Polygon' } }] }
+    });
+    const area = (await database.query.parks.findFirst({ where: eq(parks.slug, 'ounasvaara') }))!;
+    const linked = await listPublicAreaTrails(database, area.id);
+    expect(linked.map(({ slug }) => slug)).toEqual(trails);
+    expect(linked.map(({ boundaryGeoJson }) => boundaryGeoJson.features.length)).toEqual([5, 4, 1]);
+    for (const { boundaryGeoJson } of linked) {
+      const overlap = measureTrailAreaOverlap(boundaryGeoJson, destination!.boundaryGeoJson!);
+      expect(overlap).toMatchObject({ status: 'ok' });
+      if (overlap.status === 'ok') expect(overlap.ratio).toBeGreaterThan(0.97);
+    }
+    for (const slug of trails) await expect(getParkBySlug(database, slug)).resolves.toBeNull();
+
+    const [summer] = await listAreaTrails(database, area.id);
+    await setAreaTrailOverride(database, 'ounasvaara', summer!.trailId, 'exclude');
+    await importSpecialParks(options);
+    expect((await listPublicAreaTrails(database, area.id)).map(({ slug }) => slug)).toEqual(
+      trails.slice(1)
+    );
+  });
+
+  it('requires the parent for a new linked special trail and allows standalone special trails to be linked manually', async () => {
+    const { database } = testDatabase;
+    await expect(
+      importSpecialParks({ database, includeSlugs: ['ounasvaaran-satupolku'] })
+    ).rejects.toThrow('Parent area ounasvaara must be imported before ounasvaaran-satupolku');
+    await expect(getParkBySlug(database, 'ounasvaaran-satupolku')).resolves.toBeNull();
+
+    const winterSlug = 'ounasvaaran-talvikavelyreitti';
+    await importSpecialParks({ database, includeSlugs: ['ounasvaara', winterSlug] });
+    const area = (await database.query.parks.findFirst({ where: eq(parks.slug, 'ounasvaara') }))!;
+    const winter = (await database.query.parks.findFirst({ where: eq(parks.slug, winterSlug) }))!;
+    expect(await listPublicAreaTrails(database, area.id)).toEqual([]);
+    await expect(listAreaTrailCandidates(database, 'Ounasvaaran', 10, 0)).resolves.toMatchObject({
+      trails: [{ trailId: winter.id, slug: winterSlug }]
+    });
+    await setAreaTrailOverride(database, 'ounasvaara', winter.id, 'include');
+    await expect(listAreaTrails(database, area.id)).resolves.toMatchObject([
+      { slug: winterSlug, effective: true }
+    ]);
+    await expect(listTrailAreas(database, winterSlug)).resolves.toEqual([
+      { name: 'Ounasvaara', slug: 'ounasvaara' }
+    ]);
+    await expect(getParkBySlug(database, winterSlug)).resolves.toBeNull();
   });
 
   it('reuses the old Torhola trail, moves its visit and links the OSM route under the cave area', async () => {
@@ -1911,7 +1979,22 @@ describe('manual catalog imports', () => {
     );
     const kevo = await getParkBySlug(testDatabase.database, 'kevon-luonnonpuisto');
 
-    expect(allParks.map(({ slug }) => slug).sort()).toEqual(specialParkSlugs);
+    expect(allParks.map(({ slug }) => slug).sort()).toEqual(
+      specialParkConfigs
+        .filter(({ initialParentSlug }) => !initialParentSlug)
+        .map(({ slug }) => slug)
+        .sort()
+    );
+    expect(
+      (
+        await testDatabase.database
+          .select({ slug: parks.slug })
+          .from(parks)
+          .where(eq(parks.catalogStatus, 'active'))
+      )
+        .map(({ slug }) => slug)
+        .sort()
+    ).toEqual(specialParkSlugs);
     expect(merenkurkku).toMatchObject({ catalogStatus: 'active' });
     expect(kevo).toMatchObject({ catalogStatus: 'active' });
   });

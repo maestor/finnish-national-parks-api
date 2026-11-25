@@ -209,7 +209,7 @@ The importer should:
 - Print the newly added catalog rows after each import run so changes stay visible without halting the sync.
 - Upsert catalog rows by `lipasId`. When a configured special park transfers to its active LIPAS source, replace the source ID in the same transaction while keeping the catalog row and its public name, slug and marker. The import rolls back if both source IDs already exist.
 - Upsert normalized catalog types in a dedicated `park_types` table.
-- Retain source-active supported trails at any length. Link each area covering at least 10% of measured route length, and preserve administrator length edits. Special-import trails remain independent. See [long trail reimports](./importing.md#long-trails).
+- Retain source-active supported trails at any length. Link each area covering at least 10% of measured route length, and preserve administrator length edits. Special-import trails can declare an initial parent. See [trail–area reconciliation](./importing.md#trailarea-reconciliation) and [long trail reimports](./importing.md#long-trails).
 - Keep effective or formerly linked trails out of standalone public destinations. Manual inclusion/exclusion overrides survive recomputation, and existing visit history requires an explicit preservation decision before a new conversion.
 - Recompute links after LIPAS and special-area imports; use the preview, geometry report, and cache-expiry procedure in [Importing Guide](./importing.md#trailarea-reconciliation).
 - Preserve personal visit history during catalog re-imports.

@@ -322,11 +322,6 @@ describe('admin trail relationships', () => {
       .set({ catalogStatus: 'inactive' })
       .where(eq(parks.id, trail.id));
     expect(await (await app.request(path, { headers })).json()).toEqual({ areas: [] });
-    await db.database
-      .update(parks)
-      .set({ catalogStatus: 'active', managedByLipasImport: false })
-      .where(eq(parks.id, trail.id));
-    expect(await (await app.request(path, { headers })).json()).toEqual({ areas: [] });
     expect((await createApp({ database: db.database }).request(path)).status).toBe(503);
   });
   it('reports an operational error if the trail relationship read fails', async () => {
@@ -406,7 +401,7 @@ describe('admin trail relationships', () => {
     });
     expect(await (await app.request(detailPath)).json()).toMatchObject({ linkedTrails: [] });
   });
-  it('rejects ineligible trails and exposes bounded candidate search only to an admin', async () => {
+  it('lets admins find and link active supported trails regardless of source', async () => {
     const app = createApp({ auth, database: db.database, apiKey: 'secret' });
     const trail = (
       await db.database
@@ -425,6 +420,10 @@ describe('admin trail relationships', () => {
         })
       ).status
     ).toBe(401);
+    await db.database
+      .update(parks)
+      .set({ managedByLipasImport: false })
+      .where(eq(parks.id, trail.id));
     const headers = { cookie, authorization: 'Bearer secret' };
     const response = await app.request(`${base}/trail-candidates?q=luonto&limit=1`, { headers });
     expect(response.status).toBe(200);
@@ -440,16 +439,12 @@ describe('admin trail relationships', () => {
     expect(
       (await app.request(`${base}/trails/${area.id}`, { method: 'PUT', headers })).status
     ).toBe(422);
-    await db.database
-      .update(parks)
-      .set({ managedByLipasImport: false })
-      .where(eq(parks.id, trail.id));
     expect(
       (await app.request(`${base}/trails/${trail.id}`, { method: 'PUT', headers })).status
-    ).toBe(422);
+    ).toBe(200);
     await db.database
       .update(parks)
-      .set({ managedByLipasImport: true, catalogStatus: 'inactive' })
+      .set({ catalogStatus: 'inactive' })
       .where(eq(parks.id, trail.id));
     expect(
       (await app.request(`${base}/trails/${trail.id}`, { method: 'PUT', headers })).status
@@ -677,11 +672,7 @@ describe('admin trail relationships', () => {
     const trail = (await db.database.select().from(parks).where(eq(parks.lipasId, 440401)))[0]!;
     const base = '/api/admin/parks/akasmannyn-kansallispuisto/trails';
     await app.request(`${base}/${trail.id}`, { method: 'PUT', headers: { cookie } });
-    for (const state of [
-      { managedByLipasImport: false },
-      { managedByLipasImport: true, typeId: 111 },
-      { typeId: 4404, catalogStatus: 'inactive' }
-    ]) {
+    for (const state of [{ typeId: 111 }, { typeId: 4404, catalogStatus: 'inactive' }]) {
       await db.database.update(parks).set(state).where(eq(parks.id, trail.id));
       const response = await app.request(base, { headers: { cookie } });
       expect(await response.json()).toMatchObject({

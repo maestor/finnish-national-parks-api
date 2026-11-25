@@ -12,6 +12,7 @@ export type SpecialParkConfig = {
     features: Array<{ properties?: Record<string, unknown> | undefined }>
   ) => SpecialParkMetadata;
   filterFeatures?: (feature: { properties: { ely?: string | undefined; nimi: string } }) => boolean;
+  initialParentSlug?: string;
   locationLabel: string;
   markerPoint?: {
     lat: number;
