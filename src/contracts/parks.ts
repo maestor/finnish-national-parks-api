@@ -597,6 +597,7 @@ export const visitTimelineEntrySchema = z.object({
   imageCount: z.number().int(),
   park: visitTimelineParkSchema,
   route: z.string().nullable(),
+  trails: z.array(visitTrailSchema).optional(),
   trip: visitTripSchema.nullable(),
   tripStopOrder: z.number().int().positive().nullable(),
   visitedOn: visitDateSchema
