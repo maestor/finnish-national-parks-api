@@ -120,7 +120,7 @@ Current behavior:
 - `POST /api/trip-planner/search` returns `422` with `errorCode: route_not_found` when a leg cannot be routed or displayed
 - the same error now includes `routeFailure.origin`, `routeFailure.destination`, and `routeFailure.waypointIndex`
 - `GET /api/trips/slug/:slug` always stays page-friendly at `200` for found trips
-- when the trip is missing route prerequisites such as a starting point or a second visit, the route payload becomes `{ success: true, error: null, data: null }`
+- trip-page driving routes require a starting point and at least one eligible itinerary entry: a stop, a route waypoint, or a visit included in the route. The driving route returns to the starting point. If either prerequisite is missing, the route payload is `{ available: false, success: true, error: null, data: null }`.
 - once a trip has enough waypoints, route-building failures move into `route.error` with the same failed-leg details and `route.success: false`
 - provider or configuration problems for trip-page routing also stay inside `route.error` instead of changing the endpoint status
 

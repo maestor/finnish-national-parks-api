@@ -4234,7 +4234,7 @@ describe('API routes', () => {
     expect(missingTripResponse.status).toBe(404);
   });
 
-  it('keeps excluded visits in the trip payload but omits them from route calculation', async () => {
+  it('keeps a driving route to one stop after the walking visit is excluded', async () => {
     const routeData: TripPlannerRoundTripRoute = {
       distanceMeters: 11_100,
       durationSeconds: 1_800,
@@ -4242,13 +4242,12 @@ describe('API routes', () => {
         coordinates: [
           [24.9384, 60.1699] as [number, number],
           [23.7, 61.9] as [number, number],
-          [24.4, 61.7] as [number, number],
           [24.9384, 60.1699] as [number, number]
         ],
         type: 'LineString'
       },
       returnsToStart: true,
-      waypointCount: 4
+      waypointCount: 3
     };
     const buildRoundTripRoute: NonNullable<TripPlannerService['buildRoundTripRoute']> = vi.fn(
       async (): Promise<TripPlannerRoundTripRoute> => routeData
@@ -4278,48 +4277,42 @@ describe('API routes', () => {
       }
     });
 
-    await createVisit(app, 'akasmannyn-kansallispuisto', {
-      tripId: trip.id,
+    const { body: visit, response: visitResponse } = await createVisit(
+      app,
+      'kaupunkilaakson-ulkoilualue',
+      {
+        tripId: trip.id,
+        tripStopOrder: 1,
+        visitedOn: '2026-06-07'
+      }
+    );
+    expect(visitResponse.status).toBe(201);
+
+    const { body: stop, response: stopResponse } = await createTripStop(app, trip.id, {
+      location: {
+        coordinate: { lat: 61.9, lon: 23.7 },
+        label: 'Pysäköintialue'
+      },
       tripStopOrder: 1,
       visitedOn: '2026-06-07'
     });
-    const { body: excludedVisit } = await createVisit(app, 'kaupunkilaakson-ulkoilualue', {
-      excludeFromRoute: true,
-      tripId: trip.id,
-      tripStopOrder: 2,
-      visitedOn: '2026-06-08'
-    });
-    const secondPark = await getParkBySlug(testDatabase.database, 'seitsemisen-kansallispuisto');
+    expect(stopResponse.status).toBe(201);
 
-    await createVisit(app, 'seitsemisen-kansallispuisto', {
-      tripId: trip.id,
-      tripStopOrder: 3,
-      visitedOn: '2026-06-08'
+    const excludeResponse = await requestAsAdmin(app, `/api/visits/${visit.id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ excludeFromRoute: true }),
+      headers: { 'content-type': 'application/json' }
     });
+    expect(excludeResponse.status).toBe(200);
 
     const response = await app.request('/api/trips/slug/marker-only-visit');
-    const body = (await response.json()) as {
-      itinerary: Array<{
-        kind: 'visit';
-        tripStopOrder: number;
-        visit: {
-          excludeFromRoute: boolean;
-          id: number;
-        };
-      }>;
-    };
-    const routeResponse = await app.request('/api/trips/slug/marker-only-visit/route');
-    const routeBody = (await routeResponse.json()) as {
-      data: TripPlannerRoundTripRoute | null;
-      error: null;
-      success: boolean;
-    };
-
-    expect(secondPark).not.toBeNull();
     expect(response.status).toBe(200);
+    const body = (await response.json()) as { itinerary: unknown[]; route: unknown };
+    expect(body.route).toEqual({ available: true, data: null, error: null, success: true });
     expect(body.itinerary).toEqual([
       expect.objectContaining({
-        kind: 'visit',
+        kind: 'stop',
+        stop: expect.objectContaining({ id: stop.id }),
         tripStopOrder: 1
       }),
       {
@@ -4327,16 +4320,14 @@ describe('API routes', () => {
         tripStopOrder: 2,
         visit: expect.objectContaining({
           excludeFromRoute: true,
-          id: excludedVisit.id
+          id: visit.id
         })
-      },
-      expect.objectContaining({
-        kind: 'visit',
-        tripStopOrder: 3
-      })
+      }
     ]);
+
+    const routeResponse = await app.request('/api/trips/slug/marker-only-visit/route');
     expect(routeResponse.status).toBe(200);
-    expect(routeBody).toEqual({
+    expect(await routeResponse.json()).toEqual({
       available: true,
       data: routeData,
       error: null,
@@ -4349,11 +4340,8 @@ describe('API routes', () => {
           displayName: 'Helsinki'
         }),
         expect.objectContaining({
-          displayName: 'Äkäsmännyn kansallispuisto'
-        }),
-        expect.objectContaining({
-          coordinate: secondPark!.markerPoint,
-          displayName: 'Seitsemisen kansallispuisto'
+          coordinate: { lat: 61.9, lon: 23.7 },
+          displayName: 'Pysäköintialue'
         }),
         expect.objectContaining({
           displayName: 'Helsinki'
