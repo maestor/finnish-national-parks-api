@@ -142,7 +142,8 @@ const generatedMuseovirastoSources = [
   'Latokartanonkoski',
   'Kärnäkosken linnoitus',
   'Jyrkkäkosken ruukki',
-  'Haapakosken ruukki'
+  'Haapakosken ruukki',
+  'Hvits'
 ];
 
 const createPolygonFeature = (
