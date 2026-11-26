@@ -1670,6 +1670,16 @@ describe('manual catalog imports', () => {
       type: { slug: 'cultural-history-area' }
     });
 
+    const finbynJatulintarha = await getParkBySlug(testDatabase.database, 'finbyn-jatulintarha');
+    expect(finbynJatulintarha).toMatchObject({
+      lipasId: 9001096,
+      locationLabel: 'Nauvo, Parainen',
+      name: 'Finbyn jatulintarha',
+      parkUrl: 'https://www.kyppi.fi/to.aspx?id=112.533010001',
+      type: { slug: 'cultural-history-area' },
+      boundaryGeoJson: { features: [{ geometry: { type: 'Polygon' } }] }
+    });
+
     const expectedMuseovirastoHistoryImports = [
       {
         lipasId: 9001058,

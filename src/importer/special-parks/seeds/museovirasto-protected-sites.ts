@@ -63,6 +63,16 @@ export const sourceReadyHistoryAreaSeeds: SykeSpecialParkSeed[] = [
     slug: 'karnakosken-linnoitus',
     sourceName: 'Kärnäkosken linnoitus',
     syntheticLipasId: 9_001_043
+  },
+  {
+    displayTypeName: null,
+    locationLabel: 'Nauvo, Parainen',
+    parkUrl: 'https://www.kyppi.fi/to.aspx?id=112.533010001',
+    name: 'Finbyn jatulintarha',
+    parkTypeSlug: 'cultural-history-area',
+    slug: 'finbyn-jatulintarha',
+    sourceName: 'Hvits',
+    syntheticLipasId: 9_001_096
   }
 ];
 
