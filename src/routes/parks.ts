@@ -8,6 +8,7 @@ import {
   adminParkVisitsResponseSchema,
   adminVisitListResponseSchema,
   adminVisitWithParkSchema,
+  combinedSearchResponseSchema,
   completeDirectVisitImageUploadRequestSchema,
   completeDirectVisitImageUploadResponseSchema,
   createVisitRequestSchema,
@@ -210,6 +211,23 @@ export const listParkSearchRoute = createRoute({
     },
     304: {
       description: 'Catalog park search list not modified'
+    }
+  }
+});
+
+export const listCombinedSearchRoute = createRoute({
+  method: 'get',
+  path: '/api/search',
+  tags: ['Catalog'],
+  security: [{ bearerAuth: [] }],
+  responses: {
+    200: {
+      description: 'Lightweight public park and trip search index',
+      content: {
+        'application/json': {
+          schema: combinedSearchResponseSchema
+        }
+      }
     }
   }
 });

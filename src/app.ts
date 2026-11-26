@@ -77,6 +77,7 @@ import {
   listAdminParkVisibility,
   listAdminUsers,
   listAdminVisits,
+  listCombinedSearchEntries,
   listHomeFeaturedParkCandidates,
   listHomeFeaturedVisitCandidates,
   listParkImageCandidates,
@@ -217,6 +218,7 @@ import {
   listAdminParkImagesRoute,
   listAdminParkVisibilityRoute,
   listAdminVisitsRoute,
+  listCombinedSearchRoute,
   listParkSearchRoute,
   listParksRoute,
   listVisitsRoute,
@@ -1641,6 +1643,12 @@ export const createApp = ({
         },
         200
       );
+    });
+
+    app.openapi(listCombinedSearchRoute, async (context) => {
+      context.header('Cache-Control', 'no-store');
+      const searchIndex = await listCombinedSearchEntries(database);
+      return context.json(searchIndex, 200);
     });
 
     app.openapi(listAdminParkVisibilityRoute, async (context) => {

@@ -347,6 +347,7 @@ Key route behavior:
 - `GET /api/parks` is optimized for map/list views and omits boundary geometry.
 - `GET /api/map-summary` pairs `lastVisitId` with `visitedSummary.lastVisitedOn`. Both are null without a published visit. Latest means greatest visit date, with the highest visit ID breaking same-day ties.
 - `GET /api/parks/search` returns a minimal visible-park payload for search and autocomplete flows.
+- `GET /api/search` returns the lightweight visible-park search rows with required `visited` flags and every published trip with unique visible park slugs from its published visits. Any published visit makes a visible park visited, including visits assigned to draft trips; draft visits, hidden catalog rows and trips do not contribute trip links. The API-key-only route returns the same public projection with or without a session and uses `Cache-Control: no-store` so a new read reflects publication changes. Deploy the additive API before the UI consumer. The existing park-search endpoint remains unchanged.
 - `GET /api/admin/parks/:slug/areas` returns effective linked areas for a trail, including areas without public pages, as a private admin read; it does not expose excluded links.
 - `GET /api/admin/parks/visibility` returns lightweight visible and removed park arrays in one private admin response for admin visibility tooling.
 - `GET /api/parks?type=hiking-area` filters by normalized catalog type slug.

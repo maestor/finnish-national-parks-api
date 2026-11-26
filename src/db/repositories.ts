@@ -3330,6 +3330,53 @@ export const listParkSearchEntries = async (
   return rows.map((row) => toSearchPark(row));
 };
 
+export const listCombinedSearchEntries = async (database: Database) => {
+  const [parkRows, tripRows, visitRows] = await Promise.all([
+    listLightweightParkRows(database, visibleCatalogWhere()),
+    database
+      .select({ name: trips.name, slug: trips.slug, tripId: trips.id })
+      .from(trips)
+      .where(eq(trips.status, 'published'))
+      .orderBy(trips.name),
+    database
+      .selectDistinct({
+        parkSlug: parks.slug,
+        tripId: parkVisits.tripId,
+        tripStatus: trips.status
+      })
+      .from(parkVisits)
+      .innerJoin(parks, eq(parkVisits.parkId, parks.id))
+      .innerJoin(parkTypes, eq(parks.typeId, parkTypes.id))
+      .leftJoin(trips, eq(parkVisits.tripId, trips.id))
+      .where(and(eq(parkVisits.status, 'published'), visibleCatalogWhere()))
+  ]);
+
+  const visitedParkSlugs = new Set(visitRows.map((row) => row.parkSlug));
+  const tripParkSlugs = new Map<number, Set<string>>();
+
+  for (const row of visitRows) {
+    if (row.tripId === null || row.tripStatus !== 'published') {
+      continue;
+    }
+
+    const parkSlugs = tripParkSlugs.get(row.tripId) ?? new Set<string>();
+    parkSlugs.add(row.parkSlug);
+    tripParkSlugs.set(row.tripId, parkSlugs);
+  }
+
+  return {
+    parks: parkRows.map((row) => ({
+      ...toSearchPark(row),
+      visited: visitedParkSlugs.has(row.slug)
+    })),
+    trips: tripRows.map((trip) => ({
+      name: trip.name,
+      slug: trip.slug,
+      visitedParkSlugs: [...(tripParkSlugs.get(trip.tripId) ?? [])].sort()
+    }))
+  };
+};
+
 export const listAdminParkVisibility = async (database: Database) => {
   const [visibleRows, removedRows] = await Promise.all([
     listLightweightParkRows(database, visibleCatalogWhere()),
