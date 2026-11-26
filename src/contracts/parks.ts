@@ -634,6 +634,7 @@ export const combinedSearchResponseSchema = z.object({
     z.object({
       name: z.string(),
       slug: z.string(),
+      stopNames: z.array(z.string()),
       visitedParkSlugs: z.array(z.string())
     })
   )
