@@ -13,6 +13,143 @@ export const baseSpecialParkConfigs: SpecialParkConfig[] = [
   {
     displayTypeName: null,
     extractMetadata: extractGeoJsonAreaM2Metadata,
+    locationLabel: 'Mustilantie 57',
+    markerPoint: { lat: 60.7329443322227, lon: 26.4179181154634 },
+    parkUrl: 'https://mustila.fi/',
+    name: 'Arboretum Mustila',
+    parkTypeSlug: 'nature-reserve-area',
+    postalCode: '47200',
+    postalOffice: 'Elimäki',
+    responseShapeVersion: 'syke-protected-sites-boundary-v1',
+    slug: 'arboretum-mustila',
+    sourceUrl: 'special://arboretum-mustila',
+    syntheticLipasId: 9_002_222
+  },
+  {
+    displayTypeName: null,
+    extractMetadata: extractGeoJsonAreaM2Metadata,
+    locationLabel: 'Kuninkaantammentie',
+    markerPoint: { lat: 60.2738379073152, lon: 24.934514883078 },
+    parkUrl:
+      'https://www.hel.fi/fi/kulttuuri-ja-vapaa-aika/ulkoilu-puistot-ja-luontokohteet/ulkoilualueet/haltialan-luontoalue',
+    name: 'Niskalan arboretum',
+    parkTypeSlug: 'nature-reserve-area',
+    postalCode: '00430',
+    postalOffice: 'Helsinki',
+    responseShapeVersion: 'syke-protected-sites-boundary-v1',
+    slug: 'niskalan-arboretum',
+    sourceUrl: 'special://niskalan-arboretum',
+    syntheticLipasId: 9_002_223
+  },
+  {
+    displayTypeName: null,
+    locationLabel: 'Harakka',
+    markerPoint: { lat: 60.150808, lon: 24.957584 },
+    parkUrl:
+      'https://www.hel.fi/fi/kulttuuri-ja-vapaa-aika/ulkoilu-puistot-ja-luontokohteet/saaret/harakan-saari',
+    name: 'Harakka',
+    parkTypeSlug: 'outdoor-recreation-area',
+    postalCode: '00140',
+    postalOffice: 'Helsinki',
+    responseShapeVersion: 'lipas-area-boundary-v1',
+    slug: 'harakka',
+    sourceUrl: 'special://harakka',
+    syntheticLipasId: 9_002_103
+  },
+  {
+    displayTypeName: null,
+    locationLabel: 'Kaunissaari',
+    markerPoint: { lat: 60.17052100000001, lon: 25.34390606921593 },
+    parkUrl:
+      'https://www.hel.fi/fi/kulttuuri-ja-vapaa-aika/ulkoilu-puistot-ja-luontokohteet/saaret/kaunissaari',
+    name: 'Kaunissaari (Helsinki)',
+    parkTypeSlug: 'outdoor-recreation-area',
+    postalCode: '04130',
+    postalOffice: 'Sipoo',
+    responseShapeVersion: 'lipas-area-boundary-v1',
+    slug: 'kaunissaari-helsinki',
+    sourceUrl: 'special://kaunissaari-helsinki',
+    syntheticLipasId: 9_002_104
+  },
+  {
+    displayTypeName: null,
+    locationLabel: 'Mustasaari',
+    markerPoint: { lat: 60.1721421416443, lon: 24.86847994415485 },
+    parkUrl: 'https://www.mustasaarentoimintakeskus.fi/index.html',
+    name: 'Mustasaari (Helsinki)',
+    parkTypeSlug: 'outdoor-recreation-area',
+    postalCode: '00340',
+    postalOffice: 'Helsinki',
+    responseShapeVersion: 'lipas-area-boundary-v1',
+    slug: 'mustasaari-helsinki',
+    sourceUrl: 'special://mustasaari-helsinki',
+    syntheticLipasId: 9_002_105
+  },
+  {
+    displayTypeName: null,
+    locationLabel: 'Vartiosaari',
+    markerPoint: { lat: 60.1843955750643, lon: 25.0771587129158 },
+    parkUrl:
+      'https://www.hel.fi/fi/kulttuuri-ja-vapaa-aika/ulkoilu-puistot-ja-luontokohteet/saaret/vartiosaari',
+    name: 'Vartiosaari',
+    parkTypeSlug: 'outdoor-recreation-area',
+    postalCode: '00830',
+    postalOffice: 'Helsinki',
+    responseShapeVersion: 'lipas-area-boundary-v1',
+    slug: 'vartiosaari',
+    sourceUrl: 'special://vartiosaari',
+    syntheticLipasId: 9_002_106
+  },
+  {
+    displayTypeName: null,
+    extractMetadata: extractGeoJsonAreaM2Metadata,
+    locationLabel: 'Rautavaarantie 2637',
+    markerPoint: { lat: 63.4884632933987, lon: 28.110236749804 },
+    parkUrl:
+      'https://www.rautavaara.fi/asukkaille/vapaa-aika/ulkoilu-ja-retkeily/luonto-ja-retkeilykohteet/',
+    name: 'Älänne',
+    parkTypeSlug: 'outdoor-recreation-area',
+    postalCode: '73250',
+    postalOffice: 'Korpijärvi',
+    responseShapeVersion: 'syke-natura-sac-boundary-v1',
+    slug: 'alanne',
+    sourceUrl: 'special://alanne',
+    syntheticLipasId: 9_002_100
+  },
+  {
+    displayTypeName: null,
+    extractMetadata: extractGeoJsonAreaM2Metadata,
+    locationLabel: 'Jämintie 655',
+    markerPoint: { lat: 61.7740435, lon: 22.736397 },
+    parkUrl: 'https://www.luontoon.fi/fi/kohteet/hameenkangas',
+    name: 'Hämeenkangas',
+    parkTypeSlug: 'outdoor-recreation-area',
+    postalCode: '38800',
+    postalOffice: 'Jämijärvi',
+    responseShapeVersion: 'syke-natura-sac-boundary-v1',
+    slug: 'hameenkangas',
+    sourceUrl: 'special://hameenkangas',
+    syntheticLipasId: 9_002_101
+  },
+  {
+    displayTypeName: null,
+    extractMetadata: extractGeoJsonAreaM2Metadata,
+    locationLabel: 'Krootilantie',
+    markerPoint: { lat: 61.551632, lon: 21.7124163797982 },
+    parkUrl:
+      'https://www.ymparisto.fi/fi/luonto-vesistot-ja-meri/luonnon-monimuotoisuus/suojelu-ennallistaminen-ja-luonnonhoito/natura-2000-alueet/kokemaenjoen-suisto',
+    name: 'Kokemäenjoen suisto',
+    parkTypeSlug: 'nature-reserve-area',
+    postalCode: '28190',
+    postalOffice: 'Pori',
+    responseShapeVersion: 'syke-natura-sac-boundary-v1',
+    slug: 'kokemaenjoen-suisto',
+    sourceUrl: 'special://kokemaenjoen-suisto',
+    syntheticLipasId: 9_002_102
+  },
+  {
+    displayTypeName: null,
+    extractMetadata: extractGeoJsonAreaM2Metadata,
     locationLabel: 'Pillisuontie 90',
     markerPoint: { lat: 60.9033043, lon: 24.3750601 },
     parkUrl:
@@ -27,7 +164,7 @@ export const baseSpecialParkConfigs: SpecialParkConfig[] = [
     syntheticLipasId: 9_002_061
   },
   {
-    displayTypeName: 'Natura 2000 -alue',
+    displayTypeName: null,
     extractMetadata: extractGeoJsonAreaM2Metadata,
     locationLabel: 'Lepsämäntie 12',
     parkUrl: 'https://uuvi.fi/fi/kohde/isosuon-luontopolku/',

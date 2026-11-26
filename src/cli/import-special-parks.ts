@@ -4,11 +4,8 @@ import { migrateDatabase } from '../db/migrate.js';
 import { importSpecialParks } from '../importer/import-special-parks.js';
 
 const args = process.argv.slice(2);
-const allowPublicTrailConversions = args.includes('--allow-public-trail-conversions');
 const deferTrailLinks = args.includes('--defer-trail-links');
-const includeSlugs = args.filter(
-  (arg) => arg !== '--allow-public-trail-conversions' && arg !== '--defer-trail-links'
-);
+const includeSlugs = args.filter((arg) => arg !== '--defer-trail-links');
 if (deferTrailLinks && includeSlugs.length === 0) {
   throw new Error('--defer-trail-links requires explicit area slugs.');
 }
@@ -18,7 +15,6 @@ await migrateDatabase(client);
 
 const result = await importSpecialParks({
   database: createDatabase(client),
-  allowPublicTrailConversions,
   deferTrailLinks,
   ...(includeSlugs.length > 0 ? { includeSlugs } : {})
 });

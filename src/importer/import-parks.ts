@@ -64,7 +64,6 @@ type ImportParksOptions = {
   fetchLuontoonSitemap?: ((sourceUrl: string) => Promise<string>) | undefined;
   queueNewParkNotification?: boolean;
   skipDuplicateTrails?: boolean;
-  requireNoPublicTrailConversions?: boolean;
   now?: () => string;
   sourceUrl: string;
 };
@@ -199,7 +198,6 @@ export const importParks = async ({
   fetchLuontoonSitemap,
   queueNewParkNotification = false,
   skipDuplicateTrails = false,
-  requireNoPublicTrailConversions = false,
   now = () => new Date().toISOString(),
   sourceUrl
 }: ImportParksOptions) => {
@@ -574,17 +572,6 @@ export const importParks = async ({
           ])
         ];
       }
-      const manualExpirySlugs = [
-        ...(appliedMerge?.needsImmediateExpiry ? affectedMergedTrailSlugs : []),
-        ...trailAreaResult.value.newlyHiddenPublicSlugs,
-        ...formerStandaloneSlugs
-      ];
-      if (requireNoPublicTrailConversions && manualExpirySlugs.length) {
-        throw new Error(
-          `Public trail conversion requires immediate frontend cache expiry: ${[...new Set(manualExpirySlugs)].join(', ')}`
-        );
-      }
-
       const newStandaloneParks = newParks.filter(
         ({ lipasId }) => !fitnessTrailLipasIds.has(lipasId)
       );

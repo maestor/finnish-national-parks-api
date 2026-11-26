@@ -388,7 +388,7 @@ describe('weekly LIPAS import', () => {
     }
   );
 
-  it('rolls back an unattended public trail conversion that needs immediate frontend expiry', async () => {
+  it('commits a public trail conversion and reports its former standalone slug', async () => {
     const outside = createLipasTrail({
       location: {
         geometries: {
@@ -419,11 +419,10 @@ describe('weekly LIPAS import', () => {
         ? Promise.resolve(Response.json({ items: [createLipasPark(), createLipasTrail()] }))
         : normalFetch(input, init)
     );
-    await expect(runScheduledParkImport(db.client, github)).rejects.toThrow(
-      'immediate frontend cache expiry'
-    );
+    const result = await runScheduledParkImport(db.client, github);
     const trail = (await db.database.select().from(parks).where(eq(parks.lipasId, 440401)))[0]!;
-    expect(trail).toMatchObject({ removed: false, trailPublicationRole: 'independent' });
+    expect(result.trailAreaResult?.newlyHiddenPublicSlugs).toEqual([trail.slug]);
+    expect(trail).toMatchObject({ removed: false, trailPublicationRole: 'area_member' });
     expect(issues).toEqual([]);
   });
 

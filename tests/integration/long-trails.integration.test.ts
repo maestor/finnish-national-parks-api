@@ -71,8 +71,7 @@ describe('Long trails in the catalog', () => {
     const options = {
       database: db.database,
       sourceUrl: 'https://example.test',
-      fetchSource: async () => ({ items: [item] }),
-      requireNoPublicTrailConversions: true
+      fetchSource: async () => ({ items: [item] })
     };
     await importParks(options);
     const [trail] = await db.database.select().from(parks);

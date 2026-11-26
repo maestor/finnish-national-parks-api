@@ -199,7 +199,6 @@ type ImportSpecialParksOptions = {
   database: Database;
   fetchSource?: (sourceUrl: string) => Promise<unknown>;
   includeSlugs?: string[];
-  allowPublicTrailConversions?: boolean;
   deferTrailLinks?: boolean;
   now?: () => string;
 };
@@ -208,7 +207,6 @@ export const importSpecialParks = async ({
   database,
   fetchSource = defaultFetchSource,
   includeSlugs,
-  allowPublicTrailConversions = false,
   deferTrailLinks = false,
   now = () => new Date().toISOString()
 }: ImportSpecialParksOptions) => {
@@ -232,9 +230,6 @@ export const importSpecialParks = async ({
         })()
       : specialParkConfigs;
 
-  if (allowPublicTrailConversions && selectedConfigs.length !== 1) {
-    throw new Error('Public trail conversion requires exactly one selected special area.');
-  }
   const publicTrailSlugs: string[] = [];
   const trailAreaReports: Array<{
     areaSlug: string;
@@ -428,11 +423,6 @@ export const importSpecialParks = async ({
     const areas = prepared.filter(({ parkType }) => !isTrailTypeCode(parkType.code));
     if (areas.length && !deferTrailLinks) {
       const report = await reconcileTrailAreas(tx, importedAt);
-      if (!allowPublicTrailConversions && report.newlyHiddenPublicSlugs.length) {
-        throw new Error(
-          `Public trail conversion requires immediate frontend cache expiry: ${report.newlyHiddenPublicSlugs.join(', ')}`
-        );
-      }
       publicTrailSlugs.push(...report.newlyHiddenPublicSlugs);
       trailAreaReports.push({
         areaSlug: areas.map(({ config }) => config.slug).join(', '),

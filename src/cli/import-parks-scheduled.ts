@@ -34,6 +34,12 @@ try {
     console.log(
       `${result.dryRun ? 'After applying, expire' : 'Expire'} these merged-trail public park URLs: ${result.affectedMergedTrailSlugs.join(', ')}`
     );
+  const hiddenPublicTrails = result.trailAreaResult?.newlyHiddenPublicSlugs ?? [];
+  if (hiddenPublicTrails.length) {
+    console.log(
+      `Expire these former standalone trail pages: ${JSON.stringify({ parkSlugs: hiddenPublicTrails })}`
+    );
+  }
   if (result.affectedAreaLinkOnlySlugs.length) {
     console.log(
       `Expire these pages affected by link-only trails: ${JSON.stringify({ parkSlugs: result.affectedAreaLinkOnlySlugs })}`

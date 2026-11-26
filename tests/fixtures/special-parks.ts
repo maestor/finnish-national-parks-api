@@ -163,6 +163,7 @@ const readSpecialSourceFile = async (sourceUrl: string) => {
 };
 
 export const createSpecialParksSource = () => {
+  let reserveFixtures: Promise<Record<string, unknown>> | undefined;
   const responses = new Map<string, unknown>([
     [
       merenkurkkuSourceUrl,
@@ -829,6 +830,21 @@ export const createSpecialParksSource = () => {
           }
         ]
       };
+    }
+
+    if (sourceUrl.includes('cql_filter=lsaluetunnus%3D')) {
+      reserveFixtures ??= Promise.all(
+        Array.from({ length: 11 }, async (_, index) =>
+          JSON.parse(
+            await readFile(
+              new URL(`./missing-trail-parent-areas-${index + 1}.json`, import.meta.url),
+              'utf8'
+            )
+          )
+        )
+      ).then((parts) => Object.assign({}, ...parts));
+      const response = (await reserveFixtures)[sourceUrl];
+      if (response) return response;
     }
 
     const response = responses.get(sourceUrl);

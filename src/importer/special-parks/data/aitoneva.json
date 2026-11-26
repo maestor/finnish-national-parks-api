@@ -1,0 +1,44 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "source": "© OpenStreetMap contributors",
+        "source_url": "https://www.openstreetmap.org/way/1427534886",
+        "source_feature_ids": ["way/1427534886"],
+        "source_retrieved_at": "2026-11-26",
+        "source_license": "https://www.openstreetmap.org/copyright",
+        "source_crs": "EPSG:4326",
+        "processing": "Audited Geofabrik Finland extract as of 2026-11-25T21:22:46Z; full mapped outline.",
+        "area_m2": 1521578.6851622933,
+        "source_extract_url": "https://download.geofabrik.de/europe/finland.html",
+        "source_designation": "natural=wetland"
+      },
+      "geometry": {
+        "type": "MultiPolygon",
+        "coordinates": [
+          [
+            [
+              [23.2941163, 62.2035902],
+              [23.2966, 62.2000427],
+              [23.3051991, 62.1976458],
+              [23.3076453, 62.1970253],
+              [23.313632, 62.1986867],
+              [23.3103704, 62.2014888],
+              [23.3229017, 62.2039304],
+              [23.3282661, 62.2029298],
+              [23.3306264, 62.2043307],
+              [23.3311414, 62.2051712],
+              [23.3347034, 62.2100936],
+              [23.33112, 62.2115092],
+              [23.3195543, 62.2085129],
+              [23.3181596, 62.2097635],
+              [23.2941163, 62.2035902]
+            ]
+          ]
+        ]
+      }
+    }
+  ]
+}
