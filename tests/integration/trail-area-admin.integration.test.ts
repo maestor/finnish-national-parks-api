@@ -155,6 +155,17 @@ describe('admin trail relationships', () => {
     expect(await publicVisits.json()).toMatchObject({
       visits: [{ id: ids[1], trails: [{ id: trail.id }] }]
     });
+    const timeline = await app.request('/api/visits-timeline');
+    expect(timeline.status).toBe(200);
+    expect(await timeline.json()).toMatchObject({
+      visits: [
+        {
+          id: ids[1],
+          route: 'Original route',
+          trails: [{ id: trail.id, name: trail.name, slug: trail.slug }]
+        }
+      ]
+    });
     expect((await app.request(path, { method: 'DELETE' })).status).toBe(401);
     const blocked = await app.request(path, { method: 'DELETE', headers });
     expect(blocked.status).toBe(409);

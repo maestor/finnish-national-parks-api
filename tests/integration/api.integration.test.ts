@@ -2304,7 +2304,8 @@ describe('API routes', () => {
           slug: 'kaupunkilaakson-ulkoilualue',
           typeLabel: parkTypeFixtures.outdoorRecreationArea.name
         }),
-        route: null
+        route: null,
+        trails: []
       })
     );
     expect(body.visits[0]).not.toHaveProperty('author');
@@ -2427,9 +2428,9 @@ describe('API routes', () => {
       }
     });
 
-    expect(firstEtag).toContain('public-summary:v3:timeline:');
+    expect(firstEtag).toContain('public-summary:v4:timeline:');
     const legacyResponse = await app.request('/api/visits-timeline', {
-      headers: { 'if-none-match': firstEtag?.replace(':v3:', ':v2:') ?? '' }
+      headers: { 'if-none-match': firstEtag?.replace(':v4:', ':v3:') ?? '' }
     });
     expect(legacyResponse.status).toBe(200);
     expect(firstEtag).toBeTruthy();

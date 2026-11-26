@@ -2043,7 +2043,7 @@ export const createApp = ({
       const etag = createPublicSummaryEtag({
         activeCount: catalogSeed.activeCount,
         kind: 'timeline',
-        responseVersion: 'v3',
+        responseVersion: 'v4',
         latestCatalogImportRunId: catalogSeed.latestImportRunId,
         latestCatalogUpdatedAt: catalogSeed.latestUpdatedAt,
         publicUpdatedAt: version.updatedAt,

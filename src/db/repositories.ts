@@ -4691,6 +4691,10 @@ export const listVisitsTimeline = async (
     )
   );
   const visitRows = sortTripAwareVisitRows(rows);
+  const trailsByVisitId = await getVisitTrails(
+    database,
+    visitRows.map((visit) => visit.id)
+  );
 
   return visitRows.map((visit) => ({
     featuredImage: featuredImages.get(visit.id) ?? null,
@@ -4703,6 +4707,7 @@ export const listVisitsTimeline = async (
       typeLabel: resolveTypeLabel(visit)
     },
     route: visit.route,
+    trails: trailsByVisitId.get(visit.id) ?? [],
     trip:
       visit.tripId === null || !visit.tripName || !visit.tripSlug
         ? null
