@@ -826,6 +826,21 @@ describe('API routes', () => {
       visitedOn: '2026-06-02',
       tripId: publishedTrip.body.id
     });
+    await createTripStop(app, publishedTrip.body.id, {
+      displayName: 'Laavun tauko',
+      location: {
+        coordinate: { lat: 61.0, lon: 26.0 },
+        label: 'Koitajoki'
+      },
+      visitedOn: '2026-06-01'
+    });
+    await createTripStop(app, publishedTrip.body.id, {
+      location: {
+        coordinate: { lat: 61.1, lon: 26.1 },
+        label: 'Nuuksion Haukkalampi'
+      },
+      visitedOn: '2026-06-02'
+    });
     const draftTripVisit = await createVisit(app, 'kaupunkilaakson-ulkoilualue', {
       visitedOn: '2026-06-03',
       tripId: draftTrip.body.id
@@ -844,7 +859,12 @@ describe('API routes', () => {
     const response = await app.request('/api/search');
     const body = (await response.json()) as {
       parks: Array<{ slug: string; visited: boolean }>;
-      trips: Array<{ name: string; slug: string; visitedParkSlugs: string[] }>;
+      trips: Array<{
+        name: string;
+        slug: string;
+        stopNames: string[];
+        visitedParkSlugs: string[];
+      }>;
     };
     const elapsedMs = performance.now() - startedAt;
     const responseBytes = new TextEncoder().encode(JSON.stringify(body)).byteLength;
@@ -863,9 +883,10 @@ describe('API routes', () => {
       {
         name: 'Syysretki',
         slug: 'syysretki',
+        stopNames: ['Laavun tauko', 'Nuuksion Haukkalampi'],
         visitedParkSlugs: ['akasmannyn-kansallispuisto']
       },
-      { name: 'Tyhjä retki', slug: 'tyhja-retki', visitedParkSlugs: [] }
+      { name: 'Tyhjä retki', slug: 'tyhja-retki', stopNames: [], visitedParkSlugs: [] }
     ]);
     expect(body.trips.find((trip) => trip.slug === emptyTrip.body.slug)?.visitedParkSlugs).toEqual(
       []

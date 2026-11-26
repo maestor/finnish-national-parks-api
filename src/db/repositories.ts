@@ -3334,10 +3334,17 @@ export const listCombinedSearchEntries = async (database: Database) => {
   const [parkRows, tripRows, visitRows] = await Promise.all([
     listLightweightParkRows(database, visibleCatalogWhere()),
     database
-      .select({ name: trips.name, slug: trips.slug, tripId: trips.id })
+      .select({
+        name: trips.name,
+        slug: trips.slug,
+        stopDisplayName: tripStops.displayName,
+        stopLabel: tripStops.label,
+        tripId: trips.id
+      })
       .from(trips)
+      .leftJoin(tripStops, eq(tripStops.tripId, trips.id))
       .where(eq(trips.status, 'published'))
-      .orderBy(trips.name),
+      .orderBy(asc(trips.name), asc(tripStops.tripStopOrder), asc(tripStops.id)),
     database
       .selectDistinct({
         parkSlug: parks.slug,
@@ -3353,6 +3360,20 @@ export const listCombinedSearchEntries = async (database: Database) => {
 
   const visitedParkSlugs = new Set(visitRows.map((row) => row.parkSlug));
   const tripParkSlugs = new Map<number, Set<string>>();
+  const tripStopNames = new Map<number, Set<string>>();
+  const publishedTrips = new Map<number, { name: string; slug: string }>();
+
+  for (const row of tripRows) {
+    publishedTrips.set(row.tripId, { name: row.name, slug: row.slug });
+
+    if (row.stopLabel === null) {
+      continue;
+    }
+
+    const stopNames = tripStopNames.get(row.tripId) ?? new Set<string>();
+    stopNames.add(row.stopDisplayName ?? deriveDisplayNameFromLabel(row.stopLabel));
+    tripStopNames.set(row.tripId, stopNames);
+  }
 
   for (const row of visitRows) {
     if (row.tripId === null || row.tripStatus !== 'published') {
@@ -3369,10 +3390,10 @@ export const listCombinedSearchEntries = async (database: Database) => {
       ...toSearchPark(row),
       visited: visitedParkSlugs.has(row.slug)
     })),
-    trips: tripRows.map((trip) => ({
-      name: trip.name,
-      slug: trip.slug,
-      visitedParkSlugs: [...(tripParkSlugs.get(trip.tripId) ?? [])].sort()
+    trips: [...publishedTrips.entries()].map(([tripId, trip]) => ({
+      ...trip,
+      stopNames: [...(tripStopNames.get(tripId) ?? [])],
+      visitedParkSlugs: [...(tripParkSlugs.get(tripId) ?? [])].sort()
     }))
   };
 };
