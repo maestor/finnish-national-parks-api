@@ -1,4 +1,4 @@
-import { eq, inArray, sql } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 import type { DbClient } from '../db/database.js';
 import {
   parks,
@@ -58,13 +58,12 @@ export const applyLipasTrailMerge = async (
   timestamp: string
 ) => {
   const rows = await database
-    .select({ id: parks.id, lipasId: parks.lipasId, slug: parks.slug, removed: parks.removed })
+    .select({ id: parks.id, lipasId: parks.lipasId, slug: parks.slug })
     .from(parks)
     .where(inArray(parks.lipasId, definition.componentIds));
   const canonical = rows.find((row) => row.lipasId === definition.canonicalId)!;
   const absorbed = rows.filter((row) => row.id !== canonical.id);
   const absorbedIds = absorbed.map((row) => row.id);
-  let needsImmediateExpiry = false;
 
   if (!previous?.group) {
     const directVisits = await database
@@ -80,11 +79,7 @@ export const applyLipasTrailMerge = async (
     const areaLinks = await database
       .select({
         link: trailAreaLinks,
-        areaSlug: parks.slug,
-        publicMembership: sql<number>`${parks.catalogStatus} = 'active'
-          and ${parks.removed} = 0
-          and (${trailAreaLinks.override} = 'include'
-            or (${trailAreaLinks.automaticMatch} = 1 and ${trailAreaLinks.override} is null))`
+        areaSlug: parks.slug
       })
       .from(trailAreaLinks)
       .innerJoin(parks, eq(parks.id, trailAreaLinks.areaId))
@@ -95,9 +90,6 @@ export const applyLipasTrailMerge = async (
         )
       );
     const links = areaLinks.map(({ link }) => link);
-    needsImmediateExpiry =
-      absorbed.some((row) => !row.removed) ||
-      areaLinks.some(({ publicMembership }) => publicMembership === 1);
     const pins = new Set(
       links
         .filter((row) => row.trailId !== canonical.id && row.override === 'include')
@@ -179,7 +171,6 @@ export const applyLipasTrailMerge = async (
   if (changed) await bumpMergedTrailVersion(database, timestamp);
   return {
     canonicalId: canonical.id,
-    needsImmediateExpiry,
     affectedSlugs: changed
       ? await mergedTrailSlugs(
           database,

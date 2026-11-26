@@ -233,10 +233,6 @@ describe('importParks', () => {
     await updateParkRemoved(database, park!.slug, false);
     const reclassified = { ...original, type: { 'type-code': 4401 } };
     const fetchSource = async () => ({ items: [reclassified] });
-    await expect(
-      importParks({ ...options, fetchSource, requireNoPublicTrailConversions: true })
-    ).rejects.toThrow(park!.slug);
-    expect(await getParkBySlug(database, park!.slug)).not.toBeNull();
     const result = await importParks({ ...options, scope: 'area-link-only', fetchSource });
     expect(result.affectedAreaLinkOnlySlugs).toEqual([park!.slug]);
     expect(result.deactivatedParks).toEqual([{ lipasId: 99101, slug: park!.slug }]);
@@ -292,12 +288,6 @@ describe('importParks', () => {
     });
 
     items = [...catalogAreas, ...pieces.toReversed()];
-    await expect(
-      importParks({ ...options, requireNoPublicTrailConversions: true })
-    ).rejects.toThrow('Public trail conversion requires immediate frontend cache expiry');
-    expect(await database.select().from(visitTrails)).toEqual([
-      expect.objectContaining({ trailId: source!.id })
-    ]);
     const preview = await importParks({ ...options, dryRun: true });
     expect(preview.affectedMergedTrailSlugs).toContain('pieni-vierailukohde');
     expect(await database.select().from(visitTrails)).toEqual([
@@ -375,7 +365,6 @@ describe('importParks', () => {
     };
     const report = await importParks({
       ...options,
-      requireNoPublicTrailConversions: true,
       skipDuplicateTrails: true
     });
     expect(report.newParks).toEqual([
@@ -2614,7 +2603,7 @@ describe('importParks', () => {
     await expect(getParkBySlug(testDatabase.database, trail.slug)).resolves.toBeNull();
   });
 
-  it('rolls back an import that would newly suppress a visited trail', async () => {
+  it('refreshes an overlapping visited trail without linking it to the area', async () => {
     const outside = createLipasTrail({
       location: {
         geometries: {
@@ -2646,15 +2635,19 @@ describe('importParks', () => {
       status: 'published',
       visitedOn: '2026-11-10'
     });
-    const before = await testDatabase.database.select().from(parks);
-    await expect(
-      importParks({
-        database: testDatabase.database,
-        sourceUrl: 'https://example.test',
-        fetchSource: async () => ({ items: [createLipasPark(), createLipasTrail()] })
-      })
-    ).rejects.toThrow('preservation decision');
-    expect(await testDatabase.database.select().from(parks)).toEqual(before);
+    const before = await getParkBySlug(testDatabase.database, 'testin-luontopolku');
+    const result = await importParks({
+      database: testDatabase.database,
+      sourceUrl: 'https://example.test',
+      fetchSource: async () => ({ items: [createLipasPark(), createLipasTrail()] })
+    });
+    expect(result.trailAreaResult).toMatchObject({
+      automaticLinks: 0,
+      newlyHiddenPublicSlugs: []
+    });
+    const after = await getParkBySlug(testDatabase.database, 'testin-luontopolku');
+    expect(after).toMatchObject({ lipasId: before?.lipasId, slug: 'testin-luontopolku' });
+    expect(after?.boundaryGeoJson).not.toEqual(before?.boundaryGeoJson);
     expect(await testDatabase.database.select().from(trailAreaLinks)).toHaveLength(0);
     expect(
       await getParkVisitsBySlug(testDatabase.database, 'testin-luontopolku', async () => '')

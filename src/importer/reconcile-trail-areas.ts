@@ -102,6 +102,8 @@ export const reconcileTrailAreas = async (
   const keepTransactionActive = createTransactionKeepalive(database);
 
   for (const trail of trails) {
+    if (trail.trailPublicationRole === 'independent' && visited.has(trail.id)) continue;
+
     await keepTransactionActive();
     let geometryQuality = 'valid';
     try {
@@ -183,10 +185,6 @@ export const reconcileTrailAreas = async (
       }
       const effective = prior?.override === 'include' || (matches && prior?.override !== 'exclude');
       if (effective && trail.trailPublicationRole === 'independent') {
-        if (visited.has(trail.id))
-          throw new Error(
-            `Trail ${trail.slug} has visits and requires a preservation decision before conversion.`
-          );
         await database
           .update(parks)
           .set({ trailPublicationRole: 'area_member', updatedAt: timestamp })

@@ -72,9 +72,13 @@ when they meet its area match and duplicate checks.
 
 To reduce traffic to remote libSQL, the main import upserts at most ten parks per statement, with a 1 MiB geometry budget per batch. Trail reconciliation loads geometry in groups of at most 50 records and 2 MiB. A single geometry larger than a budget is sent or read on its own. The import normalizes geometry before opening the write transaction. Periodic lightweight queries keep the remote transaction stream active during both link-only trail eligibility checks and trail reconciliation. All catalog writes, reconciliation and notification queuing remain in one transaction. Dry runs roll it back.
 
-Back up the target database before applying. Run `npm run import:parks -- --dry-run` first. The dry run rolls back catalog changes and reports new rows, automatic links, exclusions, deactivations, in-place source transfers and affected public slugs. A trail with visits that would newly become a member aborts the transaction. See [the parent-area import workflow](#import-a-parent-area-for-a-trail-with-visits). After review, run `npm run import:parks` and immediately expire every reported slug through the UI's authenticated `POST /api/revalidate-public-cache` with `{ "parkSlugs": ["slug"] }` (maximum 500 per request). That endpoint also expires summary, map, planner and sitemap paths. API ETags do not invalidate the UI cache by themselves. Repeat the dry run to check stability before rollout.
+Back up the target database before applying. Run `npm run import:parks -- --dry-run` first. The dry run rolls back catalog changes and reports new rows, automatic links, exclusions, deactivations, in-place source transfers and affected public slugs. Automatic matching skips standalone trails with visits, including drafts, while continuing the import. See [the parent-area import workflow](#import-a-parent-area-for-a-trail-with-visits). After review, run `npm run import:parks` and immediately expire every reported slug through the UI's authenticated `POST /api/revalidate-public-cache` with `{ "parkSlugs": ["slug"] }` (maximum 500 per request). That endpoint also expires summary, map, planner and sitemap paths. API ETags do not invalidate the UI cache by themselves. Repeat the dry run to check stability before rollout.
 
-A scheduled import rolls back when it would newly hide an enabled trail, because it cannot perform the UI's authenticated expiry. Review the reported slugs and run the manual import. If the LIPAS import moves a trail under a newly imported parent, enable the approved parent in the admin UI and immediately expire the parent and trail URLs. Special-area imports have the same cache guard. After review, run `npm run import:special-parks -- --allow-public-trail-conversions <slug>` for a single area and immediately expire that area and every reported trail URL. A newly imported special area is visible as soon as the transaction commits.
+Scheduled and manual imports commit qualifying links for unvisited trails and
+report the former standalone URLs. Expire the reported URLs and the affected
+area URLs through the frontend endpoint when immediate updates are needed.
+Otherwise the frontend cache refreshes on its normal schedule. A newly
+imported special area is visible in the catalog as soon as the import commits.
 
 Admin-session endpoints `GET /api/admin/parks/{slug}/trails` and `/trail-candidates` expose private link and candidate data; `PUT`/`DELETE /api/admin/parks/{slug}/trails/{trailId}` record durable inclusion/exclusion overrides. The candidate read accepts `q`, `limit` (1–100) and `offset`. An API key alone is insufficient. Callers making a manual change must immediately expire both the area slug and returned trail slug through the same UI endpoint. Public area detail requests with `includeBoundary=true` include effective linked trails, their names, available addresses and lengths, and stored geometry. Park detail caches revalidate after one hour to pick up scheduled imports; immediately expire affected area details after an import when prompt updates are required. No relation editor is included.
 
@@ -108,17 +112,20 @@ workflow.
 ### Import a parent area for a trail with visits
 
 Check that the new area slug is available, then back up the target catalog and
-rehearse on an isolated copy. The default special import rolls back if it would
-convert an independent trail that still has visits. Import the new area by
-explicit slug with reconciliation deferred for that run.
+rehearse on an isolated copy. Automatic matching skips standalone trails with
+existing visits. The area and trail can both remain public while the visit
+stays on the trail.
+
+If other overlapping trails require review before reconciliation, stage the
+area with `--defer-trail-links` and record any needed exclusions in admin.
 
 ```sh
 npm run import:special-parks -- --defer-trail-links <area-slug>
 ```
 
-If the trail must stay standalone for now, exclude it from the new area in
-admin before the next reconciliation. Review other overlapping trails and
-record exclusions for any that should stay separate. When ready to move visits:
+After the last visit moves, the trail is eligible for automatic matching
+again. Record an exclusion before moving that visit if the trail should stay
+standalone. To move visits and link the trail:
 
 1. Confirm the area is visible in admin. Enable it if it already existed and was hidden.
 2. Preview the visit move with the command below. Check the reported visits and
@@ -301,9 +308,8 @@ Special parks run first so new parent areas exist when curated trails are
 linked. Routine merges with no catalog changes skip the import and backup
 steps. Removed definitions appear in the workflow summary for manual review.
 An older run skips changes superseded by a newer merge.
-Existing selected-trail drift protections still apply. Automatic imports stop
-for conversions that would hide a public standalone trail and require
-immediate cache expiry.
+Existing selected-trail drift protections still apply. Imports commit
+qualifying trail links and report affected URLs for cache expiry.
 
 Supplemental OSM discovery reads live OpenStreetMap data across all active
 areas. To request it in a PR, put a new nonempty value such as an issue number
@@ -359,8 +365,8 @@ one-hour cycle.
 
 Existing parks are refreshed using the same import and preservation rules as
 the manual command. Missing LIPAS-managed parks become inactive. Normal API
-reads remain local-first. Use the manual workflow above for public trail
-conversions that require immediate cache expiry.
+reads remain local-first. Use the frontend endpoint above if reported pages
+need immediate cache expiry.
 
 If a database statement loses its HTTP socket (`UND_ERR_SOCKET`), the workflow
 retries the full catalog import once after the failed attempt exits. A socket

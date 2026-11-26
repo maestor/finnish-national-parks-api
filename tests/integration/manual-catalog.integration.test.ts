@@ -413,19 +413,26 @@ describe('manual catalog imports', () => {
       .values({
         parkId: trail!.id,
         visitedOn: '2026-06-01',
-        status: 'published',
+        status: 'draft',
         createdAt: timestamp,
         updatedAt: timestamp
       })
       .returning({ id: parkVisits.id });
 
     const options = { database, includeSlugs: ['klaukkalan-isosuo', 'myllykoski'] };
-    await importSpecialParks({ ...options, deferTrailLinks: true });
+    await importSpecialParks({
+      database,
+      includeSlugs: ['klaukkalan-isosuo'],
+      deferTrailLinks: true
+    });
+    const imported = await importSpecialParks(options);
+    expect(imported.results.map(({ slug }) => slug)).toEqual(['klaukkalan-isosuo', 'myllykoski']);
+    expect(imported.publicTrailSlugs).toEqual([]);
     await expect(getParkBySlug(database, trailSlug)).resolves.toMatchObject({ slug: trailSlug });
     expect(await database.select().from(trailAreaLinks)).toEqual([]);
     expect(
       await database.query.parkVisits.findFirst({ where: eq(parkVisits.id, visit!.id) })
-    ).toMatchObject({ parkId: trail!.id });
+    ).toMatchObject({ parkId: trail!.id, status: 'draft' });
 
     for (const [slug, name, locationLabel, postalCode, postalOffice, areaKm2, parkUrl] of [
       [
@@ -462,9 +469,6 @@ describe('manual catalog imports', () => {
         }
       });
     }
-    await expect(importSpecialParks(options)).rejects.toThrow(
-      'Trail myllykosken-luontopolku has visits'
-    );
     await reassignParkVisits(database, { visitId: visit!.id, toSlug: 'myllykoski' });
     await setAreaTrailOverride(database, 'myllykoski', trail!.id, 'include');
     await importSpecialParks(options);
@@ -475,7 +479,7 @@ describe('manual catalog imports', () => {
     ).toMatchObject({ parkId: area!.id });
   });
 
-  it('publishes a new special area with its LIPAS link and preserves later visibility edits', async () => {
+  it('publishes a batch of special areas and links a public standalone trail', async () => {
     await importParks({
       database: testDatabase.database,
       sourceUrl: 'https://example.test',
@@ -491,7 +495,7 @@ describe('manual catalog imports', () => {
       .where(eq(parks.id, trail!.id));
     const specialOptions = {
       database: testDatabase.database,
-      includeSlugs: ['paistjarvi'],
+      includeSlugs: ['paistjarvi', 'torholan-luola'],
       fetchSource: async () => ({
         type: 'FeatureCollection',
         features: [
@@ -514,16 +518,8 @@ describe('manual catalog imports', () => {
         ]
       })
     };
-    await expect(importSpecialParks(specialOptions)).rejects.toThrow(
-      'immediate frontend cache expiry'
-    );
-    expect(
-      await testDatabase.database.query.parks.findFirst({ where: eq(parks.slug, 'paistjarvi') })
-    ).toBeUndefined();
-    const result = await importSpecialParks({
-      ...specialOptions,
-      allowPublicTrailConversions: true
-    });
+    const result = await importSpecialParks(specialOptions);
+    expect(result.results.map(({ slug }) => slug).sort()).toEqual(['paistjarvi', 'torholan-luola']);
     expect(result.publicTrailSlugs).toEqual([trail!.slug]);
     const area = await testDatabase.database.query.parks.findFirst({
       where: eq(parks.slug, 'paistjarvi')
@@ -535,9 +531,11 @@ describe('manual catalog imports', () => {
     await expect(listPublicAreaTrails(testDatabase.database, area!.id)).resolves.toMatchObject([
       { slug: trail!.slug }
     ]);
-    expect(await testDatabase.database.select().from(trailAreaLinks)).toMatchObject([
-      { trailId: trail!.id, areaId: area!.id, automaticMatch: true }
-    ]);
+    expect(await testDatabase.database.select().from(trailAreaLinks)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ trailId: trail!.id, areaId: area!.id, automaticMatch: true })
+      ])
+    );
     expect(
       await testDatabase.database.query.parks.findFirst({ where: eq(parks.id, trail!.id) })
     ).toMatchObject({ trailPublicationRole: 'area_member', removed: false });
@@ -545,18 +543,6 @@ describe('manual catalog imports', () => {
     await updateParkRemoved(testDatabase.database, 'paistjarvi', true);
     await importSpecialParks(specialOptions);
     await expect(getParkBySlug(testDatabase.database, 'paistjarvi')).resolves.toBeNull();
-  });
-
-  it('requires one selected special area when public conversions are explicitly allowed', async () => {
-    await expect(
-      importSpecialParks({
-        database: testDatabase.database,
-        allowPublicTrailConversions: true,
-        includeSlugs: ['torholan-luola', 'paistjarvi'],
-        fetchSource: createSpecialParksSource()
-      })
-    ).rejects.toThrow('exactly one');
-    expect(await testDatabase.database.select().from(parks)).toHaveLength(0);
   });
 
   it('does not partially import a batch when a later special-area source fails', async () => {

@@ -202,7 +202,7 @@ jobs:
           (( ${#keys[@]} > 0 ))
           args=()
           for key in "${keys[@]}"; do args+=(--selection "$key"); done
-          npm run import:osm-linked-trails -- --guard-public-conversions --json "${args[@]}" 2>&1 | tee -a "$GITHUB_STEP_SUMMARY"
+          npm run import:osm-linked-trails -- --json "${args[@]}" 2>&1 | tee -a "$GITHUB_STEP_SUMMARY"
 
       - name: Refresh supplemental OpenStreetMap trails
         if: steps.plan.outputs.has_imports == 'true' && fromJSON(steps.plan.outputs.json).osm
