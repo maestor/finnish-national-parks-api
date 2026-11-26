@@ -68,6 +68,34 @@ describe('admin trail relationships', () => {
   afterEach(async () => {
     await db.dispose();
   });
+  it('indexes a member trail under its visible park until the link is excluded', async () => {
+    const app = createApp({ auth, database: db.database });
+    const slug = 'akasmannyn-kansallispuisto';
+    await db.database.update(parks).set({ removed: false }).where(eq(parks.slug, slug));
+    const [trail] = await db.database
+      .update(parks)
+      .set({ name: 'Klassarinkierros', removed: true, trailPublicationRole: 'area_member' })
+      .where(eq(parks.lipasId, 440401))
+      .returning();
+    const path = `/api/admin/parks/${slug}/trails/${trail!.id}`;
+    const headers = { cookie, 'content-type': 'application/json' };
+    expect((await app.request(path, { method: 'PUT', headers })).status).toBe(200);
+    await db.database
+      .update(trailAreaLinks)
+      .set({ automaticMatch: true, override: null })
+      .where(eq(trailAreaLinks.trailId, trail!.id));
+
+    const search = await app.request('/api/search');
+    expect(search.status).toBe(200);
+    expect(await search.json()).toMatchObject({
+      parks: [{ slug, trailNames: ['Klassarinkierros'] }]
+    });
+
+    expect((await app.request(path, { method: 'DELETE', headers })).status).toBe(200);
+    expect(await (await app.request('/api/search')).json()).toMatchObject({
+      parks: [{ slug, trailNames: [] }]
+    });
+  });
   it('includes linked visit trails in public trips and admin previews', async () => {
     const app = createApp({ auth, database: db.database });
     const trail = (await db.database.select().from(parks).where(eq(parks.lipasId, 440401)))[0]!;
