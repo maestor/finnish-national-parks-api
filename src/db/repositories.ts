@@ -3670,7 +3670,7 @@ export const getPublicTripRouteInputByTripId = async (
   const startingPoint = toTrip(trip).startingPoint;
 
   return {
-    available: startingPoint !== null && routeEntries.length >= 2,
+    available: startingPoint !== null && routeEntries.length > 0,
     entries: routeEntries,
     startingPoint,
     tripId
