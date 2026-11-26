@@ -107,14 +107,18 @@ workflow.
 
 ### Import a parent area for a trail with visits
 
-Back up the target catalog and verify the conversion on an isolated copy. The
-default special import rolls back if it would convert an independent trail that
-still has visits. Import the new area by explicit slug with reconciliation
-deferred for that run.
+Check that the new area slug is available, then back up the target catalog and
+rehearse on an isolated copy. The default special import rolls back if it would
+convert an independent trail that still has visits. Import the new area by
+explicit slug with reconciliation deferred for that run.
 
 ```sh
 npm run import:special-parks -- --defer-trail-links <area-slug>
 ```
+
+If the trail must stay standalone for now, exclude it from the new area in
+admin before the next reconciliation. Review other overlapping trails and
+record exclusions for any that should stay separate. When ready to move visits:
 
 1. Confirm the area is visible in admin. Enable it if it already existed and was hidden.
 2. Preview the visit move with the command below. Check the reported visits and
@@ -463,6 +467,8 @@ Typical shape:
 - set `sourceName` to the official SYKE feature name
 - optionally set `sourceType: 'private'` when the data lives in the private-land layer
 - keep the imported `name` user-facing, even if it differs slightly from `sourceName`
+- when a name is ambiguous, filter by `lsaluetunnus` and verify the returned
+  feature ID and geometry before adding the configuration
 
 Use the composite variant when one park should be assembled from several official SYKE features:
 
@@ -530,16 +536,13 @@ chosen scope. Union overlapping selections in the source projected CRS before
 transforming to WGS84. Keep visitor markers and addresses separate from the
 geometry, and omit LIPAS contact details and comments.
 
-The standalone hiking trail `ounasvaaran-talvikavelyreitti` uses the
-[published Etiäinen GPX](https://etiainen.fi/api/fi/gpx/ounasvaaran-talvikavelyreitti-890).
-Its snapshot preserves all 16 track segments as separate lines without joining
-the loop and its access branches. The GPX provides no license metadata.
-
-Ounasvaara uses the full WGS84 polygon for regional recreation allocation
-`V 811` (`m19012al728`) from the [Lapland HAME service](https://www.lounaistieto.fi/maakuntakaavat/).
-The WFS ring touches itself at a repeated vertex. The snapshot separates the
-exterior and its touching hole at that vertex and preserves all source vertices.
-The three linked Etiäinen trails preserve their original GPX track segments.
+Use snapshots for reviewed boundaries from composite reserves, Natura sites,
+regional plans, LIPAS or OpenStreetMap when the importer should use a fixed
+version. Record Natura designations in source metadata and use the catalog's
+standard display type. Retain the feature IDs and attribution for
+[OpenStreetMap geometry](https://www.openstreetmap.org/copyright). For GPX
+sources, preserve each track segment to avoid adding artificial connections
+between separate paths.
 
 Inspect the [checked-in snapshots](../src/importer/special-parks/data) and their
 [configurations](../src/importer/special-parks) before refreshing an existing

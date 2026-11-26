@@ -610,6 +610,181 @@ describe('manual catalog imports', () => {
     });
 
     expect(result.results.map(({ slug }) => slug).sort()).toEqual(specialParkSlugs);
+    const parentAreas = (await testDatabase.database.select().from(parks)).filter(
+      ({ lipasId }) => lipasId >= 9_002_100 && lipasId <= 9_002_221
+    );
+    expect(parentAreas).toHaveLength(122);
+    expect(specialParkConfigs.map(({ displayTypeName }) => displayTypeName)).not.toContain(
+      'Natura 2000 -alue'
+    );
+
+    for (const [slug, name, type] of [
+      ['alanne', 'Älänne', 'outdoor-recreation-area'],
+      ['hameenkangas', 'Hämeenkangas', 'outdoor-recreation-area'],
+      ['kokemaenjoen-suisto', 'Kokemäenjoen suisto', 'nature-reserve-area'],
+      ['harakka', 'Harakka', 'outdoor-recreation-area'],
+      ['kaunissaari-helsinki', 'Kaunissaari (Helsinki)', 'outdoor-recreation-area'],
+      ['mustasaari-helsinki', 'Mustasaari (Helsinki)', 'outdoor-recreation-area'],
+      ['vartiosaari', 'Vartiosaari', 'outdoor-recreation-area'],
+      ['arboretum-mustila', 'Arboretum Mustila', 'nature-reserve-area'],
+      ['niskalan-arboretum', 'Niskalan arboretum', 'nature-reserve-area'],
+      ['kapeenniemen-ulkoilualue', 'Kapeenniemen virkistysalue', 'outdoor-recreation-area'],
+      ['hanikan-ulkoilupuisto', 'Hanikan ulkoilupuisto', 'outdoor-recreation-area'],
+      ['pesakallion-luonnonsuojelualue', 'Pesäkallion luonnonsuojelualue', 'nature-reserve-area'],
+      ['bergoramson-luonnonsuojelualue', 'Bergö–Ramsön luonnonsuojelualue', 'nature-reserve-area'],
+      ['bovalliuksen-luonnonsuojelualue', 'Bovalliuksen luonnonsuojelualue', 'nature-reserve-area'],
+      ['elovaaran-luonnonsuojelualue', 'Elovaaran luonnonsuojelualue', 'nature-reserve-area'],
+      ['erapyha', 'Eräpyhä', 'nature-reserve-area'],
+      ['espoonlahden-luonnonsuojelualue', 'Espoonlahden luonnonsuojelualue', 'nature-reserve-area'],
+      ['haapasaaren-luonnonsuojelualue', 'Haapasaaren luonnonsuojelualue', 'nature-reserve-area'],
+      ['hakavuori', 'Hakavuori', 'nature-reserve-area'],
+      ['halmejoen-lehto', 'Halmejoen lehto', 'nature-reserve-area'],
+      ['hanhilammen-luonnonsuojelualue', 'Hanhilammen luonnonsuojelualue', 'nature-reserve-area'],
+      [
+        'haukkavuoren-luonnonsuojelualue-kerava',
+        'Haukkavuoren luonnonsuojelualue (Kerava)',
+        'nature-reserve-area'
+      ],
+      [
+        'heina-suvannon-luonnonsuojelualue',
+        'Heinä-Suvannon luonnonsuojelualue',
+        'nature-reserve-area'
+      ],
+      ['helvetinkallio', 'Helvetinkallio', 'nature-reserve-area'],
+      ['hyypparan-luonnonsuojelualue', 'Hyyppärän luonnonsuojelualue', 'nature-reserve-area'],
+      [
+        'hogholmenhenriksbergin-luonnonsuojelualue',
+        'Högholmen–Henriksbergin luonnonsuojelualue',
+        'nature-reserve-area'
+      ],
+      [
+        'hoytiaisen-kanavan-suiston-luonnonsuojelualue',
+        'Höytiäisen kanavan suiston luonnonsuojelualue',
+        'nature-reserve-area'
+      ],
+      ['joensuonkankaan-suojelualue', 'Joensuonkankaan suojelualue', 'nature-reserve-area'],
+      ['juupajoen-rotkon-luonnonsuojelualue', 'Juupajoen rotko', 'nature-reserve-area'],
+      [
+        'kaarinan-perintometsan-luonnonsuojelualue',
+        'Kaarinan perintömetsän luonnonsuojelualue',
+        'nature-reserve-area'
+      ],
+      [
+        'kempeleenlahden-luonnonsuojelualue',
+        'Kempeleenlahden luonnonsuojelualue',
+        'nature-reserve-area'
+      ],
+      ['kilpisuon-luonnonsuojelualueet', 'Kilpisuon luonnonsuojelualueet', 'nature-reserve-area'],
+      ['kintteron-luonnonsuojelualue', 'Kintterön luonnonsuojelualue', 'nature-reserve-area'],
+      ['kirjovaaran-suojelualue', 'Kirjovaaran suojelualue', 'nature-reserve-area'],
+      [
+        'kolvananuuron-luonnonsuojelualue',
+        'Kolvananuuron luonnonsuojelualue',
+        'nature-reserve-area'
+      ],
+      ['korkeakoski-maaninka', 'Korkeakoski (Maaninka)', 'nature-reserve-area'],
+      ['kulhanvuoren-suojelualue', 'Kulhanvuoren suojelualue', 'nature-reserve-area'],
+      [
+        'laajalahden-luonnonsuojelualue-kokkola',
+        'Laajalahden luonnonsuojelualue (Kokkola)',
+        'nature-reserve-area'
+      ],
+      ['lankosken-lehto', 'Lankosken lehto', 'nature-reserve-area'],
+      ['linnaharjun-metso', 'Linnaharjun Metso', 'nature-reserve-area'],
+      ['lintuharjun-luonnonsuojelualue', 'Lintuharjun luonnonsuojelualue', 'nature-reserve-area'],
+      ['lahemaen-metsa', 'Lähemäen metsä', 'nature-reserve-area'],
+      ['mettivuoren-luonnonsuojelualue', 'Mettivuoren luonnonsuojelualue', 'nature-reserve-area'],
+      ['munkviken', 'Munkviken', 'outdoor-recreation-area'],
+      ['myllymaen-alue', 'Myllymäen alue', 'nature-reserve-area'],
+      ['mantanvuoren-luonnonsuojelualue', 'Mäntänvuoren luonnonsuojelualue', 'nature-reserve-area'],
+      ['niinimaen-suojelualue', 'Niinimäen suojelualue', 'nature-reserve-area'],
+      ['pappilanniemi', 'Pappilanniemi', 'nature-reserve-area'],
+      [
+        'polvelan-koppelon-luonnonsuojelualue',
+        'Polvelan Koppelon luonnonsuojelualue',
+        'nature-reserve-area'
+      ],
+      ['pomponrahkan-luonnonsuojelualue', 'Pomponrahkan luonnonsuojelualue', 'nature-reserve-area'],
+      [
+        'pyhajarvenkotasen-luonnonsuojelualue',
+        'Pyhäjärven–Kotasen luonnonsuojelualue',
+        'nature-reserve-area'
+      ],
+      [
+        'pyynikinharjun-luonnonsuojelualue',
+        'Pyynikinharjun luonnonsuojelualue',
+        'nature-reserve-area'
+      ],
+      [
+        'paretkivennevan-teerinevan-pohjoisnevan-soidensuojelualue',
+        'Päretkivennevan-Teerinevan-Pohjoisnevan soidensuojelualue',
+        'nature-reserve-area'
+      ],
+      [
+        'raahen-saariston-luonnonsuojelualue',
+        'Raahen saariston luonnonsuojelualue',
+        'nature-reserve-area'
+      ],
+      ['rapolan-linnavuori', 'Rapolan linnavuori', 'nature-reserve-area'],
+      ['rastunsuon-lintujarven-luonnonsuojelualue', 'Rastunsuon lintujärvi', 'nature-reserve-area'],
+      ['ritamaen-luonnonsuojelualue', 'Ritamäen luonnonsuojelualue', 'nature-reserve-area'],
+      ['ryokonkankaan-suojelualue', 'Ryökönkankaan suojelualue', 'nature-reserve-area'],
+      ['sallaajarven-aarnialue', 'Sallaajärven aarnialue', 'nature-reserve-area'],
+      [
+        'sammalsillansuon-luonnonsuojelualue',
+        'Sammalsillansuon luonnonsuojelualue',
+        'nature-reserve-area'
+      ],
+      ['siikavaaran-luonnonsuojelualue', 'Siikavaaran luonnonsuojelualue', 'nature-reserve-area'],
+      [
+        'tourujoen-laakson-luonnonsuojelualue',
+        'Tourujoen laakson luonnonsuojelualue',
+        'nature-reserve-area'
+      ],
+      [
+        'tremanskarrin-luonnonsuojelualue',
+        'Tremanskärrin luonnonsuojelualue',
+        'nature-reserve-area'
+      ],
+      [
+        'tuusulanjarven-luonnonsuojelualue',
+        'Tuusulanjärven luonnonsuojelualue',
+        'nature-reserve-area'
+      ],
+      [
+        'tvarminnen-tutkimusaseman-luonnonsuojelualue',
+        'Tvärminnen tutkimusaseman luonnonsuojelualue',
+        'nature-reserve-area'
+      ],
+      ['ulkuvaaran-luonnonsuojelualue', 'Ulkuvaaran luonnonsuojelualue', 'nature-reserve-area'],
+      [
+        'urpolajokilaakson-luonnonsuojelualue',
+        'Urpolajokilaakson luonnonsuojelualue',
+        'nature-reserve-area'
+      ],
+      ['vallonjarven-luonnonsuojelualue', 'Vallonjärven luonnonsuojelualue', 'nature-reserve-area'],
+      [
+        'vehmaanniemen-luonnonsuojelualue',
+        'Vehmaanniemen luonnonsuojelualue',
+        'nature-reserve-area'
+      ],
+      [
+        'vehoniemenharjun-luonnonsuojelualue',
+        'Vehoniemenharjun luonnonsuojelualue',
+        'nature-reserve-area'
+      ],
+      ['vilkaharjun-luonnonsuojelualue', 'Vilkaharjun luonnonsuojelualue', 'nature-reserve-area'],
+      [
+        'villilansaaren-luonnonsuojelualue',
+        'Villilänsaaren luonnonsuojelualue',
+        'nature-reserve-area'
+      ],
+      ['viuhan-luonnonsuojelualue', 'Viuhan luonnonsuojelualue', 'nature-reserve-area']
+    ] as const) {
+      const area = await getParkBySlug(testDatabase.database, slug);
+      expect(area).toMatchObject({ name, type: { slug: type } });
+      expect(area?.boundaryGeoJson?.features.length).toBeGreaterThan(0);
+    }
 
     const arktinenPuutarha = await getParkBySlug(testDatabase.database, 'arktinen-puutarha');
     expect(arktinenPuutarha).toMatchObject({

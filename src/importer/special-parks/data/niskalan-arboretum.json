@@ -1,0 +1,57 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "source": "Metsähallitus / Finnish Environment Institute, protected areas",
+        "source_url": "https://paikkatiedot.ymparisto.fi/geoserver/inspire_ps/wfs?service=WFS&request=GetFeature&version=2.0.0&typeNames=inspire_ps%3APS.ProtectedSitesYksityistenMaillaOlevaLuonnonsuojelualue&outputFormat=application%2Fjson&srsName=EPSG%3A4326&cql_filter=lsaluetunnus%3D%27YSA012331%27",
+        "source_feature_id": "YSA012331",
+        "source_retrieved_at": "2026-11-27",
+        "source_license": "https://creativecommons.org/licenses/by/4.0/",
+        "source_designation": "Yksityinen luonnonsuojelualue (LsL 47 §)",
+        "area_m2": 21998.2800264809
+      },
+      "geometry": {
+        "type": "MultiPolygon",
+        "coordinates": [
+          [
+            [
+              [24.932826, 60.27273646],
+              [24.93256862, 60.27257092],
+              [24.93248507, 60.27262115],
+              [24.93184386, 60.27306189],
+              [24.93123088, 60.2734832],
+              [24.93142685, 60.27371538],
+              [24.93208396, 60.27388415],
+              [24.93236646, 60.27395507],
+              [24.93266747, 60.27403577],
+              [24.93300909, 60.2740791],
+              [24.93325397, 60.27413992],
+              [24.93349704, 60.27422922],
+              [24.93377775, 60.27432862],
+              [24.93402021, 60.27442741],
+              [24.93437916, 60.2744995],
+              [24.93479966, 60.27450605],
+              [24.93516223, 60.27421713],
+              [24.93531872, 60.27416255],
+              [24.9355708, 60.2738054],
+              [24.93513722, 60.27370364],
+              [24.93483439, 60.27365141],
+              [24.93443603, 60.27359771],
+              [24.93399766, 60.27357188],
+              [24.93380714, 60.27355942],
+              [24.93363931, 60.27349029],
+              [24.93349302, 60.27338349],
+              [24.93338313, 60.27330577],
+              [24.93323443, 60.27323693],
+              [24.93308751, 60.27313963],
+              [24.93298183, 60.27299545],
+              [24.932826, 60.27273646]
+            ]
+          ]
+        ]
+      }
+    }
+  ]
+}
