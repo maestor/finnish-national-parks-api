@@ -629,7 +629,9 @@ export const parkSearchResponseSchema = z.object({
 });
 
 export const combinedSearchResponseSchema = z.object({
-  parks: z.array(parkSearchItemSchema.extend({ visited: z.boolean() })),
+  parks: z.array(
+    parkSearchItemSchema.extend({ trailNames: z.array(z.string()), visited: z.boolean() })
+  ),
   trips: z.array(
     z.object({
       name: z.string(),

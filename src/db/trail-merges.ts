@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, type SQLWrapper, sql } from 'drizzle-orm';
 import { deriveBoundingBox, type GeoJsonFeatureCollection } from '../importer/geometry.js';
 import {
   hasUsableLineLength,
@@ -32,10 +32,10 @@ export type MergeTrailsInput = {
   dryRun?: boolean;
 };
 
-export const unabsorbedTrailWhere = () => sql`not exists (
+export const unabsorbedTrailWhere = (trailId: SQLWrapper = parks.id) => sql`not exists (
   select 1 from ${trailMergeMembers}
-  where ${trailMergeMembers.trailId} = ${parks.id}
-    and ${trailMergeMembers.canonicalTrailId} <> ${parks.id}
+  where ${trailMergeMembers.trailId} = ${trailId}
+    and ${trailMergeMembers.canonicalTrailId} <> ${trailId}
 )`;
 
 export const combineTrailGeometry = (geometries: string[]) => {

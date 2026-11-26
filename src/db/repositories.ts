@@ -14,6 +14,7 @@ import {
   or,
   sql
 } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/sqlite-core';
 import { publicTripRouteSchema } from '../contracts/parks.js';
 import type { DateRangeReviewStory } from '../date-range-review/story.js';
 import type { GeoJsonFeatureCollection } from '../importer/geometry.js';
@@ -25,7 +26,8 @@ import {
   getSupportedParkTypeSlugsByCategorySlug,
   isHikingAndWildernessAreaTypeSlug,
   isTrailTypeSlug,
-  supportedParkTypes
+  supportedParkTypes,
+  trailTypeCodes
 } from '../parks/park-types.js';
 import type { TripPlannerParkCandidate } from '../trip-planner/types.js';
 import type { YearReviewStory, YearReviewStoryImageAsset } from '../year-review/story.js';
@@ -63,6 +65,11 @@ const standalonePublicParkWhere = () =>
     eq(parks.removed, false),
     eq(parks.trailPublicationRole, 'independent'),
     eq(parks.areaLinkOnly, false)
+  );
+const effectiveTrailAreaLinkWhere = () =>
+  or(
+    eq(trailAreaLinks.override, 'include'),
+    and(eq(trailAreaLinks.automaticMatch, true), isNull(trailAreaLinks.override))
   );
 const administrativeHistoryParkWhere = () =>
   or(eq(parks.removed, false), eq(parks.trailPublicationRole, 'area_member'));
@@ -3331,7 +3338,8 @@ export const listParkSearchEntries = async (
 };
 
 export const listCombinedSearchEntries = async (database: Database) => {
-  const [parkRows, tripRows, visitRows] = await Promise.all([
+  const trail = alias(parks, 'trail');
+  const [parkRows, tripRows, visitRows, trailRows] = await Promise.all([
     listLightweightParkRows(database, visibleCatalogWhere()),
     database
       .select({
@@ -3355,13 +3363,36 @@ export const listCombinedSearchEntries = async (database: Database) => {
       .innerJoin(parks, eq(parkVisits.parkId, parks.id))
       .innerJoin(parkTypes, eq(parks.typeId, parkTypes.id))
       .leftJoin(trips, eq(parkVisits.tripId, trips.id))
-      .where(and(eq(parkVisits.status, 'published'), visibleCatalogWhere()))
+      .where(and(eq(parkVisits.status, 'published'), visibleCatalogWhere())),
+    database
+      .selectDistinct({ parkSlug: parks.slug, trailName: trail.name })
+      .from(trailAreaLinks)
+      .innerJoin(parks, eq(parks.id, trailAreaLinks.areaId))
+      .innerJoin(parkTypes, eq(parkTypes.id, parks.typeId))
+      .innerJoin(trail, eq(trail.id, trailAreaLinks.trailId))
+      .where(
+        and(
+          visibleCatalogWhere(),
+          eq(trail.catalogStatus, 'active'),
+          inArray(trail.typeId, trailTypeCodes),
+          unabsorbedTrailWhere(trail.id),
+          effectiveTrailAreaLinkWhere()
+        )
+      )
+      .orderBy(asc(trail.name))
   ]);
 
   const visitedParkSlugs = new Set(visitRows.map((row) => row.parkSlug));
   const tripParkSlugs = new Map<number, Set<string>>();
   const tripStopNames = new Map<number, Set<string>>();
   const publishedTrips = new Map<number, { name: string; slug: string }>();
+  const trailNamesByParkSlug = new Map<string, string[]>();
+
+  for (const row of trailRows) {
+    const trailNames = trailNamesByParkSlug.get(row.parkSlug) ?? [];
+    trailNames.push(row.trailName);
+    trailNamesByParkSlug.set(row.parkSlug, trailNames);
+  }
 
   for (const row of tripRows) {
     publishedTrips.set(row.tripId, { name: row.name, slug: row.slug });
@@ -3388,6 +3419,7 @@ export const listCombinedSearchEntries = async (database: Database) => {
   return {
     parks: parkRows.map((row) => ({
       ...toSearchPark(row),
+      trailNames: trailNamesByParkSlug.get(row.slug) ?? [],
       visited: visitedParkSlugs.has(row.slug)
     })),
     trips: [...publishedTrips.entries()].map(([tripId, trip]) => ({
@@ -5211,10 +5243,7 @@ export const updateParkRemoved = async (database: Database, slug: string, remove
           and(
             eq(trailAreaLinks.trailId, park.id),
             eq(parks.catalogStatus, 'active'),
-            or(
-              eq(trailAreaLinks.override, 'include'),
-              and(eq(trailAreaLinks.automaticMatch, true), isNull(trailAreaLinks.override))
-            )
+            effectiveTrailAreaLinkWhere()
           )
         )
         .limit(1);
