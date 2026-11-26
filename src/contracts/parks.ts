@@ -628,6 +628,17 @@ export const parkSearchResponseSchema = z.object({
   parks: z.array(parkSearchItemSchema)
 });
 
+export const combinedSearchResponseSchema = z.object({
+  parks: z.array(parkSearchItemSchema.extend({ visited: z.boolean() })),
+  trips: z.array(
+    z.object({
+      name: z.string(),
+      slug: z.string(),
+      visitedParkSlugs: z.array(z.string())
+    })
+  )
+});
+
 export const adminParkVisibilityResponseSchema = z.object({
   removedParks: z.array(adminParkVisibilityItemSchema),
   visibleParks: z.array(adminParkVisibilityItemSchema)

@@ -350,6 +350,15 @@ describe('auth middleware', () => {
         'x-forwarded-for': '203.0.113.1'
       }
     });
+    const unauthorizedSearchResponse = await app.request('/api/search', {
+      headers: { 'x-forwarded-for': '203.0.113.1' }
+    });
+    const authorizedSearchResponse = await app.request('/api/search', {
+      headers: {
+        authorization: `Bearer ${apiKey}`,
+        'x-forwarded-for': '203.0.113.1'
+      }
+    });
     const authorizedTimelineResponse = await app.request('/api/visits-timeline', {
       headers: {
         authorization: `Bearer ${apiKey}`,
@@ -363,5 +372,8 @@ describe('auth middleware', () => {
     expect(authorizedMapResponse.status).toBe(200);
     expect(unauthorizedTimelineResponse.status).toBe(401);
     expect(authorizedTimelineResponse.status).toBe(200);
+    expect(unauthorizedSearchResponse.status).toBe(401);
+    expect(authorizedSearchResponse.status).toBe(200);
+    expect(authorizedSearchResponse.headers.get('cache-control')).toBe('no-store');
   });
 });

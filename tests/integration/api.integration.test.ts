@@ -809,6 +809,108 @@ describe('API routes', () => {
     expect(categoryBody.parks.map((park) => park.slug)).toEqual(['evon-retkeilyalue']);
   });
 
+  it('serves a fresh combined search index with published trip visits only', async () => {
+    const app = createAuthedApp();
+    const publishedTrip = await createTrip(app, { name: 'Syysretki', slug: 'syysretki' });
+    const emptyTrip = await createTrip(app, { name: 'Tyhjä retki', slug: 'tyhja-retki' });
+    const draftTrip = await createTrip(app, {
+      name: 'Luonnosretki',
+      slug: 'luonnosretki',
+      status: 'draft'
+    });
+    const firstVisit = await createVisit(app, 'akasmannyn-kansallispuisto', {
+      visitedOn: '2026-06-01',
+      tripId: publishedTrip.body.id
+    });
+    const secondVisit = await createVisit(app, 'akasmannyn-kansallispuisto', {
+      visitedOn: '2026-06-02',
+      tripId: publishedTrip.body.id
+    });
+    const draftTripVisit = await createVisit(app, 'kaupunkilaakson-ulkoilualue', {
+      visitedOn: '2026-06-03',
+      tripId: draftTrip.body.id
+    });
+    await createVisit(app, 'evon-retkeilyalue', {
+      visitedOn: '2026-06-04',
+      tripId: publishedTrip.body.id,
+      status: 'draft'
+    });
+    await testDatabase.database
+      .update(parks)
+      .set({ catalogStatus: 'inactive' })
+      .where(eq(parks.slug, 'teijon-kansallispuisto'));
+
+    const startedAt = performance.now();
+    const response = await app.request('/api/search');
+    const body = (await response.json()) as {
+      parks: Array<{ slug: string; visited: boolean }>;
+      trips: Array<{ name: string; slug: string; visitedParkSlugs: string[] }>;
+    };
+    const elapsedMs = performance.now() - startedAt;
+    const responseBytes = new TextEncoder().encode(JSON.stringify(body)).byteLength;
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('cache-control')).toBe('no-store');
+    expect(body.parks.find((park) => park.slug === 'akasmannyn-kansallispuisto')?.visited).toBe(
+      true
+    );
+    expect(body.parks.find((park) => park.slug === 'evon-retkeilyalue')?.visited).toBe(false);
+    expect(body.parks.find((park) => park.slug === 'kaupunkilaakson-ulkoilualue')?.visited).toBe(
+      true
+    );
+    expect(body.parks.some((park) => park.slug === 'teijon-kansallispuisto')).toBe(false);
+    expect(body.trips).toEqual([
+      {
+        name: 'Syysretki',
+        slug: 'syysretki',
+        visitedParkSlugs: ['akasmannyn-kansallispuisto']
+      },
+      { name: 'Tyhjä retki', slug: 'tyhja-retki', visitedParkSlugs: [] }
+    ]);
+    expect(body.trips.find((trip) => trip.slug === emptyTrip.body.slug)?.visitedParkSlugs).toEqual(
+      []
+    );
+    expect(elapsedMs).toBeGreaterThanOrEqual(0);
+    expect(responseBytes).toBeGreaterThan(0);
+
+    const signedInResponse = await requestAsAdmin(app, '/api/search');
+    expect(await signedInResponse.json()).toEqual(body);
+
+    await requestAsAdmin(app, `/api/trips/${publishedTrip.body.id}`, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ status: 'draft' })
+    });
+    const unpublishedTripResponse = await app.request('/api/search');
+    const unpublishedTripBody = (await unpublishedTripResponse.json()) as typeof body;
+    expect(unpublishedTripBody.trips.map((trip) => trip.slug)).toEqual(['tyhja-retki']);
+
+    await requestAsAdmin(app, `/api/visits/${firstVisit.body.id}`, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ status: 'draft' })
+    });
+    await requestAsAdmin(app, `/api/visits/${secondVisit.body.id}`, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ status: 'draft' })
+    });
+    await requestAsAdmin(app, `/api/visits/${draftTripVisit.body.id}`, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ status: 'draft' })
+    });
+    const freshResponse = await app.request('/api/search');
+    const freshBody = (await freshResponse.json()) as typeof body;
+    expect(
+      freshBody.parks.find((park) => park.slug === 'akasmannyn-kansallispuisto')?.visited
+    ).toBe(false);
+    expect(
+      freshBody.parks.find((park) => park.slug === 'kaupunkilaakson-ulkoilualue')?.visited
+    ).toBe(false);
+    expect(freshBody.trips[0]?.visitedParkSlugs).toEqual([]);
+  });
+
   it('exposes logo details in park list and park detail responses when a logo is set', async () => {
     await testDatabase.database
       .update(parks)
