@@ -305,6 +305,10 @@ weekly LIPAS workflow.
 Special parks run first so new parent areas exist when curated trails are
 linked. Routine merges with no catalog changes skip the import and backup
 steps. Removed definitions appear in the workflow summary for manual review.
+A special-park definition can explicitly retire a duplicate by synthetic LIPAS
+ID. The importer hides that row in the same transaction as the replacement
+and retains it for existing visits. Expire the retired URL printed by the
+importer along with the updated park URL.
 An older run skips changes superseded by a newer merge.
 Existing selected-trail drift protections still apply. Imports commit
 qualifying trail links and report affected URLs for cache expiry.
@@ -472,6 +476,8 @@ Typical shape:
 - keep the imported `name` user-facing, even if it differs slightly from `sourceName`
 - when a name is ambiguous, filter by `lsaluetunnus` and verify the returned
   feature ID and geometry before adding the configuration
+- when a composite selects specific IDs, set `requiredSykeSiteIds` so an
+  incomplete response cannot replace the stored boundary
 
 Use the composite variant when one park should be assembled from several official SYKE features:
 

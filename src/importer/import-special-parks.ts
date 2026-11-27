@@ -71,6 +71,7 @@ const sykeFeatureSchema = z.object({
   geometry: sykeGeometrySchema,
   properties: z.object({
     ely: z.string().optional(),
+    lsaluetunnus: z.string().optional(),
     nimi: z.string(),
     paatpvm: z.string().optional(),
     shape_area: z.number().optional()
@@ -231,6 +232,7 @@ export const importSpecialParks = async ({
       : specialParkConfigs;
 
   const publicTrailSlugs: string[] = [];
+  const retiredParkSlugs: string[] = [];
   const trailAreaReports: Array<{
     areaSlug: string;
     report: Awaited<ReturnType<typeof reconcileTrailAreas>>;
@@ -289,6 +291,13 @@ export const importSpecialParks = async ({
         : features;
       if (filteredFeatures.length === 0) {
         throw new Error(`No features found for ${config.name} in the SYKE source.`);
+      }
+      if (config.requiredSykeSiteIds) {
+        const siteIds = new Set(filteredFeatures.map((feature) => feature.properties.lsaluetunnus));
+        const missingIds = config.requiredSykeSiteIds.filter((id) => !siteIds.has(id));
+        if (missingIds.length) {
+          throw new Error(`Missing SYKE feature for ${config.name}: ${missingIds.join(', ')}.`);
+        }
       }
       sourceFeatures = filteredFeatures;
       metadata = extractSykeMetadata(filteredFeatures);
@@ -375,6 +384,14 @@ export const importSpecialParks = async ({
         typeId: parkType.id,
         updatedAt: importedAt
       });
+      if (config.retiredSyntheticLipasId !== undefined) {
+        const retired = await tx
+          .update(parks)
+          .set({ catalogStatus: 'inactive', removed: true, updatedAt: importedAt })
+          .where(eq(parks.lipasId, config.retiredSyntheticLipasId))
+          .returning({ slug: parks.slug });
+        retiredParkSlugs.push(...retired.map(({ slug }) => slug));
+      }
       if (config.curatedOsmWays) {
         const [trail] = await tx
           .select({ id: parks.id })
@@ -431,7 +448,7 @@ export const importSpecialParks = async ({
     }
   });
 
-  return { importedAt, results, publicTrailSlugs, trailAreaReports };
+  return { importedAt, results, publicTrailSlugs, retiredParkSlugs, trailAreaReports };
 };
 
 export { extractHikingAreaMetadata };

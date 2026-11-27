@@ -66,6 +66,88 @@ describe('manual catalog imports', () => {
     await testDatabase.dispose();
   });
 
+  it('imports the Kätkävaara reserve and grove as one public destination', async () => {
+    const { database } = testDatabase;
+    const slug = 'katkavaaran-luonnonsuojelualue';
+    const groveSlug = 'katkavaaran-lehto';
+    const fetchSource = createSpecialParksSource();
+    const options = { database, fetchSource, includeSlugs: [slug] };
+
+    const firstImport = await importSpecialParks(options);
+    expect(firstImport.results).toMatchObject([{ slug, featureCount: 2 }]);
+    const canonical = (await database.query.parks.findFirst({ where: eq(parks.slug, slug) }))!;
+    const { id, ...existingFields } = canonical;
+    const [grove] = await database
+      .insert(parks)
+      .values({
+        ...existingFields,
+        importedSlug: groveSlug,
+        lipasId: 9002404,
+        name: 'Kätkävaaran lehto',
+        slug: groveSlug
+      })
+      .returning({ id: parks.id });
+    const [visit] = await database
+      .insert(parkVisits)
+      .values({
+        parkId: grove!.id,
+        visitedOn: '2026-06-01',
+        note: 'Retki Kätkävaaraan',
+        status: 'published',
+        createdAt: canonical.createdAt,
+        updatedAt: canonical.updatedAt
+      })
+      .returning({ id: parkVisits.id });
+
+    const result = await importSpecialParks(options);
+    expect(result.retiredParkSlugs).toEqual([groveSlug]);
+    expect(result.results).toMatchObject([{ slug, featureCount: 2 }]);
+    const reserve = await getParkBySlug(database, slug);
+    await expect(
+      database.query.parks.findFirst({ where: eq(parks.lipasId, 9002397) })
+    ).resolves.toMatchObject({ id });
+    expect(reserve).toMatchObject({
+      lipasId: 9002397,
+      name: 'Kätkävaaran luonnonsuojelualue',
+      areaKm2: 0.89
+    });
+    expect(reserve?.boundaryGeoJson?.features).toHaveLength(3);
+    expect(reserve?.boundaryGeoJson?.features).toContainEqual({
+      type: 'Feature',
+      geometry: expect.objectContaining({
+        type: 'Polygon',
+        coordinates: [expect.arrayContaining([[24.96634564, 66.23084069]])]
+      })
+    });
+    await expect(getParkBySlug(database, groveSlug)).resolves.toBeNull();
+    await expect(
+      database.query.parks.findFirst({ where: eq(parks.id, grove!.id) })
+    ).resolves.toMatchObject({ removed: true, catalogStatus: 'inactive' });
+    await expect(
+      database.query.parkVisits.findFirst({ where: eq(parkVisits.id, visit!.id) })
+    ).resolves.toMatchObject({ parkId: grove!.id, note: 'Retki Kätkävaaraan' });
+
+    await importSpecialParks(options);
+    await expect(getParkBySlug(database, groveSlug)).resolves.toBeNull();
+  });
+
+  it('rejects a Kätkävaara source response missing one of the two boundaries', async () => {
+    const { database } = testDatabase;
+    const slug = 'katkavaaran-luonnonsuojelualue';
+    const source = createSpecialParksSource();
+    await expect(
+      importSpecialParks({
+        database,
+        includeSlugs: [slug],
+        fetchSource: async (url) => {
+          const response = await source(url);
+          return { ...response, features: response.features.slice(0, 1) };
+        }
+      })
+    ).rejects.toThrow(/Missing SYKE feature.*YSA128098/);
+    await expect(getParkBySlug(database, slug)).resolves.toBeNull();
+  });
+
   it('publishes new special trails as standalone destinations', async () => {
     await importSpecialParks({
       database: testDatabase.database,
@@ -637,10 +719,10 @@ describe('manual catalog imports', () => {
     const approvedParentAreas = (await listParks(testDatabase.database)).filter(
       ({ lipasId }) => lipasId >= 9_002_300 && lipasId <= 9_002_413
     );
-    expect(approvedParentAreas).toHaveLength(114);
+    expect(approvedParentAreas).toHaveLength(113);
     expect(
       approvedParentAreas.filter(({ type }) => type.slug === 'nature-reserve-area')
-    ).toHaveLength(108);
+    ).toHaveLength(107);
     expect(
       approvedParentAreas.filter(({ type }) => type.slug === 'outdoor-recreation-area')
     ).toHaveLength(5);
@@ -652,7 +734,7 @@ describe('manual catalog imports', () => {
         ({ lipasId, displayTypeName }) =>
           lipasId >= 9_002_300 && lipasId <= 9_002_413 && displayTypeName !== null
       )
-    ).toHaveLength(33);
+    ).toHaveLength(32);
     expect(approvedParentAreas.find(({ slug }) => slug === 'tervajarven-rotko')).toMatchObject({
       displayTypeName: 'Rotkolaakso'
     });

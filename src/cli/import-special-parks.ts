@@ -29,8 +29,9 @@ for (const park of result.results) {
 
 if (deferTrailLinks) console.log('Trail link reconciliation deferred for this import.');
 
-if (result.publicTrailSlugs.length)
-  console.log(`Expire these public park URLs immediately: ${result.publicTrailSlugs.join(', ')}`);
+const affectedPublicSlugs = [...result.publicTrailSlugs, ...result.retiredParkSlugs];
+if (affectedPublicSlugs.length)
+  console.log(`Expire these public park URLs immediately: ${affectedPublicSlugs.join(', ')}`);
 
 for (const { areaSlug, report } of result.trailAreaReports) {
   console.log(
