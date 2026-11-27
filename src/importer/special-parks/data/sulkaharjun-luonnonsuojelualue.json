@@ -1,0 +1,109 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "source": "Syke",
+        "source_url": "https://paikkatiedot.ymparisto.fi/geoserver/inspire_ps/wfs?service=WFS&version=2.0.0&request=GetFeature&typeNames=inspire_ps%3APS.ProtectedSitesValtionOmistamaLuonnonsuojelualue&outputFormat=application%2Fjson&srsName=EPSG%3A4326&cql_filter=lsaluetunnus%3D%27ESA305020%27",
+        "source_feature_ids": ["ESA305020", "YSA107194"],
+        "source_retrieved_at": "2026-11-26",
+        "source_license": "https://creativecommons.org/licenses/by/4.0/",
+        "source_crs": "EPSG:3067",
+        "processing": "Unioned the listed source features in EPSG:3067, retaining polygon components and interior rings, and transformed to EPSG:4326.",
+        "area_m2": 98114.10070452228,
+        "source_designations": [
+          {
+            "id": "ESA305020",
+            "name": "Sulkaharjun luonnonsuojelualue",
+            "designation": "Muu luonnonsuojelualue (MH)"
+          },
+          {
+            "id": "YSA107194",
+            "name": "SULKAHARJUN LUONNONSUOJELUALUE",
+            "designation": "Yksityinen luonnonsuojelualue (LsL 47 §)"
+          }
+        ],
+        "source_dataset_url": "https://ckan.ymparisto.fi/dataset/luonnonsuojelu-ja-eramaa-alueet",
+        "source_urls": [
+          "https://paikkatiedot.ymparisto.fi/geoserver/inspire_ps/wfs?service=WFS&version=2.0.0&request=GetFeature&typeNames=inspire_ps%3APS.ProtectedSitesValtionOmistamaLuonnonsuojelualue&outputFormat=application%2Fjson&srsName=EPSG%3A4326&cql_filter=lsaluetunnus%3D%27ESA305020%27",
+          "https://paikkatiedot.ymparisto.fi/geoserver/inspire_ps/wfs?service=WFS&version=2.0.0&request=GetFeature&typeNames=inspire_ps%3APS.ProtectedSitesYksityistenMaillaOlevaLuonnonsuojelualue&outputFormat=application%2Fjson&srsName=EPSG%3A4326&cql_filter=lsaluetunnus%3D%27YSA107194%27"
+        ],
+        "visitor_information_url": "https://www.luontoon.fi/fi/reitit/sulkaharjun-luontopolku-veteli-611234"
+      },
+      "geometry": {
+        "type": "MultiPolygon",
+        "coordinates": [
+          [
+            [
+              [24.01501202735561, 63.394637267021345],
+              [24.015702048418333, 63.394612090484316],
+              [24.016436263570032, 63.39460839419493],
+              [24.016586398291647, 63.39458145069503],
+              [24.01821607399071, 63.394560814239355],
+              [24.018962807081774, 63.39447626735379],
+              [24.018672404438945, 63.393926348061854],
+              [24.01840408258186, 63.39357741383853],
+              [24.018215972292815, 63.3934231521121],
+              [24.018111944839255, 63.39338631749932],
+              [24.017881759062895, 63.39324284414889],
+              [24.01751959535692, 63.39304552319508],
+              [24.017117444928385, 63.392856258000826],
+              [24.016492833431936, 63.39262494117992],
+              [24.015270740611083, 63.39220157887433],
+              [24.014674551487385, 63.39196298854611],
+              [24.014492118375593, 63.39188231362689],
+              [24.014217993865103, 63.39174412157982],
+              [24.013557418007974, 63.391405951397154],
+              [24.013121099786233, 63.39114939301135],
+              [24.013079881902822, 63.39112515916728],
+              [24.01106830501785, 63.39324273094606],
+              [24.011071229569534, 63.39324330415649],
+              [24.01414544454426, 63.3938416200364],
+              [24.0139442727067, 63.39404694664965],
+              [24.013851116551137, 63.394135357996916],
+              [24.013849859407525, 63.394136661051164],
+              [24.013850098300757, 63.39413667503012],
+              [24.01384979292612, 63.39413672253525],
+              [24.01325754545448, 63.39474776262198],
+              [24.013635612834207, 63.3946921770729],
+              [24.014693798968285, 63.394619385457716],
+              [24.01501202735561, 63.394637267021345]
+            ]
+          ],
+          [
+            [
+              [24.01854595432361, 63.39326427081232],
+              [24.018595384456624, 63.39330708769682],
+              [24.018619474996125, 63.39332795314723],
+              [24.018990223380175, 63.39364910649759],
+              [24.019294642262413, 63.394081410183475],
+              [24.019476840542566, 63.39443761637665],
+              [24.0194970492875, 63.39466452099752],
+              [24.019635177061655, 63.39477849473896],
+              [24.019809123037298, 63.39460799963742],
+              [24.019789024006265, 63.39452010377711],
+              [24.0208614337288, 63.393429187043466],
+              [24.020367663009495, 63.39335692399504],
+              [24.0189988795764, 63.39321675582533],
+              [24.018587670723598, 63.39311847381675],
+              [24.018239810819654, 63.393144999237805],
+              [24.01854595432361, 63.39326427081232]
+            ]
+          ],
+          [
+            [
+              [23.990093380973512, 63.39906500846611],
+              [23.990666018221937, 63.39899923015537],
+              [23.99138247674687, 63.398921309287886],
+              [23.991646229222916, 63.398625370358594],
+              [23.99219133319317, 63.39786575127132],
+              [23.991138820555204, 63.39742716870478],
+              [23.990093380973512, 63.39906500846611]
+            ]
+          ]
+        ]
+      }
+    }
+  ]
+}

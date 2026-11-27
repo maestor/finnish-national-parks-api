@@ -1,0 +1,50 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "source": "Syke",
+        "source_url": "https://ckan.ymparisto.fi/dataset/valtion-muut-suojelualueet",
+        "source_feature_ids": ["MKS352175"],
+        "source_retrieved_at": "2026-11-26",
+        "source_license": "https://creativecommons.org/licenses/by/4.0/",
+        "source_crs": "EPSG:3067",
+        "processing": "Selected the complete source feature in EPSG:3067 and transformed to EPSG:4326.",
+        "area_m2": 36992.507710776605,
+        "source_designations": [
+          {
+            "id": "MKS352175",
+            "name": "Iso-Naistenjärvi-Puhkusuo",
+            "designation": "Valtion muut suojelualueet, class 221"
+          }
+        ],
+        "source_dataset_url": "https://ckan.ymparisto.fi/dataset/valtion-muut-suojelualueet",
+        "visitor_information_url": "https://www.luontoon.fi/fi/reitit/iso-naistenjarven-reitti-pirkkala-604915"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [23.699593482287536, 61.44426720992159],
+            [23.69590950836469, 61.44313184014251],
+            [23.695871940790422, 61.442759847712196],
+            [23.695828136588773, 61.442666647609265],
+            [23.69568463321236, 61.44236123499633],
+            [23.69496562191834, 61.442330890840005],
+            [23.69299399581959, 61.44225350597607],
+            [23.69263450163146, 61.442659475484284],
+            [23.690623887830036, 61.44341244364779],
+            [23.691766208005117, 61.44369595049537],
+            [23.69395245781015, 61.443509873652],
+            [23.69538459753805, 61.44339805752025],
+            [23.695988143939278, 61.4436927059083],
+            [23.697038876769625, 61.44380867510345],
+            [23.69926424987268, 61.444486404025085],
+            [23.699593482287536, 61.44426720992159]
+          ]
+        ]
+      }
+    }
+  ]
+}

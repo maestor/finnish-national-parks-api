@@ -1,0 +1,68 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "source": "Syke",
+        "source_url": "https://paikkatiedot.ymparisto.fi/geoserver/inspire_ps/wfs?service=WFS&version=2.0.0&request=GetFeature&typeNames=inspire_ps%3APS.ProtectedSitesYksityistenMaillaOlevaLuonnonsuojelualue&outputFormat=application%2Fjson&srsName=EPSG%3A4326&cql_filter=lsaluetunnus%3D%27YSA090929%27",
+        "source_feature_ids": ["YSA090929", "YSA207701"],
+        "source_retrieved_at": "2026-11-26",
+        "source_license": "https://creativecommons.org/licenses/by/4.0/",
+        "source_crs": "EPSG:3067",
+        "processing": "Unioned the listed source features in EPSG:3067, retaining polygon components and interior rings, and transformed to EPSG:4326.",
+        "area_m2": 56308.11923600705,
+        "source_designations": [
+          {
+            "id": "YSA090929",
+            "name": "Konttivuori",
+            "designation": "Yksityinen luonnonsuojelualue (LsL 47 §)"
+          },
+          {
+            "id": "YSA207701",
+            "name": "Konttivuoren luonnonsuojelualue 2",
+            "designation": "Yksityinen luonnonsuojelualue (LsL 47 §)"
+          }
+        ],
+        "source_dataset_url": "https://ckan.ymparisto.fi/dataset/luonnonsuojelu-ja-eramaa-alueet",
+        "source_urls": [
+          "https://paikkatiedot.ymparisto.fi/geoserver/inspire_ps/wfs?service=WFS&version=2.0.0&request=GetFeature&typeNames=inspire_ps%3APS.ProtectedSitesYksityistenMaillaOlevaLuonnonsuojelualue&outputFormat=application%2Fjson&srsName=EPSG%3A4326&cql_filter=lsaluetunnus%3D%27YSA090929%27",
+          "https://paikkatiedot.ymparisto.fi/geoserver/inspire_ps/wfs?service=WFS&version=2.0.0&request=GetFeature&typeNames=inspire_ps%3APS.ProtectedSitesYksityistenMaillaOlevaLuonnonsuojelualue&outputFormat=application%2Fjson&srsName=EPSG%3A4326&cql_filter=lsaluetunnus%3D%27YSA207701%27"
+        ],
+        "visitor_information_url": "https://www.luontoon.fi/fi/reitit/konttivuoren-luontopolku-uurainen-96407"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [25.354540274452745, 62.43305267550808],
+            [25.35393909725885, 62.43394640007358],
+            [25.353968381688752, 62.43397508078716],
+            [25.35593135480723, 62.43486325694544],
+            [25.357364655489995, 62.43551173419387],
+            [25.35803518445076, 62.4358251125809],
+            [25.358937712443765, 62.43574437657803],
+            [25.359865590886997, 62.43568389132187],
+            [25.359762615522953, 62.4355735958886],
+            [25.35989878484763, 62.43514295531518],
+            [25.35988423701951, 62.434874814377366],
+            [25.359899219827987, 62.43460126582746],
+            [25.360014246855634, 62.43437649602559],
+            [25.360360534498305, 62.43405287650502],
+            [25.35998958931388, 62.43393672720545],
+            [25.359216799258487, 62.433942538721766],
+            [25.35848223996501, 62.43384817827343],
+            [25.357995045822737, 62.43373385108871],
+            [25.358096216877826, 62.43355671010912],
+            [25.357836951030457, 62.433456782735675],
+            [25.357067020251954, 62.433330179594115],
+            [25.356545265011295, 62.43347874145396],
+            [25.35577646814779, 62.43333933272085],
+            [25.354860547865165, 62.43320199048959],
+            [25.354540274452745, 62.43305267550808]
+          ]
+        ]
+      }
+    }
+  ]
+}

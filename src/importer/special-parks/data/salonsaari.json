@@ -1,0 +1,52 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "source": "Syke",
+        "source_url": "https://ckan.ymparisto.fi/dataset/valtion-muut-suojelualueet",
+        "source_feature_ids": ["MMO359019"],
+        "source_retrieved_at": "2026-11-26",
+        "source_license": "https://creativecommons.org/licenses/by/4.0/",
+        "source_crs": "EPSG:3067",
+        "processing": "Selected the complete source feature in EPSG:3067 and transformed to EPSG:4326.",
+        "area_m2": 20582.495679915024,
+        "source_designations": [
+          {
+            "id": "MMO359019",
+            "name": "Salonsaari",
+            "designation": "Valtion muut suojelualueet, class 212"
+          }
+        ],
+        "source_dataset_url": "https://ckan.ymparisto.fi/dataset/valtion-muut-suojelualueet",
+        "visitor_information_url": "https://www.luontoon.fi/fi/reitit/salonsaaren-luontopolku-asikkala-602179"
+      },
+      "geometry": {
+        "type": "MultiPolygon",
+        "coordinates": [
+          [
+            [
+              [25.588751930777768, 61.206742340499325],
+              [25.589211883293476, 61.20680846632224],
+              [25.58982991182446, 61.20575393062279],
+              [25.588268154763693, 61.20554912486337],
+              [25.58767542392087, 61.206587566575294],
+              [25.588751930777768, 61.206742340499325]
+            ]
+          ],
+          [
+            [
+              [25.586946444912428, 61.210710240405334],
+              [25.58707933406091, 61.21049523900039],
+              [25.587341673420994, 61.210070820878855],
+              [25.584243668255464, 61.20968418344206],
+              [25.584064614519974, 61.210076216550895],
+              [25.586946444912428, 61.210710240405334]
+            ]
+          ]
+        ]
+      }
+    }
+  ]
+}

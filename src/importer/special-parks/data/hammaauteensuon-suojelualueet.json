@@ -1,0 +1,94 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "source": "Syke",
+        "source_url": "https://paikkatiedot.ymparisto.fi/geoserver/inspire_ps/wfs?service=WFS&version=2.0.0&request=GetFeature&typeNames=inspire_ps%3APS.ProtectedSitesYksityistenMaillaOlevaLuonnonsuojelualue&outputFormat=application%2Fjson&srsName=EPSG%3A4326&cql_filter=lsaluetunnus%3D%27YSA052400%27",
+        "source_feature_ids": ["YSA052400", "YSA233207"],
+        "source_retrieved_at": "2026-11-26",
+        "source_license": "https://creativecommons.org/licenses/by/4.0/",
+        "source_crs": "EPSG:3067",
+        "processing": "Unioned the listed source features in EPSG:3067, retaining polygon components and interior rings, and transformed to EPSG:4326. A one-micrometre projected precision grid stabilized the shared edge through reprojection.",
+        "area_m2": 400829.6880780148,
+        "source_designations": [
+          {
+            "id": "YSA052400",
+            "name": "HÄMMÄAUTEENSUON LUONNONSUOJELUALUE",
+            "designation": "Yksityinen luonnonsuojelualue (LsL 47 §)"
+          },
+          {
+            "id": "YSA233207",
+            "name": "Hämmänauteensuon luonnonsuojelualue",
+            "designation": "Yksityinen luonnonsuojelualue (LsL 47 §)"
+          }
+        ],
+        "source_dataset_url": "https://ckan.ymparisto.fi/dataset/luonnonsuojelu-ja-eramaa-alueet",
+        "source_urls": [
+          "https://paikkatiedot.ymparisto.fi/geoserver/inspire_ps/wfs?service=WFS&version=2.0.0&request=GetFeature&typeNames=inspire_ps%3APS.ProtectedSitesYksityistenMaillaOlevaLuonnonsuojelualue&outputFormat=application%2Fjson&srsName=EPSG%3A4326&cql_filter=lsaluetunnus%3D%27YSA052400%27",
+          "https://paikkatiedot.ymparisto.fi/geoserver/inspire_ps/wfs?service=WFS&version=2.0.0&request=GetFeature&typeNames=inspire_ps%3APS.ProtectedSitesYksityistenMaillaOlevaLuonnonsuojelualue&outputFormat=application%2Fjson&srsName=EPSG%3A4326&cql_filter=lsaluetunnus%3D%27YSA233207%27"
+        ],
+        "visitor_information_url": "https://www.luontoon.fi/fi/reitit/hammenautioonsuon-luontopolku2-lappeenranta-600072"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [28.288467539172622, 61.00043237422971],
+            [28.2860212515578, 60.999296848956774],
+            [28.282549589085907, 60.99881310264395],
+            [28.28252000634506, 60.998870948937],
+            [28.282185878361172, 60.998829283890714],
+            [28.282041960054485, 60.99915352230348],
+            [28.28195994952596, 60.999409909747975],
+            [28.281962081343412, 60.999921105428484],
+            [28.282111932932548, 61.0002021994835],
+            [28.28223174738248, 61.00042527763209],
+            [28.282362613341594, 61.00069309222525],
+            [28.282434466828317, 61.000871784534276],
+            [28.28246850406744, 61.00143199899442],
+            [28.282436993355223, 61.0015668323723],
+            [28.282378333295053, 61.001715374526164],
+            [28.282281789417805, 61.00182605276411],
+            [28.28483334581011, 61.0035886593456],
+            [28.284832294623037, 61.00358919014528],
+            [28.288601767667103, 61.00619230145897],
+            [28.288641772598528, 61.00619229645348],
+            [28.290950717205387, 61.00781133228253],
+            [28.290961739582233, 61.00781995449861],
+            [28.291930442336195, 61.00848960959048],
+            [28.292152251431762, 61.008395817661764],
+            [28.29257117335765, 61.00821870547597],
+            [28.294132838219152, 61.00732792988424],
+            [28.294251616635258, 61.00726017440988],
+            [28.29426316174575, 61.007251632265806],
+            [28.29525216311829, 61.006519079480036],
+            [28.295741778247532, 61.005783028819124],
+            [28.295813997758717, 61.00567447800053],
+            [28.295851877853213, 61.00556289880953],
+            [28.295937790754483, 61.00530978729168],
+            [28.295757818622135, 61.00486273982557],
+            [28.29552836303252, 61.00433539121754],
+            [28.295308688393217, 61.00382141698888],
+            [28.295191482866098, 61.00355327659184],
+            [28.294181658186336, 61.003084444412735],
+            [28.29418195213919, 61.003084396697],
+            [28.29103950710467, 61.00162608603253],
+            [28.291006165555256, 61.00161061087922],
+            [28.29069318330492, 61.00146536083196],
+            [28.289115083140125, 61.00073292265081],
+            [28.2890870772734, 61.00071992815017],
+            [28.288835514128216, 61.00060317025924],
+            [28.288835837014936, 61.0006029247292],
+            [28.28854257040444, 61.000466846632065],
+            [28.288506988330354, 61.00045032376345],
+            [28.28841763774444, 61.00046087468084],
+            [28.288506380880268, 61.00045039241982],
+            [28.288467539172622, 61.00043237422971]
+          ]
+        ]
+      }
+    }
+  ]
+}

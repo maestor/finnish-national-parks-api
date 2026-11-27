@@ -46,7 +46,9 @@
       "includes": [
         "**/src/importer/data/**/*.json",
         "**/src/importer/selected-trails/*.json",
-        "**/src/importer/special-parks/data/neitvuori-ja-luonterin-luonnonsuojelualue.json"
+        "**/src/importer/special-parks/data/kuolimo.json",
+        "**/src/importer/special-parks/data/neitvuori-ja-luonterin-luonnonsuojelualue.json",
+        "**/src/importer/special-parks/data/tammisaaren-ja-hangon-saariston-ja-pohjanpitajanlahden-merensuojelualue.json"
       ],
       "formatter": {
         "enabled": false
