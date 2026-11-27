@@ -281,6 +281,26 @@ rows. A correction to an accepted snapshot needs that separate reviewed write.
 Regular LIPAS and OSM imports preserve pinned memberships and accepted geometry.
 Catalog additions use the existing database schema.
 
+### Korouoma
+
+Run `npm run import:special-parks -- korouoma` to update the existing Korouoma
+record. The snapshot keeps the 50.91 km² Korouoma component of FI1301104 and
+its two interior rings. It excludes the separate Jäniskaira component.
+[Syke Natura 2000 dataset](https://ckan.ymparisto.fi/dataset/natura2000-alueet)
+
+Use the [selected trail workflow](#selected-linked-trails) with
+`--selection osm-relation-8096856 --selection piippukallion-pihaus --selection koivukongas-pirunkirkko`.
+The long trail follows the open Lapiosalmi–Pajupuro itinerary and turns around
+at the hut. Keep the closed continuation toward Koronjää and Saukkovaara out of
+the geometry while the closure is in effect. The catalog uses the published
+17.59 km figure. The mapped main line measures 16.08 km one way.
+[Luontoon route description and closure](https://www.luontoon.fi/fi/reitit/korouoma-retkeilyreitti-posio-17505)
+
+The Piippukallio loop and Koivuköngäs out-and-back each store their shared path
+once. Koivuköngäs ends at the Pirunkirkko lean-to. Metsähallitus asks visitors
+to avoid the Pirunkirkko area from 1 May to 31 July.
+[Korouoma visitor rules](https://www.luontoon.fi/fi/kohteet/korouoma/ohjeet-ja-saannot)
+
 ### Merged OSM trail refresh
 
 Maintainers can [merge linked OSM trails manually](development.md#merge-linked-trails). Original relation identities and raw component snapshots remain separate from the destination's combined geometry. The public linked-trail `source.relations` array lists every contributing relation ID and URL; existing singular `relationId`/`sourceUrl` fields still identify the destination's primary source.

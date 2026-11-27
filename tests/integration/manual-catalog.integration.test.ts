@@ -1755,10 +1755,15 @@ describe('manual catalog imports', () => {
 
     const korouoma = await getParkBySlug(testDatabase.database, 'korouoma');
     expect(korouoma).toMatchObject({
+      areaKm2: 50.91,
       lipasId: 9001037,
       name: 'Korouoma',
       type: { slug: 'nature-reserve-area' }
     });
+    const korouomaPolygons = korouoma?.boundaryGeoJson?.features.map(({ geometry }) => geometry);
+    expect(korouomaPolygons).toEqual([
+      { type: 'Polygon', coordinates: [expect.any(Array), expect.any(Array), expect.any(Array)] }
+    ]);
 
     const lapakisto = await getParkBySlug(testDatabase.database, 'lapakisto');
     expect(lapakisto).toMatchObject({
