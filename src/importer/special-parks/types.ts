@@ -1,11 +1,16 @@
 import type { SupportedParkTypeSlug } from '../../parks/park-types.js';
+import type { PolygonGeometry } from '../geometry.js';
 
 export type SpecialParkMetadata = {
   areaKm2: number | null;
   establishmentYear: number | null;
 };
 
+export type BoundaryUnion = 'preserve-holes' | 'exterior-only';
+
 export type SpecialParkConfig = {
+  boundaryUnion?: BoundaryUnion;
+  boundaryUnionAdditions?: PolygonGeometry[];
   curatedOsmWays?: { ids: number[]; retrievedAt: string };
   displayTypeName: string | null;
   extractMetadata?: (

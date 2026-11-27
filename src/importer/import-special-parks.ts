@@ -2,6 +2,12 @@ import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { eq } from 'drizzle-orm';
+import type Geometry from 'jsts/org/locationtech/jts/geom/Geometry.js';
+import GeometryFactory from 'jsts/org/locationtech/jts/geom/GeometryFactory.js';
+import GeoJSONReader from 'jsts/org/locationtech/jts/io/GeoJSONReader.js';
+import GeoJSONWriter from 'jsts/org/locationtech/jts/io/GeoJSONWriter.js';
+import UnaryUnionOp from 'jsts/org/locationtech/jts/operation/union/UnaryUnionOp.js';
+import IsValidOp from 'jsts/org/locationtech/jts/operation/valid/IsValidOp.js';
 import { z } from 'zod';
 
 import type { Database } from '../db/database.js';
@@ -18,6 +24,7 @@ import { deriveBoundingBox } from './geometry.js';
 import { reconcileTrailAreas } from './reconcile-trail-areas.js';
 import { extractHikingAreaMetadata } from './special-parks/builders.js';
 import { specialParkConfigs } from './special-parks/index.js';
+import type { BoundaryUnion } from './special-parks/types.js';
 
 const coordinateSchema = z.tuple([z.number(), z.number()]).rest(z.number());
 
@@ -142,6 +149,35 @@ const normalizeGeometry = (geometry: {
   }
 
   throw new Error(`Unsupported geometry type "${geometry.type}" in special parks source.`);
+};
+
+const dissolvePolygonBoundary = (
+  sourceGeometries: Array<{ coordinates: unknown; type: string }>,
+  parkName: string,
+  boundaryUnion: BoundaryUnion
+) => {
+  const factory = new GeometryFactory();
+  const reader = new GeoJSONReader(factory);
+  try {
+    const parcels = sourceGeometries.map(
+      (geometry) => reader.read(sykeGeometrySchema.parse(geometry)) as Geometry
+    );
+    if (parcels.some((parcel) => !IsValidOp.isValid(parcel) || parcel.getArea() <= 0)) {
+      throw new Error('A parcel is empty or topologically invalid.');
+    }
+
+    const union = UnaryUnionOp.union(factory.createGeometryCollection(parcels));
+    const boundary = sykeGeometrySchema.parse(new GeoJSONWriter().write(union));
+    const polygons = boundary.type === 'Polygon' ? [boundary.coordinates] : boundary.coordinates;
+    return polygons.map((rings) =>
+      polygonGeometrySchema.parse({
+        type: 'Polygon',
+        coordinates: boundaryUnion === 'exterior-only' ? rings.slice(0, 1) : rings
+      })
+    );
+  } catch (cause) {
+    throw new Error(`Invalid parcel geometry for ${parkName}.`, { cause });
+  }
 };
 
 const toBoundaryGeoJson = (
@@ -303,10 +339,17 @@ export const importSpecialParks = async ({
       metadata = extractSykeMetadata(filteredFeatures);
     }
 
-    const geometries = sourceFeatures.flatMap((feature) => normalizeGeometry(feature.geometry));
+    const sourceGeometries = sourceFeatures.map(({ geometry }) => geometry);
+    const boundaryGeometries = config.boundaryUnion
+      ? dissolvePolygonBoundary(
+          [...sourceGeometries, ...(config.boundaryUnionAdditions ?? [])],
+          config.name,
+          config.boundaryUnion
+        )
+      : sourceGeometries.flatMap(normalizeGeometry);
 
     const boundaryGeoJson = toBoundaryGeoJson(
-      geometries.map((geom) => ({
+      boundaryGeometries.map((geom) => ({
         geometry: geom,
         sortKey: config.slug === 'merenkurkun-maailmanperintoalue' ? null : config.name
       }))
