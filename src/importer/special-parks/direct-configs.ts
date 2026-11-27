@@ -13,6 +13,21 @@ export const baseSpecialParkConfigs: SpecialParkConfig[] = [
   {
     displayTypeName: null,
     extractMetadata: extractGeoJsonAreaM2Metadata,
+    locationLabel: 'Korouoma',
+    markerPoint: { lat: 66.15708186, lon: 27.51445236 },
+    parkUrl: 'https://www.luontoon.fi/fi/kohteet/korouoma',
+    name: 'Korouoma',
+    parkTypeSlug: 'nature-reserve-area',
+    postalCode: null,
+    postalOffice: null,
+    responseShapeVersion: 'syke-natura-sac-boundary-v1',
+    slug: 'korouoma',
+    sourceUrl: 'special://korouoma',
+    syntheticLipasId: 9_001_037
+  },
+  {
+    displayTypeName: null,
+    extractMetadata: extractGeoJsonAreaM2Metadata,
     locationLabel: 'Mustilantie 57',
     markerPoint: { lat: 60.7329443322227, lon: 26.4179181154634 },
     parkUrl: 'https://mustila.fi/',

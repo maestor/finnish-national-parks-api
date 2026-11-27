@@ -107,6 +107,18 @@ describe('selected trail batch', () => {
           .sort()
       );
     }
+    const korouomaResponse = await createApp({ database: db.database }).request(
+      '/api/parks/korouoma?includeBoundary=true'
+    );
+    expect(korouomaResponse.status).toBe(200);
+    const korouoma = parkDetailSchema.parse(await korouomaResponse.json());
+    expect(korouoma.linkedTrails).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ name: 'Korouoma retkeilyreitti', lengthKm: 17.59 }),
+        expect.objectContaining({ name: 'Piippukallion pihaus', lengthKm: 5 }),
+        expect.objectContaining({ name: 'Koivuköngäs-Pirunkirkko', lengthKm: 3.97 })
+      ])
+    );
     const sources = await db.database.select().from(curatedTrailSources);
     expect(sources).toHaveLength(manifest.selections.length);
     const token = await createSessionToken(

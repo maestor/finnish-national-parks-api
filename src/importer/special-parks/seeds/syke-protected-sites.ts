@@ -286,14 +286,5 @@ export const sourceReadyDestinationAreaSeeds: SykeSpecialParkSeed[] = [
     slug: 'koivusuon-luonnonpuisto',
     sourceName: 'Koivusuon luonnonpuisto',
     syntheticLipasId: 9_001_040
-  },
-  {
-    displayTypeName: null,
-    parkUrl: 'https://www.luontoon.fi/fi/kohteet/korouoma',
-    name: 'Korouoma',
-    parkTypeSlug: 'nature-reserve-area',
-    slug: 'korouoma',
-    sourceName: 'Korouoman lehtojensuojelualue',
-    syntheticLipasId: 9_001_037
   }
 ];

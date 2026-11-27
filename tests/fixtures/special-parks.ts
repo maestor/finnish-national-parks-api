@@ -129,8 +129,7 @@ const generatedSykeSources: GeneratedSykeSource[] = [
     sourceType: 'private'
   },
   { name: 'Olvassuon luonnonpuisto', sourceName: 'Olvassuon luonnonpuisto' },
-  { name: 'Koivusuon luonnonpuisto', sourceName: 'Koivusuon luonnonpuisto' },
-  { name: 'Korouoma', sourceName: 'Korouoman lehtojensuojelualue' }
+  { name: 'Koivusuon luonnonpuisto', sourceName: 'Koivusuon luonnonpuisto' }
 ];
 
 const generatedMuseovirastoSources = [
