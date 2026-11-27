@@ -1,6 +1,9 @@
 import { extractGeoJsonAreaM2Metadata } from '../builders.js';
 import type { SpecialParkConfig } from '../types.js';
 
+const katkavaaraSourceIds = ['YSA232970', 'YSA128098'];
+const katkavaaraSourceFilter = katkavaaraSourceIds.map((id) => `lsaluetunnus='${id}'`).join(' OR ');
+
 export const approvedMissingParentAreaConfigs: SpecialParkConfig[] = [
   {
     displayTypeName: null,
@@ -408,21 +411,6 @@ export const approvedMissingParentAreaConfigs: SpecialParkConfig[] = [
     markerPoint: { lat: 62.42076405, lon: 25.07656557 }
   },
   {
-    displayTypeName: 'Lehtojensuojelualue',
-    locationLabel: 'Kätkävaaran lehto',
-    parkUrl: 'https://www.luontoon.fi/fi/reitit/katkavaaran-luontopolku-tervola-526785',
-    name: 'Kätkävaaran lehto',
-    parkTypeSlug: 'nature-reserve-area',
-    postalCode: null,
-    postalOffice: null,
-    responseShapeVersion: 'syke-protected-sites-v1',
-    slug: 'katkavaaran-lehto',
-    sourceUrl:
-      'https://paikkatiedot.ymparisto.fi/geoserver/inspire_ps/wfs?service=WFS&request=GetFeature&version=2.0.0&typeNames=inspire_ps%3APS.ProtectedSitesYksityistenMaillaOlevaLuonnonsuojelualue&outputFormat=application%2Fjson&srsName=EPSG%3A4326&cql_filter=lsaluetunnus%3D%27YSA128098%27',
-    syntheticLipasId: 9002404,
-    markerPoint: { lat: 66.23017555, lon: 24.96316109 }
-  },
-  {
     displayTypeName: null,
     locationLabel: 'Kätkävaaran luonnonsuojelualue',
     parkUrl: 'https://www.luontoon.fi/fi/reitit/katkavaaran-luontopolku-tervola-526785',
@@ -432,8 +420,9 @@ export const approvedMissingParentAreaConfigs: SpecialParkConfig[] = [
     postalOffice: null,
     responseShapeVersion: 'syke-protected-sites-v1',
     slug: 'katkavaaran-luonnonsuojelualue',
-    sourceUrl:
-      'https://paikkatiedot.ymparisto.fi/geoserver/inspire_ps/wfs?service=WFS&request=GetFeature&version=2.0.0&typeNames=inspire_ps%3APS.ProtectedSitesYksityistenMaillaOlevaLuonnonsuojelualue&outputFormat=application%2Fjson&srsName=EPSG%3A4326&cql_filter=lsaluetunnus%3D%27YSA232970%27',
+    requiredSykeSiteIds: katkavaaraSourceIds,
+    retiredSyntheticLipasId: 9002404,
+    sourceUrl: `https://paikkatiedot.ymparisto.fi/geoserver/inspire_ps/wfs?service=WFS&request=GetFeature&version=2.0.0&typeNames=inspire_ps%3APS.ProtectedSitesYksityistenMaillaOlevaLuonnonsuojelualue&outputFormat=application%2Fjson&srsName=EPSG%3A4326&cql_filter=${encodeURIComponent(katkavaaraSourceFilter).replaceAll("'", '%27')}`,
     syntheticLipasId: 9002397,
     markerPoint: { lat: 66.2351131, lon: 24.96073446 }
   },

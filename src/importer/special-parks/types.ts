@@ -23,7 +23,9 @@ export type SpecialParkConfig = {
   parkTypeSlug: SupportedParkTypeSlug;
   postalCode: string | null;
   postalOffice: string | null;
+  requiredSykeSiteIds?: string[];
   responseShapeVersion: string;
+  retiredSyntheticLipasId?: number;
   slug: string;
   sourceFeatureId?: number;
   sourceParser?: 'geojson' | 'syke' | 'world-heritage-area';

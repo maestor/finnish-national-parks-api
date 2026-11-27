@@ -162,7 +162,7 @@ const readSpecialSourceFile = async (sourceUrl: string) => {
 };
 
 export const createSpecialParksSource = () => {
-  let reserveFixtures: Promise<Record<string, unknown>> | undefined;
+  let reserveFixtures: Promise<Record<string, { features: unknown[] }>> | undefined;
   const responses = new Map<string, unknown>([
     [
       merenkurkkuSourceUrl,
@@ -841,8 +841,17 @@ export const createSpecialParksSource = () => {
           )
         )
       ).then((parts) => Object.assign({}, ...parts));
-      const response = (await reserveFixtures)[sourceUrl];
-      if (response) return response;
+      const fixtures = await reserveFixtures;
+      const [baseUrl, filter = ''] = sourceUrl.split('&cql_filter=');
+      const responses = filter
+        .split('%20OR%20')
+        .map((clause) => fixtures[`${baseUrl}&cql_filter=${clause}`]);
+      if (responses.every((response) => response !== undefined)) {
+        return {
+          type: 'FeatureCollection',
+          features: responses.flatMap(({ features }) => features)
+        };
+      }
     }
 
     const response = responses.get(sourceUrl);
