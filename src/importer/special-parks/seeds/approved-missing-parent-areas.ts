@@ -1,8 +1,15 @@
 import { extractGeoJsonAreaM2Metadata } from '../builders.js';
 import type { SpecialParkConfig } from '../types.js';
 
-const katkavaaraSourceIds = ['YSA232970', 'YSA128098'];
-const katkavaaraSourceFilter = katkavaaraSourceIds.map((id) => `lsaluetunnus='${id}'`).join(' OR ');
+// Both lehto parcels adjoin the main area; Kätkä corresponds to the separate northwest OSM way.
+const katkavaaraSourceIds = ['YSA232970', 'YSA128098', 'YSA128072', 'YSA207842'];
+// Orinnoro and neighboring Orkorinne together cover the destination mapped as OSM way 1020866704.
+const orinoroSourceIds = ['YSA082565', 'YSA249925'];
+
+const buildSykePrivateSitesUrlByIds = (siteIds: string[]) => {
+  const filter = siteIds.map((id) => `lsaluetunnus='${id}'`).join(' OR ');
+  return `https://paikkatiedot.ymparisto.fi/geoserver/inspire_ps/wfs?service=WFS&request=GetFeature&version=2.0.0&typeNames=inspire_ps%3APS.ProtectedSitesYksityistenMaillaOlevaLuonnonsuojelualue&outputFormat=application%2Fjson&srsName=EPSG%3A4326&cql_filter=${encodeURIComponent(filter).replaceAll("'", '%27')}`;
+};
 
 export const approvedMissingParentAreaConfigs: SpecialParkConfig[] = [
   {
@@ -411,6 +418,23 @@ export const approvedMissingParentAreaConfigs: SpecialParkConfig[] = [
     markerPoint: { lat: 62.42076405, lon: 25.07656557 }
   },
   {
+    // OSM way 815852687 covers both interior gaps in the composite visitor boundary.
+    boundaryUnion: 'exterior-only',
+    // Close the narrow notch between the SYKE parcel edges at the trail crossing.
+    // OSM way 815852687 shows this junction as a continuous boundary.
+    boundaryUnionAdditions: [
+      {
+        type: 'Polygon',
+        coordinates: [
+          [
+            [24.96157777, 66.23087353],
+            [24.96302214, 66.23140763],
+            [24.961517, 66.23088102],
+            [24.96157777, 66.23087353]
+          ]
+        ]
+      }
+    ],
     displayTypeName: null,
     locationLabel: 'Kätkävaaran luonnonsuojelualue',
     parkUrl: 'https://www.luontoon.fi/fi/reitit/katkavaaran-luontopolku-tervola-526785',
@@ -422,7 +446,7 @@ export const approvedMissingParentAreaConfigs: SpecialParkConfig[] = [
     slug: 'katkavaaran-luonnonsuojelualue',
     requiredSykeSiteIds: katkavaaraSourceIds,
     retiredSyntheticLipasId: 9002404,
-    sourceUrl: `https://paikkatiedot.ymparisto.fi/geoserver/inspire_ps/wfs?service=WFS&request=GetFeature&version=2.0.0&typeNames=inspire_ps%3APS.ProtectedSitesYksityistenMaillaOlevaLuonnonsuojelualue&outputFormat=application%2Fjson&srsName=EPSG%3A4326&cql_filter=${encodeURIComponent(katkavaaraSourceFilter).replaceAll("'", '%27')}`,
+    sourceUrl: buildSykePrivateSitesUrlByIds(katkavaaraSourceIds),
     syntheticLipasId: 9002397,
     markerPoint: { lat: 66.2351131, lon: 24.96073446 }
   },
@@ -930,6 +954,7 @@ export const approvedMissingParentAreaConfigs: SpecialParkConfig[] = [
     markerPoint: { lat: 61.92601007, lon: 25.53254591 }
   },
   {
+    boundaryUnion: 'preserve-holes',
     displayTypeName: null,
     locationLabel: 'Orinoro',
     parkUrl:
@@ -938,10 +963,10 @@ export const approvedMissingParentAreaConfigs: SpecialParkConfig[] = [
     parkTypeSlug: 'nature-reserve-area',
     postalCode: null,
     postalOffice: null,
+    requiredSykeSiteIds: orinoroSourceIds,
     responseShapeVersion: 'syke-protected-sites-v1',
     slug: 'orinoro',
-    sourceUrl:
-      'https://paikkatiedot.ymparisto.fi/geoserver/inspire_ps/wfs?service=WFS&request=GetFeature&version=2.0.0&typeNames=inspire_ps%3APS.ProtectedSitesYksityistenMaillaOlevaLuonnonsuojelualue&outputFormat=application%2Fjson&srsName=EPSG%3A4326&cql_filter=lsaluetunnus%3D%27YSA082565%27',
+    sourceUrl: buildSykePrivateSitesUrlByIds(orinoroSourceIds),
     syntheticLipasId: 9002384,
     markerPoint: { lat: 62.5056, lon: 28.0116 }
   },

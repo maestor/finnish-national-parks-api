@@ -66,7 +66,7 @@ describe('manual catalog imports', () => {
     await testDatabase.dispose();
   });
 
-  it('imports the Kätkävaara reserve and grove as one public destination', async () => {
+  it('imports the four Kätkävaara parcels as one destination without interior outlines', async () => {
     const { database } = testDatabase;
     const slug = 'katkavaaran-luonnonsuojelualue';
     const groveSlug = 'katkavaaran-lehto';
@@ -74,7 +74,7 @@ describe('manual catalog imports', () => {
     const options = { database, fetchSource, includeSlugs: [slug] };
 
     const firstImport = await importSpecialParks(options);
-    expect(firstImport.results).toMatchObject([{ slug, featureCount: 2 }]);
+    expect(firstImport.results).toMatchObject([{ slug, featureCount: 4 }]);
     const canonical = (await database.query.parks.findFirst({ where: eq(parks.slug, slug) }))!;
     const { id, ...existingFields } = canonical;
     const [grove] = await database
@@ -101,7 +101,7 @@ describe('manual catalog imports', () => {
 
     const result = await importSpecialParks(options);
     expect(result.retiredParkSlugs).toEqual([groveSlug]);
-    expect(result.results).toMatchObject([{ slug, featureCount: 2 }]);
+    expect(result.results).toMatchObject([{ slug, featureCount: 4 }]);
     const reserve = await getParkBySlug(database, slug);
     await expect(
       database.query.parks.findFirst({ where: eq(parks.lipasId, 9002397) })
@@ -109,16 +109,24 @@ describe('manual catalog imports', () => {
     expect(reserve).toMatchObject({
       lipasId: 9002397,
       name: 'Kätkävaaran luonnonsuojelualue',
-      areaKm2: 0.89
+      areaKm2: 0.99
     });
-    expect(reserve?.boundaryGeoJson?.features).toHaveLength(3);
-    expect(reserve?.boundaryGeoJson?.features).toContainEqual({
-      type: 'Feature',
-      geometry: expect.objectContaining({
-        type: 'Polygon',
-        coordinates: [expect.arrayContaining([[24.96634564, 66.23084069]])]
-      })
-    });
+    expect(reserve?.boundingBox).toMatchObject({ minLon: 24.93376404, maxLat: 66.23975232 });
+    const polygons = reserve?.boundaryGeoJson?.features.map(({ geometry }) => geometry);
+    expect(polygons).toHaveLength(2);
+    const joinedOutline = polygons?.find(
+      ({ type, coordinates }) =>
+        type === 'Polygon' &&
+        coordinates[0]?.some(([lon, lat]) => lon === 24.96755867 && lat === 66.2313351)
+    );
+    expect(joinedOutline).toMatchObject({ type: 'Polygon' });
+    const outline = joinedOutline?.type === 'Polygon' ? joinedOutline.coordinates[0] : undefined;
+    const notchMouth = [24.96157777, 66.23087353];
+    const otherSide = [24.961517, 66.23088102];
+    const mouthIndex =
+      outline?.findIndex(([lon, lat]) => lon === notchMouth[0] && lat === notchMouth[1]) ?? -1;
+    expect(outline?.slice(mouthIndex, mouthIndex + 2)).toEqual([notchMouth, otherSide]);
+    expect(polygons?.map(({ coordinates }) => coordinates.length)).toEqual([1, 1]);
     await expect(getParkBySlug(database, groveSlug)).resolves.toBeNull();
     await expect(
       database.query.parks.findFirst({ where: eq(parks.id, grove!.id) })
@@ -131,7 +139,7 @@ describe('manual catalog imports', () => {
     await expect(getParkBySlug(database, groveSlug)).resolves.toBeNull();
   });
 
-  it('rejects a Kätkävaara source response missing one of the two boundaries', async () => {
+  it('rejects a Kätkävaara source response missing the northwest parcel', async () => {
     const { database } = testDatabase;
     const slug = 'katkavaaran-luonnonsuojelualue';
     const source = createSpecialParksSource();
@@ -141,11 +149,78 @@ describe('manual catalog imports', () => {
         includeSlugs: [slug],
         fetchSource: async (url) => {
           const response = await source(url);
-          return { ...response, features: response.features.slice(0, 1) };
+          return { ...response, features: response.features.slice(0, -1) };
         }
       })
-    ).rejects.toThrow(/Missing SYKE feature.*YSA128098/);
+    ).rejects.toThrow(/Missing SYKE feature.*YSA207842/);
     await expect(getParkBySlug(database, slug)).resolves.toBeNull();
+  });
+
+  it('draws one public Orinoro outline around the gorge and Orkorinne', async () => {
+    const slug = 'orinoro';
+    const { database } = testDatabase;
+    const result = await importSpecialParks({
+      database,
+      fetchSource: createSpecialParksSource(),
+      includeSlugs: [slug]
+    });
+
+    expect(result.results).toMatchObject([{ slug, featureCount: 2 }]);
+    const park = await getParkBySlug(database, slug);
+    expect(park).toMatchObject({
+      lipasId: 9002384,
+      name: 'Orinoro',
+      areaKm2: 0.08,
+      establishmentYear: 1986
+    });
+    expect(park?.boundaryGeoJson?.features).toMatchObject([
+      { geometry: { type: 'Polygon', coordinates: [expect.any(Array)] } }
+    ]);
+    expect(park?.boundingBox).toMatchObject({ minLat: 62.50076215, minLon: 28.00449836 });
+  });
+
+  it.each([
+    { kind: 'missing a ring', coordinates: [] },
+    { kind: 'empty', coordinates: [[]] },
+    {
+      kind: 'self-intersecting',
+      coordinates: [
+        [
+          [28, 62],
+          [29, 63],
+          [28, 63],
+          [29, 62],
+          [28, 62]
+        ]
+      ]
+    }
+  ])('preserves the Orinoro boundary when a parcel is $kind', async ({ coordinates }) => {
+    const slug = 'orinoro';
+    const { database } = testDatabase;
+    const fetchSource = createSpecialParksSource();
+    const options = { database, fetchSource, includeSlugs: [slug] };
+    await importSpecialParks(options);
+    const previous = await getParkBySlug(database, slug);
+
+    await expect(
+      importSpecialParks({
+        ...options,
+        fetchSource: async (url) => {
+          const response = await fetchSource(url);
+          return {
+            ...response,
+            features: [
+              response.features[0],
+              {
+                ...response.features[1],
+                geometry: { type: 'Polygon', coordinates }
+              }
+            ]
+          };
+        }
+      })
+    ).rejects.toThrow('Invalid parcel geometry for Orinoro.');
+    await expect(getParkBySlug(database, slug)).resolves.toEqual(previous);
   });
 
   it('publishes new special trails as standalone destinations', async () => {

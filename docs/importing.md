@@ -478,6 +478,13 @@ Typical shape:
   feature ID and geometry before adding the configuration
 - when a composite selects specific IDs, set `requiredSykeSiteIds` so an
   incomplete response cannot replace the stored boundary
+- set `boundaryUnion: 'preserve-holes'` to remove shared parcel edges while
+  retaining holes and disconnected parts
+- use `boundaryUnion: 'exterior-only'` when a reviewed visitor map covers the
+  interior gaps. Record the comparison source in the catalog entry.
+  Use `boundaryUnionAdditions` for reviewed, localized gaps along the
+  exterior and record the comparison source beside the added geometry.
+  The area figure still comes from the source parcel metadata.
 
 Use the composite variant when one park should be assembled from several official SYKE features:
 

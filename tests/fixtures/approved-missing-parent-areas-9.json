@@ -2047,5 +2047,81 @@
         }
       }
     ]
+  },
+  "https://paikkatiedot.ymparisto.fi/geoserver/inspire_ps/wfs?service=WFS&request=GetFeature&version=2.0.0&typeNames=inspire_ps%3APS.ProtectedSitesYksityistenMaillaOlevaLuonnonsuojelualue&outputFormat=application%2Fjson&srsName=EPSG%3A4326&cql_filter=lsaluetunnus%3D%27YSA128072%27": {
+    "type": "FeatureCollection",
+    "features": [
+      {
+        "type": "Feature",
+        "geometry": {
+          "type": "MultiPolygon",
+          "coordinates": [
+            [
+              [
+                [24.96634564, 66.23084069],
+                [24.96302214, 66.23140763],
+                [24.96525016, 66.23223143],
+                [24.96755867, 66.2313351],
+                [24.96634564, 66.23084069]
+              ]
+            ]
+          ]
+        },
+        "id": "PS.ProtectedSitesYksityistenMaillaOlevaLuonnonsuojelualue.4465",
+        "properties": {
+          "ely": "Lapin ELY-keskus",
+          "nimi": "KÄTKÄVAARAN LEHTO (LUONNONSUOJELUALUE)",
+          "paatpvm": "1999-03-25T00:00:00Z",
+          "shape_area": 15618.4233615466,
+          "lsaluetunnus": "YSA128072",
+          "tyyppinimi": "Yksityinen luonnonsuojelualue (LsL 47 §)"
+        }
+      }
+    ]
+  },
+  "https://paikkatiedot.ymparisto.fi/geoserver/inspire_ps/wfs?service=WFS&request=GetFeature&version=2.0.0&typeNames=inspire_ps%3APS.ProtectedSitesYksityistenMaillaOlevaLuonnonsuojelualue&outputFormat=application%2Fjson&srsName=EPSG%3A4326&cql_filter=lsaluetunnus%3D%27YSA207842%27": {
+    "type": "FeatureCollection",
+    "features": [
+      {
+        "type": "Feature",
+        "geometry": {
+          "type": "MultiPolygon",
+          "coordinates": [
+            [
+              [
+                [24.93376404, 66.235047],
+                [24.93853627, 66.2394666],
+                [24.93884518, 66.23975232],
+                [24.93933358, 66.23967984],
+                [24.94064149, 66.23945386],
+                [24.94097311, 66.23939656],
+                [24.94192584, 66.23923726],
+                [24.93783417, 66.23542575],
+                [24.93778259, 66.23537768],
+                [24.93728976, 66.23537484],
+                [24.93707599, 66.23532057],
+                [24.93671849, 66.23522099],
+                [24.93620668, 66.23509226],
+                [24.93565839, 66.23499917],
+                [24.93535798, 66.23497711],
+                [24.9347925, 66.23495754],
+                [24.9343438, 66.23496963],
+                [24.93401302, 66.23499985],
+                [24.93376404, 66.235047]
+              ]
+            ]
+          ]
+        },
+        "id": "PS.ProtectedSitesYksityistenMaillaOlevaLuonnonsuojelualue.10625",
+        "properties": {
+          "ely": "Lapin ELY-keskus",
+          "nimi": "Kätkä",
+          "paatpvm": "2012-11-06T00:00:00Z",
+          "shape_area": 80540.8076165236,
+          "lsaluetunnus": "YSA207842",
+          "tyyppinimi": "Yksityinen luonnonsuojelualue (LsL 47 §)"
+        }
+      }
+    ]
   }
 }
