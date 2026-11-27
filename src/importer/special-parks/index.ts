@@ -4,6 +4,7 @@ import {
   createSykeSpecialParkConfig
 } from './builders.js';
 import { baseSpecialParkConfigs } from './direct-configs.js';
+import { approvedMissingParentAreaConfigs } from './seeds/approved-missing-parent-areas.js';
 import { missingTrailParentAreaConfigs } from './seeds/missing-trail-parent-areas.js';
 import {
   sourceReadyFactoryVillageProtectedSiteSeeds,
@@ -22,6 +23,7 @@ import {
 export const specialParkConfigs = [
   ...baseSpecialParkConfigs,
   ...missingTrailParentAreaConfigs,
+  ...approvedMissingParentAreaConfigs,
   ...sourceReadyReserveParkSeeds.map(createSykeSpecialParkConfig),
   ...sourceReadyDestinationAreaSeeds.map(createSykeSpecialParkConfig),
   ...openDestinationAreaConfigs,

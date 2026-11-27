@@ -588,6 +588,39 @@ describe('manual catalog imports', () => {
     expect(forest?.boundaryGeoJson).not.toEqual(oldGrowth?.boundaryGeoJson);
   });
 
+  it('publishes the approved parent-area pilot with its reviewed catalog types and boundaries', async () => {
+    await importSpecialParks({
+      database: testDatabase.database,
+      includeSlugs: [
+        'sulkaharjun-luonnonsuojelualue',
+        'kellankoski',
+        'vaakonpuisto',
+        'kustavin-vuoret',
+        'jyllinkosken-sahkopuisto'
+      ],
+      fetchSource: createSpecialParksSource()
+    });
+
+    const sulkaharjun = await getParkBySlug(
+      testDatabase.database,
+      'sulkaharjun-luonnonsuojelualue'
+    );
+    const kellankoski = await getParkBySlug(testDatabase.database, 'kellankoski');
+    const vaakonpuisto = await getParkBySlug(testDatabase.database, 'vaakonpuisto');
+    const kustavin = await getParkBySlug(testDatabase.database, 'kustavin-vuoret');
+    const jyllinkoski = await getParkBySlug(testDatabase.database, 'jyllinkosken-sahkopuisto');
+
+    expect(sulkaharjun).toMatchObject({ type: { slug: 'nature-reserve-area' } });
+    expect(sulkaharjun?.boundaryGeoJson?.features).toHaveLength(3);
+    expect(kellankoski).toMatchObject({ name: 'Kellankoski', areaKm2: 0.04 });
+    expect(vaakonpuisto).toMatchObject({ type: { slug: 'outdoor-recreation-area' } });
+    expect(kustavin).toMatchObject({ type: { slug: 'nature-reserve-area' } });
+    expect(jyllinkoski).toMatchObject({
+      name: 'Jyllinkosken Sähköpuisto',
+      type: { slug: 'cultural-history-area' }
+    });
+  });
+
   it('imports all special parks with correct metadata', async () => {
     const result = await importSpecialParks({
       database: testDatabase.database,
@@ -596,10 +629,33 @@ describe('manual catalog imports', () => {
     });
 
     expect(result.results.map(({ slug }) => slug).sort()).toEqual(specialParkSlugs);
-    const parentAreas = (await testDatabase.database.select().from(parks)).filter(
+    const storedParks = await testDatabase.database.select().from(parks);
+    const parentAreas = storedParks.filter(
       ({ lipasId }) => lipasId >= 9_002_100 && lipasId <= 9_002_221
     );
     expect(parentAreas).toHaveLength(122);
+    const approvedParentAreas = (await listParks(testDatabase.database)).filter(
+      ({ lipasId }) => lipasId >= 9_002_300 && lipasId <= 9_002_413
+    );
+    expect(approvedParentAreas).toHaveLength(114);
+    expect(
+      approvedParentAreas.filter(({ type }) => type.slug === 'nature-reserve-area')
+    ).toHaveLength(108);
+    expect(
+      approvedParentAreas.filter(({ type }) => type.slug === 'outdoor-recreation-area')
+    ).toHaveLength(5);
+    expect(
+      approvedParentAreas.filter(({ type }) => type.slug === 'cultural-history-area')
+    ).toHaveLength(1);
+    expect(
+      storedParks.filter(
+        ({ lipasId, displayTypeName }) =>
+          lipasId >= 9_002_300 && lipasId <= 9_002_413 && displayTypeName !== null
+      )
+    ).toHaveLength(33);
+    expect(approvedParentAreas.find(({ slug }) => slug === 'tervajarven-rotko')).toMatchObject({
+      displayTypeName: 'Rotkolaakso'
+    });
     expect(specialParkConfigs.map(({ displayTypeName }) => displayTypeName)).not.toContain(
       'Natura 2000 -alue'
     );

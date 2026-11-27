@@ -1,0 +1,119 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "source": "Syke",
+        "source_url": "https://paikkatiedot.ymparisto.fi/geoserver/inspire_ps/wfs?service=WFS&version=2.0.0&request=GetFeature&typeNames=inspire_ps%3APS.ProtectedSitesYksityistenMaillaOlevaLuonnonsuojelualue&outputFormat=application%2Fjson&srsName=EPSG%3A4326&cql_filter=lsaluetunnus%3D%27YSA107228%27",
+        "source_feature_ids": [
+          "YSA107228",
+          "YSA107229",
+          "YSA107230",
+          "YSA107240",
+          "YSA107275",
+          "YSA107276",
+          "YSA107335"
+        ],
+        "source_retrieved_at": "2026-11-26",
+        "source_license": "https://creativecommons.org/licenses/by/4.0/",
+        "source_crs": "EPSG:3067",
+        "processing": "Unioned the listed source features in EPSG:3067, retaining polygon components and interior rings, and transformed to EPSG:4326.",
+        "area_m2": 1406423.3506395817,
+        "source_designations": [
+          {
+            "id": "YSA107228",
+            "name": "STORSANDEN 3 (SKOGSLIDEN)",
+            "designation": "Yksityinen luonnonsuojelualue (LsL 47 §)"
+          },
+          {
+            "id": "YSA107229",
+            "name": "STORSANDEN 4 (SUNEBO)",
+            "designation": "Yksityinen luonnonsuojelualue (LsL 47 §)"
+          },
+          {
+            "id": "YSA107230",
+            "name": "STORSANDEN 5 (SMÄLTAS)",
+            "designation": "Yksityinen luonnonsuojelualue (LsL 47 §)"
+          },
+          {
+            "id": "YSA107240",
+            "name": "STORSANDEN 6 (KNUTS)",
+            "designation": "Yksityinen luonnonsuojelualue (LsL 47 §)"
+          },
+          {
+            "id": "YSA107275",
+            "name": "STORSANDEN 7 (KNUTS)",
+            "designation": "Yksityinen luonnonsuojelualue (LsL 47 §)"
+          },
+          {
+            "id": "YSA107276",
+            "name": "Storsanden 8",
+            "designation": "Yksityinen luonnonsuojelualue (LsL 47 §)"
+          },
+          {
+            "id": "YSA107335",
+            "name": "STORSANDEN 9 (BJÖRK)",
+            "designation": "Yksityinen luonnonsuojelualue (LsL 47 §)"
+          }
+        ],
+        "source_dataset_url": "https://ckan.ymparisto.fi/dataset/luonnonsuojelu-ja-eramaa-alueet",
+        "source_urls": [
+          "https://paikkatiedot.ymparisto.fi/geoserver/inspire_ps/wfs?service=WFS&version=2.0.0&request=GetFeature&typeNames=inspire_ps%3APS.ProtectedSitesYksityistenMaillaOlevaLuonnonsuojelualue&outputFormat=application%2Fjson&srsName=EPSG%3A4326&cql_filter=lsaluetunnus%3D%27YSA107228%27",
+          "https://paikkatiedot.ymparisto.fi/geoserver/inspire_ps/wfs?service=WFS&version=2.0.0&request=GetFeature&typeNames=inspire_ps%3APS.ProtectedSitesYksityistenMaillaOlevaLuonnonsuojelualue&outputFormat=application%2Fjson&srsName=EPSG%3A4326&cql_filter=lsaluetunnus%3D%27YSA107229%27",
+          "https://paikkatiedot.ymparisto.fi/geoserver/inspire_ps/wfs?service=WFS&version=2.0.0&request=GetFeature&typeNames=inspire_ps%3APS.ProtectedSitesYksityistenMaillaOlevaLuonnonsuojelualue&outputFormat=application%2Fjson&srsName=EPSG%3A4326&cql_filter=lsaluetunnus%3D%27YSA107230%27",
+          "https://paikkatiedot.ymparisto.fi/geoserver/inspire_ps/wfs?service=WFS&version=2.0.0&request=GetFeature&typeNames=inspire_ps%3APS.ProtectedSitesYksityistenMaillaOlevaLuonnonsuojelualue&outputFormat=application%2Fjson&srsName=EPSG%3A4326&cql_filter=lsaluetunnus%3D%27YSA107240%27",
+          "https://paikkatiedot.ymparisto.fi/geoserver/inspire_ps/wfs?service=WFS&version=2.0.0&request=GetFeature&typeNames=inspire_ps%3APS.ProtectedSitesYksityistenMaillaOlevaLuonnonsuojelualue&outputFormat=application%2Fjson&srsName=EPSG%3A4326&cql_filter=lsaluetunnus%3D%27YSA107275%27",
+          "https://paikkatiedot.ymparisto.fi/geoserver/inspire_ps/wfs?service=WFS&version=2.0.0&request=GetFeature&typeNames=inspire_ps%3APS.ProtectedSitesYksityistenMaillaOlevaLuonnonsuojelualue&outputFormat=application%2Fjson&srsName=EPSG%3A4326&cql_filter=lsaluetunnus%3D%27YSA107276%27",
+          "https://paikkatiedot.ymparisto.fi/geoserver/inspire_ps/wfs?service=WFS&version=2.0.0&request=GetFeature&typeNames=inspire_ps%3APS.ProtectedSitesYksityistenMaillaOlevaLuonnonsuojelualue&outputFormat=application%2Fjson&srsName=EPSG%3A4326&cql_filter=lsaluetunnus%3D%27YSA107335%27"
+        ],
+        "visitor_information_url": "https://www.luontoon.fi/fi/reitit/storsandin-luontopolku-uusikaarlepyy-603380"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [22.287000202239337, 63.47458208792788],
+            [22.285667679273512, 63.47488719769481],
+            [22.284440688325564, 63.47498819304077],
+            [22.282822100093444, 63.47499150815464],
+            [22.280733550965294, 63.474909496322574],
+            [22.278873129486513, 63.47506851496075],
+            [22.276344298235948, 63.47521729246213],
+            [22.27507277816136, 63.4752319943861],
+            [22.27300398131533, 63.47517579324815],
+            [22.272975870421124, 63.47516774963982],
+            [22.270310015113285, 63.47515360865797],
+            [22.269398609728764, 63.47526910507539],
+            [22.268598667698992, 63.47541946635563],
+            [22.267485655464704, 63.47561326863683],
+            [22.274168564635673, 63.47758620330527],
+            [22.27150996206148, 63.479345170243086],
+            [22.27090597393833, 63.479747327730664],
+            [22.274190573939514, 63.48078646764856],
+            [22.273057721235283, 63.481531370287215],
+            [22.278777981256425, 63.48334488472911],
+            [22.283625360772277, 63.483356257144294],
+            [22.291214730994657, 63.48337686777557],
+            [22.29126929783574, 63.48338374677456],
+            [22.291327767152243, 63.48339111405457],
+            [22.293671485245333, 63.483692063082486],
+            [22.30047271249707, 63.48456361292211],
+            [22.300692578810267, 63.48467577184497],
+            [22.302917899386422, 63.48581099506826],
+            [22.303322632651014, 63.48558976245506],
+            [22.304692961201827, 63.48564089529414],
+            [22.307174857612207, 63.483133384103645],
+            [22.30548737926176, 63.48273607014852],
+            [22.30857930178085, 63.48148851262112],
+            [22.30584091559771, 63.48082148761212],
+            [22.306938383484493, 63.47986095727801],
+            [22.297620685970788, 63.477632181686296],
+            [22.29110617380925, 63.476073388174],
+            [22.287000202239337, 63.47458208792788]
+          ]
+        ]
+      }
+    }
+  ]
+}
