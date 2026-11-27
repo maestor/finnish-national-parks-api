@@ -1,6 +1,7 @@
 # Importing Guide
 
-This repo has three separate import paths:
+Use this guide to choose an import source, validate catalog changes, and run
+local or production imports.
 
 - `npm run import:parks` for the main LIPAS-backed catalog import
 - `npm run import:special-parks` for curated non-LIPAS additions that still belong in the shared park catalog
@@ -12,8 +13,6 @@ When `npm run import:parks` finds brand-new parks, it imports them as removed so
 Use `npm run import:parks -- --dry-run` for the same preview without persisting
 imported parks or import runs. The manual CLI applies pending schema migrations
 before either mode; the scheduled command below never applies migrations.
-
-Use this guide when you need to reproduce or extend the curated special import workflow.
 
 See the [catalog data source](../README.md#data-source) for supported LIPAS types.
 Attribute LIPAS data to Jyväskylän yliopisto, Lipas Liikuntapaikat.fi, with the
@@ -48,7 +47,7 @@ of source. Special-import trails start independent by default. Set
 parent as part of its first import. Import the parent in the same batch or
 before the trail. Reimports preserve later admin link decisions.
 
-The LIPAS `route-length-km` property is stored as nullable `lengthKm` independently of the geometry measurements used for matching. Re-imports refresh the source value while preserving administrator edits, as with area. Existing rows receive their source length on the next LIPAS import after migration `0048_trail_length.sql`; missing values remain null.
+The LIPAS `route-length-km` property is stored as nullable `lengthKm` independently of the geometry measurements used for matching. Reimports refresh the source value while preserving administrator edits, as with area.
 
 ### Link-only trails
 
@@ -82,32 +81,29 @@ imported special area is visible in the catalog as soon as the import commits.
 
 Admin-session endpoints `GET /api/admin/parks/{slug}/trails` and `/trail-candidates` expose private link and candidate data; `PUT`/`DELETE /api/admin/parks/{slug}/trails/{trailId}` record durable inclusion/exclusion overrides. The candidate read accepts `q`, `limit` (1–100) and `offset`. An API key alone is insufficient. Callers making a manual change must immediately expire both the area slug and returned trail slug through the same UI endpoint. Public area detail requests with `includeBoundary=true` include effective linked trails, their names, available addresses and lengths, and stored geometry. Park detail caches revalidate after one hour to pick up scheduled imports; immediately expire affected area details after an import when prompt updates are required. No relation editor is included.
 
-### Seitsemän veljeksen vaellusreitti
+### LIPAS trail consolidation
 
-The LIPAS import consolidates records `524135`, `528635`, `528636`, `601262`,
-`602277` and `602303` into the existing trail for `524135`. The combined map
-includes both Vantaa branches and the connecting trails. The displayed source
-length is the unique mapped line length. Existing administrator edits on the
-canonical record survive refresh.
+When the importer consolidates configured LIPAS components, it stores the
+combined geometry on the canonical trail. The displayed source length is the
+unique mapped line length. Administrator edits on the canonical record survive
+refresh. Consult the [importer configuration](../src/importer/seitsemans-veljesta-trail.ts)
+for the current source IDs.
 
-Preview and apply the first merge through the manual LIPAS workflow above
-when it affects public trails. The scheduled import then requires manual
-application so the affected UI caches can be expired immediately. Once merged,
-absorbed IDs stay inactive and are omitted from admin visibility and area trail
-lists. Later imports rebuild the combined route when all six components are
-usable. If a component is missing or invalid, the importer logs a warning and
-retains the last complete combined route.
+If a first consolidation affects public trails, preview and apply it through the
+manual LIPAS workflow above, then expire the affected UI caches. After
+consolidation, absorbed records stay inactive and are omitted from admin
+visibility and area trail lists. Later imports refresh the combined geometry
+when all components are usable. If a component is missing or invalid, the
+importer reports it and retains the last complete route.
 
 The standard 10% calculation uses the full combined geometry for each area.
-Automatic matches from individual components are recalculated. Explicit
-inclusions and visit assignments carry over to the canonical trail. Direct
-visits on an absorbed record or a conflicting canonical exclusion stop the
-first merge for operator review. To resolve a reported exclusion and preserve
-the existing area membership, open **Reitit → Alueen reitit** for the reported
-area. Search by trail name, choose **Lisää**, and confirm the canonical slug
-shown by the import error. Keep existing visit assignments and rerun the dry
-run. A new trail with no effective area link follows the usual admin visibility
-workflow.
+The import recalculates automatic matches and carries explicit inclusions and
+visit assignments to the canonical trail. Direct visits on an absorbed record
+or a conflicting canonical exclusion stop the first consolidation for review.
+To resolve a reported exclusion and preserve membership, open
+**Reitit → Alueen reitit** for the reported area. Search for the trail, choose
+**Lisää**, and confirm the canonical slug shown by the import error. Keep
+existing visit assignments and rerun the dry run.
 
 ### Import a parent area for a trail with visits
 
@@ -231,8 +227,10 @@ The preview's hashes and the apply output identify the reviewed catalog version.
 
 1. Download the OSM relation or selected ways and check the route on a map
    against its intended start, finish, and branches. Use a Luontoon URL only as an
-   optional visitor reference. Record the OSM identity, snapshot timestamp, and
-   any choice to omit or include particular member ways.
+   optional visitor reference. Check the current official alignment and access
+   guidance. Record the OSM identity, snapshot timestamp, and any decision that
+   affects the selected geometry in the catalog entry. Link to official guidance
+   when it affects the selection.
 2. Add or edit the entry in `selections` and its ordered LineString geometry in
    `features`. Use the same stable `selectionKey` on the entry and every feature.
    Set the existing park's `parentSlug`. Record the nominal walking distance
@@ -280,26 +278,6 @@ rows. A correction to an accepted snapshot needs that separate reviewed write.
 
 Regular LIPAS and OSM imports preserve pinned memberships and accepted geometry.
 Catalog additions use the existing database schema.
-
-### Korouoma
-
-Run `npm run import:special-parks -- korouoma` to update the existing Korouoma
-record. The snapshot keeps the 50.91 km² Korouoma component of FI1301104 and
-its two interior rings. It excludes the separate Jäniskaira component.
-[Syke Natura 2000 dataset](https://ckan.ymparisto.fi/dataset/natura2000-alueet)
-
-Use the [selected trail workflow](#selected-linked-trails) with
-`--selection osm-relation-8096856 --selection piippukallion-pihaus --selection koivukongas-pirunkirkko`.
-The long trail follows the open Lapiosalmi–Pajupuro itinerary and turns around
-at the hut. Keep the closed continuation toward Koronjää and Saukkovaara out of
-the geometry while the closure is in effect. The catalog uses the published
-17.59 km figure. The mapped main line measures 16.08 km one way.
-[Luontoon route description and closure](https://www.luontoon.fi/fi/reitit/korouoma-retkeilyreitti-posio-17505)
-
-The Piippukallio loop and Koivuköngäs out-and-back each store their shared path
-once. Koivuköngäs ends at the Pirunkirkko lean-to. Metsähallitus asks visitors
-to avoid the Pirunkirkko area from 1 May to 31 July.
-[Korouoma visitor rules](https://www.luontoon.fi/fi/kohteet/korouoma/ohjeet-ja-saannot)
 
 ### Merged OSM trail refresh
 
@@ -358,9 +336,8 @@ Each run backs up production to a GitHub Actions artifact retained for 14 days,
 then runs `npm run import:parks:scheduled` using the `production` environment's
 existing `DATABASE_URL` and `DATABASE_AUTH_TOKEN` secrets. It shares the
 `production-database` concurrency group with production migrations and never
-applies migrations itself. Wait for Production Migration to finish before
-starting a manual workflow dispatch. It must apply `0053_area_link_only_trails.sql`
-before the first link-only trail import.
+applies migrations itself. Wait for Production Migration to apply pending
+migrations before starting a manual workflow dispatch.
 
 The workflow opens one Finnish issue, mentioning only `@maestor`, when it adds
 new standalone destinations, new automatic links for link-only trails, or
@@ -407,8 +384,8 @@ enable email for participating conversations in
 Environment protection rules must allow unattended scheduled runs if fully
 automatic operation is desired. GitHub schedules can be delayed, and public
 repositories' schedules are disabled after 60 days without repository activity.
-After merging, verify the first scheduled run in Actions and the notification
-settings; local tests do not send real issues or emails.
+When enabling scheduled imports, verify the first run in Actions and check
+notification delivery. Local tests use simulated notifications.
 
 ## Entry Points
 
