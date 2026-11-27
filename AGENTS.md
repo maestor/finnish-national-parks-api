@@ -38,6 +38,13 @@ Use the repository docs as a searchable reference index rather than a startup re
 - `docs/recovery.md`: safe backup/restore drills and operator evidence when recovery work is involved.
 - The UI sibling owns browser behavior, translations, proxy routes, and generated consumers. Read its `AGENTS.md` and only the relevant UI documentation when the task crosses that boundary; do not automatically preload both repositories.
 
+Keep `docs/importing.md` focused on reusable import workflows, source selection,
+validation, and operations. Record catalog-specific source IDs, geometry
+decisions, and attribution in the relevant catalog entry or snapshot metadata.
+Keep one-off import outcomes, news, and dated project notes in the associated PR
+or Plans vault entry. Use official sources for current access guidance. Before
+review, check that guide changes apply beyond the current catalog entry or import run.
+
 ## Repository invariants
 
 - The API’s Zod/OpenAPI definitions are the contract source of truth. Define or update the contract before handlers; keep runtime responses, OpenAPI, tests, fixtures, and generated UI consumers aligned. Never hand-edit generated consumers.
