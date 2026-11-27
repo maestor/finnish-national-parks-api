@@ -222,6 +222,15 @@ export const sourceReadyHistoryRkyAreaSeeds: MuseovirastoRkyAreaSeed[] = [
   },
   {
     displayTypeName: null,
+    parkUrl: 'https://www.rky.fi/read/asp/r_kohde_det.aspx?KOHDE_ID=1792',
+    name: 'Nauvon kirkonkylä',
+    parkTypeSlug: 'cultural-history-area',
+    slug: 'nauvon-kirkonkyla',
+    sourceName: 'Nauvon kirkko ja kirkonseutu',
+    syntheticLipasId: 9_001_097
+  },
+  {
+    displayTypeName: null,
     parkUrl: 'https://www.hamina.fi/asuminen-ymparisto/linnoitus-ja-ympyrakeskusta/',
     name: 'Haminan linnoitus',
     parkTypeSlug: 'cultural-history-area',
