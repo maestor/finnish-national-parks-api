@@ -2,7 +2,7 @@ import { eq } from 'drizzle-orm';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { createApp } from '../../src/app.js';
-import { parkDetailSchema } from '../../src/contracts/parks.js';
+import { adminParkVisibilityResponseSchema, parkDetailSchema } from '../../src/contracts/parks.js';
 import {
   trailAreaCandidateSchema,
   trailAreaLinkSchema,
@@ -94,6 +94,82 @@ describe('admin trail relationships', () => {
     expect((await app.request(path, { method: 'DELETE', headers })).status).toBe(200);
     expect(await (await app.request('/api/search')).json()).toMatchObject({
       parks: [{ slug, trailNames: [] }]
+    });
+  });
+  it('lists each linked trail with its current areas in admin visibility', async () => {
+    const app = createApp({ auth, database: db.database });
+    const [area] = await db.database
+      .update(parks)
+      .set({ removed: false })
+      .where(eq(parks.slug, 'akasmannyn-kansallispuisto'))
+      .returning();
+    const [trail] = await db.database
+      .update(parks)
+      .set({ removed: false })
+      .where(eq(parks.lipasId, 440401))
+      .returning();
+    const [secondArea] = await db.database
+      .insert(parks)
+      .values({
+        ...area!,
+        id: undefined,
+        lipasId: 987654321,
+        name: 'Toinen alue',
+        slug: 'toinen-alue'
+      })
+      .returning();
+    const headers = { cookie };
+    const visibilityPath = '/api/admin/parks/visibility';
+    const linkPath = (areaSlug: string) => `/api/admin/parks/${areaSlug}/trails/${trail!.id}`;
+    expect((await app.request(linkPath(area!.slug), { method: 'PUT', headers })).status).toBe(200);
+    await db.database.insert(trailAreaLinks).values({
+      trailId: trail!.id,
+      areaId: secondArea!.id,
+      automaticMatch: true,
+      createdAt: '2026-01-01',
+      updatedAt: '2026-01-01'
+    });
+
+    const linkedTrail = {
+      slug: trail!.slug,
+      linkedAreas: [
+        { name: secondArea!.name, slug: secondArea!.slug },
+        { name: area!.name, slug: area!.slug }
+      ]
+    };
+    const response = await app.request(visibilityPath, { headers });
+    expect(response.status).toBe(200);
+    expect(adminParkVisibilityResponseSchema.parse(await response.json())).toMatchObject({
+      linkedTrails: [linkedTrail],
+      removedParks: []
+    });
+
+    await db.database.update(parks).set({ areaLinkOnly: true }).where(eq(parks.id, trail!.id));
+    expect(await (await app.request(visibilityPath, { headers })).json()).toMatchObject({
+      linkedTrails: [linkedTrail],
+      removedParks: []
+    });
+
+    await db.database.update(parks).set({ areaLinkOnly: false }).where(eq(parks.id, trail!.id));
+    for (const areaSlug of [area!.slug, secondArea!.slug]) {
+      expect((await app.request(linkPath(areaSlug), { method: 'DELETE', headers })).status).toBe(
+        200
+      );
+    }
+    expect(await (await app.request(visibilityPath, { headers })).json()).toMatchObject({
+      linkedTrails: [],
+      removedParks: [{ slug: trail!.slug }]
+    });
+    const restored = await app.request(`/api/parks/${trail!.slug}/removed`, {
+      method: 'PATCH',
+      headers: { ...headers, 'content-type': 'application/json' },
+      body: JSON.stringify({ removed: false })
+    });
+    expect(restored.status).toBe(204);
+    expect(await (await app.request(visibilityPath, { headers })).json()).toMatchObject({
+      linkedTrails: [],
+      removedParks: [],
+      visibleParks: expect.arrayContaining([expect.objectContaining({ slug: trail!.slug })])
     });
   });
   it('includes linked visit trails in public trips and admin previews', async () => {

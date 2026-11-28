@@ -239,7 +239,7 @@ export const listAdminParkVisibilityRoute = createRoute({
   security: [{ bearerAuth: [], sessionAuth: [] }],
   responses: {
     200: {
-      description: 'Lightweight visible and removed parks for admin visibility management',
+      description: 'Lightweight parks and effective trail links for admin visibility management',
       content: {
         'application/json': {
           schema: adminParkVisibilityResponseSchema

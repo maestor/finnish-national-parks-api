@@ -1,6 +1,7 @@
 import { z } from '@hono/zod-openapi';
 
 import { supportedParkCategorySlugs, supportedParkTypeSlugs } from '../parks/park-types.js';
+import { trailLinkedAreaSchema } from './trail-areas.js';
 
 export const parkTypeSchema = z.object({
   code: z.number().int(),
@@ -644,6 +645,9 @@ export const combinedSearchResponseSchema = z.object({
 });
 
 export const adminParkVisibilityResponseSchema = z.object({
+  linkedTrails: z
+    .array(adminParkVisibilityItemSchema.extend({ linkedAreas: z.array(trailLinkedAreaSchema) }))
+    .optional(),
   removedParks: z.array(adminParkVisibilityItemSchema),
   visibleParks: z.array(adminParkVisibilityItemSchema)
 });
