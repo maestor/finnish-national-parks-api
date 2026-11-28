@@ -1775,29 +1775,32 @@ const listTripPlannerParkRows = async (database: Database) => {
     .orderBy(parks.name);
 };
 
+const lightweightParkColumns = {
+  bboxMaxLat: parks.bboxMaxLat,
+  bboxMaxLon: parks.bboxMaxLon,
+  bboxMinLat: parks.bboxMinLat,
+  bboxMinLon: parks.bboxMinLon,
+  displayTypeName: parks.displayTypeName,
+  locationLabel: parks.locationLabel,
+  markerLat: parks.markerLat,
+  markerLon: parks.markerLon,
+  name: parks.name,
+  postalCode: parks.postalCode,
+  postalOffice: parks.postalOffice,
+  removed: parks.removed,
+  slug: parks.slug,
+  typeCode: parkTypes.code,
+  typeId: parkTypes.id,
+  typeName: parkTypes.name,
+  typeSlug: parkTypes.slug
+};
+
 const listLightweightParkRows = async (
   database: Database,
-  where: ReturnType<typeof visibleCatalogWhere> | ReturnType<typeof removedCatalogWhere>
+  where: ReturnType<typeof visibleCatalogWhere>
 ) => {
   return database
-    .select({
-      bboxMaxLat: parks.bboxMaxLat,
-      bboxMaxLon: parks.bboxMaxLon,
-      bboxMinLat: parks.bboxMinLat,
-      bboxMinLon: parks.bboxMinLon,
-      displayTypeName: parks.displayTypeName,
-      locationLabel: parks.locationLabel,
-      markerLat: parks.markerLat,
-      markerLon: parks.markerLon,
-      name: parks.name,
-      postalCode: parks.postalCode,
-      postalOffice: parks.postalOffice,
-      slug: parks.slug,
-      typeCode: parkTypes.code,
-      typeId: parkTypes.id,
-      typeName: parkTypes.name,
-      typeSlug: parkTypes.slug
-    })
+    .select(lightweightParkColumns)
     .from(parks)
     .innerJoin(parkTypes, eq(parks.typeId, parkTypes.id))
     .where(where)
@@ -3431,13 +3434,57 @@ export const listCombinedSearchEntries = async (database: Database) => {
 };
 
 export const listAdminParkVisibility = async (database: Database) => {
-  const [visibleRows, removedRows] = await Promise.all([
+  const area = alias(parks, 'area');
+  const [visibleRows, removedRows, linkedRows] = await Promise.all([
     listLightweightParkRows(database, visibleCatalogWhere()),
-    listLightweightParkRows(database, removedCatalogWhere())
+    listLightweightParkRows(
+      database,
+      or(
+        removedCatalogWhere(),
+        and(
+          eq(parks.catalogStatus, 'active'),
+          eq(parks.trailPublicationRole, 'area_member'),
+          eq(parks.areaLinkOnly, false),
+          unabsorbedTrailWhere()
+        )
+      )
+    ),
+    database
+      .select({ ...lightweightParkColumns, linkedArea: { name: area.name, slug: area.slug } })
+      .from(trailAreaLinks)
+      .innerJoin(parks, eq(parks.id, trailAreaLinks.trailId))
+      .innerJoin(parkTypes, eq(parkTypes.id, parks.typeId))
+      .innerJoin(area, eq(area.id, trailAreaLinks.areaId))
+      .where(
+        and(
+          eq(parks.catalogStatus, 'active'),
+          inArray(parks.typeId, trailTypeCodes),
+          unabsorbedTrailWhere(),
+          eq(area.catalogStatus, 'active'),
+          effectiveTrailAreaLinkWhere()
+        )
+      )
+      .orderBy(asc(area.name), asc(area.slug))
   ]);
 
+  const linkedTrails = new Map<
+    string,
+    ReturnType<typeof toAdminVisibilityPark> & { linkedAreas: { name: string; slug: string }[] }
+  >();
+  for (const row of linkedRows) {
+    const trail = linkedTrails.get(row.slug);
+    if (trail) {
+      trail.linkedAreas.push(row.linkedArea);
+    } else {
+      linkedTrails.set(row.slug, { ...toAdminVisibilityPark(row), linkedAreas: [row.linkedArea] });
+    }
+  }
+
   return {
-    removedParks: removedRows.map((row) => toAdminVisibilityPark(row)),
+    linkedTrails: [...linkedTrails.values()],
+    removedParks: removedRows
+      .filter((row) => row.removed || !linkedTrails.has(row.slug))
+      .map(toAdminVisibilityPark),
     visibleParks: visibleRows.map((row) => toAdminVisibilityPark(row))
   };
 };
